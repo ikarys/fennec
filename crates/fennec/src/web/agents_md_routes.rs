@@ -1,6 +1,7 @@
 //! The human's click to write the agent's AGENTS.md draft: it writes the
 //! human's tree only, never commits.
 
+use crate::web::http::HttpError;
 use std::fs;
 use std::net::TcpStream;
 use std::path::Path;
@@ -16,7 +17,7 @@ use crate::domain::event::Event;
 use crate::notifier::NotifyingLog;
 
 /// `POST /api/sessions/{id}/agents-md` → `{replaced}`.
-pub fn write(app: &App, stream: &mut TcpStream, session_id: &str) -> Result<(), String> {
+pub fn write(app: &App, stream: &mut TcpStream, session_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(session_id)? else {
         return error(stream, 404, "no such session");

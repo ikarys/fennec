@@ -1,6 +1,7 @@
 //! Incoming contributions: a branch someone else wrote, adopted into a session
 //! worktree so it goes through the same integration gate.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -10,7 +11,7 @@ use super::App;
 use super::http::{Request, error, send_json};
 
 /// `GET /api/projects/{id}/contributions`.
-pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");
@@ -27,7 +28,7 @@ pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
 }
 
 /// `POST /api/projects/{id}/contributions` with `{"branch": string}`.
-pub fn adopt(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn adopt(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");

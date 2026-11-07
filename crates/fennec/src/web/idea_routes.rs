@@ -1,6 +1,7 @@
 //! The project page's ideas backlog (contract: `docs/api.md`): every write is
 //! the human's click. `routes.rs` only dispatches here.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::sync::Arc;
 
@@ -67,7 +68,7 @@ fn parse_attachments(body: &Value) -> Result<Vec<IdeaAttachment>, String> {
 }
 
 /// `GET /api/projects/{id}/ideas`.
-pub fn list_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+pub fn list_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     if app.store()?.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
     }
@@ -81,7 +82,7 @@ pub fn add_idea(
     req: &Request,
     stream: &mut TcpStream,
     project_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
@@ -139,7 +140,7 @@ pub fn update_idea(
     project_id: &str,
     idea_id: &str,
     action: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
@@ -201,7 +202,7 @@ pub fn start_one(
     stream: &mut TcpStream,
     project_id: &str,
     idea_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(project_id)? else {
         return error(stream, 404, "no such project");
@@ -232,7 +233,7 @@ pub fn start_queue(
     req: &Request,
     stream: &mut TcpStream,
     project_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     if app.store()?.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
     }
@@ -244,7 +245,7 @@ pub fn start_queue(
 /// `POST /api/projects/{id}/ideas/queue/stop`.
 ///
 /// Stops the queue from starting the next idea; a running turn finishes.
-pub fn stop_queue(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+pub fn stop_queue(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     if app.store()?.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
     }
@@ -258,7 +259,7 @@ pub fn reorder(
     req: &Request,
     stream: &mut TcpStream,
     project_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
@@ -289,7 +290,7 @@ pub fn reorder(
 }
 
 /// `POST /api/projects/{id}/ideas/report/read`.
-pub fn report_read(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+pub fn report_read(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(project_id)?.is_none() {
         return error(stream, 404, "no such project");
@@ -298,7 +299,7 @@ pub fn report_read(app: &App, stream: &mut TcpStream, project_id: &str) -> Resul
     send_board(app, stream, project_id)
 }
 
-fn send_board(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), String> {
+fn send_board(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(project_id)? else {
         return error(stream, 404, "no such project");

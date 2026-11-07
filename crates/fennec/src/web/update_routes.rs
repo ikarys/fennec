@@ -1,5 +1,6 @@
 //! Routes that report update availability and apply a self-update.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
@@ -22,7 +23,7 @@ struct UpdateView {
     release_url: String,
 }
 
-fn send_check(stream: &mut TcpStream, check: &crate::update::Check) -> Result<(), String> {
+fn send_check(stream: &mut TcpStream, check: &crate::update::Check) -> Result<(), HttpError> {
     let release_url = crate::update::release_url(&check.latest);
     let view = UpdateView {
         current: check.current.to_string(),
@@ -33,7 +34,7 @@ fn send_check(stream: &mut TcpStream, check: &crate::update::Check) -> Result<()
     send_json(stream, 200, &json!(view))
 }
 
-pub fn check(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn check(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     // `refresh=1` is the Settings button's manual bypass.
     let refresh = req.query_param("refresh").as_deref() == Some("1");
     let cached = {
@@ -56,7 +57,7 @@ pub fn check(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
     }
 }
 
-pub fn apply(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn apply(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     // A development build lives in target/: git updates it, the installer would overwrite it.
     if cfg!(debug_assertions) {
         return error(

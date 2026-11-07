@@ -41,6 +41,7 @@ use crate::domain::workflow::run::{self as run, RunOutcome, Waiting};
 use crate::notifier::NotifyingLog;
 use crate::skills;
 use crate::store::SqliteStore;
+use crate::web::http::HttpError;
 use crate::{git, workflows};
 use backlog::idea_for_session;
 use serde_json::{Value, json};
@@ -70,7 +71,7 @@ pub(super) fn create_session(
     app: &App,
     req: &Request,
     stream: &mut TcpStream,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let prompt = body["prompt"].as_str().unwrap_or("").trim().to_string();
     let attachments = match parse_attachments(&body) {
@@ -181,7 +182,7 @@ pub(super) fn create_session(
     send_json(stream, 200, &json!({ "id": id }))
 }
 
-pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((s, p)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
@@ -261,7 +262,7 @@ pub(super) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
 /// The session's skills folded from its log: loaded so far, those frozen
 /// into its prompt as always-on, those still in the model's view, and the
 /// always-on ones chosen after its prompt froze. `GET /api/sessions/{id}/skills`.
-pub(super) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((_, p)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
@@ -284,7 +285,7 @@ pub(super) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Resul
 
 /// The session's pending blocks (approval, waiver, queue), folded by the domain.
 /// `GET /api/sessions/{id}/thread`.
-pub(super) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if app.session_and_project(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -302,7 +303,7 @@ pub(super) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Resul
 /// `GET /api/sessions/{id}/usage`.
 /// The header's gauge; events from before `compactAt` was recorded fall back
 /// to the current settings.
-pub(super) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -321,7 +322,7 @@ pub(super) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Resu
     send_json(stream, 200, &json!(view))
 }
 
-pub(super) fn serve_vision(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn serve_vision(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -329,7 +330,7 @@ pub(super) fn serve_vision(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     send_json(stream, 200, &json!(seen_images(&store.events(id)?)))
 }
 
-pub(super) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -362,7 +363,11 @@ pub(super) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
     )
 }
 
-pub(super) fn serve_usage_calls(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn serve_usage_calls(
+    app: &App,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -385,7 +390,7 @@ pub(super) fn serve_usage_workflow(
     app: &App,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -416,7 +421,7 @@ pub(super) fn set_session_mode(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let mode = body["mode"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
@@ -441,7 +446,7 @@ pub(super) fn send_message(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let content = body["content"].as_str().unwrap_or("").trim().to_string();
     let attachments = match parse_attachments(&body) {
@@ -524,7 +529,7 @@ pub(super) fn cancel_queued(
     stream: &mut TcpStream,
     id: &str,
     queue_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
@@ -554,7 +559,7 @@ pub(super) fn replay_message(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let message_id = body["messageId"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
@@ -581,7 +586,7 @@ pub(super) fn replay_message(
 
 /// `POST /api/sessions/{id}/retry`: re-run a turn that ended in an error,
 /// with a system-generated continuation prompt.
-pub(super) fn retry_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn retry_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, p)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
@@ -619,7 +624,11 @@ pub(super) fn retry_session(app: &App, stream: &mut TcpStream, id: &str) -> Resu
     }
 }
 
-pub(super) fn compact_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn compact_session(
+    app: &App,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, p)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
@@ -645,7 +654,7 @@ pub(super) fn serve_events_page(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let Some(limit) = req.query_param("limit").and_then(|v| v.parse::<u64>().ok()) else {
         return error(stream, 400, "limit is not a number");
     };
@@ -676,7 +685,7 @@ pub(super) fn serve_run_events(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let before = req
         .query_param("before")
         .and_then(|v| v.parse::<u64>().ok())

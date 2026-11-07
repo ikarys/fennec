@@ -6,12 +6,13 @@ use super::App;
 use super::http::{Request, error, send_json};
 use crate::domain::plugin::PluginActivation;
 use crate::plugins::config;
+use crate::web::http::HttpError;
 use serde_json::{Value, json};
 use std::net::TcpStream;
 
 /// `GET /api/plugins`: the global definitions, their activation state, why
 /// some were left out, and the global blocks the active plugins have emitted.
-pub(super) fn list(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn list(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let (defs, problems) = config::read_defs_checked(&app.agents_home);
     let activations = store.plugin_activations().map_err(|e| e.to_string())?;
@@ -41,7 +42,7 @@ pub(super) fn list(app: &App, stream: &mut TcpStream) -> Result<(), String> {
 
 /// `GET /api/sessions/{id}/plugins`: the session-scope blocks the session's
 /// plugins have emitted, for the right-hand panel.
-pub(super) fn session_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn session_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.session(id).map_err(|e| e.to_string())?.is_none() {
         return error(stream, 404, "no such session");
@@ -52,7 +53,11 @@ pub(super) fn session_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Res
 
 /// `GET /api/plugins/status-bar`: every status-bar block — the global ones,
 /// then the project's, then the session's. Both params are optional.
-pub(super) fn status_bar(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn status_bar(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+) -> Result<(), HttpError> {
     let blocks = app.plugins.blocks_status_bar(
         req.query_param("sessionId").as_deref(),
         req.query_param("projectId").as_deref(),
@@ -62,7 +67,7 @@ pub(super) fn status_bar(app: &App, req: &Request, stream: &mut TcpStream) -> Re
 
 /// `GET /api/projects/{id}/plugins`: the project-scope blocks the project's
 /// plugins have emitted, for the project page's dashboard.
-pub(super) fn project_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn project_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     if store.project(id).map_err(|e| e.to_string())?.is_none() {
         return error(stream, 404, "no such project");
@@ -73,7 +78,7 @@ pub(super) fn project_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Res
 
 /// `POST /api/plugins`: set a plugin's activation (enabled, network),
 /// hashing its definition and code so a later change deactivates it.
-pub(super) fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let name = body["name"].as_str().unwrap_or("").to_string();
     let network = body["network"].as_bool().unwrap_or(false);

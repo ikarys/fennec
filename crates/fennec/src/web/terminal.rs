@@ -4,13 +4,14 @@
 
 use super::App;
 use super::http::{error, send_json};
+use crate::web::http::HttpError;
 use serde_json::json;
 use std::net::TcpStream;
 use std::path::Path;
 use std::process::Command;
 
 /// `POST /api/sessions/{id}/terminal`.
-pub(super) fn open(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn open(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");

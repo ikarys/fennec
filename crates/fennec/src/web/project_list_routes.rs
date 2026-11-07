@@ -11,12 +11,13 @@ use crate::chat;
 use crate::domain::agent::resolve_mode as agent_resolve_mode;
 use crate::domain::project::Project;
 use crate::domain::slash::commands;
+use crate::web::http::HttpError;
 use crate::{folders, git, skills};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
 
-pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let favorites = store.favorite_projects()?;
     let recent = store.recent_project_ids()?;
@@ -63,7 +64,7 @@ pub(super) fn set_favorite(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     let body = req.json()?;
     let favorite = match body["favorite"].as_bool() {
@@ -76,7 +77,11 @@ pub(super) fn set_favorite(
     send_json(stream, 200, &json!({ "ok": true }))
 }
 
-pub(super) fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn open_project(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let dir = Path::new(body["workdir"].as_str().unwrap_or(""));
     let Some(dir) = dir.canonicalize().ok().filter(|d| d.is_dir()) else {
@@ -93,7 +98,7 @@ pub(super) fn open_project(app: &App, req: &Request, stream: &mut TcpStream) -> 
     send_json(stream, 200, &project_json(&p, store_dir(app)))
 }
 
-pub(super) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");
@@ -106,7 +111,7 @@ pub(super) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Resu
     send_json(stream, 200, &Value::Array(out))
 }
 
-pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub(super) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some(project) = store.project(id)? else {
         return error(stream, 404, "no such project");

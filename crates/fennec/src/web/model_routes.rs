@@ -7,6 +7,7 @@ use crate::domain::event::Event;
 use crate::domain::model_choice::chosen_model;
 use crate::domain::preferences::{LOCAL_PROVIDER, ModelRef, Preferences};
 use crate::store::SqliteStore;
+use crate::web::http::HttpError;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -61,7 +62,7 @@ fn choice_value(prefs: &Preferences, model: &ModelRef) -> Value {
 
 /// `GET /api/models/choices`: the composer's default and favorites, from
 /// stored preferences only.
-pub(super) fn choices(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub(super) fn choices(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     let prefs = store.preferences()?;
     let default = prefs.default_model(&app.settings.llm.defaults);
@@ -83,7 +84,7 @@ pub(super) fn set_model(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let provider = body["provider"].as_str().unwrap_or("").to_string();
     let model_id = body["model"].as_str().unwrap_or("").to_string();

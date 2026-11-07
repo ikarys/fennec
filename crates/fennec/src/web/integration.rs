@@ -29,6 +29,7 @@ use crate::risk;
 use crate::security_scan;
 use crate::store::SqliteStore;
 use crate::tools::Sandbox;
+use crate::web::http::HttpError;
 use crate::worktree::{self, Worktree};
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -62,20 +63,23 @@ struct Gate {
     idea: Option<(String, String)>,
 }
 
-/// The session's gate; `Err((status, message))` when there is nothing to gate.
-fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, String)>, String> {
+/// The session's gate; a 404 or 409 when there is nothing to gate.
+fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, HttpError> {
     let Some((session, project)) = app.session_and_project(id)? else {
-        return Ok(Err((404, "no such session".into())));
+        return Err(HttpError::new(404, "no such session"));
     };
     let Some(wt) = app.place(store, &session, &project)?.worktree else {
-        return Ok(Err((409, "the session has no worktree".into())));
+        return Err(HttpError::new(409, "the session has no worktree"));
     };
     let Some((top, prefix)) = worktree::top(Path::new(&project.workdir)) else {
-        return Ok(Err((409, "the project is not in a git repository".into())));
+        return Err(HttpError::new(
+            409,
+            "the project is not in a git repository",
+        ));
     };
     let preview = match integration::preview(&top, &wt) {
         Ok(preview) => preview,
-        Err(e) => return Ok(Err((409, e))),
+        Err(e) => return Err(HttpError::new(409, e)),
     };
     // The protection is the human's, from the project's tree, not the
     // worktree's copy the agent worked in.
@@ -162,7 +166,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
     );
     let title = session.title.clone();
     let idea = finishable_idea(&project.id, &store.ideas(&project.id)?, &session.id);
-    Ok(Ok(Gate {
+    Ok(Gate {
         session_id: session.id,
         title,
         wt,
@@ -178,7 +182,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Result<Gate, (u16, S
         review,
         passed_before,
         idea,
-    }))
+    })
 }
 
 /// The project's directory, where `.agents/protected` lives.
@@ -190,12 +194,9 @@ fn gate_workdir(app: &App, id: &str) -> Result<String, String> {
 
 /// `GET /api/sessions/{id}/integration`: what the integration would do and
 /// what blocks it.
-pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let gate = match gate(&store, app, id)? {
-        Ok(gate) => gate,
-        Err((status, message)) => return error(stream, status, &message),
-    };
+    let gate = gate(&store, app, id)?;
     let files: Vec<Value> = gate
         .review
         .iter()
@@ -246,7 +247,7 @@ pub fn start_understanding(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let Some(dialogue_id) = body
         .get("dialogueId")
@@ -265,10 +266,7 @@ pub fn start_understanding(
         return error(stream, 400, "the dialogue belongs to another project");
     }
     let store = app.store()?;
-    let gate = match gate(&store, app, id)? {
-        Ok(gate) => gate,
-        Err((status, message)) => return error(stream, status, &message),
-    };
+    let gate = gate(&store, app, id)?;
     let Some(head) = gate.preview.commits.last().map(|commit| commit.sha.clone()) else {
         return error(stream, 409, "nothing to understand");
     };
@@ -292,12 +290,9 @@ pub fn start_understanding(
 
 /// `POST /api/sessions/{id}/integration/message`: an English commit subject the
 /// model proposes for the integration (indicative; the human edits it), or null.
-pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let gate = match gate(&store, app, id)? {
-        Ok(gate) => gate,
-        Err((status, message)) => return error(stream, status, &message),
-    };
+    let gate = gate(&store, app, id)?;
 
     let events = store.events(&gate.session_id)?;
     let request = crate::domain::commit_subject::request_since_integration(&events);
@@ -328,7 +323,7 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
 
 /// The human's repository as it is now, read for every session (with or
 /// without a worktree).
-pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
@@ -356,7 +351,12 @@ pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Strin
 
 /// `POST /api/sessions/{id}/integrate`: the human's confirmation. The
 /// client's `acknowledged` keys only say which blockers the human accepted.
-pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn integrate(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
     let body = req.json()?;
     let acknowledged: Vec<String> = body
         .get("acknowledged")
@@ -381,10 +381,7 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
         return error(stream, 409, "a turn is already running");
     }
     let store = app.store()?;
-    let gate = match gate(&store, app, id)? {
-        Ok(gate) => gate,
-        Err((status, message)) => return error(stream, status, &message),
-    };
+    let gate = gate(&store, app, id)?;
     // The human may keep their commits free of model trailers (Settings).
     let mut models = Vec::new();
     if store.preferences()?.integration.model_trailers {
@@ -482,16 +479,18 @@ pub fn integrate(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> 
 
 /// `POST /api/sessions/{id}/discard`: the human's decision to drop the
 /// session's worktree, branch and base ref.
-pub fn discard(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn discard(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
     let _ = req.json()?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
     let store = app.store()?;
-    let gate = match gate(&store, app, id)? {
-        Ok(gate) => gate,
-        Err((status, message)) => return error(stream, status, &message),
-    };
+    let gate = gate(&store, app, id)?;
     if let Err(message) = worktree::remove(&gate.top, &gate.wt) {
         return error(stream, 409, &message);
     }
@@ -528,7 +527,7 @@ pub fn resolve_conflict(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let _ = req.json()?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
@@ -537,10 +536,7 @@ pub fn resolve_conflict(
         return error(stream, 409, "a workflow is waiting in this session");
     }
     let store = app.store()?;
-    let gate = match gate(&store, app, id)? {
-        Ok(gate) => gate,
-        Err((status, message)) => return error(stream, status, &message),
-    };
+    let gate = gate(&store, app, id)?;
     if let Err(message) = worktree::commit(&gate.wt, &format!("fennec: agent work in session {id}"))
     {
         return error(stream, 409, &message);

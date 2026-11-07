@@ -4,6 +4,7 @@
 use super::http::{Request, error};
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
+use crate::web::http::HttpError;
 use std::io::Write;
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
@@ -17,7 +18,7 @@ pub fn serve(
     req: &Request,
     stream: &mut TcpStream,
     id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     if store.session(id)?.is_none() {
         return error(stream, 404, "no such session");
     }

@@ -3,6 +3,7 @@
 //! see what needs attention and start/stop queues without opening each project.
 //! `routes.rs` only dispatches here.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 
 use serde_json::{Value, json};
@@ -13,7 +14,7 @@ use super::idea_board::{Board, board_json};
 use crate::store::SqliteStore;
 
 /// `GET /api/backlog`: the cross-project table of every project's board.
-pub fn list_backlog(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn list_backlog(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let store = app.store()?;
     send_json(stream, 200, &backlog_view(app, &store)?)
 }

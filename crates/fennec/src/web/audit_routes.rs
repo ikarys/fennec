@@ -2,6 +2,7 @@
 //! human's click only: the client names finding numbers, the server writes the ideas'
 //! text from the report in the log, and records the creation in the session's log.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 
 use serde_json::json;
@@ -22,7 +23,7 @@ pub fn create_tasks(
     req: &Request,
     stream: &mut TcpStream,
     session_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(session_id)? else {
         return error(stream, 404, "no such session");

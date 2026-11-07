@@ -3,6 +3,7 @@
 //! The `canvas` crate owns the artifacts; this module only translates HTTP to
 //! its calls and reads the pinned files from the session's working directory.
 
+use crate::web::http::HttpError;
 use std::net::TcpStream;
 
 use canvas::{Anchor, Artifact, CanvasStore, Format, NewArtifact, Source, StoreError};
@@ -25,7 +26,7 @@ pub(super) fn list_session(
     app: &App,
     stream: &mut TcpStream,
     session_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     if app.store()?.session(session_id)?.is_none() {
         return http::error(stream, 404, "session not found");
     }
@@ -40,7 +41,7 @@ pub(super) fn list_project(
     app: &App,
     stream: &mut TcpStream,
     project_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     if app.store()?.project(project_id)?.is_none() {
         return http::error(stream, 404, "project not found");
     }
@@ -56,7 +57,7 @@ pub(super) fn create(
     req: &Request,
     stream: &mut TcpStream,
     session_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let Some(session) = app.store()?.session(session_id)? else {
         return http::error(stream, 404, "session not found");
     };
@@ -123,7 +124,11 @@ fn block_revisions(
         .collect())
 }
 
-pub(super) fn detail(app: &App, stream: &mut TcpStream, artifact_id: &str) -> Result<(), String> {
+pub(super) fn detail(
+    app: &App,
+    stream: &mut TcpStream,
+    artifact_id: &str,
+) -> Result<(), HttpError> {
     let Ok(id) = parse_id(artifact_id) else {
         return http::error(stream, 404, "artifact not found");
     };
@@ -155,7 +160,7 @@ pub(super) fn content(
     stream: &mut TcpStream,
     artifact_id: &str,
     number: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let Ok(id) = parse_id(artifact_id) else {
         return http::error(stream, 404, "artifact not found");
     };
@@ -182,7 +187,11 @@ pub(super) fn content(
 }
 
 /// Deletes the artifact from the library only, never the file in the working directory.
-pub(super) fn delete(app: &App, stream: &mut TcpStream, artifact_id: &str) -> Result<(), String> {
+pub(super) fn delete(
+    app: &App,
+    stream: &mut TcpStream,
+    artifact_id: &str,
+) -> Result<(), HttpError> {
     let Ok(id) = parse_id(artifact_id) else {
         return http::error(stream, 404, "artifact not found");
     };
@@ -200,7 +209,7 @@ pub(super) fn annotate(
     req: &Request,
     stream: &mut TcpStream,
     artifact_id: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let Ok(id) = parse_id(artifact_id) else {
         return http::error(stream, 404, "artifact not found");
     };
@@ -241,7 +250,7 @@ fn create_file(
     project_id: &str,
     session_id: &str,
     path: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let Some(format) = Format::of_path(path) else {
         return http::error(stream, 400, "this file cannot be shown on a canvas");
     };
@@ -289,7 +298,7 @@ fn create_block(
     session_id: &str,
     format: Format,
     content: &str,
-) -> Result<(), String> {
+) -> Result<(), HttpError> {
     let artifact = match store.create(
         NewArtifact {
             project_id: project_id.to_owned(),
@@ -308,11 +317,11 @@ fn create_block(
 }
 
 fn body_create(req: &Request) -> Result<CreateBody, String> {
-    create_body_from_value(&req.json()?)
+    create_body_from_value(&req.json().map_err(|e| e.message)?)
 }
 
 fn annotate_body(req: &Request) -> Result<(u32, Anchor, String), String> {
-    let value = req.json()?;
+    let value = req.json().map_err(|e| e.message)?;
     let version = value
         .get("version")
         .and_then(Value::as_u64)
@@ -353,13 +362,13 @@ fn parse_id(raw: &str) -> Result<i64, String> {
     raw.parse().map_err(|_| "artifact not found".to_owned())
 }
 
-fn store_error(stream: &mut TcpStream, e: StoreError) -> Result<(), String> {
+fn store_error(stream: &mut TcpStream, e: StoreError) -> Result<(), HttpError> {
     match e {
         StoreError::Empty => http::error(stream, 400, "empty content"),
         StoreError::TooLarge => http::error(stream, 413, "content too large"),
         StoreError::NotFound => http::error(stream, 404, "artifact or version not found"),
         StoreError::Annotation(e) => http::error(stream, 400, &e.to_string()),
-        _ => Err(e.to_string()),
+        _ => Err(e.into()),
     }
 }
 

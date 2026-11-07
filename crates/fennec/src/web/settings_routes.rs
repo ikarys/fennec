@@ -11,6 +11,7 @@ use crate::domain::scanner::SCANNERS;
 use crate::scanners;
 use crate::skills;
 use crate::tools::{SandboxHealth, probe};
+use crate::web::http::HttpError;
 use crate::workflows;
 use llm_providers_connector::{
     ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
@@ -41,7 +42,7 @@ fn mcp_tools(prefs: &Preferences) -> Map<String, Value> {
         .collect()
 }
 
-pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), String> {
+pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
     let prefs = app.store()?.preferences()?;
     let local = prefs.provider(LOCAL_PROVIDER).cloned().unwrap_or(Provider {
         id: LOCAL_PROVIDER.to_string(),
@@ -200,7 +201,7 @@ fn model_entries(
 
 /// Re-lists one provider's models now. Returns a single listing in the same
 /// shape as `GET /api/settings`.
-pub fn list_provider(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn list_provider(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let (provider, endpoint) = requested_endpoint(app, &body)?;
     let listed = list_models(&endpoint);
@@ -213,7 +214,7 @@ pub fn list_provider(app: &App, req: &Request, stream: &mut TcpStream) -> Result
 /// Probes one model for its limits (an endpoint that does not list them).
 /// The request names the provider as `providers/list` does, plus `model`.
 /// The result is indicative: it is read from the endpoint's error messages.
-pub fn probe_model(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn probe_model(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let (_, endpoint) = requested_endpoint(app, &body)?;
     let Some(model) = body
@@ -273,7 +274,7 @@ fn requested_endpoint(app: &App, body: &Value) -> Result<(String, Endpoint), Str
     Ok((provider, Endpoint { base_url, api_key }))
 }
 
-pub fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), String> {
+pub fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let mut prefs: Preferences = match serde_json::from_value(body) {
         Ok(prefs) => prefs,

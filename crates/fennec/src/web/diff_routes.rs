@@ -4,12 +4,18 @@ use super::App;
 use super::http::{Request, error, send_json};
 use crate::domain::diff;
 use crate::integration;
+use crate::web::http::HttpError;
 use crate::worktree;
 use serde_json::json;
 use std::net::TcpStream;
 use std::path::Path;
 
-pub fn get_diff(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), String> {
+pub fn get_diff(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
     let store = app.store()?;
     let Some((session, project)) = app.session_and_project(id)? else {
         return error(stream, 404, "no such session");
