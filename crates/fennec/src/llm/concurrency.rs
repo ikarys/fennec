@@ -73,6 +73,9 @@ impl ModelGate {
             if state.free > 0 && self.admits(&state, session) {
                 state.free -= 1;
                 match &mut state.holder {
+                    // A one-off call (a session's name, a commit subject) never
+                    // releases: as the holder it would make the next session wait the grace.
+                    _ if session.is_empty() => {}
                     Some(holder) if holder.session == session => holder.idle_since = None,
                     _ => {
                         state.holder = Some(Holder {
@@ -251,6 +254,14 @@ mod tests {
         let rx = try_enter(&gate, "a");
         assert!(!got_in(&rx, 50));
         assert!(got_in(&rx, 500));
+    }
+
+    #[test]
+    fn a_one_off_call_does_not_hold_the_gate() {
+        let gate = Arc::new(ModelGate::new(1, Duration::from_secs(60)));
+        drop(gate.enter("", &no_stop()).unwrap());
+        // No grace to wait: the one-off call never comes back.
+        assert!(got_in(&try_enter(&gate, "a"), 500));
     }
 
     #[test]
