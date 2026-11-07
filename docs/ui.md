@@ -7,7 +7,7 @@ look lives in two places only, so a screen can never drift from the others:
    spacing unit, radii. Components use the tokens (`bg-panel`, `text-muted`),
    never a literal colour.
 2. **The primitives** (`web/src/components/ui/`): `Button`, `Badge`,
-   `SectionLabel`, `Stat` (a run metric chip: icon, figure, the detail in its tooltip), `Tile` (a dashboard figure: tinted icon, label, figure, detail; a tone bar when it counts something), `Card`, `Modal`, `ConfirmDialog`, `Section`, `Panel`,
+   `SectionLabel`, `Stat` (a run metric chip: icon, figure, the detail in its tooltip), `Tile` (a dashboard figure: tinted icon, label, figure, detail; a tone bar when it counts something), `Card`, `TableHeader` (the column headings above a table-like list's rows), `Modal`, `ConfirmDialog`, `Section`, `Panel`,
    `Segmented`, `Switch` (an on/off that applies at once), `Tabs` (a page's sections, vertical or horizontal), `Menu`,
    `ChoiceMenu` (one value among grouped choices, each group under a tinted
    band; never a native `<select>` for a list of choices: the browser draws

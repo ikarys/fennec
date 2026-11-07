@@ -26,6 +26,7 @@ import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ProjectMap } from './ProjectMap';
+import { TableHeader } from '../ui/TableHeader';
 
 export function MapSection({
   projectId,
@@ -182,12 +183,12 @@ export function MapSection({
         {/* Only render the violations table when there is at least one rule breach. */}
         {drift.violations.length > 0 ? (
           <Card className="overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+            <TableHeader>
               <span className="w-3.5" aria-hidden />
               <span className="grow">{t('forbiddenDependency')}</span>
               <span className="w-20 text-right">{t('filesCol')}</span>
               <span className="w-64">{t('ruleCol')}</span>
-            </div>
+            </TableHeader>
             <ul className="divide-y divide-border">
               {drift.violations.map((violation) => (
                 <li
@@ -216,7 +217,7 @@ export function MapSection({
         {/* Cap the diff list so a large change set cannot push the map out of view. */}
         {drift.sinceMap !== null && hasChanges ? (
           <Card className="overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
+            <TableHeader>
               <span className="grow">{t('driftSinceMap')}</span>
               <Badge tone="ok" appearance="pill">
                 +{added}
@@ -224,7 +225,7 @@ export function MapSection({
               <Badge tone="err" appearance="pill">
                 −{removed}
               </Badge>
-            </div>
+            </TableHeader>
             <ul className="max-h-64 divide-y divide-border overflow-y-auto">
               {drift.sinceMap.added.map((edge) => (
                 <li
