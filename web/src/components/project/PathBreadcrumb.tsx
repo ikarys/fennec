@@ -9,7 +9,7 @@ interface PathBreadcrumbProps {
 export function PathBreadcrumb({ path, onNavigate }: PathBreadcrumbProps) {
   const t = useT();
   const segments = path.split('/').filter(Boolean);
-  const crumbClass = 'max-w-full truncate rounded px-1.5 py-0.5 text-xs text-muted hover:bg-raised';
+  const crumbClass = 'max-w-full truncate rounded-md px-1.5 py-0.5 text-xs text-muted hover:bg-raised';
   return (
     <nav aria-label={t('folderPathNav')} className="flex flex-wrap items-center gap-1">
       <button type="button" onClick={() => onNavigate('/')} title="/" className={crumbClass}>

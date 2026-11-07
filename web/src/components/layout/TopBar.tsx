@@ -140,7 +140,7 @@ function AttentionBell({ attention, onOpen }: { attention: AttentionItem[]; onOp
                   setOpen(false);
                   onOpen(item.sessionId);
                 }}
-                className="block w-full rounded px-2 py-1.5 text-left hover:bg-raised"
+                className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-raised"
               >
                 <div className="flex items-center gap-1.5">
                   <Badge tone={item.kind === 'error' ? 'err' : 'attention'} dot>

@@ -186,14 +186,14 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
         {preview ? (
           <div className="border-b border-border bg-accent-soft px-4 py-3">
             <div className="flex items-center gap-2.5">
-              <span className="flex shrink-0 items-center gap-1.5 rounded border border-border bg-raised px-2 py-0.5 font-mono text-xs">
+              <span className="flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-raised px-2 py-0.5 font-mono text-xs">
                 <BranchIcon className="h-3 w-3 text-accent" />
                 {preview.humanBranch ?? t('yourBranch')}
               </span>
               <h2 className="m-0 min-w-0 truncate text-sm font-semibold">
                 {t('integrateInto', { branch: preview.humanBranch ?? t('yourBranch') })}
               </h2>
-              <span className="ml-auto shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-xs text-muted">
+              <span className="ml-auto shrink-0 rounded-md border border-border px-1.5 py-0.5 font-mono text-xs text-muted">
                 {preview.commits.length} {t(preview.commits.length === 1 ? 'commit' : 'commits')}
               </span>
             </div>

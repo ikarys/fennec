@@ -102,7 +102,7 @@ export function CriteriaSection({ criteria, tally }: { criteria: CriterionView[]
                         {typeof provenance.exitCode === 'number' && (
                           <div className="text-xs text-muted">{t('exitCode', { code: provenance.exitCode })}</div>
                         )}
-                        <pre className="max-h-40 overflow-auto rounded bg-code p-2 font-mono text-xs text-muted">
+                        <pre className="max-h-40 overflow-auto rounded-md bg-code p-2 font-mono text-xs text-muted">
                           {provenance.output}
                         </pre>
                       </>

@@ -33,7 +33,7 @@ export function SandboxSection({ value, onChange, health, save }: SandboxSection
               {health.detail && <code className="font-mono text-xs text-err">{health.detail}</code>}
               <div className="flex items-center gap-2">
                 <code
-                  className="min-w-0 grow truncate rounded bg-surface px-2 py-1 font-mono text-xs"
+                  className="min-w-0 grow truncate rounded-md bg-surface px-2 py-1 font-mono text-xs"
                   title={FIX}
                 >
                   {FIX}

@@ -354,7 +354,7 @@ function OrphanRow({
         {entry.sudoCommand ? (
           <div className="mt-2">
             <div className="flex items-center gap-2">
-              <code className="rounded bg-code px-2 py-1 font-mono text-xs text-text">{entry.sudoCommand}</code>
+              <code className="rounded-md bg-code px-2 py-1 font-mono text-xs text-text">{entry.sudoCommand}</code>
               <CopyButton text={entry.sudoCommand} />
             </div>
             <p className="mt-1 text-xs text-muted">

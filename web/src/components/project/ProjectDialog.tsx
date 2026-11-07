@@ -173,7 +173,7 @@ export function ProjectDialog({ open, submitting, error, onClose, onSubmit }: Pr
               type="checkbox"
               checked={showHidden}
               onChange={handleShowHiddenChange}
-              className="h-4 w-4 rounded border-border bg-raised text-accent"
+              className="h-4 w-4 rounded-md border-border bg-raised text-accent"
             />
             {t('showHiddenFolders')}
           </label>

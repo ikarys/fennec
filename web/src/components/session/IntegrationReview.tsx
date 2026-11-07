@@ -108,7 +108,7 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate, un
         <SectionLabel className="flex items-center">
           {t('filesLabel')}
           {preview.files.length > 0 && (
-            <span className="ml-1 rounded border border-border bg-raised px-1.5 text-[11px] tabular-nums text-text">
+            <span className="ml-1 rounded-md border border-border bg-raised px-1.5 text-[11px] tabular-nums text-text">
               {preview.files.length}
             </span>
           )}

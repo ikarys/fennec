@@ -81,7 +81,7 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
             type="checkbox"
             checked={Boolean(node.verdicts)}
             onChange={(event) => onChange('verdicts', event.target.checked)}
-            className="h-4 w-4 rounded border-border bg-panel"
+            className="h-4 w-4 rounded-md border-border bg-panel"
           />
           {t('agentFieldsVerdictsLabel')}
         </label>

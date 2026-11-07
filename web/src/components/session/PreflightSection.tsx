@@ -8,7 +8,7 @@ import { SectionLabel } from '../ui/SectionLabel';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 
-const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
+const INLINE_CODE = 'rounded-md bg-code px-1 py-0.5 font-mono text-xs text-text';
 
 const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; label: MsgKey; title: MsgKey }> = {
   fails: {
@@ -57,7 +57,7 @@ export function PreflightSection({ results }: { results: PreflightResultView[] }
               {result.output && (
                 <details>
                   <summary className="cursor-pointer text-xs text-muted">{t('outputLabel')}</summary>
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-code p-2 font-mono text-xs text-muted">
+                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-code p-2 font-mono text-xs text-muted">
                     {result.output}
                   </pre>
                 </details>

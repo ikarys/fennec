@@ -141,7 +141,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         <div className="flex items-center gap-2 text-xs text-muted">
           {/* The model that answered, from the ledger; the session's current one while it streams. */}
           <span className="font-semibold text-text">{call ? modelShortName(call.model) : model}</span>
-          <span className="rounded border border-border px-1.5 text-xs">{t('assistantProducedByModel')}</span>
+          <span className="rounded-md border border-border px-1.5 text-xs">{t('assistantProducedByModel')}</span>
         </div>
       )}
       {item.segments.map((segment) => {

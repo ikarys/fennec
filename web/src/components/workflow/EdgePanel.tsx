@@ -50,7 +50,7 @@ export function EdgePanel({ edge, issues, onChange, onDelete }: EdgePanelProps) 
             type="checkbox"
             checked={edge.pause === true}
             onChange={(event) => onChange({ ...edge, pause: event.target.checked })}
-            className="rounded"
+            className="rounded-md"
           />
           {t('edgePauseBeforeTarget')}
         </label>

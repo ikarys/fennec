@@ -142,7 +142,7 @@ function ModelRow({
 
   return (
     <div className="flex flex-col border-t border-border/60 first:border-t-0">
-      <div className="-mx-2 flex h-8 items-center gap-2 rounded px-2 hover:bg-raised">
+      <div className="-mx-2 flex h-8 items-center gap-2 rounded-md px-2 hover:bg-raised">
         <button
           type="button"
           aria-expanded={open}

@@ -99,7 +99,7 @@ export function ProjectMap({ map }: { map: ModuleMap }) {
               </span>
               <button
                 type="button"
-                className="shrink-0 rounded p-0.5 text-muted hover:bg-accent-soft hover:text-accent-strong"
+                className="shrink-0 rounded-md p-0.5 text-muted hover:bg-accent-soft hover:text-accent-strong"
                 title={t('whatModuleIs')}
                 aria-label={t('whatModuleIs')}
                 onClick={(event) => {

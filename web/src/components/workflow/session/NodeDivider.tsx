@@ -123,7 +123,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
               <div className="flex flex-col gap-1">
                 <SectionLabel>{t('outputLabel')}</SectionLabel>
                 {item.nodeKind === 'shell' || item.nodeKind === 'criteria' ? (
-                  <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded bg-code p-2 font-mono text-xs text-muted">
+                  <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-code p-2 font-mono text-xs text-muted">
                     {item.output}
                   </pre>
                 ) : (

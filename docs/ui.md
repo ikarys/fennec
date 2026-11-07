@@ -63,6 +63,11 @@ dead: every list and grid shows the human where they are and what reacts.
   `border-border-strong` bounds a component (a field, a secondary button, a
   pill): it is the one at 3:1 in every theme. What floats over the thread
   (the palette, the composer, a tooltip) uses `shadow-float` and `rounded-lg`.
+- Corners come from the radius scale (`styles/app.css`), in px so they do not
+  grow with the text size: `rounded-sm` a badge, `rounded-md` a control, a chip,
+  inline code, a hovered row, `rounded-lg` what floats, `rounded-xl` a card or a
+  tile, `rounded-full` a pill or a dot. Never the bare `rounded` (rem) or an
+  arbitrary `rounded-[…]`.
 - Cards only for what stands apart (a plan, a dialog, a question waiting for
   the human) and for a page that holds groups: the Settings page is one card,
   its tabs and its groups inside. Groups are `Section`s: a `SectionLabel`
