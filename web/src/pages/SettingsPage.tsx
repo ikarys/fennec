@@ -370,7 +370,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   if (!settings || !form) {
     return (
       <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
-        <div className="mx-auto max-w-[960px]">
+        <div className="mx-auto max-w-page">
           <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
           <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
           <div className="mt-6 text-sm text-muted">{t('loading')}</div>
@@ -382,7 +382,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
   return (
     <main className="grow overflow-y-auto px-4 md:px-6">
       {/* The top padding sits inside the scroller, so the jump bar sticks at its very top. */}
-      <div className="mx-auto flex max-w-[960px] flex-col gap-6 pt-6 md:pt-8">
+      <div className="mx-auto flex max-w-page flex-col gap-6 pt-6 md:pt-8">
         <div>
           <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
           <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>

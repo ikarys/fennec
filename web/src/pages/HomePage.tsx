@@ -46,7 +46,7 @@ function SessionRow({
     <div className="group flex h-[34px] w-full items-center gap-3 border-t border-border px-3 hover:bg-raised">
       <input
         type="checkbox"
-        className={`h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)] ${hidden}`}
+        className={`h-3.5 w-3.5 shrink-0 ${hidden}`}
         aria-label={t('selectSessionAria', { title: session.title })}
         checked={selected}
         disabled={running}
@@ -60,7 +60,7 @@ function SessionRow({
       >
         <SessionStateIcon state={session.state} />
         <span className="min-w-0 grow truncate text-sm text-text">{session.title}</span>
-        {session.awaitingIntegration && <Badge tone="accent" solid>{t('toIntegrateBadge')}</Badge>}
+        {session.awaitingIntegration && <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>}
         <span title={formatDateTime(lang, session.createdAt)} className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-faint tabular-nums">
           {formatRelative(lang, session.updatedAt)}
         </span>
@@ -215,7 +215,7 @@ function ProjectSection({
           />
           <span className="shrink-0 text-sm font-semibold">{project.name}</span>
           {runningCount > 0 && (
-            <Badge tone="accent" solid dot pulse>
+            <Badge tone="accent" appearance="solid" dot pulse>
               {t('runningCount', { count: runningCount })}
             </Badge>
           )}
@@ -414,7 +414,7 @@ export function HomePage({
 
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-5">
+      <div className="mx-auto flex max-w-page flex-col gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <h1 className="text-2xl font-semibold">{t('paletteProjects')}</h1>

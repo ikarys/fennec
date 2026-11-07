@@ -32,7 +32,7 @@ export function ListCard({
         {description ? <div className="text-xs text-muted">{description}</div> : null}
       </div>
       {count !== undefined ? (
-        <Badge tone="neutral" pill>
+        <Badge tone="neutral" appearance="pill">
           {count}
         </Badge>
       ) : null}

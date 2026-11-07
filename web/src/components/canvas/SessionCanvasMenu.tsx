@@ -68,7 +68,7 @@ export function SessionCanvasMenu({ sessionId, refreshKey, onOpen }: SessionCanv
           <MenuItem key={artifact.id} onSelect={() => onOpen(artifact.id)}>
             <span className="flex items-center gap-2">
               <span className="truncate">{artifact.title}</span>
-              <Badge tone="neutral" pill>{artifact.format}</Badge>
+              <Badge tone="neutral" appearance="pill">{artifact.format}</Badge>
             </span>
           </MenuItem>
         ))

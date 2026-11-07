@@ -131,7 +131,7 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
           return (
             <Card key={index} className="flex flex-col overflow-hidden transition-colors focus-within:border-accent/60">
               <div className="flex items-center gap-2 border-b border-border bg-accent-soft/40 px-3 py-2">
-                <Badge solid>{index + 1}</Badge>
+                <Badge appearance="solid">{index + 1}</Badge>
                 <input
                   aria-label={t('panelPageNameLabel')}
                   value={page.name}
@@ -197,7 +197,7 @@ export function PanelPagesSection({ value, onChange, save }: PanelPagesSectionPr
                 <div
                   onDragOver={(event) => drag?.page === index && event.preventDefault()}
                   onDrop={(event) => dropOnChips(event, index)}
-                  className={`flex flex-wrap items-center gap-1.5 border-t px-3 py-2 transition-colors ${drag?.page === index ? 'border-err/40 bg-err/10' : 'border-border'}`}
+                  className={`flex flex-wrap items-center gap-1.5 border-t px-3 py-2 transition-colors ${drag?.page === index ? 'border-err/40 bg-err-soft' : 'border-border'}`}
                 >
                   <span className={`text-xs ${drag?.page === index ? 'text-err' : 'text-faint'}`}>
                     {t(drag?.page === index ? 'panelDropToRemove' : 'panelBlocksAvailable')}

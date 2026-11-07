@@ -213,7 +213,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
           {loading && <div className="text-xs text-muted">{t('loading')}</div>}
           {conflict ? (
-            <div className="rounded-lg border border-err/40 bg-err/10 p-3 text-xs flex flex-col gap-2">
+            <div className="rounded-lg border border-err/40 bg-err-soft p-3 text-xs flex flex-col gap-2">
               <div className="font-semibold text-err">{t('conflictNothingIntegrated')}</div>
               <div>{t('conflictNothingIntegratedBody')}</div>
               <div className="flex flex-col gap-1">
@@ -302,7 +302,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                   {preview.securityScans.map((scan) => {
                     const b = scanBadge(lang, scan);
                     return (
-                      <Badge key={scan.scanner} tone={b.tone} pill>
+                      <Badge key={scan.scanner} tone={b.tone} appearance="pill">
                         {b.running && <SpinnerIcon className="h-3 w-3" />}
                         {b.text}
                       </Badge>
@@ -313,7 +313,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
 
 
               {preview.blockers.length > 0 && (
-                <section className="flex flex-col gap-1.5 rounded-lg border border-attention/35 bg-attention/10 p-3">
+                <section className="flex flex-col gap-1.5 rounded-lg border border-attention/35 bg-attention-soft p-3">
                   <SectionLabel className="flex items-center">
                     <span className="flex items-center gap-1.5 text-attention">
                       <AlertIcon className="h-3.5 w-3.5" />

@@ -71,7 +71,7 @@ export function IndicatorsSection({ projectId }: { projectId: string }) {
       title={t('indicatorsTitle')}
       description={t('indicatorsHint')}
       actions={
-        <Badge tone="ok" pill title={t('verifiedFromLog')}>
+        <Badge tone="ok" appearance="pill" title={t('verifiedFromLog')}>
           {t('verified')}
         </Badge>
       }

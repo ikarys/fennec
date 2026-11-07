@@ -82,7 +82,7 @@ export function CanvasSection({ projectId }: { projectId: string }) {
                   <span className="min-w-0 grow truncate font-medium group-hover:text-accent-strong">
                     {artifact.title}
                   </span>
-                  <Badge tone="neutral" pill>{artifact.format}</Badge>
+                  <Badge tone="neutral" appearance="pill">{artifact.format}</Badge>
                   <span className="hidden shrink-0 font-mono text-xs text-muted md:inline">
                     {artifact.source.kind === 'file' ? artifact.source.path : t('canvasFromMessage')}
                   </span>

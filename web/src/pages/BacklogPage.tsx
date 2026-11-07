@@ -190,7 +190,7 @@ export default function BacklogPage() {
 
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
-      <div className="mx-auto max-w-[960px]">
+      <div className="mx-auto max-w-page">
         <div>
           <h1 className="text-2xl font-semibold">{t('tasks')}</h1>
           {view ? <p className="mt-0.5 text-sm text-muted">{headerSummary(view, t)}</p> : null}

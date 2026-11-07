@@ -173,7 +173,7 @@ export function DiskSection({
         flush
         actions={
           <>
-            {data ? <Badge tone="ok" pill title={t('measuredOnDisk')}>{t('verified')}</Badge> : null}
+            {data ? <Badge tone="ok" appearance="pill" title={t('measuredOnDisk')}>{t('verified')}</Badge> : null}
             <Button
               variant="ghost"
               size="sm"

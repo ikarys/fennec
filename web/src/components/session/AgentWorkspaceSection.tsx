@@ -204,14 +204,14 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                   {t('reading')}
                 </span>
               ) : hasCommits ? (
-                <Badge tone="neutral" pill>
+                <Badge tone="neutral" appearance="pill">
                   {t('commitsFiles', { commits: preview?.commits.length ?? 0, files: preview?.files.length ?? 0 })}
                 </Badge>
               ) : (
                 <span className="truncate text-faint">{t('nothingToIntegrate')}</span>
               )}
               {protectedCount > 0 && (
-                <Badge tone="err" pill>
+                <Badge tone="err" appearance="pill">
                   {t('protectedCount', { count: protectedCount })}
                 </Badge>
               )}
@@ -269,7 +269,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
               <SectionLabel>{t('yourRepo')}</SectionLabel>
               <span className="ml-auto inline-flex shrink-0">
                 {repo.dirty > 0 && (
-                  <Badge tone="accent" pill title={t('dirtyTitle')}>
+                  <Badge tone="accent" appearance="pill" title={t('dirtyTitle')}>
                     {t('dirtyCount', { count: repo.dirty })}
                   </Badge>
                 )}
@@ -304,7 +304,7 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
         {worktree !== null && (
           <div className="flex flex-col gap-1.5">
             {conflictFiles.length > 0 && (
-              <div className="rounded-lg border border-err/40 bg-err/10 px-2.5 py-2 text-xs flex flex-col gap-1.5">
+              <div className="rounded-lg border border-err/40 bg-err-soft px-2.5 py-2 text-xs flex flex-col gap-1.5">
                 <div>
                   {t('conflictBlocked', { branch: humanBranch, count: conflictFiles.length })}
                 </div>

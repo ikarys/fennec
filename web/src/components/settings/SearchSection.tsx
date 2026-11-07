@@ -44,7 +44,7 @@ export function SearchSection({
             type="checkbox"
             checked={value.webFetch}
             onChange={(event) => onChange({ ...value, webFetch: event.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)]"
+            className="h-4 w-4"
           />
           {t('allowWebFetch')}
         </label>
