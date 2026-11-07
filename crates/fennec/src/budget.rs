@@ -5,7 +5,7 @@ use crate::config::Settings;
 use crate::domain::budget::{self, BudgetStatus};
 use crate::domain::clock::{month_start_ms, now_ms};
 use crate::domain::lang::Lang;
-use crate::domain::pricing::{priced, prices};
+use crate::domain::pricing::{billed_prices, priced};
 use crate::store::SqliteStore;
 use token_usage::display::usd;
 use token_usage::{Filter, GroupBy, Ledger};
@@ -42,7 +42,7 @@ pub fn of_project(
         .map_err(|e| e.to_string())?;
     let pricing = priced(
         &rows,
-        &prices(&store.preferences().map_err(|e| e.to_string())?),
+        &billed_prices(&store.preferences().map_err(|e| e.to_string())?),
     );
     let spent = pricing.cost.total();
     Ok(Some(ProjectBudget {

@@ -7,7 +7,7 @@ import { SectionLabel } from '../ui/SectionLabel';
 import { ChevronRightIcon, CloseIcon, HeartIcon, PinIcon, StarIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
-import { percentFromFraction } from '../../lib/settingsForm';
+import { billedByDefault, percentFromFraction } from '../../lib/settingsForm';
 import { useLang, useT } from '../../i18n';
 import { t, type Lang, type MsgKey } from '../../i18n/messages';
 
@@ -24,9 +24,11 @@ export interface ModelForm {
 interface ModelPrefsSectionProps {
   listings: ProviderListing[];
   values: Record<string, ModelForm>;
+  billing: Record<string, boolean>;
   defaults: SettingsDefaults;
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
+  onToggleBilled: (key: string, billed: boolean) => void;
   /** `provider/model` of the default model, '' when none is chosen. */
   defaultModel: string;
   onSetDefault: (key: string) => void;
@@ -109,9 +111,11 @@ function ModelRow({
   modelId,
   model,
   values,
+  billing,
   defaults,
   favorites,
   onToggleFavorite,
+  onToggleBilled,
   isDefault,
   onSetDefault,
   onChange,
@@ -124,9 +128,11 @@ function ModelRow({
   /** Null for a hand-added model (no listing entry yet). */
   model: ProviderListing['models'][number] | null;
   values: Record<string, ModelForm>;
+  billing: Record<string, boolean>;
   defaults: SettingsDefaults;
   favorites: ModelRef[];
   onToggleFavorite: (ref: ModelRef) => void;
+  onToggleBilled: (key: string, billed: boolean) => void;
   isDefault: boolean;
   onSetDefault: (key: string) => void;
   onChange: (key: string, field: keyof ModelForm, value: string) => void;
@@ -290,6 +296,17 @@ function ModelRow({
                 className="w-full"
               />
             </FieldRow>
+            <label className="flex items-center gap-2 text-sm md:col-span-3">
+              <input
+                type="checkbox"
+                checked={billing[key] ?? billedByDefault(providerId)}
+                onChange={(event) => onToggleBilled(key, event.target.checked)}
+              />
+              <span>
+                {t('billedLabel')}
+                <span className="block text-xs text-faint">{t('billedHint')}</span>
+              </span>
+            </label>
           </div>
 
           {model !== null && (
@@ -348,9 +365,11 @@ function ModelRow({
 export function ModelPrefsSection({
   listings,
   values,
+  billing,
   defaults,
   favorites,
   onToggleFavorite,
+  onToggleBilled,
   defaultModel,
   onSetDefault,
   onChange,
@@ -390,9 +409,11 @@ export function ModelPrefsSection({
                   modelId={model.id}
                   model={model}
                   values={values}
+                  billing={billing}
                   defaults={defaults}
                   favorites={favorites}
                   onToggleFavorite={onToggleFavorite}
+                  onToggleBilled={onToggleBilled}
                   isDefault={defaultModel === `${listing.provider}/${model.id}`}
                   onSetDefault={onSetDefault}
                   onChange={onChange}
@@ -408,9 +429,11 @@ export function ModelPrefsSection({
                   modelId={modelId}
                   model={null}
                   values={values}
+                  billing={billing}
                   defaults={defaults}
                   favorites={favorites}
                   onToggleFavorite={onToggleFavorite}
+                  onToggleBilled={onToggleBilled}
                   isDefault={defaultModel === `${listing.provider}/${modelId}`}
                   onSetDefault={onSetDefault}
                   onChange={onChange}

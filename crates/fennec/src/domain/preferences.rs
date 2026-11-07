@@ -25,6 +25,9 @@ pub struct Preferences {
     /// The providers and each one's per-model overrides; an entry with id
     /// `local` overrides only what it sets of the environment's endpoint.
     pub providers: Vec<Provider>,
+    /// Whether a model's spend counts toward the projects' budgets, keyed `provider/model`
+    /// (a provider id has no `/`); a model not listed follows `pricing::billed_by_default`.
+    pub billing: BTreeMap<String, bool>,
     pub display: Display,
     /// `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
