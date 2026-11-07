@@ -502,7 +502,9 @@ read-only. The human edits them as usual.
   while a blocker is not acknowledged (`noCommits` and `conflict` never are), or when git
   fails; then it merges `<base>..<branch>` onto the human's HEAD (plus the
   `carried` files' uncommitted content) with `git merge-tree`, makes one
-  commit with `message` plus a `Fennec-Session: <session id>` trailer, under
+  commit with `message` plus a `Fennec-Session: <session id>` trailer and one
+  `Co-Authored-By: <model> <noreply@fennec.local>` per model that answered in the session or its child
+  sessions (`stats.model` of `message.done`, in order of first use), under
   the human's git identity, and moves the human's branch and tree to it with
   `git reset --keep` (other uncommitted work stays). A conflict leaves the
   repository untouched and answers 409
