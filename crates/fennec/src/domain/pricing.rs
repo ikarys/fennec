@@ -3,7 +3,7 @@
 //! and what is not.
 
 use crate::domain::lang::Lang;
-use crate::domain::preferences::Preferences;
+use crate::domain::preferences::{LOCAL_PROVIDER, Preferences};
 use llm_providers_connector::{Cost, Price};
 use std::collections::BTreeMap;
 use token_usage::Row;
@@ -90,11 +90,33 @@ pub fn priced(models: &[Row], prices: &BTreeMap<String, Price>) -> Pricing {
     }
 }
 
-/// The per-model prices from the settings; the first provider's price wins.
-pub fn prices(preferences: &Preferences) -> BTreeMap<String, Price> {
+/// A local model's price is a simulation, a paid provider's is a bill.
+pub fn billed_by_default(provider: &str) -> bool {
+    provider != LOCAL_PROVIDER
+}
+
+/// Whether a model's spend counts toward the projects' budgets: the explicit
+/// `billing` entry wins, else the provider's default.
+pub fn billed(preferences: &Preferences, provider: &str, model: &str) -> bool {
+    preferences
+        .billing
+        .get(&format!("{provider}/{model}"))
+        .copied()
+        .unwrap_or(billed_by_default(provider))
+}
+
+/// The per-model prices from the settings, keeping only the models `keep` allows;
+/// the first provider's price wins.
+fn filtered_prices(
+    preferences: &Preferences,
+    keep: impl Fn(&str, &str) -> bool,
+) -> BTreeMap<String, Price> {
     let mut prices = BTreeMap::new();
     for provider in &preferences.providers {
         for (model_id, model_prefs) in &provider.models {
+            if !keep(&provider.id, model_id) {
+                continue;
+            }
             if let Some(price) = model_prefs.price {
                 prices.entry(model_id.clone()).or_insert(price);
             }
@@ -103,9 +125,23 @@ pub fn prices(preferences: &Preferences) -> BTreeMap<String, Price> {
     prices
 }
 
+/// The per-model prices from the settings; the first provider's price wins.
+pub fn prices(preferences: &Preferences) -> BTreeMap<String, Price> {
+    filtered_prices(preferences, |_, _| true)
+}
+
+/// The per-model prices that count toward the projects' budgets; the first
+/// billed provider's price wins.
+pub fn billed_prices(preferences: &Preferences) -> BTreeMap<String, Price> {
+    filtered_prices(preferences, |provider, model| {
+        billed(preferences, provider, model)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::preferences::{ModelPrefs, Provider};
     use token_usage::{Filter, Ledger};
 
     fn row(key: &str, prompt_tokens: u64) -> Row {
@@ -169,5 +205,64 @@ mod tests {
             some.detail(Lang::En),
             "indicative, at each model's price; without a price: b"
         );
+    }
+
+    const PRICE: Price = Price {
+        input_per_m: 1.0,
+        cached_per_m: 0.0,
+        output_per_m: 0.0,
+    };
+
+    fn prefs_with_model(
+        provider: &str,
+        model: &str,
+        price: Price,
+        billing: BTreeMap<String, bool>,
+    ) -> Preferences {
+        let mut models = BTreeMap::new();
+        models.insert(
+            model.to_string(),
+            ModelPrefs {
+                price: Some(price),
+                ..Default::default()
+            },
+        );
+        let providers = vec![Provider {
+            id: provider.to_string(),
+            name: provider.to_string(),
+            base_url: String::new(),
+            api_key: None,
+            models,
+        }];
+        Preferences {
+            providers,
+            billing,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn billed_prices_omits_an_unbilled_local_model_but_prices_keeps_it() {
+        let prefs = prefs_with_model("local", "m", PRICE, BTreeMap::new());
+
+        assert!(!billed_prices(&prefs).contains_key("m"));
+        assert!(prices(&prefs).contains_key("m"));
+    }
+
+    #[test]
+    fn an_explicit_billing_entry_makes_a_local_model_billed() {
+        let billing = BTreeMap::from([("local/m".to_string(), true)]);
+        let prefs = prefs_with_model("local", "m", PRICE, billing);
+
+        assert!(billed_prices(&prefs).contains_key("m"));
+    }
+
+    #[test]
+    fn an_explicit_billing_entry_makes_a_paid_model_unbilled() {
+        let billing = BTreeMap::from([("paid/m".to_string(), false)]);
+        let prefs = prefs_with_model("paid", "m", PRICE, billing);
+
+        assert!(!billed_prices(&prefs).contains_key("m"));
+        assert!(prices(&prefs).contains_key("m"));
     }
 }

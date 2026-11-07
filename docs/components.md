@@ -202,7 +202,7 @@ Budgets, done (C18): a monthly cost budget per project, set from a tile of the p
 (`domain/pricing.rs`, indicative); at 80 % the tile turns to attention and `/api/notices` raises a system notification;
 once reached, fennec's kernel refuses to start any turn on the project (`turn_build`, every path: web, CLI, the queue,
 workflow children; the message route answers 409 first so the typed text stays) until the human raises or removes it
-(`domain/budget.rs`, `budget.rs`, `web/routes/budget_routes.rs`).
+(`domain/budget.rs`, `budget.rs`, `web/routes/budget_routes.rs`). Only billed models count (Settings, per model; a local model is not billed by default), every price stays displayed.
 Indicators, done (C19): an "Indicators" tab on the project page measures the project from recorded facts only (verified):
 AI commits outside fennec, sensitive integrations without a comprehension dialogue, dialogues held, module rule breaks with
 the violations accepted and the active waivers, scanner findings accepted, the month's cost per integration, the map and

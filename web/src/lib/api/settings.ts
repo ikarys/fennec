@@ -99,6 +99,8 @@ export interface SessionModel {
 export interface Preferences {
   selected: ModelRef | null;
   providers: Provider[];
+  /** Whether a model's spend counts toward the projects' budgets, keyed `provider/model`. */
+  billing?: Record<string, boolean>;
   display: DisplayPrefs;
   /** Models the composer offers as favourites. */
   favorites?: ModelRef[];

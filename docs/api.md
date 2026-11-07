@@ -174,6 +174,8 @@ not in a command: the model only chooses the query. `webFetch` (fennec's own, de
 
 `delegation` (fennec's own) is the `delegate` tool: `enabled` (default true) lets an agent hand a task to a read-only agent in a hidden child session; `maxPerTurn` (default 5, 0 = no limit) caps the delegations one turn starts, the next ones fail and the agent goes on itself. Turned off, the agents' reminder no longer lists `delegate` and a call is refused.
 
+`billing` (fennec's own) is a `provider/model` → bool map: a model not listed follows the provider default (local models are not billed, paid providers are), and a listed entry overrides it.
+
 `sandbox` (fennec's own) is how commands run: the `run_command` tool and the
 workflow shell nodes. Enabled (the default), each command runs in bwrap: the
 system read-only, the working directory writable, `/tmp` private, the secrets

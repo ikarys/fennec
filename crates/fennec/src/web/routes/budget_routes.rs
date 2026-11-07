@@ -80,8 +80,10 @@ fn view(budget: Option<&ProjectBudget>, lang: Lang) -> BudgetView {
                 &usd(budget.limit, lang.locale()),
             );
             if !budget.priced {
-                detail
-                    .push_str(lang.pick(" (no model has a price)", " (aucun modèle n'a de prix)"));
+                detail.push_str(lang.pick(
+                    " (no billed model has a price: Settings, Models)",
+                    " (aucun modèle facturé n'a de prix : Paramètres, Modèles)",
+                ));
             }
             let tone = match budget.status {
                 BudgetStatus::Under => Tone::Ok,
@@ -151,6 +153,10 @@ mod tests {
         );
         assert_eq!(exceeded.figure, "100 %");
         assert_eq!(exceeded.tone, Tone::Err);
-        assert!(exceeded.detail.ends_with(" (aucun modèle n'a de prix)"));
+        assert!(
+            exceeded
+                .detail
+                .ends_with(" (aucun modèle facturé n'a de prix : Paramètres, Modèles)")
+        );
     }
 }

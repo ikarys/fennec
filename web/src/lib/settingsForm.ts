@@ -25,11 +25,17 @@ export function percentFromFraction(fraction: number): string {
   return String(Number((fraction * 100).toFixed(2)));
 }
 
+/** Mirrors `pricing::billed_by_default`: a local model's price is a simulation. */
+export function billedByDefault(providerId: string): boolean {
+  return providerId !== 'local';
+}
+
 export interface SettingsForm {
   model: string;
   favorites: ModelRef[];
   providers: ProviderForm[];
   models: Record<string, ModelForm>;
+  billing: Record<string, boolean>;
   display: DisplayPrefs;
   instructions: string;
   search: SearchForm;
@@ -67,7 +73,7 @@ export type SaveGroup =
 export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form: (keyof SettingsForm)[] }> = {
   model: { prefs: ['selected'], form: ['model'] },
   providers: { prefs: ['providers'], form: ['providers', 'models'] },
-  modelPrefs: { prefs: ['providers', 'favorites'], form: ['providers', 'models', 'favorites'] },
+  modelPrefs: { prefs: ['providers', 'favorites', 'billing'], form: ['providers', 'models', 'favorites', 'billing'] },
   instructions: { prefs: ['globalInstructions'], form: ['instructions'] },
   search: { prefs: ['search'], form: ['search'] },
   sandbox: { prefs: ['sandbox'], form: ['sandbox'] },
@@ -183,6 +189,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     favorites: preferences.favorites ?? [],
     providers: providerForms,
     models,
+    billing: preferences.billing ?? {},
     display: preferences.display,
     instructions: preferences.globalInstructions ?? '',
     search: {
@@ -277,6 +284,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     selected,
     favorites: form.favorites,
     providers,
+    billing: form.billing,
     display: form.display,
     globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
     search: {
