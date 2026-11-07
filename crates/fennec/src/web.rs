@@ -1,68 +1,19 @@
 //! Web adapter: the server behind the UI. std only, one thread per connection,
 //! bound to the configured address.
 
-mod agent_routes;
-mod agents_md_routes;
 mod assets;
-mod audit_routes;
-mod backlog_routes;
-mod budget_routes;
-mod canvas_routes;
-mod changelog_routes;
 mod children;
-mod commit_subject;
-mod context_view;
-mod contribution_routes;
-mod diff_routes;
-mod editor;
-mod event_stream;
-mod file_manager;
-mod folder_routes;
 mod guard;
 mod http;
-mod idea_assets;
-mod idea_board;
-mod idea_queue;
-mod idea_routes;
-mod indicator_routes;
-mod insight;
-mod integration;
+mod jobs;
 mod login;
-mod mcp_oauth_routes;
-mod mcp_routes;
-mod model_routes;
-mod model_view;
-mod notice_stream;
-mod plugin_routes;
-mod preview;
-mod project_dashboard;
-mod project_delete;
-mod project_list_routes;
-mod project_routes;
-mod proposal_routes;
+mod os;
 mod routes;
-mod rule_approval_routes;
-mod rule_bridge_routes;
-mod rule_routes;
-mod run_stats_backfill;
-mod server_routes;
-mod servers;
-mod session_delete;
-mod session_name;
-mod session_routes;
-mod session_usage;
-mod settings_routes;
-mod setup_routes;
-mod terminal;
+mod streams;
 #[cfg(test)]
 mod test_support;
-mod thread_view;
 mod turns;
-mod update_routes;
-mod waiver_routes;
-mod workflow_routes;
-mod workflow_usage;
-mod worktree_routes;
+mod views;
 
 use crate::agent::ports::EventLog;
 use crate::chat;
@@ -75,8 +26,8 @@ use crate::store::SqliteStore;
 use crate::tools::Sandbox;
 use crate::web::http::HttpError;
 use crate::worktree;
+use os::servers::RunningServer;
 use serde_json::json;
-use servers::RunningServer;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
@@ -114,9 +65,9 @@ struct App {
     skill_folds: Mutex<HashMap<String, (u64, SessionSkills)>>,
     /// Each idea session's board report, keyed by its log's max seq like
     /// `skill_folds`: the UI polls the board while a run goes on.
-    idea_reports: Mutex<HashMap<String, (u64, idea_board::IdeaReport)>>,
+    idea_reports: Mutex<HashMap<String, (u64, views::idea_board::IdeaReport)>>,
     /// Projects whose ideas queue runs, and the flag that stops it after the
-    /// current idea (`idea_queue::start_queue`).
+    /// current idea (`jobs::idea_queue::start_queue`).
     idea_queues: Mutex<HashMap<String, Arc<AtomicBool>>>,
     /// The last worktrees disk scan and when it ran (ms): a scan walks gigabytes,
     /// so the home page's total reuses it for a while (`worktree_routes`).
@@ -242,13 +193,13 @@ impl App {
         &self,
         store: &SqliteStore,
         session_id: &str,
-    ) -> Result<idea_board::IdeaReport, String> {
+    ) -> Result<views::idea_board::IdeaReport, String> {
         let last = store.last_seq(session_id)?;
         let mut cache = crate::locks::lock(&self.idea_reports);
         if cache.get(session_id).is_some_and(|(seq, _)| *seq == last) {
             return Ok(cache[session_id].1.clone());
         }
-        let report = idea_board::idea_report(&store.events(session_id)?);
+        let report = views::idea_board::idea_report(&store.events(session_id)?);
         cache.insert(session_id.to_string(), (last, report.clone()));
         Ok(report)
     }
@@ -340,7 +291,7 @@ pub fn serve(
     if closed > 0 {
         eprintln!("fennec · closed {closed} turn(s) left open by a crash");
     }
-    let resumed_queues = idea_queue::resume_interrupted_runs(&app)?;
+    let resumed_queues = jobs::idea_queue::resume_interrupted_runs(&app)?;
     if resumed_queues > 0 {
         eprintln!("fennec · resumed {resumed_queues} ideas queue(s) cut by a restart");
     }
@@ -523,9 +474,9 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(idea_queue::resume_interrupted_runs(&app).unwrap(), 1);
+        assert_eq!(jobs::idea_queue::resume_interrupted_runs(&app).unwrap(), 1);
         for _ in 0..200 {
-            if !idea_queue::queue_running(&app, &project.id) {
+            if !jobs::idea_queue::queue_running(&app, &project.id) {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(10));

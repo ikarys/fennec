@@ -71,6 +71,6 @@ mod tests {
         assert!(has("web/src/pages", "web/src/lib"));
         // Strings in test fixtures are not imports.
         assert!(!has("crates/fennec/src/domain", "crates/fennec/src/web"));
-        assert!(has("crates/fennec/src/web", "crates/token-usage/src"));
+        assert!(has("crates/fennec/src/web/views", "crates/token-usage/src"));
     }
 }

@@ -3,21 +3,49 @@
 //! A thin dispatcher: each route points at the module that owns it. The
 //! session, project and folder handlers live in `session_routes`.
 
-use super::App;
-use super::agent_routes;
-use super::agents_md_routes;
-use super::audit_routes;
-use super::http::{Request, error, send, send_json};
-use super::proposal_routes;
-use super::{
-    assets, backlog_routes, budget_routes, canvas_routes, changelog_routes, contribution_routes,
-    diff_routes, event_stream, file_manager, folder_routes, idea_routes, indicator_routes,
-    integration, mcp_oauth_routes, mcp_routes, model_routes, plugin_routes, project_dashboard,
-    project_delete, project_list_routes, project_routes, rule_approval_routes, rule_bridge_routes,
-    rule_routes, server_routes, servers, session_delete, session_routes, settings_routes,
-    setup_routes, terminal, update_routes, waiver_routes, workflow_routes, worktree_routes,
-};
+pub(super) mod agent_routes;
+pub(super) mod agents_md_routes;
+pub(super) mod audit_routes;
+pub(super) mod backlog_routes;
+pub(super) mod budget_routes;
+pub(super) mod canvas_routes;
+pub(super) mod changelog_routes;
+pub(super) mod contribution_routes;
+pub(super) mod diff_routes;
+pub(super) mod folder_routes;
+pub(super) mod idea_assets;
+pub(super) mod idea_routes;
+pub(super) mod indicator_routes;
+pub(super) mod integration;
+pub(super) mod mcp_oauth_routes;
+pub(super) mod mcp_routes;
+pub(super) mod model_routes;
+pub(super) mod plugin_routes;
+pub(super) mod preview;
+pub(super) mod project_delete;
+pub(super) mod project_list_routes;
+pub(super) mod project_routes;
+pub(super) mod proposal_routes;
+pub(super) mod rule_approval_routes;
+pub(super) mod rule_bridge_routes;
+pub(super) mod rule_routes;
+pub(super) mod server_routes;
+pub(super) mod session_delete;
+pub(super) mod session_routes;
+pub(super) mod settings_routes;
+pub(super) mod setup_routes;
+pub(super) mod update_routes;
+pub(super) mod waiver_routes;
+pub(super) mod workflow_routes;
+pub(super) mod worktree_routes;
+
+use crate::web::App;
 use crate::web::http::HttpError;
+use crate::web::http::{Request, error, send, send_json};
+use crate::web::{
+    assets, os::file_manager, os::servers, os::terminal, streams::event_stream,
+    views::project_dashboard,
+};
 use serde_json::json;
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -48,8 +76,8 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "setup"]) => setup_routes::serve(app, stream),
         ("GET", ["api", "changelog"]) => changelog_routes::serve(app, stream),
         ("POST", ["api", "changelog", "seen"]) => changelog_routes::mark_seen(app, stream),
-        ("GET", ["api", "insight"]) => super::insight::serve(app, req, stream),
-        ("GET", ["api", "notices"]) => super::notice_stream::serve(app, stream),
+        ("GET", ["api", "insight"]) => crate::web::views::insight::serve(app, req, stream),
+        ("GET", ["api", "notices"]) => crate::web::streams::notice_stream::serve(app, stream),
         ("POST", ["api", "settings"]) => settings_routes::save_settings(app, req, stream),
         ("POST", ["api", "settings", "providers", "list"]) => {
             settings_routes::list_provider(app, req, stream)
@@ -277,7 +305,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             canvas_routes::annotate(app, req, stream, id)
         }
         ("GET", ["api", "sessions", id, "preview", rest @ ..]) => {
-            super::preview::serve(app, stream, id, rest)
+            crate::web::routes::preview::serve(app, stream, id, rest)
         }
         ("GET", ["api", ..]) | ("POST", _) => error(stream, 404, "not found"),
         ("GET", _) => {

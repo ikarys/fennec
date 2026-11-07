@@ -1,9 +1,9 @@
 //! The `App` the web adapter's tests build: a real store on disk, no turn running.
 
-use super::App;
 use crate::config::{LlmSettings, Settings};
 use crate::domain::preferences::ModelParams;
 use crate::notifier::Notifier;
+use crate::web::App;
 use crate::web::turns::Turns;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -34,7 +34,7 @@ pub(super) fn app(db_path: PathBuf) -> App {
         settings,
         port: 0,
         listen: std::net::Ipv4Addr::LOCALHOST.into(),
-        logins: super::login::Logins::default(),
+        logins: crate::web::login::Logins::default(),
         notifier: notifier.clone(),
         skill_folds: Mutex::new(HashMap::new()),
         idea_reports: Mutex::new(HashMap::new()),

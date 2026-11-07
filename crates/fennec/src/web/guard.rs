@@ -6,7 +6,7 @@
 //! must carry JSON, which a cross-site form cannot send without a CORS
 //! preflight this server never grants.
 
-use super::http::Request;
+use crate::web::http::Request;
 
 /// Vite's dev server proxies `/api` to fennec during `npm run dev`.
 const DEV_PORT: u16 = 5173;
