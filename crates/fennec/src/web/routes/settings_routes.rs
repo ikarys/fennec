@@ -13,9 +13,7 @@ use crate::web::http::HttpError;
 use crate::web::http::{Request, error, send_json};
 use crate::web::views::model_view;
 use crate::workflows;
-use llm_providers_connector::{
-    ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs, list_models,
-};
+use llm_providers_connector::{ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::net::TcpStream;
@@ -111,11 +109,12 @@ fn sandbox_health() -> Value {
     }
 }
 
-/// What `provider` lists now, at its stored endpoint.
+/// What `provider` lists, at its stored endpoint: the cached listing at once,
+/// refreshed in the background so a busy model server never delays the page.
 fn listing(app: &App, prefs: &Preferences, provider: &Provider) -> Value {
     let name = provider_name(prefs, &provider.id);
     let (base_url, listed) = match app.settings.endpoint(prefs, &provider.id) {
-        Ok(endpoint) => (endpoint.base_url.clone(), list_models(&endpoint)),
+        Ok(endpoint) => (endpoint.base_url.clone(), app.listings.get(&endpoint)),
         Err(e) => (provider.base_url.clone(), Err(e)),
     };
     listing_body(app, prefs, &provider.id, &name, base_url, listed)
@@ -204,7 +203,7 @@ fn model_entries(
 pub fn list_provider(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
     let body = req.json()?;
     let (provider, endpoint) = requested_endpoint(app, &body)?;
-    let listed = list_models(&endpoint);
+    let listed = app.listings.refresh(&endpoint);
     let prefs = app.store()?.preferences()?;
     let name = provider_name(&prefs, &provider);
     let listing = listing_body(app, &prefs, &provider, &name, endpoint.base_url, listed);

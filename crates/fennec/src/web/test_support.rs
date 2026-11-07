@@ -49,5 +49,6 @@ pub(super) fn app(db_path: PathBuf) -> App {
         )),
         agents_home: std::env::temp_dir(),
         update_check: Mutex::default(),
+        listings: Default::default(),
     }
 }

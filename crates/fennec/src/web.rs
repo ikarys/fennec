@@ -6,6 +6,7 @@ mod children;
 mod guard;
 mod http;
 mod jobs;
+mod listings;
 mod login;
 mod os;
 mod routes;
@@ -82,6 +83,9 @@ struct App {
     /// The last release check and when it ran: GitHub is asked at most every
     /// few hours (`update_routes`).
     update_check: Mutex<Option<(std::time::Instant, crate::update::Check)>>,
+    /// The last model listing each endpoint answered: the Settings page shows it at once
+    /// and re-lists in the background, so a busy model server never delays the page.
+    listings: listings::Listings,
 }
 
 impl App {
@@ -260,6 +264,7 @@ pub fn serve(
         plugins: plugins.clone(),
         agents_home,
         update_check: Mutex::default(),
+        listings: Default::default(),
     });
     // The event pump feeds the active plugins; it reads the store only.
     app.plugins
