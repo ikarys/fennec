@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
   AutonomyPrefs,
+  IntegrationPrefs,
   DisplayPrefs,
   McpServer,
   ModelRef,
@@ -37,6 +38,7 @@ import { McpSection } from '../components/settings/McpSection';
 import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
+import { IntegrationSection } from '../components/settings/IntegrationSection';
 import { ScannersSection } from '../components/settings/ScannersSection';
 import { PluginsSection } from '../components/settings/PluginsSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
@@ -253,6 +255,10 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     setForm((previous) => (previous ? { ...previous, autonomy } : previous));
   }
 
+  function updateIntegration(integration: IntegrationPrefs) {
+    setForm((previous) => (previous ? { ...previous, integration } : previous));
+  }
+
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
   }
@@ -430,6 +436,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                 <InstructionsSection save={groupSave('instructions')} value={form.instructions} onChange={updateInstructions} />
                 <SearchSection save={groupSave('search')} value={form.search} onChange={updateSearch} />
                 <AutonomySection save={groupSave('autonomy')} value={form.autonomy} onChange={updateAutonomy} />
+                <IntegrationSection save={groupSave('integration')} value={form.integration} onChange={updateIntegration} />
               </>
             )}
 

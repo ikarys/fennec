@@ -329,14 +329,45 @@ pub fn default_message(session_title: &str) -> String {
     format!("feat: {first}{}", chars.collect::<String>())
 }
 
-/// The integration commit message: the human's message plus the session's
-/// provenance trailer.
-pub fn commit_message(message: &str, session_id: &str) -> Result<String, String> {
+/// The integration commit message: the human's message, the session's
+/// provenance trailer, and one `Co-Authored-By` trailer per answering model.
+pub fn commit_message(
+    message: &str,
+    session_id: &str,
+    models: &[String],
+) -> Result<String, String> {
     let message = message.trim();
     if message.is_empty() {
         return Err("empty commit message".to_string());
     }
-    Ok(format!("{message}\n\nFennec-Session: {session_id}"))
+
+    let mut out = format!("{message}\n\nFennec-Session: {session_id}");
+
+    // Sanitize each model so an untrusted id cannot break the one-line trailer.
+    for model in models {
+        let model = sanitize_model(model);
+        if model.is_empty() {
+            continue;
+        }
+        out.push_str("\nCo-Authored-By: ");
+        out.push_str(&model);
+        out.push_str(" <noreply@fennec.local>");
+    }
+
+    Ok(out)
+}
+
+/// Reduce an untrusted model id to a safe trailer name.
+///
+/// It drops trailer-breaking characters and surrounding whitespace, and the
+/// caller skips it if that leaves no name.
+fn sanitize_model(model: &str) -> String {
+    // Drop characters that would let an untrusted id change the trailer's shape.
+    let cleaned: String = model
+        .chars()
+        .filter(|c| !matches!(c, '<' | '>' | '\r' | '\n'))
+        .collect();
+    cleaned.trim().to_string()
 }
 
 /// The prompt sent to the agent after `update_branch` left conflict markers.
@@ -1039,7 +1070,7 @@ mod tests {
     #[test]
     fn commit_message_adds_the_session_trailer() {
         assert_eq!(
-            commit_message("  Fix login \n", "s1"),
+            commit_message("  Fix login \n", "s1", &[]),
             Ok("Fix login\n\nFennec-Session: s1".to_string())
         );
     }
@@ -1047,9 +1078,43 @@ mod tests {
     #[test]
     fn commit_message_refuses_a_blank_message() {
         assert_eq!(
-            commit_message("   ", "s1"),
+            commit_message("   ", "s1", &[]),
             Err("empty commit message".to_string())
         );
+    }
+
+    #[test]
+    fn commit_message_adds_one_trailer_per_model_in_order() {
+        let models = vec!["qwen3.8-27b".to_string(), "claude-sonnet".to_string()];
+        let expected = [
+            "Fix",
+            "",
+            "Fennec-Session: s1",
+            "Co-Authored-By: qwen3.8-27b <noreply@fennec.local>",
+            "Co-Authored-By: claude-sonnet <noreply@fennec.local>",
+        ]
+        .join("\n");
+        assert_eq!(commit_message("Fix", "s1", &models), Ok(expected));
+    }
+
+    #[test]
+    fn commit_message_sanitizes_a_model_with_newlines_and_angle_brackets() {
+        let models = vec!["  <q\nwen>  ".to_string()];
+        let expected = [
+            "Fix",
+            "",
+            "Fennec-Session: s1",
+            "Co-Authored-By: qwen <noreply@fennec.local>",
+        ]
+        .join("\n");
+        assert_eq!(commit_message("Fix", "s1", &models), Ok(expected));
+    }
+
+    #[test]
+    fn commit_message_skips_a_model_blank_after_sanitizing() {
+        let models = vec!["<>\r\n".to_string()];
+        let expected = ["Fix", "", "Fennec-Session: s1"].join("\n");
+        assert_eq!(commit_message("Fix", "s1", &models), Ok(expected));
     }
 
     #[test]
