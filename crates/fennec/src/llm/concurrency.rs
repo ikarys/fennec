@@ -65,7 +65,7 @@ impl ModelGate {
     /// when `stop` is set so a stopped session does not queue behind a long
     /// round in another session.
     pub fn enter(&self, session: &str, stop: &AtomicBool) -> Option<Guard<'_>> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = crate::locks::lock(&self.state);
         loop {
             if stop.load(Ordering::Relaxed) {
                 return None;
@@ -87,7 +87,7 @@ impl ModelGate {
             state = self
                 .cv
                 .wait_timeout(state, Duration::from_millis(200))
-                .unwrap()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .0;
         }
     }
@@ -111,7 +111,7 @@ impl ModelGate {
 
     /// `session`'s turn ended: the gate stops waiting for it.
     pub fn release(&self, session: &str) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = crate::locks::lock(&self.state);
         if state.holder.as_ref().is_some_and(|h| h.session == session) {
             state.holder = None;
             self.cv.notify_all();
@@ -126,7 +126,7 @@ pub struct Guard<'a> {
 
 impl Drop for Guard<'_> {
     fn drop(&mut self) {
-        let mut state = self.gate.state.lock().unwrap();
+        let mut state = crate::locks::lock(&self.gate.state);
         state.free += 1;
         if let Some(holder) = &mut state.holder {
             holder.idle_since = Some(Instant::now());

@@ -79,16 +79,16 @@ impl Turns {
     }
 
     pub fn is_running(&self, session_id: &str) -> bool {
-        self.running.lock().unwrap().contains_key(session_id)
+        crate::locks::lock(&self.running).contains_key(session_id)
     }
 
     /// A copy of the running map's keys, for the server-wide notice stream.
     pub fn running_ids(&self) -> HashSet<String> {
-        self.running.lock().unwrap().keys().cloned().collect()
+        crate::locks::lock(&self.running).keys().cloned().collect()
     }
 
     pub fn stop(&self, session_id: &str) {
-        if let Some(flag) = self.running.lock().unwrap().get(session_id) {
+        if let Some(flag) = crate::locks::lock(&self.running).get(session_id) {
             flag.store(true, Ordering::Relaxed);
         }
     }
@@ -102,7 +102,7 @@ impl Turns {
         session_id: &str,
         add: impl FnOnce() -> Result<(), String>,
     ) -> Result<bool, String> {
-        let running = self.running.lock().unwrap();
+        let running = crate::locks::lock(&self.running);
         if running.contains_key(session_id) {
             add()?;
             Ok(true)
@@ -127,7 +127,7 @@ impl Turns {
     ) -> Result<(), String> {
         let stop = Arc::new(AtomicBool::new(false));
         {
-            let mut running = self.running.lock().unwrap();
+            let mut running = crate::locks::lock(&self.running);
             if running.contains_key(session_id) {
                 return Err("a turn is already running".into());
             }
@@ -174,7 +174,7 @@ impl Turns {
                         eprintln!("fennec: session {session_id}: commit: {e}");
                     }
                 }
-                let mut running = running.lock().unwrap();
+                let mut running = crate::locks::lock(&running);
                 match next_job(
                     &settings,
                     &notifier,

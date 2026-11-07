@@ -76,8 +76,8 @@ pub fn create(base: &Path, name: &str) -> Result<PathBuf, String> {
     std::fs::create_dir(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     // A missing git identity leaves the folder created but uncommitted; the
     // project stays openable either way.
-    crate::worktree::git(&path, &["init", "-q"], None).map_err(|e| format!("git init: {e}"))?;
-    let _ = crate::worktree::git(
+    crate::git::run(&path, &["init", "-q"], None).map_err(|e| format!("git init: {e}"))?;
+    let _ = crate::git::run(
         &path,
         &["commit", "--allow-empty", "-q", "-m", "fennec: initial"],
         None,

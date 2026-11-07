@@ -37,7 +37,7 @@ pub fn check(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
     // `refresh=1` is the Settings button's manual bypass.
     let refresh = req.query_param("refresh").as_deref() == Some("1");
     let cached = {
-        let guard = app.update_check.lock().unwrap();
+        let guard = crate::locks::lock(&app.update_check);
         guard
             .as_ref()
             .filter(|(checked_at, _)| !refresh && checked_at.elapsed() < CACHE)
@@ -48,7 +48,7 @@ pub fn check(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Str
         Some(check) => send_check(stream, &check),
         None => match crate::update::check() {
             Ok(check) => {
-                *app.update_check.lock().unwrap() = Some((Instant::now(), check.clone()));
+                *crate::locks::lock(&app.update_check) = Some((Instant::now(), check.clone()));
                 send_check(stream, &check)
             }
             Err(message) => error(stream, 502, &message),
@@ -82,7 +82,7 @@ pub fn apply(app: &App, stream: &mut TcpStream) -> Result<(), String> {
         Err(message) => return error(stream, 502, &message),
     };
 
-    *app.update_check.lock().unwrap() = Some((Instant::now(), check.clone()));
+    *crate::locks::lock(&app.update_check) = Some((Instant::now(), check.clone()));
 
     if !check.newer {
         return error(stream, 409, "fennec is already up to date");

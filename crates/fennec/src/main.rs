@@ -16,6 +16,7 @@ mod git;
 mod instructions;
 mod integration;
 mod llm;
+mod locks;
 mod mcp;
 mod metering;
 mod module_map;

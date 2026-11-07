@@ -78,9 +78,23 @@ use servers::RunningServer;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use turns::{Place, Turns};
+
+/// One thread per connection; 256 keeps an open SSE tab from exhausting the process.
+const MAX_CONNECTIONS: usize = 256;
+
+static ACTIVE_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
+
+/// Drops the active-connection count when a handler thread ends, even if it panics.
+struct ConnectionSlot;
+
+impl Drop for ConnectionSlot {
+    fn drop(&mut self) {
+        ACTIVE_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
+    }
+}
 
 /// What every request handler shares.
 struct App {
@@ -207,7 +221,7 @@ impl App {
         skills: &[Skill],
     ) -> Result<SessionSkills, String> {
         let last = store.last_seq(id)?;
-        let mut cache = self.skill_folds.lock().unwrap();
+        let mut cache = crate::locks::lock(&self.skill_folds);
         if cache.get(id).is_some_and(|(seq, _)| *seq == last) {
             return Ok(cache[id].1.clone());
         }
@@ -225,7 +239,7 @@ impl App {
         session_id: &str,
     ) -> Result<idea_board::IdeaReport, String> {
         let last = store.last_seq(session_id)?;
-        let mut cache = self.idea_reports.lock().unwrap();
+        let mut cache = crate::locks::lock(&self.idea_reports);
         if cache.get(session_id).is_some_and(|(seq, _)| *seq == last) {
             return Ok(cache[session_id].1.clone());
         }
@@ -312,8 +326,20 @@ pub fn serve(port: u16, settings: Settings) -> Result<(), String> {
         eprintln!("fennec · resumed {resumed_queues} ideas queue(s) cut by a restart");
     }
     for stream in listener.incoming().flatten() {
+        let mut stream = stream;
+        if ACTIVE_CONNECTIONS.fetch_add(1, Ordering::Relaxed) + 1 > MAX_CONNECTIONS {
+            ACTIVE_CONNECTIONS.fetch_sub(1, Ordering::Relaxed);
+            let _ = http::send_json(
+                &mut stream,
+                503,
+                &json!({ "error": "too many connections" }),
+            );
+            continue;
+        }
         let app = app.clone();
+        let slot = ConnectionSlot;
         std::thread::spawn(move || {
+            let _slot = slot;
             let mut stream = stream;
             if let Err(e) = handle(&app, &mut stream) {
                 let _ = http::send_json(&mut stream, 400, &json!({ "error": e }));

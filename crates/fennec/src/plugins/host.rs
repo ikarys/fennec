@@ -177,13 +177,13 @@ impl Host {
                 "event": payload,
             },
         });
-        let mut stdin = self.stdin.lock().unwrap();
+        let mut stdin = crate::locks::lock(&self.stdin);
         let _ = writeln!(stdin, "{message}").and_then(|()| stdin.flush());
     }
 
     /// The block data this plugin has emitted, as a snapshot.
     pub fn blocks_snapshot(&self) -> HashMap<BlockKey, BlockContent> {
-        self.blocks.read().unwrap().clone()
+        crate::locks::read(&self.blocks).clone()
     }
 }
 
@@ -201,7 +201,7 @@ fn apply_update(
         return false;
     }
     let key = update.key();
-    let mut map = blocks.write().unwrap();
+    let mut map = crate::locks::write(blocks);
     if map.len() >= MAX_BLOCKS && !map.contains_key(&key) {
         return false;
     }
@@ -211,7 +211,7 @@ fn apply_update(
 
 impl Drop for Host {
     fn drop(&mut self) {
-        if let Some(mut child) = self.child.lock().unwrap().take() {
+        if let Some(mut child) = crate::locks::lock(&self.child).take() {
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -527,7 +527,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             },
         };
         assert!(!apply_update(&blocks, &update));
-        assert!(blocks.read().unwrap().is_empty());
+        assert!(crate::locks::read(&blocks).is_empty());
 
         // Updates in a burst are all stored: the latest wins.
         let text = |value: &str| PluginBlockUpdate {
