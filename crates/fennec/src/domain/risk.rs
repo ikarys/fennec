@@ -19,6 +19,11 @@ const AI_PROVIDERS: &[&str] = &[
     "gemini",
     "devin",
     "aider",
+    "qwen",
+    "mistral",
+    "llama",
+    "deepseek",
+    "grok",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
