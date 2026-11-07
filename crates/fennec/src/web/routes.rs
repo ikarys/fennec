@@ -58,6 +58,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             settings_routes::probe_model(app, req, stream)
         }
         ("POST", ["api", "settings", "mcp", "connect"]) => mcp_routes::connect(app, req, stream),
+        ("POST", ["api", "mcp"]) => mcp_routes::draft_mcp(app, req, stream),
         ("POST", ["api", "settings", "mcp", "authorize"]) => {
             mcp_oauth_routes::authorize(app, req, stream)
         }
