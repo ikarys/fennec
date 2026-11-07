@@ -38,8 +38,19 @@ dev:
     # npm stamps node_modules/.package-lock.json at each install.
     (cd web && ([ node_modules/.package-lock.json -nt package-lock.json ] || npm ci))
     cargo build -p fennec
+    # The installed fennec service holds 7777 and the same store: pause it while
+    # the dev server runs, start it again on exit (Ctrl-C included).
+    resume=:
+    if [ "$API_PORT" = 7777 ]; then
+      if command -v systemctl >/dev/null && systemctl --user is-active --quiet fennec 2>/dev/null; then
+        systemctl --user stop fennec && resume='systemctl --user start fennec'
+      elif command -v launchctl >/dev/null && launchctl list dev.fennec >/dev/null 2>&1; then
+        plist="$HOME/Library/LaunchAgents/dev.fennec.plist"
+        launchctl bootout "gui/$(id -u)" "$plist" && resume="launchctl bootstrap gui/$(id -u) $plist"
+      fi
+    fi
     target/debug/fennec --port "$API_PORT" & server=$!
-    trap 'kill $server' EXIT
+    trap 'kill $server 2>/dev/null || true; wait $server 2>/dev/null || true; $resume' EXIT
     # strictPort: a busy UI port fails loudly instead of drifting to a port
     # the server's origin guard does not know (5174+ → "forbidden origin").
     cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT" --strictPort
