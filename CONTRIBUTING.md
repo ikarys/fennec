@@ -11,6 +11,17 @@ included, can relicense your code without your consent.
 You are responsible for what you submit, whoever or whatever wrote it: make sure you have the right to
 contribute it, and that you understand it.
 
+## Say which AI models you used
+
+If an AI model wrote or changed part of your contribution, name it, with its version:
+
+- in each commit concerned, as a trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`,
+  `Co-Authored-By: Qwen3.8-27B (local) <noreply@example.com>`…;
+- in the pull request description, a line `AI models: <model, version>` (or `AI models: none`).
+
+This is not a judgement on the contribution: reviewers read model-written code differently, and fennec's own
+risk view uses these trailers to find the code no human has reviewed yet.
+
 ## Before opening a pull request
 
 - Run `just setup` once per clone (git hooks), then `just check`: formatting, clippy, tests, UI lint,
