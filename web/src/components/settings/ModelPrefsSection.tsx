@@ -377,13 +377,9 @@ export function ModelPrefsSection({
   onRemoveModel
 }: ModelPrefsSectionProps) {
   const t = useT();
-  // A model with saved overrides opens by itself: that is what the human came to edit.
-  const hasOverrides = (key: string) => {
-    const value = values[key];
-    return value != null && (value.maxTokens !== '' || value.contextWindow !== '' || value.compactionThreshold !== '' || value.reasoningEffort !== '' || value.priceInput !== '' || value.priceCached !== '' || value.priceOutput !== '');
-  };
+  // Every model starts collapsed: the list stays short, the human opens the one to edit.
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const isOpen = (key: string) => open[key] ?? hasOverrides(key);
+  const isOpen = (key: string) => open[key] === true;
   const toggleOpen = (key: string) => setOpen((previous) => ({ ...previous, [key]: !isOpen(key) }));
 
   return (
