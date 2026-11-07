@@ -62,16 +62,17 @@ interface SettingsPageProps {
   onListing: (listing: ProviderListing) => void;
 }
 
-type SettingsTab = 'models' | 'behaviour' | 'security' | 'plugins' | 'library' | 'display' | 'about';
+type SettingsTab = 'models' | 'behaviour' | 'security' | 'agents' | 'extensions' | 'display' | 'about';
 
 // Six groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
-// (sandbox, scanners, the human's rules), the human's plugins, the catalogues of content (skills, workflows, agents, MCP) and the display.
+// (sandbox, scanners, the human's rules), the agents and what they load (skills, workflows), what plugs into fennec
+// (plugins, MCP servers) and the display.
 const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
   { id: 'models', labelKey: 'settingsTabModels' },
   { id: 'behaviour', labelKey: 'settingsTabBehaviour' },
   { id: 'security', labelKey: 'settingsTabSecurity' },
-  { id: 'plugins', labelKey: 'settingsTabPlugins' },
-  { id: 'library', labelKey: 'settingsTabLibrary' },
+  { id: 'agents', labelKey: 'settingsTabAgents' },
+  { id: 'extensions', labelKey: 'settingsTabExtensions' },
   { id: 'display', labelKey: 'settingsTabDisplay' },
   { id: 'about', labelKey: 'settingsTabAbout' }
 ];
@@ -84,10 +85,11 @@ const LEGACY_TABS: Record<string, SettingsTab> = {
   security: 'security',
   rules: 'security',
   autonomy: 'behaviour',
-  skills: 'library',
-  workflows: 'library',
-  agents: 'library',
-  mcp: 'library'
+  skills: 'agents',
+  workflows: 'agents',
+  library: 'agents',
+  plugins: 'extensions',
+  mcp: 'extensions'
 };
 
 export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
@@ -449,10 +451,9 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
               </>
             )}
 
-            {tab === 'plugins' && <PluginsSection />}
-
-            {tab === 'library' && (
+            {tab === 'agents' && (
               <>
+                <AgentsSection />
                 <SkillsSection
                   save={groupSave('skills')}
                   skills={settings.skills}
@@ -465,7 +466,12 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   value={form.enabledWorkflows}
                   onChange={updateEnabledWorkflows}
                 />
-                <AgentsSection />
+              </>
+            )}
+
+            {tab === 'extensions' && (
+              <>
+                <PluginsSection />
                 <McpSection
                   save={groupSave('mcp')}
                   value={form.mcp}
