@@ -1,5 +1,5 @@
 // Project page indicators tab: verified figures drawn from recorded facts.
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
@@ -17,9 +17,9 @@ import {
 import {
   getProjectIndicators,
   type IndicatorId,
-  type IndicatorView,
 } from '../../lib/api';
 import { useT } from '../../i18n';
+import { useLoaded } from '../../hooks/useLoaded';
 
 const ICONS: Record<IndicatorId, ReactNode> = {
   integrity: <CommitIcon />,
@@ -35,32 +35,8 @@ const ICONS: Record<IndicatorId, ReactNode> = {
 
 export function IndicatorsSection({ projectId }: { projectId: string }) {
   const t = useT();
-  const [data, setData] = useState<IndicatorView[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setData(null);
-    getProjectIndicators(projectId)
-      .then((indicators) => {
-        if (!cancelled) {
-          setData(indicators);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : t('unknownError'));
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  const { data, error, loading } = useLoaded(() => getProjectIndicators(projectId), [projectId]);
 
   if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;

@@ -1,8 +1,8 @@
 // Project page risks tab: server-measured risk tiles and zones with a re-measure action.
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
-import { getProjectRisks, type RiskReport, type RiskSignal, type RiskZone } from '../../lib/api/risks';
+import { getProjectRisks, type RiskSignal, type RiskZone } from '../../lib/api/risks';
 import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -11,6 +11,7 @@ import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../Icons';
 import { TableHeader } from '../ui/TableHeader';
+import { useLoaded } from '../../hooks/useLoaded';
 
 type T = (key: MsgKey, vars?: Record<string, string | number>) => string;
 
@@ -47,35 +48,10 @@ export function RiskSection({
   onStart: (prompt: string, mode: string) => void;
 }) {
   const t = useT();
-  const [data, setData] = useState<RiskReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [measuring, setMeasuring] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const { data, error, loading: measuring } = useLoaded(() => getProjectRisks(projectId), [projectId, reloadKey]);
   // The brief to remediate, global or one module's; null when no confirmation is open.
   const [confirming, setConfirming] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setData(null);
-    setError(null);
-    setMeasuring(true);
-    getProjectRisks(projectId)
-      .then((report) => {
-        if (!cancelled) {
-          setData(report);
-          setMeasuring(false);
-        }
-      })
-      .catch((loadError: unknown) => {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : String(loadError));
-          setMeasuring(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, reloadKey]);
 
   const refresh = () => {
     setReloadKey((key) => key + 1);
