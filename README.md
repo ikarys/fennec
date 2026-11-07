@@ -104,6 +104,13 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 - A usage ledger: calls, tokens and speeds per model, kept beyond sessions.
 - API keys are sealed at rest with `secret.key` next to the store.
 
+### Budgets and billed models
+
+- A project can have a monthly cost budget, set from a tile on its project page.
+- The month's spend is the usage ledger priced at each model's price (Settings, Models; per million tokens: input, cached, output).
+- At 80 % an alert shows, once exceeded a new turn is refused until the budget is raised or removed.
+- Only billed models count: a model on the local provider is not billed by default (its price is an estimate, kept for comparison), a paid provider's model is; the Billed checkbox of each model overrides it. Every price stays displayed either way.
+
 ## Platforms
 
 - Linux x86_64 and aarch64: full support; the command sandbox is bubblewrap.
