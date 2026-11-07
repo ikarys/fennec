@@ -226,6 +226,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   has nothing new.
 - `POST /api/changelog/seen` `{}` → `{unseen: 0}`: the human looked at the changelog of the running version.
 - `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools}`
+  (`listings` may be the last listing the endpoint answered, refreshed in the background)
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
     MCP tool's access as its server declares it in its annotations (indicative, not verified;
     `undeclared` without annotations) and its definition's estimated token cost
