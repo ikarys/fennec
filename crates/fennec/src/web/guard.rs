@@ -1,20 +1,34 @@
 //! Who may talk to the server. It drives an agent that runs commands, so only
-//! the human's own pages may: `Host` must name this server (DNS rebinding),
-//! `Origin`, when a browser sends one, must be its pages or Vite's dev server
-//! (CSRF), and a POST must carry JSON, which a cross-site form cannot send
-//! without a CORS preflight this server never grants.
+//! the human's own pages may: a local peer must name this server in `Host`
+//! (DNS rebinding) and, when a browser sends `Origin`, it must be this server's
+//! pages or Vite's dev server (CSRF). A remote peer is allowed only when a
+//! password is set; its `Origin`, when present, must be its own `Host`. A POST
+//! must carry JSON, which a cross-site form cannot send without a CORS
+//! preflight this server never grants.
 
 use super::http::Request;
 
 /// Vite's dev server proxies `/api` to fennec during `npm run dev`.
 const DEV_PORT: u16 = 5173;
 
+#[derive(Debug, PartialEq)]
 pub struct Refusal {
     pub status: u16,
     pub message: &'static str,
 }
 
-pub fn check(req: &Request, port: u16) -> Result<(), Refusal> {
+#[derive(Debug, PartialEq)]
+pub enum Caller {
+    Local,
+    Remote,
+}
+
+pub fn check(
+    req: &Request,
+    port: u16,
+    peer_is_loopback: bool,
+    remote_enabled: bool,
+) -> Result<Caller, Refusal> {
     // `port` is this server; `port - 1` is the Vite page when the recipe pairs
     // the API one port above its UI (the servers panel), so that origin is
     // allowed too. `DEV_PORT` covers the no-panel recipe, where Vite stays on
@@ -28,12 +42,29 @@ pub fn check(req: &Request, port: u16) -> Result<(), Refusal> {
     let origin_ok = req
         .header("origin")
         .is_none_or(|o| o.strip_prefix("http://").is_some_and(local));
-    if !(host_ok && origin_ok) {
-        return Err(Refusal {
-            status: 403,
-            message: "forbidden origin",
-        });
+
+    if peer_is_loopback && host_ok && origin_ok {
+        json_rule(req)?;
+        return Ok(Caller::Local);
     }
+
+    if remote_enabled {
+        let Some(host) = req.header("host") else {
+            return Err(forbidden());
+        };
+        let origin_ok = req
+            .header("origin")
+            .is_none_or(|o| o == format!("http://{host}") || o == format!("https://{host}"));
+        if origin_ok {
+            json_rule(req)?;
+            return Ok(Caller::Remote);
+        }
+    }
+
+    Err(forbidden())
+}
+
+fn json_rule(req: &Request) -> Result<(), Refusal> {
     let json = req
         .header("content-type")
         .is_some_and(|c| c.starts_with("application/json"));
@@ -44,6 +75,13 @@ pub fn check(req: &Request, port: u16) -> Result<(), Refusal> {
         });
     }
     Ok(())
+}
+
+fn forbidden() -> Refusal {
+    Refusal {
+        status: 403,
+        message: "forbidden origin",
+    }
 }
 
 #[cfg(test)]
@@ -64,7 +102,9 @@ mod tests {
     }
 
     fn status(headers: &[(&str, &str)]) -> Option<u16> {
-        check(&post(headers), 7777).err().map(|r| r.status)
+        check(&post(headers), 7777, true, false)
+            .err()
+            .map(|r| r.status)
     }
 
     const JSON: (&str, &str) = ("Content-Type", "application/json");
@@ -124,7 +164,7 @@ mod tests {
             body: Vec::new(),
         };
 
-        assert!(check(&req, 7777).is_ok());
+        assert!(check(&req, 7777, true, false).is_ok());
     }
 
     #[test]
@@ -191,9 +231,42 @@ mod tests {
     #[test]
     fn the_port_argument_is_honoured_for_the_host_check() {
         let allowed = post(&[("Host", "127.0.0.1:9000"), JSON]);
-        assert!(check(&allowed, 9000).is_ok());
+        assert!(check(&allowed, 9000, true, false).is_ok());
 
         let refused = post(&[("Host", "127.0.0.1:7777"), JSON]);
-        assert_eq!(check(&refused, 9000).unwrap_err().status, 403);
+        assert_eq!(check(&refused, 9000, true, false).unwrap_err().status, 403);
+    }
+
+    #[test]
+    fn remote_disabled_refuses_a_non_local_host() {
+        let req = post(&[("Host", "example.com:7777"), JSON]);
+        assert_eq!(check(&req, 7777, false, false).unwrap_err().status, 403);
+        assert_eq!(check(&req, 7777, true, false).unwrap_err().status, 403);
+    }
+
+    #[test]
+    fn remote_enabled_accepts_a_matching_origin() {
+        let req = post(&[
+            ("Host", "nas.example:7777"),
+            ("Origin", "http://nas.example:7777"),
+            JSON,
+        ]);
+        assert_eq!(check(&req, 7777, false, true), Ok(Caller::Remote));
+    }
+
+    #[test]
+    fn remote_enabled_refuses_a_foreign_origin() {
+        let req = post(&[
+            ("Host", "nas.example:7777"),
+            ("Origin", "https://evil.example"),
+            JSON,
+        ]);
+        assert_eq!(check(&req, 7777, false, true).unwrap_err().status, 403);
+    }
+
+    #[test]
+    fn a_loopback_peer_with_a_non_local_host_is_remote_not_local() {
+        let req = post(&[("Host", "nas.example:7777"), JSON]);
+        assert_eq!(check(&req, 7777, true, true), Ok(Caller::Remote));
     }
 }

@@ -130,6 +130,7 @@ pub fn send_with(
         200 => "OK",
         202 => "Accepted",
         400 => "Bad Request",
+        401 => "Unauthorized",
         403 => "Forbidden",
         404 => "Not Found",
         409 => "Conflict",

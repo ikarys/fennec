@@ -191,6 +191,13 @@ read-only. The human edits them as usual.
 
 ## Endpoints
 
+A local caller (loopback peer, local `Host`) reaches every endpoint with no login. A remote caller,
+accepted only when `settings.yaml` sets `listen:` and a password hash, needs the `fennec_session`
+cookie: without it `/api/*` answers 401 `{error: "login required"}` and any other path the login page.
+
+- `POST /api/login` `{password}` → 200 `{}` with `Set-Cookie: fennec_session=…; HttpOnly; SameSite=Strict`
+  (30 days, in memory: a restart asks again); 401 `{error}` after a one-second delay on a wrong password,
+  one attempt at a time. Remote callers only.
 - `GET /api/config` → `{model, contextWindow, compactAt}`: the resolved parameters of the
   stored preferences; `compactAt` is the fraction at which the session compacts (0 disables)
 - `GET /api/version` → `{version, build, changelogUrl}`: the binary's version, the same string `fennec --version` prints; `build` is the local build's number (`<commits>.<sha>[-dirty]`, set by `just install`), `null` for a release; `changelogUrl` is the changelog on GitHub

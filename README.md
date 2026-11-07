@@ -166,6 +166,31 @@ project folder from the home page, describe the change and approve the plan.
 Port 7777 taken? `fennec --port 7788`, or set it for good in `~/.config/fennec/settings.yaml` (`port: 7788`),
 also editable on Settings > Security.
 
+### Remote access
+
+fennec listens on 127.0.0.1 only, and needs no password there. To use it from another machine
+(fennec on a NAS, say):
+
+```bash
+fennec password                                       # stores a PBKDF2 hash in ~/.config/fennec/settings.yaml
+echo "listen: 0.0.0.0" >> ~/.config/fennec/settings.yaml
+fennec                                                # refuses a non-local address without a password
+```
+
+A remote browser gets a login page, then a session cookie (30 days, lost when fennec restarts).
+Local use stays password-free. fennec speaks plain HTTP: across an untrusted network, put it behind
+TLS, for example Tailscale, an SSH tunnel (`ssh -L 7777:127.0.0.1:7777 nas`, no password needed) or a
+reverse proxy. A reverse proxy must pass the original `Host` (Caddy does by default; nginx needs
+`proxy_set_header Host $host;`):
+
+```
+fennec.example.lan {
+    reverse_proxy 127.0.0.1:7777
+}
+```
+
+The play button's servers and the preview still bind 127.0.0.1: open them through an SSH tunnel.
+
 ## Configuration
 
 | Variable | Default | Notes |
@@ -184,6 +209,7 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 - The human owns the CLI/UI and configuration; fennec never blocks them.
 - The code that decides, such as integration, never runs what a model wrote.
+- The server answers local pages only (`Host`/`Origin` checked, JSON bodies); a remote caller needs the password set with `fennec password` (see "Remote access").
 - **Git hooks do not run on fennec's own git commands.** Every git command fennec runs itself (the commit that saves each turn's work in its worktree, the integration's cherry-pick and commit, status and diffs) passes `-c core.hooksPath=/dev/null -c core.fsmonitor=false`: a hook or fsmonitor in a repository may have been written by a model, and fennec's kernel never executes one. Your hooks still run on your own `git commit`; if a check matters (a commit-message format, a linter), run it in your own workflow after integrating, or make it a criterion's `check:` command.
 - Git's metadata (`.git`) is read-only inside the command sandbox and refused to the file tools, with no waiver: an agent cannot change the repository's config, hooks or refs through them.
 - Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox. **What the sandbox blocks, and how to run the app, add a dependency or see the agent's work anyway: [docs/sandbox.md](docs/sandbox.md).**

@@ -39,11 +39,13 @@ mod workflows;
 mod worktree;
 
 use config::Settings;
+use std::io::{BufRead, IsTerminal, Write};
 use store::SqliteStore;
 
 const USAGE: &str = "usage:
   fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777 (or the port of
                                            ~/.config/fennec/settings.yaml, `port: <n>`)
+  fennec password                          set the remote-access password in settings.yaml
   fennec run [--session <id>] [--agent <id>] [--image <path>]... <prompt>
                                            run the agent loop in the current directory;
                                            agent: plan (default, read-only) or builder
@@ -87,8 +89,11 @@ fn run(args: &[String]) -> Result<(), String> {
                 [flag, n] if flag == "--port" => n.parse().map_err(|_| USAGE)?,
                 _ => return Err(USAGE.into()),
             };
-            web::serve(port, Settings::from_env()?)
+            let listen = server_config::listen()?;
+            let password = server_config::password()?;
+            web::serve(port, listen, password, Settings::from_env()?)
         }
+        Some("password") => password_command(),
         Some("run") => {
             let mut session = None;
             let mut agent = None;
@@ -121,6 +126,55 @@ fn run(args: &[String]) -> Result<(), String> {
         Some("log") => cli::replay(&open_store()?, args.get(1).ok_or(USAGE)?),
         _ => Err(USAGE.into()),
     }
+}
+
+fn password_command() -> Result<(), String> {
+    use ring::rand::SecureRandom;
+    let first = read_password_line("New password: ")?;
+    let second = read_password_line("Again: ")?;
+    if first.chars().count() < 12 {
+        return Err("password must be at least 12 characters".into());
+    }
+    if first != second {
+        return Err("passwords do not match".into());
+    }
+
+    let mut salt = [0u8; 16];
+    ring::rand::SystemRandom::new()
+        .fill(&mut salt)
+        .map_err(|e| e.to_string())?;
+    let hash = domain::password::hash(&first, &salt, domain::password::ITERATIONS);
+    server_config::set_password(&hash)?;
+
+    println!("wrote password to {}", server_config::path().display());
+    println!("set `listen: 0.0.0.0` in that file to accept remote connections");
+    Ok(())
+}
+
+fn read_password_line(prompt: &str) -> Result<String, String> {
+    eprint!("{prompt}");
+    std::io::stderr().flush().map_err(|e| e.to_string())?;
+
+    let stdin = std::io::stdin();
+    let interactive = stdin.is_terminal();
+    if interactive {
+        let _ = std::process::Command::new("stty").arg("-echo").status();
+    }
+
+    let mut line = String::new();
+    let read = stdin
+        .lock()
+        .read_line(&mut line)
+        .map_err(|e| e.to_string())?;
+
+    if interactive {
+        let _ = std::process::Command::new("stty").arg("echo").status();
+    }
+
+    if read == 0 {
+        return Err("no password entered".into());
+    }
+    Ok(line.trim_end_matches(['\r', '\n']).to_string())
 }
 
 /// `sessions` and `log` only read the store: no need to reach the model.
