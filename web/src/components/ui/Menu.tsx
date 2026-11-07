@@ -114,7 +114,7 @@ export function MenuItem({
     <button
       type="button"
       role="menuitem"
-      className={`rounded px-2 py-1 text-left text-xs hover:bg-raised ${
+      className={`rounded-md px-2 py-1 text-left text-xs hover:bg-raised ${
         tone === 'danger' ? 'text-err' : 'text-text'
       }`}
       onClick={() => {

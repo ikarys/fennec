@@ -42,7 +42,7 @@ export function ScannersSection({ scanners }: ScannersSectionProps) {
               {!scanner.path && (
                 <div className="flex items-center gap-2">
                   <code
-                    className="min-w-0 grow truncate rounded bg-surface px-2 py-1 font-mono text-xs"
+                    className="min-w-0 grow truncate rounded-md bg-surface px-2 py-1 font-mono text-xs"
                     title={scanner.install}
                   >
                     {scanner.install}

@@ -17,7 +17,7 @@ import type { MsgKey } from '../../i18n/messages';
 const REMARK_PLUGINS = [remarkGfm];
 
 // Inline code: Thread.tsx's inline style, on bg-code so it reads on the raised card.
-const INLINE_CODE = 'rounded bg-code px-1 py-0.5 font-mono text-xs text-text';
+const INLINE_CODE = 'rounded-md bg-code px-1 py-0.5 font-mono text-xs text-text';
 
 // Titles and bodies may hold inline markdown (code, **bold**).
 function Inline({ children }: { children: string }) {
@@ -35,11 +35,11 @@ function Inline({ children }: { children: string }) {
 }
 
 function PathChip({ path }: { path: string }) {
-  return <code className="rounded bg-code px-1.5 py-0.5 font-mono text-xs text-text">{path}</code>;
+  return <code className="rounded-md bg-code px-1.5 py-0.5 font-mono text-xs text-text">{path}</code>;
 }
 
 // A step's files, on the raised inset: bg-panel keeps them lighter than bg-code.
-const STEP_FILE_CHIP = 'rounded bg-panel px-1.5 py-0.5 font-mono text-xs text-text';
+const STEP_FILE_CHIP = 'rounded-md bg-panel px-1.5 py-0.5 font-mono text-xs text-text';
 
 export function PlanCard({ plan, actions, preflight }: { plan: Plan; actions?: PlanActions | null; preflight?: PreflightResultView[] }) {
   const t = useT();

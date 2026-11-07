@@ -55,7 +55,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
 
   function row(server: McpServerView) {
     return (
-      <div key={server.name} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm text-text hover:bg-bg">
+      <div key={server.name} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-text hover:bg-bg">
         <Switch
           checked={server.active}
           onChange={(on) => onToggle(server.name, on)}

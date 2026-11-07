@@ -216,9 +216,9 @@ export function InsightPage() {
                     {view.days.map((day) => (
                       <div key={day.day} title={day.title} className="group flex h-full min-w-0 flex-1 items-end">
                         <div className="flex h-full w-full flex-col-reverse transition-[filter] group-hover:brightness-110">
-                          <div className="rounded-t-[3px] bg-accent/35" style={{ height: `${day.cachedPercent}%` }} />
-                          <div className="rounded-t-[3px] bg-accent" style={{ height: `${day.freshPercent}%` }} />
-                          <div className="rounded-t-[3px] bg-err" style={{ height: `${day.lostPercent}%` }} />
+                          <div className="rounded-t-md bg-accent/35" style={{ height: `${day.cachedPercent}%` }} />
+                          <div className="rounded-t-md bg-accent" style={{ height: `${day.freshPercent}%` }} />
+                          <div className="rounded-t-md bg-err" style={{ height: `${day.lostPercent}%` }} />
                         </div>
                       </div>
                     ))}
