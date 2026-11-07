@@ -398,4 +398,18 @@ describe('round trip', () => {
 
     expect(toForm(rebuilt, listings)).toEqual(initial);
   });
+
+  it('round-trips a billing map', () => {
+    const listings = [listing('p', ['listed'])];
+    const prefs = preferences({
+      billing: { 'p/listed': false, 'local/m': true },
+      providers: [provider('p')],
+    });
+
+    const initial = toForm(prefs, listings);
+    const rebuilt = buildPreferences(initial, response(prefs, listings));
+
+    expect(rebuilt.billing).toEqual({ 'p/listed': false, 'local/m': true });
+    expect(toForm(rebuilt, listings).billing).toEqual(initial.billing);
+  });
 });

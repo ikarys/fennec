@@ -147,6 +147,13 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     });
   }
 
+  function toggleBilled(key: string, billed: boolean) {
+    setForm((previous) => {
+      if (!previous) return previous;
+      return { ...previous, billing: { ...previous.billing, [key]: billed } };
+    });
+  }
+
   function updateProvider(index: number, patch: Partial<ProviderForm>) {
     setForm((previous) => {
       if (!previous) return previous;
@@ -428,9 +435,11 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   save={groupSave('modelPrefs')}
                   listings={settings.listings}
                   values={form.models}
+                  billing={form.billing}
                   defaults={settings.defaults}
                   favorites={form.favorites}
                   onToggleFavorite={toggleFavorite}
+                  onToggleBilled={toggleBilled}
                   defaultModel={form.model}
                   onSetDefault={setDefaultModel}
                   onChange={updateModelField}
