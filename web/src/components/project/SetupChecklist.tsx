@@ -1,14 +1,13 @@
-import { useEffect, useState } from "react";
 import { Badge, type BadgeTone } from "../ui/Badge";
 import { Button, buttonClass } from "../ui/Button";
 import { ListCard } from "../ui/ListCard";
 import {
   getSetup,
-  type Setup,
   type SetupStatus,
   type SetupCheckId,
 } from "../../lib/api/setup";
 import { useT } from "../../i18n";
+import { useLoaded } from "../../hooks/useLoaded";
 
 const TONES: Record<SetupStatus, BadgeTone> = {
   ok: "ok",
@@ -42,21 +41,9 @@ export function SetupChecklist({
   onOpenProject: () => void;
 }) {
   const t = useT();
-  const [setup, setSetup] = useState<Setup | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    getSetup()
-      .then((result) => {
-        if (!cancelled) setSetup(result);
-      })
-      .catch(() => {
-        // The checklist is a hint; ignore failures.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectCount]);
+  // The checklist is a hint: a failure shows nothing.
+  const { data: setup } = useLoaded(getSetup, [projectCount]);
 
   if (!setup || setup.complete) return null;
 

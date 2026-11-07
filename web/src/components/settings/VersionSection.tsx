@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Section } from '../ui/Section';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { ExternalIcon, RefreshIcon, SpinnerIcon } from '../Icons';
 import { useT } from '../../i18n';
-import { getVersion, getUpdate, type UpdateCheck, type VersionInfo } from '../../lib/api';
+import { getVersion, getUpdate, type UpdateCheck } from '../../lib/api';
+import { useLoaded } from '../../hooks/useLoaded';
 
 type CheckResult =
   | { kind: 'checked'; check: UpdateCheck }
@@ -12,24 +13,10 @@ type CheckResult =
 
 export function VersionSection() {
   const t = useT();
-  const [info, setInfo] = useState<VersionInfo | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [check, setCheck] = useState<CheckResult | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    getVersion()
-      .then((versionInfo) => {
-        if (!cancelled) setInfo(versionInfo);
-      })
-      .catch((error) => {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: info, error: loadError } = useLoaded(getVersion, []);
 
   const onCheck = () => {
     if (checking) return;
