@@ -280,7 +280,7 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
         <span className="min-w-0 grow truncate text-sm font-medium">
           {artifact?.title ?? t('canvasMenu')}
         </span>
-        {artifact ? <Badge tone="neutral" pill>{artifact.format}</Badge> : null}
+        {artifact ? <Badge tone="neutral" appearance="pill">{artifact.format}</Badge> : null}
         {artifact?.source.kind === 'file' ? (
           <span className="hidden max-w-40 truncate font-mono text-xs text-muted xl:inline">
             {artifact.source.path}
@@ -370,7 +370,7 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
         </Button>
       </header>
 
-      {deleteError ? <div className="border-b border-border bg-err/10 px-4 py-2 text-xs text-err">{deleteError}</div> : null}
+      {deleteError ? <div className="border-b border-border bg-err-soft px-4 py-2 text-xs text-err">{deleteError}</div> : null}
 
       <div className="relative flex min-h-0 grow flex-col">
         {loading && !detail ? (

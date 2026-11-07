@@ -99,7 +99,7 @@ export function QueueBar({
               type="checkbox"
               checked={autonomous}
               onChange={(e) => setAutonomous(e.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-4 w-4"
             />
             <MoonIcon className="h-3.5 w-3.5" />
             {t('nightMode')}

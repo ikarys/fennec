@@ -74,7 +74,7 @@ export function PluginsSection() {
         {plugins === null && !error && <div className="px-4 py-3 text-sm text-muted">{t('loading')}</div>}
         {problems.length > 0 && (
           <Card className="mx-4 mb-3 overflow-hidden">
-            <div className="border-b border-border bg-attention/10 px-3 py-1.5 text-xs font-medium text-attention">
+            <div className="border-b border-border bg-attention-soft px-3 py-1.5 text-xs font-medium text-attention">
               {t('pluginProblems')}
             </div>
             <ul className="space-y-1 px-3 py-2">
@@ -101,15 +101,15 @@ export function PluginsSection() {
                   <div className="flex items-center gap-2">
                     <span className="truncate font-mono text-xs text-text">{plugin.name}</span>
                     {plugin.active ? (
-                      <Badge tone="ok" pill dot pulse={plugin.enabled}>
+                      <Badge tone="ok" appearance="pill" dot pulse={plugin.enabled}>
                         {t('pluginEnabled')}
                       </Badge>
                     ) : plugin.enabled ? (
-                      <Badge tone="attention" pill title={t('pluginCodeChanged')}>
+                      <Badge tone="attention" appearance="pill" title={t('pluginCodeChanged')}>
                         {t('pluginCodeChanged')}
                       </Badge>
                     ) : (
-                      <Badge tone="neutral" pill>
+                      <Badge tone="neutral" appearance="pill">
                         {t('pluginDisabled')}
                       </Badge>
                     )}

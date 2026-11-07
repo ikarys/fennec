@@ -130,14 +130,14 @@ function ServerCard({
         <summary className="flex cursor-pointer list-none select-none items-center gap-2 hover:text-accent [&::-webkit-details-marker]:hidden">
           <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
           <span className="shrink-0 font-mono text-sm text-text">{server.name || t('newServer')}</span>
-          <Badge tone="neutral" pill>
+          <Badge tone="neutral" appearance="pill">
             {server.transport}
           </Badge>
           <span className="min-w-0 flex-1 truncate text-xs text-faint">
             {server.transport === 'http' ? server.url : [server.command, ...server.args].join(' ')}
           </span>
           {server.cachedTools.length > 0 ? (
-            <Badge tone="accent" pill>
+            <Badge tone="accent" appearance="pill">
               {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
             </Badge>
           ) : null}
@@ -227,7 +227,7 @@ function ServerCard({
                 type="checkbox"
                 checked={server.visible}
                 onChange={(event) => onPatch({ visible: event.target.checked })}
-                className="h-4 w-4 accent-[var(--accent)]"
+                className="h-4 w-4"
               />
               {t('mcpShown')}
             </label>
@@ -286,7 +286,7 @@ function ServerCard({
                           ref={(el) => {
                             if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
                           }}
-                          className="h-4 w-4 accent-[var(--accent)]"
+                          className="h-4 w-4"
                           aria-label={t('mcpToggleTab')}
                         />
                         <span className="tabular-nums">{t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}</span>
@@ -305,7 +305,7 @@ function ServerCard({
                         checked={!disabled}
                         onChange={() => toggleTool(entry.tool.name)}
                         onClick={(event) => event.stopPropagation()}
-                        className="h-4 w-4 accent-[var(--accent)]"
+                        className="h-4 w-4"
                         aria-label={entry.tool.name}
                       />
                       <span

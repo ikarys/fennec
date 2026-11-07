@@ -22,11 +22,11 @@ function outcomeView(
     case 'done':
       return { header: 'bg-ok-soft', tone: 'text-ok', icon: <CheckIcon className="h-4 w-4" />, text: t('workflowDone') };
     case 'blocked':
-      return { header: 'bg-err/10', tone: 'text-err', icon: <AlertIcon className="h-4 w-4" />, text: t('workflowBlocked') };
+      return { header: 'bg-err-soft', tone: 'text-err', icon: <AlertIcon className="h-4 w-4" />, text: t('workflowBlocked') };
     case 'stopped':
       return { header: 'bg-raised', tone: 'text-muted', icon: <PauseIcon className="h-4 w-4" />, text: t('workflowStopped') };
     case 'error':
-      return { header: 'bg-err/10', tone: 'text-err', icon: <CloseIcon className="h-4 w-4" />, text: t('workflowError') };
+      return { header: 'bg-err-soft', tone: 'text-err', icon: <CloseIcon className="h-4 w-4" />, text: t('workflowError') };
   }
 }
 

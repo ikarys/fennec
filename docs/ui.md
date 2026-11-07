@@ -72,7 +72,10 @@ dead: every list and grid shows the human where they are and what reacts.
   Lists are rows separated by space or a hairline (`border-border`); the
   entries of a group that are edited as a whole (a panel page, an MCP server)
   are `Card variant="inset"` blocks, never a bordered box inside a box.
-- Only the accent gets a filled `Badge`; ok and err are coloured text.
+- Only the accent gets a filled `Badge` (`appearance="solid"`); ok and err are coloured text,
+  or an `appearance="pill"` tag. Tinted backgrounds use the `*-soft` tokens (`bg-err-soft`,
+  `bg-attention-soft`, `bg-info-soft`, `bg-ok-soft`, `bg-accent-soft`), never an alpha suffix.
+- A page's readable width is `max-w-page`; native checkboxes take the accent from the theme.
   Text is sentence case; only `SectionLabel` is capitals with tracking: as an h2 (a page's group, bold, full text colour, over a hairline) it stands out from the fields; as an h3 (a panel, a card part) it stays small and muted.
 - Radii are small (2 to 6px) and come from the tokens; no pills.
 - Text: `text-sm` for reading, `text-xs` for controls and metadata,

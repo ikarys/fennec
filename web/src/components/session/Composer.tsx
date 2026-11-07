@@ -154,7 +154,7 @@ export function Composer({
   return (
     <div className="px-6 pt-2 pb-4">
       <div
-        className="mx-auto max-w-[960px] rounded-lg border border-border-strong bg-panel shadow-float transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-4 focus-within:ring-accent-soft"
+        className="mx-auto max-w-page rounded-lg border border-border-strong bg-panel shadow-float transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-4 focus-within:ring-accent-soft"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >

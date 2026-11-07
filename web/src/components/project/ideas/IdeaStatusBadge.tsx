@@ -24,7 +24,7 @@ export function IdeaStatusBadge({ status }: { status: IdeaStatus }) {
   const cfg = STATUS_CONFIG[status];
   const label = t(cfg.labelKey);
   return (
-    <Badge tone={cfg.tone} pill dot pulse={cfg.pulse ?? false} title={t('statusLabel', { label })}>
+    <Badge tone={cfg.tone} appearance="pill" dot pulse={cfg.pulse ?? false} title={t('statusLabel', { label })}>
       {label}
     </Badge>
   );

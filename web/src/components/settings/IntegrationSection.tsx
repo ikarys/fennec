@@ -19,7 +19,7 @@ export function IntegrationSection({ value, onChange, save }: IntegrationSection
             type="checkbox"
             checked={value.modelTrailers}
             onChange={(event) => onChange({ ...value, modelTrailers: event.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)]"
+            className="h-4 w-4"
           />
           {t('modelTrailersLabel')}
         </label>

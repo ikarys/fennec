@@ -694,7 +694,7 @@ export function SessionPage({
                   <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
                     {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
                     <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
-                      <div className="mx-auto flex w-full max-w-[960px] items-center gap-2">
+                      <div className="mx-auto flex w-full max-w-page items-center gap-2">
                         {/* Title and state first; project and date on a quieter line below: the header stays light. */}
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
@@ -772,7 +772,7 @@ export function SessionPage({
                       >
                         <div
                           ref={contentRef}
-                          className="mx-auto flex max-w-[960px] flex-col gap-4.5"
+                          className="mx-auto flex max-w-page flex-col gap-4.5"
                         >
                           {sessionId && hasMore && (
                             <Button
@@ -899,7 +899,7 @@ export function SessionPage({
                       )}
                     {/* A node's session is driven by its workflow: the human answers in the parent. */}
                     {detail?.parentId && (
-                      <div className="mx-auto flex max-w-[960px] items-center gap-3 border-t border-border px-1 py-2">
+                      <div className="mx-auto flex max-w-page items-center gap-3 border-t border-border px-1 py-2">
                         <span
                           className={`h-2 w-2 shrink-0 rounded-full ${running ? "bg-accent" : "bg-ok"}`}
                         />

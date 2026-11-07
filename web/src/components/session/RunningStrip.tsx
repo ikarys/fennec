@@ -21,7 +21,7 @@ export function RunningStrip({
       : undefined;
   return (
     <div
-      className="mx-auto flex w-full max-w-[960px] items-center gap-2 px-1 pb-1.5 text-xs text-muted"
+      className="mx-auto flex w-full max-w-page items-center gap-2 px-1 pb-1.5 text-xs text-muted"
       role="status"
     >
       {running && (

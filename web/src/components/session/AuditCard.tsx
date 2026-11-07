@@ -114,7 +114,7 @@ export function AuditCard({
               >
                 <input
                   type="checkbox"
-                  className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                  className="h-4 w-4 shrink-0"
                   checked={isTaken || checked.has(finding.number)}
                   disabled={busy || isTaken}
                   onChange={() => toggle(finding.number)}

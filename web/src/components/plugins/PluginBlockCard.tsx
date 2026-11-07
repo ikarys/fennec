@@ -15,7 +15,7 @@ export function PluginBlockCard({ block }: { block: ServedPluginBlock }) {
     <div className="rounded-md border border-border bg-raised/40 px-2.5 py-2">
       <div className="flex items-center gap-1.5">
         <span className="min-w-0 truncate text-xs font-medium text-text">{block.title}</span>
-        <Badge tone="info" pill className="ml-auto shrink-0" title={provenance}>
+        <Badge tone="info" appearance="pill" className="ml-auto shrink-0" title={provenance}>
           {provenance}
         </Badge>
       </div>

@@ -25,7 +25,7 @@ function Count({ value, tone, title }: { value: number; tone: BadgeTone; title: 
   return (
     <span className="w-28 shrink-0 text-right">
       {value > 0 ? (
-        <Badge tone={tone} pill title={title}>
+        <Badge tone={tone} appearance="pill" title={title}>
           {value}
         </Badge>
       ) : (
@@ -125,7 +125,7 @@ export function RiskSection({
             >
               {t('remedy')}
             </Button>
-            <Badge tone="ok" pill title={t('computedFromGit')}>
+            <Badge tone="ok" appearance="pill" title={t('computedFromGit')}>
               {t('verified')}
             </Badge>
             <Button
@@ -193,7 +193,7 @@ export function RiskSection({
                         {zone.path}
                       </span>
                       {zone.signals.map((signal) => (
-                        <Badge key={signal} tone={SIGNAL_META[signal].tone} pill>
+                        <Badge key={signal} tone={SIGNAL_META[signal].tone} appearance="pill">
                           {SIGNAL_META[signal].label(zone, t)}
                         </Badge>
                       ))}

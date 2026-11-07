@@ -42,7 +42,7 @@ export function StatusBar({ sessionId, projectId }: { sessionId: string | null; 
         const provenance = t('pluginProvenance', { name: block.plugin });
         return (
           <span key={`${block.plugin}:${block.title}`} className="flex shrink-0 items-center gap-1.5">
-            <Badge tone="info" pill title={provenance}>
+            <Badge tone="info" appearance="pill" title={provenance}>
               {provenance}
             </Badge>
             <BlockElements elements={block.content.elements} compact />

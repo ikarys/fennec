@@ -20,7 +20,7 @@ export function QueuedMessages({
 
   return (
     <div className="px-6 py-2">
-      <div className="mx-auto flex max-w-[960px] flex-col gap-1.5">
+      <div className="mx-auto flex max-w-page flex-col gap-1.5">
         {queued.map((message) => (
           <div
             key={message.queueId}

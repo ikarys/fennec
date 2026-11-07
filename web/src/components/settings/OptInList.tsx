@@ -44,7 +44,7 @@ export function OptInList({ title, items, value, onChange, empty }: OptInListPro
                   type="checkbox"
                   checked={checked}
                   onChange={(event) => toggle(item.id, event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+                  className="mt-0.5 h-4 w-4 shrink-0"
                 />
                 <div className="min-w-0">
                   <div className={`text-sm text-text ${item.mono ? 'font-mono' : ''}`}>{item.label}</div>

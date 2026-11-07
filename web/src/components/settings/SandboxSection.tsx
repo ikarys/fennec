@@ -50,7 +50,7 @@ export function SandboxSection({ value, onChange, health, save }: SandboxSection
             type="checkbox"
             checked={value.enabled}
             onChange={(event) => onChange({ ...value, enabled: event.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)]"
+            className="h-4 w-4"
           />
           {t('sandboxEnabledLabel')}
         </label>
@@ -63,7 +63,7 @@ export function SandboxSection({ value, onChange, health, save }: SandboxSection
             checked={value.network}
             disabled={!value.enabled}
             onChange={(event) => onChange({ ...value, network: event.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)] disabled:opacity-60"
+            className="h-4 w-4 disabled:opacity-60"
           />
           {t('sandboxNetworkLabel')}
         </label>
