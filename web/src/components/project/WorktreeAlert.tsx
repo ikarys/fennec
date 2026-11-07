@@ -1,30 +1,16 @@
-import { useEffect, useState } from 'react';
 import { buttonClass } from '../ui/Button';
 import { HardDriveIcon } from '../Icons';
-import { getWorktreeSummary, type WorktreeSummary } from '../../lib/api/worktrees';
+import { getWorktreeSummary } from '../../lib/api/worktrees';
 import { formatBytes } from '../../lib/format';
 import { useT, useLang } from '../../i18n';
+import { useLoaded } from '../../hooks/useLoaded';
 
 export function WorktreeAlert() {
   const lang = useLang();
   const t = useT();
-  const [summary, setSummary] = useState<WorktreeSummary | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    getWorktreeSummary()
-      .then((result) => {
-        if (!cancelled) setSummary(result);
-      })
-      .catch(() => {
-        // The summary is a hint; ignore failures.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The summary is a hint: a failure shows nothing.
+  const { data: summary } = useLoaded(getWorktreeSummary, []);
 
   const largestProjectId = summary?.largestProjectId ?? null;
   if (!summary?.alert || !largestProjectId) return null;

@@ -1,5 +1,5 @@
 // Project page overview tab: the server's dashboard tiles and recent sessions.
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -14,7 +14,7 @@ import {
   ReviewIcon,
   TokensIcon,
 } from '../Icons';
-import { getProjectDashboard, type DashboardIcon, type ProjectDashboard } from '../../lib/api';
+import { getProjectDashboard, type DashboardIcon } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { BudgetTile } from './BudgetTile';
 import { DiskSection } from './DiskSection';
@@ -22,6 +22,7 @@ import { ProjectRulesTile } from '../rules/RulesSection';
 import { PluginsSection } from './PluginsSection';
 import { useT, useLang } from '../../i18n';
 import { TableHeader } from '../ui/TableHeader';
+import { useLoaded } from '../../hooks/useLoaded';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
   sessions: <LayersIcon />,
@@ -42,32 +43,8 @@ export function DashboardSection({
 }) {
   const lang = useLang();
   const t = useT();
-  const [data, setData] = useState<ProjectDashboard | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setData(null);
-    getProjectDashboard(projectId)
-      .then((dashboard) => {
-        if (!cancelled) {
-          setData(dashboard);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : t('unknownError'));
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  const { data, error, loading } = useLoaded(() => getProjectDashboard(projectId), [projectId]);
 
   if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;
