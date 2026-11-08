@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>fennec: stay the author of the software your AI writes</title>
   <meta name="description" content="AI-written code is abundant. Understanding, mastery and responsibility are rare. fennec tools what is rare.">
-  <link rel="icon" href="images/brand/emblem.png">
+  <link rel="icon" href="images/emblem.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -358,7 +358,9 @@
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
-      margin: 0 0 24px;
+      justify-content: center;
+      margin: 16px 0 0;
+      font-size: 14px;
     }
 
     .theme-label {
@@ -379,7 +381,7 @@
       background: transparent;
       border: 1px solid var(--rule);
       border-radius: 999px;
-      padding: 6px 14px 6px 10px;
+      padding: 4px 12px 4px 8px;
       font-family: inherit;
       font-size: 14px;
       line-height: 1.4;
@@ -474,6 +476,71 @@
 
     .feature-media .window {
       margin-right: 0;
+    }
+
+    .sandbox {
+      padding-top: clamp(96px, 12vw, 160px);
+    }
+
+    .sandbox-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 64px;
+      align-items: start;
+    }
+
+    .sandbox-text h2 {
+      margin-bottom: 16px;
+    }
+
+    .sandbox-text p {
+      color: var(--dune);
+      margin: 0 0 16px;
+    }
+
+    .walls {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      background: var(--dusk);
+      overflow: hidden;
+    }
+
+    .walls li {
+      padding: 22px 24px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .walls li:nth-child(-n+2) {
+      border-top: 0;
+    }
+
+    .walls li:nth-child(odd) {
+      border-right: 1px solid var(--rule);
+    }
+
+    .walls strong {
+      display: block;
+      color: var(--sand);
+      font-size: 17px;
+      margin-bottom: 6px;
+    }
+
+    .walls span {
+      color: var(--dune);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .walls code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.9em;
+      color: var(--sand);
     }
 
     .details h2 {
@@ -590,6 +657,11 @@
       .details dl {
         grid-template-columns: repeat(2, 1fr);
       }
+
+      .sandbox-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
     }
 
     @media (max-width: 560px) {
@@ -599,6 +671,18 @@
 
       .details dl {
         grid-template-columns: 1fr;
+      }
+
+      .walls {
+        grid-template-columns: 1fr;
+      }
+
+      .walls li:nth-child(odd) {
+        border-right: 0;
+      }
+
+      .walls li:nth-child(2) {
+        border-top: 1px solid var(--rule);
       }
 
       .gate li {
@@ -637,8 +721,9 @@
 <body>
   <header class="site-header">
     <div class="container header-inner">
-      <a class="wordmark" href="#"><img src="images/brand/emblem.png" width="28" height="28" alt=""> fennec</a>
+      <a class="wordmark" href="#"><img src="images/emblem.png" width="28" height="28" alt=""> fennec</a>
       <nav class="header-nav" aria-label="Primary">
+        <a href="#sandbox">Security</a>
         <a href="https://github.com/ikarys/fennec/tree/main/docs">Docs</a>
         <a href="https://github.com/ikarys/fennec/releases">Releases</a>
         <a href="https://github.com/ikarys/fennec">GitHub</a>
@@ -698,16 +783,6 @@
         </div>
 
         <div class="hero-below">
-          <div class="theme-row">
-            <span class="theme-label">Try a theme:</span>
-            <div class="theme-group" role="radiogroup" aria-label="Theme">
-              <button class="theme-radio" type="button" role="radio" aria-checked="true" data-theme="nuit" style="--chip-bg:#0E1013;--chip-accent:#F08A4B"><span class="chip" aria-hidden="true"></span>Night</button>
-              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="jour" style="--chip-bg:#F6F6F3;--chip-accent:#A8440F"><span class="chip" aria-hidden="true"></span>Day</button>
-              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="ardoise" style="--chip-bg:#1E2332;--chip-accent:#82AAFF"><span class="chip" aria-hidden="true"></span>Slate</button>
-              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="cyber" style="--chip-bg:#000300;--chip-accent:#00FF41"><span class="chip" aria-hidden="true"></span>Cyber</button>
-            </div>
-          </div>
-
           <figure class="window">
             <div class="window-bar" aria-hidden="true">
               <span class="dot"></span>
@@ -716,6 +791,16 @@
             </div>
             <img id="hero-img" src="images/workflow-nuit.png" alt="A fennec workflow run: plan, build, criteria checks, fresh-context review, Night theme" width="1600" height="1000" fetchpriority="high">
           </figure>
+          <div class="theme-row">
+            <span class="theme-label">The same screen in another theme:</span>
+            <div class="theme-group" role="radiogroup" aria-label="Theme">
+              <button class="theme-radio" type="button" role="radio" aria-checked="true" data-theme="nuit" style="--chip-bg:#0E1013;--chip-accent:#F08A4B"><span class="chip" aria-hidden="true"></span>Night</button>
+              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="jour" style="--chip-bg:#F6F6F3;--chip-accent:#A8440F"><span class="chip" aria-hidden="true"></span>Day</button>
+              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="ardoise" style="--chip-bg:#1E2332;--chip-accent:#82AAFF"><span class="chip" aria-hidden="true"></span>Slate</button>
+              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="cyber" style="--chip-bg:#000300;--chip-accent:#00FF41"><span class="chip" aria-hidden="true"></span>Cyber</button>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -792,13 +877,32 @@
       </div>
     </section>
 
+    <section class="sandbox" id="sandbox" aria-labelledby="sandbox-title">
+      <div class="container sandbox-grid">
+        <div class="sandbox-text">
+          <h2 id="sandbox-title">The model works in a box. You don't.</h2>
+          <p>A prompt injection in a README, a dependency or a web page can make a model run anything. So every command it runs, and every shell step of a workflow, runs isolated: bubblewrap on Linux, Seatbelt on macOS.</p>
+          <p>You are never sandboxed. Your terminal, your editor, the servers you start and your own git keep your normal rights.</p>
+          <p><a href="https://github.com/ikarys/fennec/blob/main/docs/sandbox.md">What the sandbox blocks, and how to work with it</a></p>
+        </div>
+        <ul class="walls">
+          <li><strong>Its own worktree</strong><span>The system is read-only. A session writes only its git worktree, on its own branch; your checkout stays untouched until you integrate.</span></li>
+          <li><strong>Secrets hidden</strong><span><code>~/.ssh</code>, <code>~/.aws</code>, <code>~/.config/gh</code>, credentials and fennec's own database are invisible to commands.</span></li>
+          <li><strong>No network by default</strong><span>Builds and tests run offline from your caches. You turn the network on when a step needs it.</span></li>
+          <li><strong>Protected files</strong><span>Lockfiles, CI config, <code>AGENTS.md</code>, accepted ADRs and <code>.git</code> are read-only. Changing one takes your waiver.</span></li>
+          <li><strong>No push, ever</strong><span>The kernel refuses <code>git push</code>, branch moves and PR merges before they run. Pushing is your action.</span></li>
+          <li><strong>Hooks never run</strong><span>fennec's own git commands disable hooks and fsmonitor, so code a model planted in a repository never executes.</span></li>
+        </ul>
+      </div>
+    </section>
+
     <section class="details" aria-labelledby="details-title">
       <div class="container">
         <h2 id="details-title">The rest of the day-to-day.</h2>
         <dl>
           <div>
-            <dt>Sandbox by default</dt>
-            <dd>bwrap on Linux, Seatbelt on macOS: a read-only system, hidden secrets, no network, and one git worktree per workflow.</dd>
+            <dt>Your rules</dt>
+            <dd>Command and path rules that allow, ask or block, for a session, a project or everywhere. A block always wins.</dd>
           </div>
           <div>
             <dt>Provenance shown</dt>

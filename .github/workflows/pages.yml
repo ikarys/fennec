@@ -4,7 +4,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", "docs/images/site/**", "docs/images/brand/**", "docs/images/night-report.png", ".github/workflows/pages.yml"]
+    paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -24,11 +24,6 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
-      # The screenshots live once, in docs/images, next to the README's.
-      - run: |
-          mkdir -p site/images
-          cp docs/images/site/*.png docs/images/night-report.png site/images/
-          cp -r docs/images/brand site/images/brand
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

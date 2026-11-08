@@ -81,7 +81,7 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 
 ### Ideas & night mode
 
-![The Tasks tab after a night: the board, the queue bar and the night report](docs/images/night-report.png)
+![The Tasks tab after a night: the board, the queue bar and the night report](site/images/night-report.png)
 
 - The project page keeps the human's ideas; "Cadrer" opens a plan session tied to the idea; the approved plan marks the idea ready, verbatim.
 - "Lancer la file" runs the ready ideas one at a time, oldest first, each through the default workflow (plan, build, criteria checks, fresh-context verify and review) in its own session and git worktree.
