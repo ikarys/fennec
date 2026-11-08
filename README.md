@@ -223,11 +223,14 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 - Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox. **What the sandbox blocks, and how to run the app, add a dependency or see the agent's work anyway: [docs/sandbox.md](docs/sandbox.md).**
 - The server only answers local pages: `Host` and `Origin` must be `127.0.0.1` or `localhost` and POST bodies must be JSON, so no web page can drive the agent.
 - Known gap: the file tools run in fennec's process behind a working-directory guard, and a command can create a new file matching a protected pattern where none existed; the review gate is there to catch it.
+- Every claim, the test that proves it, what is not protected and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
 - [User guide](https://ikarys.github.io/fennec/docs/) (source in [docs/guide](docs/guide)): install, sessions, plans, the review gate, workflows, the sandbox, settings, CLI
 - [docs/sandbox.md](docs/sandbox.md): the command sandbox: what it blocks, how to run, test and see the agent's work
+- [SECURITY.md](SECURITY.md): threat model, what is and is not protected, reporting a vulnerability
+- [VERIFICATION.md](VERIFICATION.md): how fennec is built and verified, and how to re-run the checks
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, licence of contributions
 - [AGENTS.md](AGENTS.md): architecture, conventions
 - [docs/api.md](docs/api.md): HTTP API and event format
@@ -246,13 +249,17 @@ reviews it and decides what is merged. The models that wrote code:
 
 Each commit names the models that wrote it in `Assisted-by: <tool>:<model>` trailers, the format
 of the Linux kernel, Fedora and LLVM: a model is not an author, so it is never a `Co-Authored-By:`.
-That record is incomplete before 2026-11-07: Claude's trailers are missing on part of the commits,
+Before 2026-10-27, fennec was written with openfox driving the same local Qwen3.8-27B; those commits
+carry no trailer, and no log is left to tell them apart one by one.
+After that, the record is incomplete before 2026-11-07: Claude's trailers are missing on part of the commits,
 and the local Qwen's on most of the work delegated to it. The history was rewritten twice, before
 fennec was published. On 2026-11-07, to add the trailers that could be proven: each commit fennec
 integrated (`Fennec-Session:`) got the models its session log or usage ledger recorded; twenty
 sessions deleted before the ledger existed were credited to Qwen3.8-27B, the only model fennec had
 ever been configured with. On 2026-11-08, to turn every `Co-Authored-By:` naming a model into
-`Assisted-by:` (code, dates and authors unchanged).
+`Assisted-by:` (code, dates and authors unchanged), and to drop some 600 duplicate commits that two
+merges had brought in twice (every branch's code unchanged).
+The trust does not rest on who wrote the code but on the checks anyone can re-run: [VERIFICATION.md](VERIFICATION.md).
 Contributors follow the same rule (`CONTRIBUTING.md`).
 
 ## License
