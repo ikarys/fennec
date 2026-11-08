@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
-import type { AttentionItem, SessionState } from '../../lib/api';
+import { getVersion, type AttentionItem, type SessionState } from '../../lib/api';
 import { SessionStateIcon } from '../session/SessionStateIcon';
 import { BellIcon, ChatIcon, CloseIcon, PlusIcon, SearchIcon, SettingsIcon, SplitIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
@@ -164,11 +164,10 @@ function VersionTag() {
   const [build, setBuild] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/version')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: { version?: string; build?: string | null } | null) => {
-        if (body?.version) setVersion(body.version);
-        if (body?.build) setBuild(body.build);
+    getVersion()
+      .then((body) => {
+        setVersion(body.version);
+        setBuild(body.build);
       })
       .catch(() => undefined);
   }, []);

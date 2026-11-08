@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import { ArrowUpIcon, SpinnerIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { buttonClass } from '../ui/Button';
-import { getUpdate, applyUpdate, type UpdateCheck } from '../../lib/api';
+import { getUpdate, applyUpdate, getVersion, type UpdateCheck } from '../../lib/api';
 
 // The human decides when to update; nothing installs on its own.
 export function UpdateNotice() {
@@ -62,16 +62,13 @@ export function UpdateNotice() {
           tries += 1;
 
           try {
-            const response = await fetch('/api/version');
-            if (response.ok) {
-              const data = (await response.json()) as { version?: string };
-              const current = check.current.replace(/^v/, '');
-              const latest = String(data.version ?? '').replace(/^v/, '');
-              if (current && latest && current !== latest) {
-                window.clearInterval(timer);
-                window.location.reload();
-                return;
-              }
+            const data = await getVersion();
+            const current = check.current.replace(/^v/, '');
+            const latest = data.version.replace(/^v/, '');
+            if (current && latest && current !== latest) {
+              window.clearInterval(timer);
+              window.location.reload();
+              return;
             }
           } catch {
             // The server may not be up yet.
