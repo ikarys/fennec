@@ -43,6 +43,7 @@ A session page has the thread, composer, agent and model pickers, workflow picke
 ## Documentation map
 
 - [Install](install.md): platforms, install script, service, and updates.
+- [Three ways to work](ways-to-work.md): chat, an agent, or a workflow, and which to pick.
 - [First run](first-run.md): setup checklist, model, first project, first session.
 - [Sessions](sessions.md): projects, sessions, agents, composer, context panel.
 - [Plans](plans.md): framing work and approving criteria.

@@ -6,13 +6,14 @@
 
 - [Install](install.md)
 - [First run](first-run.md)
+- [Three ways to work](ways-to-work.md)
 
 # Working with fennec
 
 - [Projects and sessions](sessions.md)
+- [Workflows](workflows.md)
 - [Plans and acceptance criteria](plans.md)
 - [The review gate](review-gate.md)
-- [Workflows](workflows.md)
 - [Tasks and night mode](tasks.md)
 - [Understanding the project](understanding.md)
 - [Usage and budgets](insight.md)
