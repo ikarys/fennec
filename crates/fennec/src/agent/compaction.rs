@@ -69,7 +69,7 @@ fn stream_summary(turn: &mut Turn, prompt: &RoundPrompt) -> Result<SummaryRound,
 pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted, String> {
     let events = turn.log.events(turn.session_id)?;
     let before = compaction::context_tokens(&events);
-    turn.append_user(COMPACTION_PROMPT, true, None, Vec::new())?;
+    turn.append_system(COMPACTION_PROMPT)?;
 
     let mut summary = None;
     for _ in 0..3 {
@@ -88,7 +88,7 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
 
     // The model only tried tools: nudge it to summarise, once.
     let summary = if summary.trim().is_empty() {
-        turn.append_user(NO_TOOLS_PROMPT, true, None, Vec::new())?;
+        turn.append_system(NO_TOOLS_PROMPT)?;
         match stream_summary(turn, prompt)? {
             SummaryRound::Answered(content) => content,
             SummaryRound::Interrupted => return Ok(Compacted::Skipped),
@@ -117,7 +117,7 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
         after_tokens: after,
         summary: summary.clone(),
     })?;
-    turn.append_user(&resume, true, None, Vec::new())?;
+    turn.append_system(&resume)?;
     turn.append(Event::ContextState {
         current_tokens: after,
         max_tokens: turn.context_window,

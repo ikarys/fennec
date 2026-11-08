@@ -18,6 +18,7 @@ mod request_waiver;
 mod round;
 pub mod rule_approval;
 mod rule_check;
+mod snapshot;
 mod submit_report;
 mod suggest_agent;
 #[cfg(test)]
