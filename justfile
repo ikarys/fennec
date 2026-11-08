@@ -70,6 +70,10 @@ test:
 test-web:
     cd web && npm test
 
+# The project site (site/), as GitHub Pages serves it, on :8080
+site:
+    python3 -m http.server -d site 8080
+
 # Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
 setup:
     git config core.hooksPath .githooks
