@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  Linux &nbsp;·&nbsp; one Rust binary &nbsp;·&nbsp; local models first &nbsp;·&nbsp; AGPL-3.0
+  <a href="https://ikarys.github.io/fennec/">Website</a> &nbsp;·&nbsp; Linux &nbsp;·&nbsp; one Rust binary &nbsp;·&nbsp; local models first &nbsp;·&nbsp; AGPL-3.0
 </p>
 
 ---
