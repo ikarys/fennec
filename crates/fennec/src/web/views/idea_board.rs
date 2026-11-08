@@ -500,7 +500,7 @@ mod tests {
             worktree_scan: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
             plugins: Arc::new(crate::plugins::PluginManager::new(
-                crate::tools::Sandbox::Off,
+                crate::sandbox::Sandbox::Off,
                 std::env::temp_dir(),
                 std::env::temp_dir(),
                 notifier,

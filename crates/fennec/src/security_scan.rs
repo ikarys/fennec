@@ -1,7 +1,7 @@
 //! Adapter that runs the integration-gate scanners in the worktree.
 use crate::domain::security_scan::{self, ScanReport, ScanState, ScanStatus, SecurityFinding};
+use crate::sandbox::Sandbox;
 use crate::scanners;
-use crate::tools::Sandbox;
 use crate::worktree::Worktree;
 
 use std::io::Read;
@@ -493,7 +493,10 @@ mod tests {
     #[test]
     fn gitleaks_flags_a_secret_committed_on_the_branch_in_the_background_sandbox() {
         if scanners::find("gitleaks").is_none()
-            || !matches!(crate::tools::probe(), crate::tools::SandboxHealth::Ready)
+            || !matches!(
+                crate::sandbox::probe(),
+                crate::sandbox::SandboxHealth::Ready
+            )
         {
             return;
         }

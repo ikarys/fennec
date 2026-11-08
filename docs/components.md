@@ -42,7 +42,7 @@ Browser and vision, done: the `browser` skill embedded as a default
 kept out of the worktree's commits), and a Vision section in the context panel:
 the images the model saw, those a compaction dropped dimmed.
 Sandbox, done: every command (run_command, workflow shell nodes) runs in a bwrap
-world (`tools/sandbox.rs`): the system read-only, the workdir writable, secrets
+world (`sandbox.rs`): the system read-only, the workdir writable, secrets
 and fennec's store hidden, no network by default; the Settings page turns it or
 the network off.
 Criteria, done: the "Done when" list of the approved plan is the run's contract
@@ -239,8 +239,8 @@ opens the whole file in VS Code. The server parses the hunks and only diffs a pa
 macOS sandbox, done: on macOS the commands' sandbox world (secrets hidden, protected files read-only, network
 cut or not) is rendered as a Seatbelt profile run by `/usr/bin/sandbox-exec`, every path passed as a parameter;
 the main checkout's dependency directories are linked into a worktree instead of mounted. Commands write their own
-TMPDIR, not /tmp. Known gap: a protected file's parent directory can be renamed (`tools/sandbox/seatbelt.rs`,
-`tools/sandbox.rs`, `turn_build.rs`).
+TMPDIR, not /tmp. Known gap: a protected file's parent directory can be renamed (`sandbox/seatbelt.rs`,
+`sandbox.rs`, `turn_build.rs`).
 
 First-run checklist, done: the home page shows what a first run still misses (a reachable model, the sandbox, git,
 a project, the security scanners), each line with its fix, and hides once all is ready; `fennec doctor` prints the

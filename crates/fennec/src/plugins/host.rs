@@ -4,7 +4,7 @@
 //! sandboxed — a turned-off sandbox is a refusal to start, not a fallback.
 
 use crate::domain::plugin::{BlockContent, BlockKey, MAX_BLOCKS, PluginBlockUpdate, PluginDef};
-use crate::tools::Sandbox;
+use crate::sandbox::Sandbox;
 use serde_json::{Value, json};
 use std::collections::{BTreeSet, HashMap};
 use std::io::{BufRead, BufReader, Write};
@@ -223,7 +223,7 @@ mod tests {
     use super::*;
     use crate::domain::plugin::{BlockElement, BlockScope};
     use crate::domain::preferences::SandboxPrefs;
-    use crate::tools::Sandbox;
+    use crate::sandbox::Sandbox;
     use std::collections::BTreeMap;
 
     /// The `on_update` hook the tests do not watch: a no-op.

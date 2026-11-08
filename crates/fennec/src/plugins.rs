@@ -10,8 +10,8 @@ pub mod pump;
 
 use crate::domain::plugin::{BlockKey, BlockScope, Placement, PluginDef, ServedPluginBlock};
 use crate::notifier::Notifier;
+use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
-use crate::tools::Sandbox;
 use host::Host;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

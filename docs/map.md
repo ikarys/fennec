@@ -9,7 +9,7 @@ graph LR
   m1["crates/fennec/src/tools/run_command"]
   m2["crates/fennec/src/tools/web_fetch"]
   m3["crates/fennec/src/web"]
-  m4["crates/fennec/src/tools/sandbox"]
+  m4["crates/fennec/src/sandbox"]
   m5["crates/fennec/src/web/routes"]
   m6["crates/fennec/src/web/os"]
   m7["crates/fennec/src/web/streams"]
@@ -302,7 +302,7 @@ graph LR
 | `crates/fennec/src/tools/run_command` | 3 | 2 |  | `run_command`: a shell command run in the working directory, in the sandbox when the human enabled it; what the model reads back is `report`. |
 | `crates/fennec/src/tools/web_fetch` | 5 | 5 |  | `web_fetch`: a web page fetched for the model, by pointer, not by copy: - the page is saved as a file in a cache and the model gets a short, deterministic pointer (path, size, outline, first lines), not the page: it reads the parts it needs with `read_file` or `rg`; - no `format` or `timeout` argument: always Markdown, fixed 30 s timeout; - private, loopback and link-local addresses are refused (SSRF), redirects are followed by hand so each hop is checked. |
 | `crates/fennec/src/web` | 8 | 4 |  | Web adapter: the server behind the UI. std only, one thread per connection, bound to the configured address. |
-| `crates/fennec/src/tools/sandbox` | 2 | 2 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
+| `crates/fennec/src/sandbox` | 2 | 2 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
 | `crates/fennec/src/web/routes` | 36 | 19 |  | The JSON API (contract: `docs/api.md`) and the UI's pages. |
 | `crates/fennec/src/web/os` | 4 | 1 |  |  |
 | `crates/fennec/src/web/streams` | 2 | 1 |  |  |
