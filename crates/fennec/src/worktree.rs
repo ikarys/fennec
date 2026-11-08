@@ -132,7 +132,7 @@ pub fn adopt(
 /// until git gc, which is why the route records their shas.
 pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
     let path_arg = wt.path.to_string_lossy().into_owned();
-    crate::tools::remove_private_tmp(&wt.path);
+    crate::sandbox::remove_private_tmp(&wt.path);
     let removed = git::run(top, &["worktree", "remove", "--force", &path_arg], None);
     if let Err(e) = &removed
         && !e.contains("Permission denied")

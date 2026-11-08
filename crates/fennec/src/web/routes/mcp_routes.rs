@@ -6,7 +6,7 @@ use crate::agent::ports::EventLog;
 use crate::domain::event::Event;
 use crate::domain::mcp;
 use crate::domain::preferences::Preferences;
-use crate::tools::Sandbox;
+use crate::sandbox::Sandbox;
 use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{Request, error, send_json};
@@ -271,7 +271,7 @@ mod tests {
             worktree_scan: Mutex::default(),
             server_runs: Arc::new(Mutex::new(HashMap::new())),
             plugins: Arc::new(crate::plugins::PluginManager::new(
-                crate::tools::Sandbox::Off,
+                crate::sandbox::Sandbox::Off,
                 std::env::temp_dir(),
                 std::env::temp_dir(),
                 notifier,

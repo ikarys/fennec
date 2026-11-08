@@ -111,8 +111,8 @@ mod tests {
     use crate::domain::plugin::{BlockElement, PluginActivation};
     use crate::domain::preferences::SandboxPrefs;
     use crate::plugins::config;
+    use crate::sandbox::Sandbox;
     use crate::store::SqliteStore;
-    use crate::tools::Sandbox;
 
     /// The example counter plugin's script: counts `tool.call` events.
     const COUNTER: &str = r#"

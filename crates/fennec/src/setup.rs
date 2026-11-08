@@ -2,8 +2,8 @@
 
 use crate::config::Settings;
 use crate::domain::setup::{Facts, ModelFact, SandboxFact};
+use crate::sandbox::{SandboxHealth, probe};
 use crate::store::SqliteStore;
-use crate::tools::{SandboxHealth, probe};
 use llm_providers_connector::list_models;
 
 pub fn facts(settings: &Settings, store: &SqliteStore) -> Result<Facts, String> {

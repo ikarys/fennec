@@ -17,8 +17,8 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
-use crate::tools::Sandbox;
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
 

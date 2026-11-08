@@ -4,9 +4,9 @@
 use crate::domain::mcp;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
+use crate::sandbox::{SandboxHealth, probe};
 use crate::scanners;
 use crate::skills;
-use crate::tools::{SandboxHealth, probe};
 use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{Request, error, send_json};

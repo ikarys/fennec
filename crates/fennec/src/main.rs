@@ -24,6 +24,7 @@ mod notifier;
 mod plugins;
 mod protected;
 mod risk;
+mod sandbox;
 mod scanners;
 mod security_scan;
 mod server_config;
