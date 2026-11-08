@@ -5,6 +5,7 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::criteria_fold;
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
+use crate::domain::modified_files::{self, ModifiedFiles};
 use crate::domain::preflight;
 use crate::domain::queue;
 use crate::domain::replay;
@@ -61,6 +62,7 @@ pub struct ThreadView {
     pub decisions: Vec<Decision>,
     /// The messages the human may replay: typed, in the model's current view.
     pub replayable: Vec<String>,
+    pub modified_files: ModifiedFiles,
 }
 
 impl From<rule_approval::Pending> for ApprovalView {
@@ -113,7 +115,7 @@ impl CriterionView {
     }
 }
 
-pub fn thread_view(events: &[Event]) -> ThreadView {
+pub fn thread_view(events: &[Event], workdir: &str) -> ThreadView {
     // The domain folds each block; the view only shapes it for the UI.
     let passed_before = preflight::passed_before(events);
     let criteria = criteria_fold::in_force(events);
@@ -131,6 +133,7 @@ pub fn thread_view(events: &[Event]) -> ThreadView {
             .collect(),
         decisions: decisions_in_force(events),
         replayable: replay::replayable_ids(events),
+        modified_files: modified_files::tally(events, workdir),
     }
 }
 
@@ -153,7 +156,7 @@ mod tests {
 
     #[test]
     fn empty_log_has_nothing_pending() {
-        let view = thread_view(&[]);
+        let view = thread_view(&[], "/w");
 
         assert!(view.pending_approval.is_none());
         assert!(view.pending_waiver.is_none());
@@ -180,7 +183,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, "/w");
 
         assert_eq!(
             view.pending_approval,
@@ -222,7 +225,7 @@ mod tests {
             },
         ];
 
-        assert!(thread_view(&events).pending_approval.is_none());
+        assert!(thread_view(&events, "/w").pending_approval.is_none());
     }
 
     #[test]
@@ -239,7 +242,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, "/w");
 
         assert_eq!(
             view.pending_waiver,
@@ -284,7 +287,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, "/w");
 
         assert_eq!(
             view.queued,
@@ -334,7 +337,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, "/w");
 
         assert_eq!(
             view.criteria,
@@ -385,7 +388,10 @@ mod tests {
             typed("u2", true),
         ];
 
-        assert_eq!(thread_view(&events).replayable, vec!["u1".to_string()]);
+        assert_eq!(
+            thread_view(&events, "/w").replayable,
+            vec!["u1".to_string()]
+        );
     }
 
     #[test]
@@ -407,7 +413,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, "/w");
 
         assert_eq!(
             view.decisions
@@ -420,7 +426,7 @@ mod tests {
 
     #[test]
     fn serializes_with_camel_case_and_nulls() {
-        let value = serde_json::to_value(thread_view(&[])).unwrap();
+        let value = serde_json::to_value(thread_view(&[], "/w")).unwrap();
 
         assert_eq!(
             value,
@@ -431,7 +437,8 @@ mod tests {
                 "criteria": [],
                 "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0},
                 "decisions": [],
-                "replayable": []
+                "replayable": [],
+                "modifiedFiles": {"count": 0, "added": 0, "removed": 0}
             })
         );
     }

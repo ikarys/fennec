@@ -13,7 +13,6 @@ import type {
   WorkflowNodeStat,
   WorkflowStats,
   ThreadItem,
-  ModifiedFile,
   PendingQuestion,
   ThreadView,
 } from './threadView';
@@ -93,34 +92,21 @@ function parseWorkflowStats(value: unknown): WorkflowStats | undefined {
   };
 }
 
-function updateToolStats(tool: ToolCallView, modified: Map<string, ModifiedFile>): void {
+function updateToolStats(tool: ToolCallView): void {
   if (tool.name === 'write_file') {
-    const path = String(tool.args.path ?? '');
     const content = String(tool.args.content ?? '');
     const lines = splitLines(content);
     tool.contentPreview = lines.slice(0, 20);
     tool.addedLines = lines.length;
     tool.removedLines = 0;
-    if (path) {
-      const entry = modified.get(path) ?? { path, added: 0, removed: 0 };
-      entry.added += lines.length;
-      modified.set(path, entry);
-    }
   }
 
   if (tool.name === 'edit_file') {
-    const path = String(tool.args.path ?? '');
     const oldLines = splitLines(String(tool.args.old_string ?? ''));
     const newLines = splitLines(String(tool.args.new_string ?? ''));
     tool.diff = { removed: oldLines, added: newLines };
     tool.addedLines = newLines.length;
     tool.removedLines = oldLines.length;
-    if (path) {
-      const entry = modified.get(path) ?? { path, added: 0, removed: 0 };
-      entry.added += newLines.length;
-      entry.removed += oldLines.length;
-      modified.set(path, entry);
-    }
   }
 
   if (tool.name === 'run_command') {
@@ -149,7 +135,6 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
   let running = false;
   let lastDone: string | undefined;
   let pendingQuestion: PendingQuestion | undefined;
-  const modified = new Map<string, ModifiedFile>();
   const assistants = new Map<string, AssistantItem>();
   const tools = new Map<string, ToolCallView>();
   let index = 0;
@@ -291,7 +276,7 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
         if (name === 'ask_user' && typeof args.question === 'string') {
           tool.question = args.question;
         }
-        updateToolStats(tool, modified);
+        updateToolStats(tool);
 
         const assistant = assistants.get(messageId) ?? newAssistant(messageId);
         assistant.segments.push({ kind: 'tool', id: toolId, tool });
@@ -649,7 +634,6 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
     running,
     lastDone,
     pendingQuestion,
-    modifiedFiles: Array.from(modified.values()),
     mode,
     name,
     run: runFold.view()

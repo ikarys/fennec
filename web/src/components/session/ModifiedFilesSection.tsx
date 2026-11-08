@@ -1,35 +1,16 @@
-import { useMemo } from 'react';
-import type { ThreadView } from '../../lib/fold';
-import { relativeToWorkdir } from '../../lib/preview';
-import { usePreviewWorkdir } from '../preview/PreviewContext';
+import type { ModifiedFiles } from '../../lib/api';
 import { ChevronRightIcon, FileIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { useT } from '../../i18n';
 import { changesPath } from '../../lib/route';
 
 interface ModifiedFilesSectionProps {
-  modifiedFiles: ThreadView['modifiedFiles'];
+  totals: ModifiedFiles;
   sessionId: string | null;
 }
 
-export function ModifiedFilesSection({ modifiedFiles, sessionId }: ModifiedFilesSectionProps) {
+export function ModifiedFilesSection({ totals, sessionId }: ModifiedFilesSectionProps) {
   const t = useT();
-  const workdir = usePreviewWorkdir();
-
-  const totals = useMemo(() => {
-    const merged = new Map<string, { added: number; removed: number }>();
-    for (const file of modifiedFiles) {
-      const key = (workdir ? relativeToWorkdir(file.path, workdir) : undefined) ?? file.path;
-      const entry = merged.get(key) ?? { added: 0, removed: 0 };
-      entry.added += file.added;
-      entry.removed += file.removed;
-      merged.set(key, entry);
-    }
-    const added = Array.from(merged.values()).reduce((sum, entry) => sum + entry.added, 0);
-    const removed = Array.from(merged.values()).reduce((sum, entry) => sum + entry.removed, 0);
-    return { count: merged.size, added, removed };
-  }, [modifiedFiles, workdir]);
-
   return (
     <Panel
       id="modifiedFiles"
