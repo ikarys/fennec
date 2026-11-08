@@ -8,19 +8,15 @@ It is for professional developers who work with AI and want to stay the
 authors of their software: they frame the work, the agent loop runs the steps,
 then waits for their review. Nothing is integrated without a human decision.
 
-The full definition lives in the Notion page "Définition de Fennec (v1)".
-
 **Approach since 2026-10-25**: the earlier code (fennec-os, fennec-lead) is
-removed (git history and `~/workspace/fennec_project` keep it). fennec is
+removed (the git history keeps it). fennec is
 rebuilt in Rust, **one component at a time**, each one working end to end
 before the next. Its agent loop, web UI and session log started from openfox
 (see "Origin" below); fennec's vocabulary is its own.
 
 What is done: `docs/components.md`; add a paragraph there when a component lands.
 
-Next, one PR each: fennec's own layer, the tools that keep the human the author
-(capabilities C* of the Notion definition):
-1. To be chosen among the remaining capabilities C* of the Notion definition.
+Next, one PR each: fennec's own layer, the tools that keep the human the author.
 
 ## Layout
 
