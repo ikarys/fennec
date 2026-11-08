@@ -100,7 +100,7 @@ pub fn authorship(message: &str) -> Authorship {
         if line.starts_with("Fennec-Session:") {
             return Authorship::Integrated;
         }
-        if is_ai_coauthor(line) {
+        if is_ai_trailer(line) {
             has_ai = true;
         }
     }
@@ -222,8 +222,17 @@ fn remedy_prompt(modules: &[RiskModule]) -> String {
     format!("{}\n", lines.join("\n"))
 }
 
-fn is_ai_coauthor(line: &str) -> bool {
+/// A line is an AI trailer when it declares assistance directly, or is an
+/// older `Co-Authored-By` trailer naming a known AI provider.
+fn is_ai_trailer(line: &str) -> bool {
     let lowered = line.to_ascii_lowercase();
+    if let Some(value) = lowered
+        .strip_prefix("assisted-by:")
+        .or_else(|| lowered.strip_prefix("generated-by:"))
+    {
+        return !value.trim().is_empty();
+    }
+
     let Some(value) = lowered.strip_prefix("co-authored-by:") else {
         return false;
     };
@@ -353,14 +362,38 @@ mod tests {
     }
 
     #[test]
-    fn authorship_is_case_insensitive_for_ai_coauthor() {
+    fn authorship_is_case_insensitive_for_ai_trailer() {
         let message = "Fix bug\n\nCO-AUTHORED-BY: Claude <bot@example.com>";
         assert_eq!(authorship(message), Authorship::Ai);
     }
 
     #[test]
-    fn integrated_wins_over_ai_coauthor() {
+    fn integrated_wins_over_ai_trailer() {
         let message = "Fix bug\n\nFennec-Session: 42\nCo-Authored-By: Claude <bot@example.com>";
+        assert_eq!(authorship(message), Authorship::Integrated);
+    }
+
+    #[test]
+    fn assisted_by_trailer_is_ai() {
+        let message = "Fix bug\n\nAssisted-by: fennec:qwen3.8-27b";
+        assert_eq!(authorship(message), Authorship::Ai);
+    }
+
+    #[test]
+    fn generated_by_trailer_is_ai() {
+        let message = "Fix bug\n\ngenerated-by: Claude";
+        assert_eq!(authorship(message), Authorship::Ai);
+    }
+
+    #[test]
+    fn empty_assisted_by_trailer_is_human() {
+        let message = "Fix bug\n\nAssisted-by:";
+        assert_eq!(authorship(message), Authorship::Human);
+    }
+
+    #[test]
+    fn integrated_wins_over_assisted_by_trailer() {
+        let message = "Fix bug\n\nFennec-Session: 42\nAssisted-by: fennec:qwen";
         assert_eq!(authorship(message), Authorship::Integrated);
     }
 

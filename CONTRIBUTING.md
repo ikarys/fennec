@@ -15,8 +15,9 @@ contribute it, and that you understand it.
 
 If an AI model wrote or changed part of your contribution, name it, with its version:
 
-- in each commit concerned, as a trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`,
-  `Co-Authored-By: Qwen3.8-27B (local) <noreply@example.com>`…;
+- in each commit concerned, as a trailer `Assisted-by: <tool>:<model>`: `Assisted-by: Claude Code:claude-opus-5-5`,
+  `Assisted-by: local:qwen3.8-27b`… Never `Co-Authored-By` or `Signed-off-by` for a model: a model is not an
+  author and cannot certify anything;
 - in the pull request description, a line `AI models: <model, version>` (or `AI models: none`).
 
 This is not a judgement on the contribution: reviewers read model-written code differently, and fennec's own

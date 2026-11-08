@@ -383,7 +383,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   excluded; `commits` and `aiCommits` report the commits in history and those declaring an AI co-author; the
   unreviewed signal sees only declared ones; `unreviewedPercent` the share of their lines (git blame) from AI commits
   never integrated through fennec, where a file is unreviewed when more than half of its lines come from such commits:
-  a commit with an AI `Co-Authored-By` trailer and no `Fennec-Session` trailer (written only by an integration, the
+  a commit with an AI trailer (`Assisted-by:`, `Generated-by:`, or a `Co-Authored-By:` naming an AI provider) and no `Fennec-Session` trailer (written only by an integration, the
   human's review gate).
   - `modules` `[{path, unreviewed, untested, churning, zones, remedyPrompt}]`: risk zones grouped by the zone file's
     parent directory (`.` for a file at the root), riskiest module first (most total signals, then path); the counts
@@ -520,7 +520,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   fails; then it merges `<base>..<branch>` onto the human's HEAD (plus the
   `carried` files' uncommitted content) with `git merge-tree`, makes one
   commit with `message` plus a `Fennec-Session: <session id>` trailer and one
-  `Co-Authored-By: <model> <noreply@fennec.local>` per model that answered in the session or its child
+  `Assisted-by: fennec:<model>` per model that answered in the session or its child
   sessions (`stats.model` of `message.done`, in order of first use; none when the Settings preference
   `integration.modelTrailers`, default true, is off), under
   the human's git identity, and moves the human's branch and tree to it with

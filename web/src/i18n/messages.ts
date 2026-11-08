@@ -386,7 +386,7 @@ export const en = {
   integrationCommitTitle: 'Integration commit',
   modelTrailersLabel: 'Name the AI models in the commit',
   modelTrailersHint:
-    'Adds one Co-Authored-By line per model that answered in the session, so the history says which models wrote the code. Off, the commit keeps only the Fennec-Session line.',
+    'Adds one Assisted-by line per model that answered in the session, so the history says which models wrote the code. Off, the commit keeps only the Fennec-Session line.',
   nightModeTitle: 'Night mode',
   nightModeHint:
     'When the queue runs in autonomous mode, the agent does not wait for your answer: it decides its own questions and records them as decisions. An idea that exceeds a cap is stopped and the queue moves to the next.',
@@ -734,7 +734,7 @@ export const en = {
   oftenModifiedDetail: '5 commits or more in {days} days',
   riskZones: 'Risk zones',
   riskZonesDescription:
-    'An AI commit not reviewed carries an AI co-author (Co-Authored-By) without a Fennec-Session trailer: integration by fennec is the human review.',
+    'An AI commit not reviewed carries an AI trailer (Assisted-by, or an AI Co-Authored-By) without a Fennec-Session trailer: integration by fennec is the human review.',
   proposeTasks: 'Propose tasks for these zones',
   remedy: 'Remedy',
   computedFromGit: 'Computed from git, no model',
@@ -1823,7 +1823,7 @@ export const fr: Record<MsgKey, string> = {
   integrationCommitTitle: "Commit d'intégration",
   modelTrailersLabel: 'Nommer les modèles IA dans le commit',
   modelTrailersHint:
-    "Ajoute une ligne Co-Authored-By par modèle qui a répondu dans la session : l'historique dit quels modèles ont écrit le code. Désactivé, le commit ne garde que la ligne Fennec-Session.",
+    "Ajoute une ligne Assisted-by par modèle qui a répondu dans la session : l'historique dit quels modèles ont écrit le code. Désactivé, le commit ne garde que la ligne Fennec-Session.",
   nightModeTitle: 'Mode nuit',
   nightModeHint:
     "Lorsque la file tourne en mode autonome, l'agent n'attend pas ta réponse : il tranche ses questions lui-même et les note comme décisions. Une idée qui dépasse un plafond est arrêtée et la file passe à la suivante.",
@@ -2173,7 +2173,7 @@ export const fr: Record<MsgKey, string> = {
   oftenModifiedDetail: '5 commits ou plus en {days} jours',
   riskZones: 'Zones à risque',
   riskZonesDescription:
-    "Un commit IA non relu porte un co-auteur IA (Co-Authored-By) sans trailer Fennec-Session : l'intégration par fennec est la revue humaine.",
+    "Un commit IA non relu porte un trailer IA (Assisted-by, ou un Co-Authored-By IA) sans trailer Fennec-Session : l'intégration par fennec est la revue humaine.",
   proposeTasks: 'Proposer des tâches pour ces zones',
   remedy: 'Remédier',
   computedFromGit: 'Calculé depuis git, sans modèle',
