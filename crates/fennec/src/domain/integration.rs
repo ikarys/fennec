@@ -330,7 +330,8 @@ pub fn default_message(session_title: &str) -> String {
 }
 
 /// The integration commit message: the human's message, the session's
-/// provenance trailer, and one `Co-Authored-By` trailer per answering model.
+/// provenance trailer, and one `Assisted-by: fennec:<model>` trailer per
+/// answering model.
 pub fn commit_message(
     message: &str,
     session_id: &str,
@@ -349,9 +350,8 @@ pub fn commit_message(
         if model.is_empty() {
             continue;
         }
-        out.push_str("\nCo-Authored-By: ");
+        out.push_str("\nAssisted-by: fennec:");
         out.push_str(&model);
-        out.push_str(" <noreply@fennec.local>");
     }
 
     Ok(out)
@@ -1090,8 +1090,8 @@ mod tests {
             "Fix",
             "",
             "Fennec-Session: s1",
-            "Co-Authored-By: qwen3.8-27b <noreply@fennec.local>",
-            "Co-Authored-By: claude-sonnet <noreply@fennec.local>",
+            "Assisted-by: fennec:qwen3.8-27b",
+            "Assisted-by: fennec:claude-sonnet",
         ]
         .join("\n");
         assert_eq!(commit_message("Fix", "s1", &models), Ok(expected));
@@ -1100,13 +1100,7 @@ mod tests {
     #[test]
     fn commit_message_sanitizes_a_model_with_newlines_and_angle_brackets() {
         let models = vec!["  <q\nwen>  ".to_string()];
-        let expected = [
-            "Fix",
-            "",
-            "Fennec-Session: s1",
-            "Co-Authored-By: qwen <noreply@fennec.local>",
-        ]
-        .join("\n");
+        let expected = ["Fix", "", "Fennec-Session: s1", "Assisted-by: fennec:qwen"].join("\n");
         assert_eq!(commit_message("Fix", "s1", &models), Ok(expected));
     }
 

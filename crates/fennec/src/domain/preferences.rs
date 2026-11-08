@@ -94,7 +94,7 @@ impl Default for SandboxPrefs {
     }
 }
 
-/// `integration.modelTrailers`: one `Co-Authored-By` trailer per model that wrote the work; on by
+/// `integration.modelTrailers`: one `Assisted-by` trailer per model that wrote the work; on by
 /// default, the human may keep their commits free of it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]

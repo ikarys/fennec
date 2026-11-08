@@ -244,8 +244,9 @@ reviews it and decides what is merged. The models that wrote code:
 - Claude (Anthropic): Opus 5.5, Fable 5.1, Sonnet 5.5;
 - Qwen3.8-27B, run locally, both through fennec itself and as an executor Claude delegated to.
 
-Each commit names the models that wrote it in `Co-Authored-By:` trailers. That record is
-incomplete before 2026-11-07: Claude's trailers are missing on part of the commits, and the
+Each commit names the models that wrote it in trailers: `Assisted-by: <tool>:<model>` since
+2026-11-08, the format of the Linux kernel, Fedora and LLVM (a model is not an author), and
+`Co-Authored-By:` before. That record is incomplete before 2026-11-07: Claude's trailers are missing on part of the commits, and the
 local Qwen's on most of the work delegated to it. On 2026-11-07 the history was rewritten once
 to add the trailers that could be proven: each commit fennec integrated (`Fennec-Session:`) got
 the models its session log or usage ledger recorded; twenty sessions deleted before the ledger

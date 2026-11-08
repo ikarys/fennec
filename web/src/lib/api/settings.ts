@@ -42,7 +42,7 @@ export interface SandboxPrefs {
 
 /** What fennec writes in the integration commit. */
 export interface IntegrationPrefs {
-  /** One `Co-Authored-By` trailer per model that wrote the work (server default true). */
+  /** One `Assisted-by` trailer per model that wrote the work (server default true). */
   modelTrailers: boolean;
 }
 

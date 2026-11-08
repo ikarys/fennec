@@ -31,7 +31,7 @@ Add models by id or click **Fetch** to read the endpoint's `/models` list. **Add
 
 ## Behaviour
 
-**Integration commit** can **Name the AI models in the commit**. When on, the integration commit adds one `Co-Authored-By` line per model that answered in the session. When off, it keeps only the `fennec-Session` line.
+**Integration commit** can **Name the AI models in the commit**. When on, the integration commit adds one `Assisted-by: fennec:<model>` line per model that answered in the session. When off, it keeps only the `Fennec-Session` line.
 
 **Night mode** controls unattended queue runs. Set **Max duration per idea (minutes)** and **Max tokens per idea**. A value of 0 means no limit. See [tasks](tasks.md).
 
