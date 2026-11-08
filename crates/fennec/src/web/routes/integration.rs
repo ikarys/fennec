@@ -92,7 +92,7 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, HttpError> {
         .collect();
     let test_files = new_test_patterns(&in_project, &protection);
     let rules = architecture::load(Path::new(&project.workdir));
-    let changed = integration::changed_files(&top, &wt, &preview.files, &prefix);
+    let changed = integration::changed_files(&top, &wt, &preview.files, &prefix)?;
     let events = store.events(&session.id)?;
     let mut checks = DiffChecks::of(&rules, &changed);
     // The scanners read model-written files: they run in the human's sandbox,

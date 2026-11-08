@@ -13,12 +13,7 @@ impl Listings {
     /// (nothing cached) it lists now and waits.
     pub fn get(&self, endpoint: &Endpoint) -> Result<Vec<ListedModel>, String> {
         let key = endpoint.base_url.clone();
-        let cached = self
-            .0
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .get(&key)
-            .cloned();
+        let cached = crate::locks::lock(&self.0).get(&key).cloned();
         match cached {
             Some(models) => {
                 // ponytail: concurrent page loads may each start a refresh (each bounded by
@@ -37,7 +32,7 @@ impl Listings {
     /// Lists now, and caches a success (the re-list button: the human asked for the truth).
     pub fn refresh(&self, endpoint: &Endpoint) -> Result<Vec<ListedModel>, String> {
         let models = list_models(endpoint)?;
-        let mut cache = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut cache = crate::locks::lock(&self.0);
         cache.insert(endpoint.base_url.clone(), models.clone());
         Ok(models)
     }

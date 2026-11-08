@@ -277,14 +277,15 @@ pub fn protected_touched(files: &[String], prefix: &str, protection: &Protection
 
 /// The lines the agent's branch adds and removes, per file under the project
 /// (`files` relative to the repository top, the result relative to the
-/// project: the `prefix` is stripped, files outside it are skipped). A file
-/// git cannot diff (binary) changes no line.
+/// project: the `prefix` is stripped, files outside it are skipped). A binary
+/// file changes no line. A failed `git diff` is an error, never an empty diff:
+/// the gate's bypass checks read these lines and must not pass on nothing.
 pub fn changed_files(
     top: &Path,
     wt: &Worktree,
     files: &[String],
     prefix: &str,
-) -> Vec<(String, ChangedLines)> {
+) -> Result<Vec<(String, ChangedLines)>, String> {
     let start = merge_start(top, wt);
     files
         .iter()
@@ -296,8 +297,8 @@ pub fn changed_files(
                 None,
             )
             .map(|out| String::from_utf8_lossy(&out).into_owned())
-            .unwrap_or_default();
-            (relative.to_string(), changed_lines(&diff))
+            .map_err(|e| format!("cannot diff {file}: {e}"))?;
+            Ok((relative.to_string(), changed_lines(&diff)))
         })
         .collect()
 }
@@ -633,6 +634,26 @@ mod tests {
 
         assert!(raw.contains("-one\n+two"));
         assert_eq!(file_diff(&top, &wt, "other.txt").unwrap(), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn changed_files_fails_when_git_cannot_diff_instead_of_passing_empty() {
+        let (base, repo) = setup();
+        let wt = open(&base.join("wt"), &repo, "s1").unwrap().unwrap();
+        std::fs::write(wt.workdir.join("a.txt"), "two\n").unwrap();
+        assert_eq!(commit(&wt, "agent work"), Ok(true));
+        let top = top(&repo).unwrap().0;
+        let files = vec!["a.txt".to_string()];
+
+        let changed = changed_files(&top, &wt, &files, "").unwrap();
+        assert_eq!(changed[0].1.added, vec!["two".to_string()]);
+
+        let gone = Worktree {
+            branch: "fennec/no-such-branch".into(),
+            ..wt
+        };
+        assert!(changed_files(&top, &gone, &files, "").is_err());
         let _ = std::fs::remove_dir_all(&base);
     }
 
