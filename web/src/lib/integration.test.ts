@@ -5,7 +5,6 @@ import {
   blockerSentence,
   gateState,
   narrativePrompt,
-  neverAcknowledged,
   scanBadge,
   understandingPrompt,
 } from './integration';
@@ -32,31 +31,11 @@ function preview(overrides: Partial<IntegrationPreview> = {}): IntegrationPrevie
   };
 }
 
-function blocker<T extends Blocker>(value: T): T {
-  return value;
+/** A blocker as the server serves it: those four kinds are never acknowledgeable (domain/integration.rs). */
+function blocker<T extends { kind: Blocker['kind'] }>(value: T): Blocker {
+  const acknowledgeable = !['noCommits', 'conflict', 'localChanges', 'securityScanRunning'].includes(value.kind);
+  return { ...value, acknowledgeable } as unknown as Blocker;
 }
-
-describe('never acknowledged', () => {
-  it('returns true for no commits', () => {
-    expect(neverAcknowledged('noCommits')).toBe(true);
-  });
-
-  it('returns true for conflict', () => {
-    expect(neverAcknowledged('conflict')).toBe(true);
-  });
-
-  it('returns true for local changes', () => {
-    expect(neverAcknowledged('localChanges')).toBe(true);
-  });
-
-  it('returns false for no criteria', () => {
-    expect(neverAcknowledged('noCriteria')).toBe(false);
-  });
-
-  it('returns false for protected touched', () => {
-    expect(neverAcknowledged('protectedTouched')).toBe(false);
-  });
-});
 
 describe('narrative prompt', () => {
   it('names branch and base, lists files, and ends with diff instruction', () => {
@@ -317,7 +296,7 @@ describe('gate state', () => {
     const state = gateState({
       preview: preview({
         commits: [{ sha: 'c1', subject: 'feat' }],
-        blockers: [{ kind: 'securityScanRunning' }],
+        blockers: [blocker({ kind: 'securityScanRunning' })],
       }),
       acknowledged: { securityScanRunning: true },
       result: null,

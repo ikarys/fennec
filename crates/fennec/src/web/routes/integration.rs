@@ -66,12 +66,24 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "testFiles": gate.test_files,
             "criteria": criteria,
             "decisions": gate.decisions,
-            "blockers": gate.blockers,
+            "blockers": blockers_json(&gate.blockers),
             "securityScans": gate.security_scans,
             "understanding": gate.understanding,
             "idea": idea_json(gate.idea.as_ref()),
         }),
     )
+}
+
+/// The blockers as the dialog shows them: each one says whether the human may accept it.
+fn blockers_json(blockers: &[Blocker]) -> Vec<Value> {
+    blockers
+        .iter()
+        .map(|blocker| {
+            let mut value = json!(blocker);
+            value["acknowledgeable"] = json!(blocker.acknowledgeable());
+            value
+        })
+        .collect()
 }
 
 /// `POST /api/sessions/{id}/understanding`: link the comprehension dialogue the

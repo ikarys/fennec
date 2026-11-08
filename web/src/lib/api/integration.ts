@@ -31,7 +31,8 @@ export type ScanStatus = { scanner: string } & (
   | { state: 'running'; seconds: number }
 );
 
-export type Blocker =
+/** A blocker; `acknowledgeable` says whether the human may accept it (the server decides). */
+export type Blocker = { acknowledgeable: boolean } & (
   | { kind: "securityScanRunning" }
   | { kind: "noCommits" }
   | { kind: "conflict"; files: string[] }
@@ -51,7 +52,8 @@ export type Blocker =
     }
   | { kind: "branchChanged"; from: string; to: string | null }
   | { kind: "localChanges"; paths: string[] }
-  | { kind: "understandingMissing" };
+  | { kind: "understandingMissing" }
+);
 
 export type ReviewSignal =
   | 'protected'
