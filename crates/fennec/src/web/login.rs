@@ -5,23 +5,26 @@ use crate::web::http::HttpError;
 use crate::web::http::{self, Request};
 use crate::web::routes;
 use ring::rand::SecureRandom;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub struct Logins {
     password: Mutex<Option<String>>,
     // ponytail: in-memory sessions, persist them if re-login after a restart annoys
-    sessions: Mutex<HashSet<String>>,
+    sessions: Mutex<HashMap<String, Instant>>,
     attempts: Mutex<()>,
 }
+
+/// A session lasts as long as its cookie; the server forgets it then too.
+const SESSION_TTL: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 impl Logins {
     pub fn new(password: Option<String>) -> Self {
         Self {
             password: Mutex::new(password),
-            sessions: Mutex::new(HashSet::new()),
+            sessions: Mutex::new(HashMap::new()),
             attempts: Mutex::new(()),
         }
     }
@@ -31,15 +34,26 @@ impl Logins {
     }
 
     pub fn set_password(&self, hash: String) {
+        // A stolen token must not survive a password change.
+        crate::locks::lock(&self.sessions).clear();
         *crate::locks::lock(&self.password) = Some(hash);
     }
 
     pub fn has_session(&self, token: &str) -> bool {
-        crate::locks::lock(&self.sessions).contains(token)
+        let mut sessions = crate::locks::lock(&self.sessions);
+        let expired = sessions
+            .get(token)
+            .is_some_and(|&created| Instant::now().duration_since(created) > SESSION_TTL);
+        if expired {
+            sessions.remove(token);
+            false
+        } else {
+            sessions.contains_key(token)
+        }
     }
 
     pub fn add_session(&self, token: &str) {
-        crate::locks::lock(&self.sessions).insert(token.to_string());
+        crate::locks::lock(&self.sessions).insert(token.to_string(), Instant::now());
     }
 
     pub fn verify_password(&self, candidate: &str) -> bool {
@@ -55,24 +69,38 @@ impl Default for Logins {
     }
 }
 
+/// What a remote caller's request gets, before anything is written.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Access {
+    Granted,
+    LoginAttempt,
+    Refused,
+    LoginPage,
+}
+
+pub(crate) fn access(logins: &Logins, req: &Request) -> Access {
+    if session_cookie(req).is_some_and(|token| logins.has_session(token)) {
+        Access::Granted
+    } else if req.method == "POST" && req.path == "/api/login" {
+        Access::LoginAttempt
+    } else if req.path.starts_with("/api/") {
+        Access::Refused
+    } else {
+        Access::LoginPage
+    }
+}
+
 pub fn gate(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
-    if session_cookie(req).is_some_and(|token| app.logins.has_session(token)) {
-        return routes::handle(app, req, stream);
-    }
-
-    if req.method == "POST" && req.path == "/api/login" {
-        return login_attempt(app, req, stream);
-    }
-
-    if req.path.starts_with("/api/") {
-        return http::send_json(
+    match access(&app.logins, req) {
+        Access::Granted => routes::handle(app, req, stream),
+        Access::LoginAttempt => login_attempt(app, req, stream),
+        Access::Refused => http::send_json(
             stream,
             401,
             &serde_json::json!({ "error": "login required" }),
-        );
+        ),
+        Access::LoginPage => login_page(stream),
     }
-
-    login_page(stream)
 }
 
 fn login_attempt(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {
@@ -94,8 +122,10 @@ fn login_attempt(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Resul
             .collect::<String>();
         app.logins.add_session(&token);
 
-        let cookie =
-            format!("fennec_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000");
+        let cookie = format!(
+            "fennec_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={}",
+            SESSION_TTL.as_secs()
+        );
         http::send_with(
             stream,
             200,
@@ -164,4 +194,99 @@ document.querySelector('form').addEventListener('submit', async function (event)
 </html>
 "#;
     http::send(stream, 200, "text/html; charset=utf-8", html.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(method: &str, path: &str, headers: Vec<(&str, &str)>, body: &[u8]) -> Request {
+        Request {
+            method: method.to_string(),
+            path: path.to_string(),
+            query: String::new(),
+            headers: headers
+                .into_iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect(),
+            body: body.to_vec(),
+        }
+    }
+
+    #[test]
+    fn an_api_call_without_a_cookie_is_refused() {
+        let logins = Logins::new(None);
+        let req = request("GET", "/api/status", Vec::new(), b"");
+        assert_eq!(access(&logins, &req), Access::Refused);
+    }
+
+    #[test]
+    fn a_page_without_a_cookie_gets_the_login_page() {
+        let logins = Logins::new(None);
+        let req = request("GET", "/", Vec::new(), b"");
+        assert_eq!(access(&logins, &req), Access::LoginPage);
+    }
+
+    #[test]
+    fn a_login_post_is_an_attempt() {
+        let logins = Logins::new(None);
+        let req = request("POST", "/api/login", Vec::new(), b"");
+        assert_eq!(access(&logins, &req), Access::LoginAttempt);
+    }
+
+    #[test]
+    fn a_valid_session_cookie_is_granted() {
+        let logins = Logins::new(None);
+        logins.add_session("token123");
+        let req = request(
+            "GET",
+            "/api/status",
+            vec![("cookie", "other=1; fennec_session=token123")],
+            b"",
+        );
+        assert_eq!(access(&logins, &req), Access::Granted);
+    }
+
+    #[test]
+    fn an_unknown_session_cookie_is_refused() {
+        let logins = Logins::new(None);
+        let req = request(
+            "GET",
+            "/api/status",
+            vec![("cookie", "fennec_session=unknown")],
+            b"",
+        );
+        assert_eq!(access(&logins, &req), Access::Refused);
+    }
+
+    #[test]
+    fn changing_the_password_ends_every_session() {
+        let logins = Logins::new(None);
+        logins.add_session("old");
+        assert!(logins.has_session("old"));
+        let hash = crate::domain::password::hash("new", &[0u8; 8], 1);
+        logins.set_password(hash);
+        assert!(!logins.has_session("old"));
+    }
+
+    #[test]
+    fn an_expired_session_is_refused() {
+        let logins = Logins::new(None);
+        let token = "expired";
+        let created = match Instant::now().checked_sub(SESSION_TTL + Duration::from_secs(1)) {
+            Some(created) => created,
+            None => return,
+        };
+        crate::locks::lock(&logins.sessions).insert(token.to_string(), created);
+        assert!(!logins.has_session(token));
+    }
+
+    #[test]
+    fn the_right_password_verifies_and_a_wrong_one_does_not() {
+        let logins = Logins::new(None);
+        let hash = crate::domain::password::hash("right", &[0u8; 8], 1);
+        logins.set_password(hash);
+        assert!(logins.verify_password("right"));
+        assert!(!logins.verify_password("wrong"));
+    }
 }
