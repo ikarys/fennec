@@ -6,7 +6,7 @@ import { Badge } from '../ui/Badge';
 import { Switch } from '../ui/Switch';
 import { CheckIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
-import { getServer, setServer, setServerPassword, restartServer, type ServerSettings } from '../../lib/api';
+import { getServer, getVersion, setServer, setServerPassword, restartServer, type ServerSettings } from '../../lib/api';
 
 export function NetworkSection() {
   const t = useT();
@@ -109,9 +109,9 @@ export function NetworkSection() {
           return;
         }
 
-        const response = await fetch('/api/version');
+        await getVersion();
         // The old process may answer briefly after re-exec.
-        if (response.ok && tries >= 2) {
+        if (tries >= 2) {
           stopPolling();
           setRestarting(false);
           window.location.reload();
