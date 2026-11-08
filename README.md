@@ -226,6 +226,7 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 ## Documentation
 
+- [User guide](https://ikarys.github.io/fennec/docs/) (source in [docs/guide](docs/guide)): install, sessions, plans, the review gate, workflows, the sandbox, settings, CLI
 - [docs/sandbox.md](docs/sandbox.md): the command sandbox: what it blocks, how to run, test and see the agent's work
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, licence of contributions
 - [AGENTS.md](AGENTS.md): architecture, conventions

@@ -12,3 +12,6 @@ web/dist/
 *.db
 *.db-shm
 *.db-wal
+
+# The user guide, built into the site by `just site` and the Pages workflow
+site/docs/
