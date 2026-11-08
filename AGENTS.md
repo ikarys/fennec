@@ -99,6 +99,7 @@ crates/fennec/src/
     round.rs           one model round: streaming, retries, continuation, timing
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      runs and records tool calls
+    own_tools.rs       the loop's own tools (ask_user, propose_plan, delegate…) dispatched, each one's outcome
     ask_user.rs        the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
     propose_plan.rs    the loop's propose_plan tool: the plan validated and recorded, the turn ends

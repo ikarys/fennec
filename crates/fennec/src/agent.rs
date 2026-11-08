@@ -5,6 +5,7 @@ mod ask_user;
 mod compaction;
 pub mod delegate;
 mod delta_buffer;
+mod own_tools;
 pub mod ports;
 mod preflight;
 mod prompt;
