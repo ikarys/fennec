@@ -8,7 +8,7 @@ use crate::domain::project::Project;
 use crate::domain::slash::commands;
 use crate::web::App;
 use crate::web::http::HttpError;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 use crate::web::os::editor;
 use crate::web::routes::folder_routes::store_dir;
 use crate::web::routes::session_routes::session_json;
@@ -100,9 +100,7 @@ pub(crate) fn open_project(
 
 pub(crate) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     let list = commands(&skills::discover(Path::new(&project.workdir)));
     let out: Vec<Value> = list
         .into_iter()
@@ -113,9 +111,7 @@ pub(crate) fn list_commands(app: &App, stream: &mut TcpStream, id: &str) -> Resu
 
 pub(crate) fn list_agents(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     let mut list = agents::discover(Path::new(&project.workdir));
     // The menu follows a project's order, so phase comes first.
     list.sort_by_key(|agent| (agent.phase.is_none(), agent.phase));

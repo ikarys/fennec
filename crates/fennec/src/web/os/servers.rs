@@ -45,9 +45,7 @@ fn key(session_id: &str, name: &str) -> String {
 /// The project's servers with their running state in this session.
 /// `GET /api/sessions/{id}/servers`.
 pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
-    let Some((_, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (_, project) = app.require_session(id)?;
     let dir = Path::new(&project.workdir);
     let defs = servers::read(dir);
     // Nothing configured: offer the guessed command, which the human confirms
@@ -127,9 +125,7 @@ impl Snapshot {
 /// Saves the project's servers to `.agents/servers.json`.
 /// `POST /api/sessions/{id}/servers` with `{servers: [{name, command}]}`.
 pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
-    let Some((_, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (_, project) = app.require_session(id)?;
     let body = req.json()?;
     let Some(items) = body.get("servers").and_then(Value::as_array) else {
         return error(stream, 400, "servers must be an array");
@@ -153,9 +149,7 @@ pub fn save(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
 /// Starts a server in the session's place.
 /// `POST /api/sessions/{id}/servers/start` with `{name}`.
 pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     let name = req_name(req)?;
     let defs = servers::read(Path::new(&project.workdir));
     let Some(def) = defs.into_iter().find(|d| d.name.trim() == name) else {

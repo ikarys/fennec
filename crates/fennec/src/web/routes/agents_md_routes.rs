@@ -19,9 +19,7 @@ use crate::web::http::{error, send_json};
 /// `POST /api/sessions/{id}/agents-md` → `{replaced}`.
 pub fn write(app: &App, stream: &mut TcpStream, session_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(session_id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(session_id)?;
 
     let events = store.events(&session.id)?;
     let Some(draft) = agents_md::draft(&last_assistant_text(&events)) else {

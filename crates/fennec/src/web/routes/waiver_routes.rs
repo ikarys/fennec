@@ -23,9 +23,7 @@ pub(crate) fn answer_waiver(
     let call_id = body["callId"].as_str().unwrap_or("").to_string();
     let grant = body["grant"].as_bool().unwrap_or(false);
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }

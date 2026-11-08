@@ -5,28 +5,21 @@ use crate::agent::ports::EventLog;
 use crate::agent::workflow::WorkflowJob;
 use crate::agents;
 use crate::domain::event::Event;
-use crate::domain::project::Project;
 use crate::domain::workflow::definition::Workflow;
 use crate::domain::workflow::run::{self as run, Waiting};
 use crate::domain::workflow::validate;
 use crate::notifier::NotifyingLog;
 use crate::web::App;
 use crate::web::http::HttpError;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 use crate::web::turns::{Job, Place};
 use crate::workflows::{self, Origin};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
 
-fn project(app: &App, id: &str) -> Result<Option<Project>, String> {
-    Ok(app.store()?.project(id)?)
-}
-
 pub fn list_workflows(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
-    let Some(project) = project(app, id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&app.store()?, id)?;
     let enabled = &app.store()?.preferences()?.enabled_workflows;
     let found = workflows::discover(Path::new(&project.workdir), enabled);
     let out: Vec<Value> = found
@@ -49,9 +42,7 @@ pub fn get_workflow(
     id: &str,
     wid: &str,
 ) -> Result<(), HttpError> {
-    let Some(project) = project(app, id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&app.store()?, id)?;
     let enabled = &app.store()?.preferences()?.enabled_workflows;
     let Some(found) = workflows::find(Path::new(&project.workdir), wid, enabled) else {
         return error(stream, 404, "no such workflow");
@@ -71,9 +62,7 @@ pub fn save_workflow(
     wid: &str,
 ) -> Result<(), HttpError> {
     let body = req.json()?;
-    let Some(project) = project(app, id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&app.store()?, id)?;
     let scope = body["scope"].as_str().unwrap_or("");
     let origin = match scope {
         "project" => Origin::Project,
@@ -109,9 +98,7 @@ pub fn validate_workflow_route(
     stream: &mut TcpStream,
 ) -> Result<(), HttpError> {
     let body = req.json()?;
-    let Some(project) = project(app, body["projectId"].as_str().unwrap_or(""))? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&app.store()?, body["projectId"].as_str().unwrap_or(""))?;
     let raw = &body["workflow"];
     if raw.is_null() {
         return error(stream, 400, "workflow is required");
@@ -157,9 +144,7 @@ pub fn start_workflow(
 ) -> Result<(), HttpError> {
     let body = req.json()?;
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     let workflow_id = body["workflowId"].as_str().unwrap_or("");
     let enabled = &store.preferences()?.enabled_workflows;
     let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id, enabled) else {
@@ -221,9 +206,7 @@ pub fn control_workflow(
         _ => return error(stream, 404, "not found"),
     };
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }

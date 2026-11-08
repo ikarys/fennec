@@ -1,6 +1,6 @@
 //! The project's indicators: read-only figures drawn only from recorded facts.
 
-use crate::web::http::HttpError;
+use crate::web::http::{HttpError, require_project};
 use std::collections::BTreeMap;
 use std::net::TcpStream;
 use std::path::Path;
@@ -21,7 +21,7 @@ use crate::domain::pricing::{priced, prices};
 use crate::domain::waiver;
 use crate::store::SqliteStore;
 use crate::web::App;
-use crate::web::http::{error, send_json};
+use crate::web::http::send_json;
 use crate::web::views::project_dashboard::Tone;
 use crate::{adr, architecture, module_map, risk};
 
@@ -52,9 +52,7 @@ pub struct IndicatorView {
 /// `GET /api/projects/{id}/indicators`.
 pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     let lang = Lang::from_code(&store.preferences()?.display.language);
     let facts = facts(app, &store, &project.id, Path::new(&project.workdir))?;
     send_json(stream, 200, &json!({ "indicators": view(&facts, lang) }))

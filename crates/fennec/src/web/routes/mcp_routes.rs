@@ -76,9 +76,7 @@ pub(crate) fn disabled_servers(value: &Value) -> Option<Vec<String>> {
 /// `GET /api/sessions/{id}/mcp`: the session's MCP state and token totals.
 pub(crate) fn session_mcp(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if app.session_and_project(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    app.require_session(id)?;
     let events = store.events(id)?;
     let prefs = store.preferences()?;
     send_json(stream, 200, &mcp_view(&prefs, &events))
@@ -94,9 +92,7 @@ pub(crate) fn set_session_mcp(
     let body = req.json()?;
     let disabled = disabled_servers(&body["disabled"]).unwrap_or_default();
     let store = app.store()?;
-    if app.session_and_project(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    app.require_session(id)?;
     crate::web::routes::session_routes::append_human_event(
         app,
         &store,
