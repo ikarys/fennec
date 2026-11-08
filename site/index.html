@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="nuit">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,94 +8,67 @@
   <link rel="icon" href="images/brand/emblem.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    html {
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    html[data-theme="nuit"] {
-      --bg: #0E1013;
-      --panel: #15181D;
-      --line: #272C34;
-      --text: #E7E9EC;
-      --muted: #9AA2AE;
-      --accent: #F08A4B;
-      --accent-ink: #16110D;
-      color-scheme: dark;
-    }
-
-    html[data-theme="jour"] {
-      --bg: #F6F6F3;
-      --panel: #FFFFFF;
-      --line: #E1E1DB;
-      --text: #1A1B1E;
-      --muted: #5C6066;
-      --accent: #A8440F;
-      --accent-ink: #FFFFFF;
-      color-scheme: light;
-    }
-
-    html[data-theme="ardoise"] {
-      --bg: #1E2332;
-      --panel: #252B3C;
-      --line: #343C50;
-      --text: #DDE3EF;
-      --muted: #A6B0C5;
-      --accent: #82AAFF;
-      --accent-ink: #141826;
-      color-scheme: dark;
-    }
-
-    html[data-theme="cyber"] {
-      --bg: #000300;
-      --panel: #020A03;
-      --line: #0F3D17;
-      --text: #B6FFC4;
-      --muted: #3FBF5A;
-      --accent: #00FF41;
-      --accent-ink: #000300;
-      color-scheme: dark;
+    :root {
+      --night: #161925;
+      --dusk: #20253A;
+      --rule: #2E3450;
+      --sand: #EADBC0;
+      --dune: #9A917F;
+      --fox: #F08A4B;
+      --fox-ink: #1A120C;
+      --ok: #7FC8A0;
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html {
+      background: var(--night);
+      color: var(--sand);
+      color-scheme: dark;
+      overflow-x: hidden;
+    }
+
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Schibsted Grotesk", sans-serif;
-      font-size: 17px;
+      background: var(--night);
+      color: var(--sand);
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-size: 18px;
       line-height: 1.6;
-      transition: background-color 250ms, color 250ms;
+      overflow-x: hidden;
     }
 
     a {
-      color: var(--accent);
+      color: var(--fox);
       text-decoration: none;
     }
 
+    a:hover {
+      text-decoration: underline;
+    }
+
     :focus-visible {
-      outline: 2px solid var(--accent);
+      outline: 2px solid var(--fox);
       outline-offset: 3px;
     }
 
     .container {
       width: 100%;
-      max-width: 1180px;
+      max-width: 1200px;
       margin-inline: auto;
       padding-inline: clamp(20px, 5vw, 48px);
     }
 
     .site-header {
-      border-bottom: 1px solid var(--line);
+      background: transparent;
     }
 
     .header-inner {
-      height: 64px;
+      min-height: 72px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -105,10 +78,14 @@
     .wordmark {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      font-size: 18px;
+      gap: 10px;
+      font-size: 20px;
       font-weight: 700;
-      color: var(--text);
+      color: var(--sand);
+    }
+
+    .wordmark:hover {
+      text-decoration: none;
     }
 
     .wordmark img {
@@ -118,36 +95,30 @@
     .header-nav {
       display: flex;
       gap: 24px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .header-nav a {
-      color: var(--muted);
       font-size: 15px;
-    }
-
-    .header-nav a:hover {
-      color: var(--text);
-    }
-
-    .hero {
-      padding-top: 96px;
     }
 
     h1 {
       margin: 0 0 24px;
-      font-size: clamp(2.6rem, 6vw, 4.6rem);
-      font-weight: 500;
-      letter-spacing: -0.025em;
-      line-height: 1.05;
-      max-width: 14ch;
+      font-size: clamp(44px, 7.2vw, 96px);
+      font-weight: 800;
+      letter-spacing: -0.022em;
+      line-height: 0.98;
+      max-width: 12ch;
+      font-variation-settings: "opsz" 96;
     }
 
     h2 {
       margin: 0 0 24px;
-      font-size: clamp(1.7rem, 3vw, 2.4rem);
-      font-weight: 500;
-      letter-spacing: -0.015em;
-      line-height: 1.15;
+      font-size: clamp(30px, 3.6vw, 46px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
     }
 
     p {
@@ -155,9 +126,33 @@
       max-width: 60ch;
     }
 
+    .hero {
+      padding-top: clamp(72px, 10vw, 120px);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: clamp(40px, 6vw, 80px);
+      align-items: center;
+    }
+
+    .hero-copy,
+    .gate-wrap {
+      min-width: 0;
+    }
+
+    /* The gate reads as a small piece of the product: a panel, like a run in the app. */
+    .gate-wrap {
+      background: var(--dusk);
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      padding: clamp(20px, 3vw, 32px);
+    }
+
     .hero-lede {
-      color: var(--muted);
-      font-size: 20px;
+      color: var(--dune);
+      font-size: 21px;
       margin: 0 0 32px;
     }
 
@@ -169,10 +164,11 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
+      background: var(--dusk);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
       padding: 14px 16px;
+      min-width: 0;
     }
 
     .code-scroll {
@@ -182,47 +178,179 @@
     }
 
     .cmd {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 14px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 15px;
       line-height: 1.6;
       white-space: nowrap;
-      color: var(--text);
+      color: var(--sand);
     }
 
     .prompt {
       user-select: none;
       -webkit-user-select: none;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 14px;
-      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 15px;
+      color: var(--dune);
     }
 
     .copy {
       flex: 0 0 auto;
       background: transparent;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      color: var(--muted);
-      font-family: "Schibsted Grotesk", sans-serif;
-      font-size: 13px;
-      line-height: 1.6;
-      padding: 4px 10px;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      color: var(--sand);
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      padding: 6px 12px;
       cursor: pointer;
     }
 
     .copy:hover {
-      color: var(--text);
+      border-color: var(--sand);
     }
 
     .install-note {
-      color: var(--muted);
-      font-size: 14px;
+      color: var(--dune);
+      font-size: 15px;
       margin: 10px 0 0;
     }
 
     .install-note code {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 13px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 14px;
+    }
+
+    .gate {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .gate li {
+      position: relative;
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 0;
+    }
+
+    .gate li:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      bottom: -50%;
+      width: 1px;
+      background: var(--rule);
+    }
+
+    .marker {
+      position: relative;
+      z-index: 1;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--rule);
+      background: var(--night);
+    }
+
+    .human.done .marker::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 4px;
+      width: 5px;
+      height: 9px;
+      border-right: 2px solid var(--night);
+      border-bottom: 2px solid var(--night);
+      transform: rotate(45deg);
+    }
+
+    .human.done .marker {
+      background: var(--ok);
+      border-color: var(--ok);
+    }
+
+    .human .marker {
+      border-color: var(--fox);
+    }
+
+    .step.done .marker {
+      background: var(--ok);
+      border-color: var(--ok);
+    }
+
+    .step.done .marker::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 4px;
+      width: 5px;
+      height: 9px;
+      border-right: 2px solid var(--night);
+      border-bottom: 2px solid var(--night);
+      transform: rotate(45deg);
+    }
+
+    .gate-label {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--sand);
+      overflow-wrap: break-word;
+    }
+
+    .gate-detail {
+      font-size: 14px;
+      color: var(--dune);
+      text-align: right;
+      overflow-wrap: break-word;
+    }
+
+    .integrate {
+      grid-column: 2;
+      justify-self: start;
+      background: var(--fox);
+      color: var(--fox-ink);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      border: 0;
+      border-radius: 10px;
+      padding: 14px 26px;
+      opacity: 0.5;
+      transition: opacity 0.3s ease, box-shadow 0.45s ease, background-color 0.2s ease;
+    }
+
+    .integrate:not(:disabled) {
+      cursor: pointer;
+    }
+
+    .integrate:disabled {
+      cursor: default;
+    }
+
+    .integrate.ready {
+      opacity: 1;
+      box-shadow: 0 0 0 8px rgba(240, 138, 75, 0.18);
+    }
+
+    .integrate.integrated {
+      background: var(--ok);
+      opacity: 1;
+      box-shadow: none;
+    }
+
+    .gate-status {
+      margin: 16px 0 0;
+      font-size: 15px;
+      color: var(--dune);
+      min-height: 1.6em;
+    }
+
+    .hero-below {
+      margin-top: clamp(48px, 6vw, 72px);
     }
 
     .theme-row {
@@ -230,11 +358,11 @@
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
-      margin-top: 32px;
+      margin: 0 0 24px;
     }
 
     .theme-label {
-      color: var(--muted);
+      color: var(--dune);
       font-size: 15px;
     }
 
@@ -249,19 +377,19 @@
       align-items: center;
       gap: 8px;
       background: transparent;
-      border: 1px solid var(--line);
+      border: 1px solid var(--rule);
       border-radius: 999px;
       padding: 6px 14px 6px 10px;
-      font-family: "Schibsted Grotesk", sans-serif;
+      font-family: inherit;
       font-size: 14px;
-      line-height: 1.6;
-      color: var(--muted);
+      line-height: 1.4;
+      color: var(--dune);
       cursor: pointer;
     }
 
     .theme-radio[aria-checked="true"] {
-      border-color: var(--accent);
-      color: var(--text);
+      border-color: var(--fox);
+      color: var(--sand);
     }
 
     .chip {
@@ -281,28 +409,54 @@
       clip-path: polygon(0 0, 100% 0, 0 100%);
     }
 
-    .hero-shot {
-      margin: 40px 0 0;
-      border: 1px solid var(--line);
-      border-radius: 12px;
+    .window {
+      background: var(--dusk);
+      border: 1px solid var(--rule);
+      border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .6);
+      box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.7);
     }
 
-    .hero-shot img {
+    .window-bar {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px;
+      background: var(--dusk);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--rule);
+    }
+
+    .window img {
       display: block;
       width: 100%;
       height: auto;
       transition: opacity 150ms;
     }
 
+    .features,
+    .details,
+    .story,
+    .get-started {
+      padding-top: clamp(96px, 12vw, 160px);
+    }
+
     .feature {
       display: grid;
-      grid-template-columns: 5fr 7fr;
+      grid-template-columns: 340px 1fr;
       gap: 64px;
       align-items: center;
-      padding: 96px 0;
-      border-top: 1px solid var(--line);
+    }
+
+    .feature + .feature {
+      margin-top: 120px;
     }
 
     .feature-text h2 {
@@ -310,29 +464,16 @@
     }
 
     .feature-text p {
-      color: var(--muted);
+      color: var(--dune);
       margin: 0;
     }
 
-    .feature-media img {
-      display: block;
-      width: 100%;
-      height: auto;
-      border: 1px solid var(--line);
-      border-radius: 10px;
+    .feature-media {
+      min-width: 0;
     }
 
-    .feature.reverse .feature-media {
-      order: -1;
-    }
-
-    .feature.reverse .feature-text {
-      order: 1;
-    }
-
-    .details {
-      border-top: 1px solid var(--line);
-      padding: 96px 0;
+    .feature-media .window {
+      margin-right: 0;
     }
 
     .details h2 {
@@ -342,37 +483,50 @@
     .details dl {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 40px 48px;
+      gap: 48px;
       margin: 0;
     }
 
     .details dt {
-      font-weight: 500;
-      color: var(--text);
+      position: relative;
+      padding-top: 16px;
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--sand);
+      margin: 0;
+    }
+
+    .details dt::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 24px;
+      height: 3px;
+      background: var(--fox);
     }
 
     .details dd {
-      margin: 6px 0 0;
-      color: var(--muted);
+      margin: 8px 0 0;
+      color: var(--dune);
       font-size: 16px;
     }
 
-    .story {
-      border-top: 1px solid var(--line);
-      padding: 96px 0;
+    .story-large {
+      font-size: 28px;
+      line-height: 1.35;
+      font-weight: 500;
+      color: var(--sand);
+      max-width: 30em;
+      margin: 0 0 24px;
     }
 
-    .story p {
-      color: var(--muted);
-    }
-
-    .get-started {
-      border-top: 1px solid var(--line);
-      padding: 96px 0;
+    .story p:last-child {
+      color: var(--dune);
     }
 
     .get-started > .container > p {
-      color: var(--muted);
+      color: var(--dune);
       margin-bottom: 32px;
     }
 
@@ -381,20 +535,21 @@
     }
 
     .code-caption {
-      color: var(--muted);
+      color: var(--dune);
       font-size: 14px;
       margin: 0 0 8px;
     }
 
     .get-started .links {
-      color: var(--muted);
+      color: var(--dune);
       margin: 32px 0 0;
     }
 
     .site-footer {
-      border-top: 1px solid var(--line);
+      margin-top: clamp(96px, 12vw, 160px);
+      border-top: 1px solid var(--rule);
       padding: 32px 0;
-      color: var(--muted);
+      color: var(--dune);
       font-size: 14px;
     }
 
@@ -409,35 +564,27 @@
     .footer-nav {
       display: flex;
       gap: 20px;
+      flex-wrap: wrap;
     }
 
-    .footer-nav a {
-      color: var(--muted);
+    @media (min-width: 1201px) {
+      .feature-media .window {
+        margin-right: -6vw;
+      }
     }
 
-    .footer-nav a:hover {
-      color: var(--text);
-    }
+    @media (max-width: 900px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
 
-    @media (max-width: 860px) {
       .feature {
         grid-template-columns: 1fr;
       }
 
-      .feature-text {
-        order: 0;
-      }
-
-      .feature-media {
-        order: 1;
-      }
-
-      .feature.reverse .feature-media {
-        order: 1;
-      }
-
-      .feature.reverse .feature-text {
-        order: 0;
+      .feature-media .window {
+        margin-right: 0;
       }
 
       .details dl {
@@ -446,17 +593,42 @@
     }
 
     @media (max-width: 560px) {
+      .header-nav {
+        gap: 16px;
+      }
+
       .details dl {
         grid-template-columns: 1fr;
+      }
+
+      .gate li {
+        grid-template-columns: 22px minmax(0, 1fr);
+        row-gap: 6px;
+      }
+
+      .gate-detail {
+        grid-column: 2;
+        text-align: left;
+      }
+
+      .human .integrate {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+      }
+
+      .human .gate-detail {
+        grid-column: 2;
+        grid-row: 2;
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      body {
+      .window img {
         transition: none;
       }
 
-      .hero-shot img {
+      .integrate {
         transition: none;
       }
     }
@@ -477,32 +649,74 @@
   <main>
     <section class="hero" aria-labelledby="hero-title">
       <div class="container">
-        <h1 id="hero-title">Stay the author of the software your AI writes.</h1>
-        <p class="hero-lede">AI-written code is abundant. Understanding, mastery and responsibility are rare. fennec tools what is rare.</p>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 id="hero-title">Stay the author of the software your AI writes.</h1>
+            <p class="hero-lede">AI-written code is abundant. Understanding, mastery and responsibility are rare. fennec tools what is rare.</p>
 
-        <div class="install">
-          <div class="codebox">
-            <div class="code-scroll">
-              <span class="prompt" aria-hidden="true">$ </span><code class="cmd">curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh</code>
+            <div class="install">
+              <div class="codebox">
+                <div class="code-scroll">
+                  <span class="prompt" aria-hidden="true">$ </span><code class="cmd">curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh</code>
+                </div>
+                <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh">Copy</button>
+              </div>
+              <p class="install-note">Linux or macOS, one Rust binary. Windows through WSL2. Then open <code>http://127.0.0.1:7777</code>.</p>
             </div>
-            <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh">Copy</button>
           </div>
-          <p class="install-note">Linux or macOS, one Rust binary. Windows through WSL2. Then open <code>http://127.0.0.1:7777</code>.</p>
+
+          <div class="gate-wrap">
+            <ol class="gate">
+              <li class="step">
+                <span class="marker" aria-hidden="true"></span>
+                <span class="gate-label">Plan approved</span>
+                <span class="gate-detail">read-only</span>
+              </li>
+              <li class="step">
+                <span class="marker" aria-hidden="true"></span>
+                <span class="gate-label">Built in its own worktree</span>
+                <span class="gate-detail">sandboxed</span>
+              </li>
+              <li class="step">
+                <span class="marker" aria-hidden="true"></span>
+                <span class="gate-label">Criteria checks 10/10</span>
+                <span class="gate-detail">run by fennec</span>
+              </li>
+              <li class="step">
+                <span class="marker" aria-hidden="true"></span>
+                <span class="gate-label">Fresh-context review</span>
+                <span class="gate-detail">agents that did not write it</span>
+              </li>
+              <li class="human">
+                <span class="marker" aria-hidden="true"></span>
+                <button class="integrate" type="button" disabled>Integrate</button>
+                <span class="gate-detail">your click</span>
+              </li>
+            </ol>
+            <p class="gate-status" aria-live="polite"></p>
+          </div>
         </div>
 
-        <div class="theme-row">
-          <span class="theme-label">Try a theme:</span>
-          <div class="theme-group" role="radiogroup" aria-label="Theme">
-            <button class="theme-radio" type="button" role="radio" aria-checked="true" data-theme="nuit" style="--chip-bg:#0E1013;--chip-accent:#F08A4B"><span class="chip" aria-hidden="true"></span>Night</button>
-            <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="jour" style="--chip-bg:#F6F6F3;--chip-accent:#A8440F"><span class="chip" aria-hidden="true"></span>Day</button>
-            <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="ardoise" style="--chip-bg:#1E2332;--chip-accent:#82AAFF"><span class="chip" aria-hidden="true"></span>Slate</button>
-            <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="cyber" style="--chip-bg:#000300;--chip-accent:#00FF41"><span class="chip" aria-hidden="true"></span>Cyber</button>
+        <div class="hero-below">
+          <div class="theme-row">
+            <span class="theme-label">Try a theme:</span>
+            <div class="theme-group" role="radiogroup" aria-label="Theme">
+              <button class="theme-radio" type="button" role="radio" aria-checked="true" data-theme="nuit" style="--chip-bg:#0E1013;--chip-accent:#F08A4B"><span class="chip" aria-hidden="true"></span>Night</button>
+              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="jour" style="--chip-bg:#F6F6F3;--chip-accent:#A8440F"><span class="chip" aria-hidden="true"></span>Day</button>
+              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="ardoise" style="--chip-bg:#1E2332;--chip-accent:#82AAFF"><span class="chip" aria-hidden="true"></span>Slate</button>
+              <button class="theme-radio" type="button" role="radio" aria-checked="false" data-theme="cyber" style="--chip-bg:#000300;--chip-accent:#00FF41"><span class="chip" aria-hidden="true"></span>Cyber</button>
+            </div>
           </div>
-        </div>
 
-        <figure class="hero-shot">
-          <img id="hero-img" src="images/workflow-nuit.png" alt="A fennec workflow run: plan, build, criteria checks, fresh-context review, Night theme" width="1600" height="1000" fetchpriority="high">
-        </figure>
+          <figure class="window">
+            <div class="window-bar" aria-hidden="true">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
+            <img id="hero-img" src="images/workflow-nuit.png" alt="A fennec workflow run: plan, build, criteria checks, fresh-context review, Night theme" width="1600" height="1000" fetchpriority="high">
+          </figure>
+        </div>
       </div>
     </section>
 
@@ -514,17 +728,31 @@
             <p>The approved plan is a contract. Its "Done when" criteria are checked by commands fennec runs, then fresh agents that did not write the code review it. Findings go back to the builder. Integration stays the human's click after a review gate.</p>
           </div>
           <div class="feature-media">
-            <img src="images/overview.png" alt="The project overview: sessions, tokens, cost, module map and docs" width="1600" height="1000" loading="lazy">
+            <figure class="window">
+              <div class="window-bar" aria-hidden="true">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <img src="images/overview.png" alt="The project overview: sessions, tokens, cost, module map and docs" width="1600" height="1000" loading="lazy">
+            </figure>
           </div>
         </article>
 
-        <article class="feature reverse">
+        <article class="feature">
           <div class="feature-text">
             <h2>See where the risk is.</h2>
             <p>Risk zones from git: lines from AI commits never reviewed, files with no test of their own, files changed often. Verified, computed by fennec, not a model.</p>
           </div>
           <div class="feature-media">
-            <img src="images/risks.png" alt="Risk zones per module" width="1600" height="1000" loading="lazy">
+            <figure class="window">
+              <div class="window-bar" aria-hidden="true">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <img src="images/risks.png" alt="Risk zones per module" width="1600" height="1000" loading="lazy">
+            </figure>
           </div>
         </article>
 
@@ -534,17 +762,31 @@
             <p>Night mode runs your ready ideas unattended, within per-idea caps on time and tokens. ask_user answers itself, the agent records each decision with its reason, and changing the acceptance criteria is refused. In the morning a report lists each idea with its duration, tokens, criteria passed and files changed. Integrating stays your click, one idea at a time.</p>
           </div>
           <div class="feature-media">
-            <img src="images/night-report.png" alt="The Tasks tab after a night: the board, the queue bar and the night report" loading="lazy">
+            <figure class="window">
+              <div class="window-bar" aria-hidden="true">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <img src="images/night-report.png" alt="The Tasks tab after a night: the board, the queue bar and the night report" loading="lazy">
+            </figure>
           </div>
         </article>
 
-        <article class="feature reverse">
+        <article class="feature">
           <div class="feature-text">
             <h2>Frugal with tokens.</h2>
             <p>The prompt only grows, so the inference cache is reused turn after turn. Any OpenAI-compatible endpoint works, a local model included. A usage ledger tracks calls and tokens, and budgets cap the month's spend.</p>
           </div>
           <div class="feature-media">
-            <img src="images/insight.png" alt="Insight: calls, cache hit rate, estimated cost, what consumes the input" width="1600" height="1000" loading="lazy">
+            <figure class="window">
+              <div class="window-bar" aria-hidden="true">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <img src="images/insight.png" alt="Insight: calls, cache hit rate, estimated cost, what consumes the input" width="1600" height="1000" loading="lazy">
+            </figure>
           </div>
         </article>
       </div>
@@ -585,7 +827,7 @@
     <section class="story" aria-labelledby="story-title">
       <div class="container">
         <h2 id="story-title">Why another coding agent?</h2>
-        <p>Most coding agents optimise for writing code fast. fennec is for professional developers who want to stay the authors of their software: you frame the work, the agent loop runs the steps, then waits for your review. Nothing is integrated without a human decision.</p>
+        <p class="story-large">Most coding agents optimise for writing code fast. fennec is for professional developers who want to stay the authors of their software: you frame the work, the agent loop runs the steps, then waits for your review. Nothing is integrated without a human decision.</p>
         <p>fennec is built with AI assistance itself, in the open. Each commit names the models that wrote it, and the checks are ones anyone can re-run.</p>
       </div>
     </section>
@@ -635,13 +877,11 @@
     (function () {
       const themes = { nuit: "Night", jour: "Day", ardoise: "Slate", cyber: "Cyber" };
       const shot = (t) => `images/workflow-${t}.png`;
-      const root = document.documentElement;
       const hero = document.getElementById("hero-img");
       const reduce = matchMedia("(prefers-reduced-motion: reduce)");
       const state = { theme: "nuit" };
 
       const render = (instant) => {
-        root.setAttribute("data-theme", state.theme);
         document.querySelectorAll("[data-theme].theme-radio").forEach((r) => {
           r.setAttribute("aria-checked", r.dataset.theme === state.theme ? "true" : "false");
         });
@@ -695,6 +935,42 @@
           setTimeout(() => { b.textContent = original; }, 1500);
         });
       }));
+
+      const steps = document.querySelectorAll(".gate .step");
+      const integrate = document.querySelector(".integrate");
+      const status = document.querySelector(".gate-status");
+
+      const enableGate = () => {
+        integrate.disabled = false;
+        integrate.classList.add("ready");
+      };
+
+      if (reduce.matches) {
+        steps.forEach((s) => s.classList.add("done"));
+        enableGate();
+      } else {
+        setTimeout(() => {
+          let i = 0;
+          const tick = setInterval(() => {
+            if (i < steps.length) {
+              steps[i].classList.add("done");
+              i++;
+            }
+            if (i >= steps.length) {
+              clearInterval(tick);
+              enableGate();
+            }
+          }, 450);
+        }, 400);
+      }
+
+      integrate.addEventListener("click", () => {
+        integrate.textContent = "Integrated by you";
+        integrate.classList.add("integrated");
+        integrate.disabled = true;
+        integrate.closest("li").classList.add("done");
+        status.textContent = "Integrated by you. Nothing went in before that click.";
+      });
     })();
   </script>
 </body>
