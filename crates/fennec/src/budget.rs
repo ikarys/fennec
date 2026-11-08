@@ -4,7 +4,6 @@
 use crate::config::Settings;
 use crate::domain::budget::{self, BudgetStatus};
 use crate::domain::clock::{month_start_ms, now_ms};
-use crate::domain::lang::Lang;
 use crate::domain::pricing::{billed_prices, priced};
 use crate::store::SqliteStore;
 use token_usage::display::usd;
@@ -71,13 +70,11 @@ pub fn check(
         return Ok(());
     };
     if budget.status == BudgetStatus::Exceeded {
-        let lang = Lang::from_code(
-            &store
-                .preferences()
-                .map_err(|e| e.to_string())?
-                .display
-                .language,
-        );
+        let lang = store
+            .preferences()
+            .map_err(|e| e.to_string())?
+            .display
+            .language;
         let spent = usd(budget.spent, lang.locale());
         let limit = usd(budget.limit, lang.locale());
         return Err(budget::refusal(lang, &spent, &limit));

@@ -10,7 +10,6 @@ use crate::config::Settings;
 use crate::domain::clock;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::kernel_rules;
-use crate::domain::lang::Lang;
 use crate::domain::mcp;
 use crate::domain::preferences::{ModelRef, Preferences};
 use crate::domain::project::SessionSummary;
@@ -129,7 +128,7 @@ pub fn with_turn<R>(
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
         autonomous: options.autonomous,
-        lang: Lang::from_code(&prefs.display.language),
+        lang: prefs.display.language,
         preflight_sent_back: false,
         stop,
         on_event: &mut options.on_event,

@@ -156,7 +156,7 @@ fn gather(
         .map_err(|e| e.to_string())?;
     // The dashboard's cost text follows the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     let pricing = priced(&models, &prices(&preferences));
 
     let map = module_map::load(workdir);

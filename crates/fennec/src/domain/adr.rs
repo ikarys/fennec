@@ -5,6 +5,8 @@
 
 use serde::Serialize;
 
+use super::frontmatter::{self, Frontmatter};
+
 pub const ADR_DIR: &str = "docs/adr";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -21,45 +23,17 @@ pub struct Adr {
 pub fn parse(file: &str, content: &str) -> Option<Adr> {
     let number = parse_number(file)?;
 
-    let mut lines = content.lines();
-    let first = lines.next()?.trim_end_matches(['\r', ' ', '\t']);
-
-    let (frontmatter, body) = if first == "---" {
-        let mut closed = false;
-        let mut fm = Vec::new();
-
-        for line in &mut lines {
-            if line.trim_end_matches(['\r', ' ', '\t']) == "---" {
-                closed = true;
-                break;
-            }
-            fm.push(line);
-        }
-
-        if closed {
-            (Some(fm), lines.collect::<Vec<_>>().join("\n"))
-        } else {
-            (None, content.to_owned())
-        }
-    } else {
-        (None, content.to_owned())
+    let (frontmatter, body) = match frontmatter::split(content) {
+        Some((frontmatter, body)) => (frontmatter, body),
+        None => (Frontmatter::default(), content.to_owned()),
     };
-
-    let mut status = None;
-    let mut date = None;
-
-    if let Some(fm) = frontmatter {
-        for line in fm {
-            if let Some((key, value)) = line.split_once(':') {
-                let value = strip_quotes(value.trim());
-                match key.trim() {
-                    "status" => status = value,
-                    "date" => date = value,
-                    _ => {}
-                }
-            }
-        }
-    }
+    let field = |key| {
+        frontmatter
+            .scalar(key)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+    };
+    let (status, date) = (field("status"), field("date"));
 
     let body = body.trim_start_matches(['\n', '\r', ' ', '\t']).to_owned();
     let title = body
@@ -106,21 +80,6 @@ fn parse_number(file: &str) -> Option<u32> {
     digits.parse::<u32>().ok()
 }
 
-fn strip_quotes(value: &str) -> Option<String> {
-    let value = value.trim();
-    if value.is_empty() {
-        return None;
-    }
-
-    let unquoted = value
-        .strip_prefix('"')
-        .and_then(|v| v.strip_suffix('"'))
-        .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
-        .unwrap_or(value);
-
-    Some(unquoted.to_owned())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,7 +89,7 @@ mod tests {
         let content = "\
 ---
 status: accepted
-date: 2024-01-01
+date: \"2024-01-01\"
 ---
 
 # Use SQLite

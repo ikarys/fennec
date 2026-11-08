@@ -1,17 +1,17 @@
 //! The language the human reads fennec in: the texts the server builds follow it.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+/// Stored as `display.language`: `en` (the default) or `fr`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Lang {
+    #[default]
     En,
     Fr,
 }
 
 impl Lang {
-    /// The stored `display.language`; anything but "fr" reads as English, the default.
-    pub fn from_code(code: &str) -> Lang {
-        if code == "fr" { Lang::Fr } else { Lang::En }
-    }
-
     /// The text for this language.
     pub fn pick<'a>(self, en: &'a str, fr: &'a str) -> &'a str {
         match self {
@@ -34,10 +34,10 @@ mod tests {
     use super::Lang;
 
     #[test]
-    fn from_code_reads_fr_and_defaults_to_english() {
-        assert_eq!(Lang::from_code("fr"), Lang::Fr);
-        assert_eq!(Lang::from_code("en"), Lang::En);
-        assert_eq!(Lang::from_code("de"), Lang::En);
+    fn stored_as_its_lowercase_code() {
+        assert_eq!(serde_json::to_string(&Lang::Fr).unwrap(), "\"fr\"");
+        assert_eq!(serde_json::from_str::<Lang>("\"en\"").unwrap(), Lang::En);
+        assert!(serde_json::from_str::<Lang>("\"de\"").is_err());
     }
 
     #[test]
