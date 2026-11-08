@@ -108,9 +108,7 @@ impl PluginManager {
 
     /// Whether any plugin host is running.
     pub fn has_hosts(&self) -> bool {
-        self.hosts
-            .lock()
-            .unwrap()
+        crate::locks::lock(&self.hosts)
             .as_ref()
             .is_some_and(|h| !h.is_empty())
     }
