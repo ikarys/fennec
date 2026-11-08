@@ -4,7 +4,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "docs/guide/**", "docs/sandbox.md", "docs/plugins.md", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,10 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+      # The user guide, an mdBook, served under /docs/.
+      - run: |
+          curl -fsSL https://github.com/rust-lang/mdBook/releases/download/v0.4.40/mdbook-v0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+          ./mdbook build docs/guide -d ../../site/docs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

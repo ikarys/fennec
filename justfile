@@ -70,9 +70,14 @@ test:
 test-web:
     cd web && npm test
 
-# The project site (site/), as GitHub Pages serves it, on :8080
+# The project site and its user guide, as GitHub Pages serves them, on :8080 (needs mdbook)
 site:
+    mdbook build docs/guide -d ../../site/docs
     python3 -m http.server -d site 8080
+
+# The user guide alone, rebuilt on save, on :3000
+guide:
+    mdbook serve docs/guide
 
 # Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
 setup:

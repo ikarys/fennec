@@ -17,7 +17,7 @@ Every command the model runs, and every shell node in a workflow, runs isolated:
 
 ### See the changes
 
-The session's Changes page shows each changed file as a diff. The work lives in a git worktree on its own branch, `fennec/<session-id>`, in a folder under `~/.local/share/fennec/worktrees/`. From your checkout, `git log fennec/<session-id>` and `git diff HEAD...fennec/<session-id>` work too. Nothing reaches your branch until you click "Intégrer".
+The session's Changes page shows each changed file as a diff. The work lives in a git worktree on its own branch, `fennec/<session-id>`, in a folder under `~/.local/share/fennec/worktrees/`. From your checkout, `git log fennec/<session-id>` and `git diff HEAD...fennec/<session-id>` work too. Nothing reaches your branch until you click **Integrate**.
 
 ### Open it in your own tools
 
@@ -25,7 +25,7 @@ The session panel's buttons open a terminal, your editor, or your file manager i
 
 ### Run the app
 
-The play button in the session header, and the "Tester" section of the integration dialog, start the project's servers in the session's worktree, outside the sandbox. It is your action. The server gets a free port in `$PORT`. The panel shows starting/ready/exited, the URL it printed, and the last output lines.
+The play button in the session header, and the **Try it** section of the integration dialog, start the project's servers in the session's worktree, outside the sandbox. It is your action. The server gets a free port in `$PORT`. The panel shows starting/ready/exited, the URL it printed, and the last output lines.
 
 The servers come from `.agents/servers.json`. With none, fennec guesses a command from the Justfile, `package.json`, `Makefile`, or `Cargo.toml` and saves it once you confirm. The main checkout's `.env*` files are linked in.
 
@@ -63,7 +63,7 @@ The worktree sees your checkout's `node_modules`/`.venv` live; if your checkout 
 | `Could not resolve host` / `Network is unreachable` | Network is off. | Turn on "Network for commands" in Settings → Sandbox, or do the step yourself. |
 | npm `ENOTCACHED` / cargo `--offline was specified` / `failed to download` | Offline mode. | Same: turn on the network, or install in your checkout. |
 | `No such file or directory` on `~/.ssh/...`, `Permission denied` reading a secret | Secrets are hidden on purpose. | Never give the agent your keys. Push, publish, and deploy are your actions. |
-| `bwrap: ... Operation not permitted` / "bwrap cannot create its isolated space" | AppArmor on Ubuntu 23.10+ forbids the user namespaces bwrap needs. | The Settings page shows the command to allow bwrap; details are in `docs/releasing.md`. |
+| `bwrap: ... Operation not permitted` / "bwrap cannot create its isolated space" | AppArmor on Ubuntu 23.10+ forbids the user namespaces bwrap needs. | The Settings page shows the command to allow bwrap; details are in the [install guide](https://ikarys.github.io/fennec/docs/install.html). |
 | `Background commands ('&') are not supported` | No background processes. | Use the play button for servers. |
 
 ## Settings
