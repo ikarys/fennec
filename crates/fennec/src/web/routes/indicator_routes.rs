@@ -13,7 +13,6 @@ use crate::domain::clock::{month_start_ms, now_ms};
 use crate::domain::drift;
 use crate::domain::event::Event;
 use crate::domain::indicators::{Facts, Integration};
-use crate::domain::lang::Lang;
 use crate::domain::pricing::{priced, prices};
 use crate::domain::waiver;
 use crate::store::SqliteStore;
@@ -25,7 +24,7 @@ use crate::{adr, architecture, module_map, risk};
 pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let project = require_project(&store, id)?;
-    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let lang = store.preferences()?.display.language;
     let facts = facts(app, &store, &project.id, Path::new(&project.workdir))?;
     send_json(
         stream,

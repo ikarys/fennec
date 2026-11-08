@@ -14,7 +14,6 @@ use crate::domain::clock;
 use crate::domain::conversation::{first_request, last_assistant_text};
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
-use crate::domain::lang::Lang;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::SessionSummary;
 use crate::domain::queue;
@@ -306,7 +305,7 @@ pub(crate) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Resu
     let (chosen, _) = model_routes::session_choice(&store, id)?;
     // The context gauge's texts follow the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     let params = app.settings.llm.for_turn(&preferences, chosen.as_ref());
     let view = context_view(
         &store.events(id)?,
@@ -339,7 +338,7 @@ pub(crate) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
         .map_err(|e| e.to_string())?;
     // The usage panel's cost text follows the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     let pricing =
         crate::domain::pricing::priced(&rows, &crate::domain::pricing::prices(&preferences));
     send_json(
@@ -371,7 +370,7 @@ pub(crate) fn serve_usage_calls(
     let calls = ledger.calls(&filter).map_err(|e| e.to_string())?;
     // The call lines follow the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     send_json(stream, 200, &json!(call_views(&events, &calls, lang)))
 }
 
@@ -395,7 +394,7 @@ pub(crate) fn serve_usage_workflow(
     }
     // The workflow usage lines follow the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     send_json(
         stream,
         200,

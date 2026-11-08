@@ -30,7 +30,7 @@ pub fn get(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError>
     let store = app.store()?;
     require_project(&store, id)?;
     let budget = crate::budget::of_project(&app.settings, &store, id)?;
-    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let lang = store.preferences()?.display.language;
     let view = view(budget.as_ref(), lang);
     send_json(stream, 200, &json!(view))
 }
@@ -50,7 +50,7 @@ pub fn set(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result
     };
     store.set_project_budget(id, limit)?;
     let budget = crate::budget::of_project(&app.settings, &store, id)?;
-    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let lang = store.preferences()?.display.language;
     let view = view(budget.as_ref(), lang);
     send_json(stream, 200, &json!(view))
 }

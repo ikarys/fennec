@@ -42,7 +42,7 @@ pub struct Pending {
     pub message_id: String,
     pub call: ToolCall,
     pub subject: String,
-    pub kind: String,
+    pub kind: rules::TargetKind,
     pub pattern: String,
     pub access: Option<String>,
     pub folders: Vec<String>,
@@ -82,12 +82,14 @@ pub fn pending(events: &[Event]) -> Option<Pending> {
                 } if tool_call.id == *call_id => Some((message_id.clone(), tool_call.clone())),
                 _ => None,
             })
-            .map(|(message_id, call)| Pending {
+            // A kind outside the three the kernel writes leaves nothing to answer.
+            .zip(rules::TargetKind::parse(kind))
+            .map(|((message_id, call), kind)| Pending {
                 call_id: call_id.clone(),
                 message_id,
                 call,
                 subject: subject.clone(),
-                kind: kind.clone(),
+                kind,
                 pattern: pattern.clone(),
                 access: access.clone(),
                 folders: folders.clone(),
@@ -150,7 +152,7 @@ mod tests {
         assert_eq!(pending.call_id, "c1");
         assert_eq!(pending.message_id, "m");
         assert_eq!(pending.call.name, "read_file");
-        assert_eq!(pending.kind, "tool");
+        assert_eq!(pending.kind, rules::TargetKind::Tool);
         assert_eq!(pending.pattern, "pattern");
         assert_eq!(pending.access, None);
     }

@@ -68,7 +68,7 @@ impl From<rule_approval::Pending> for ApprovalView {
         Self {
             call_id: pending.call_id,
             subject: pending.subject,
-            kind: pending.kind,
+            kind: pending.kind.as_str().to_string(),
             pattern: pending.pattern,
             access: pending.access,
             folders: pending.folders,
@@ -173,7 +173,7 @@ mod tests {
                 call_id: "call-1".into(),
                 subject: "subject".into(),
                 rule_id: None,
-                kind: "allow".into(),
+                kind: "path".into(),
                 pattern: "pattern".into(),
                 access: Some("read".into()),
                 folders: vec!["folder".into()],
@@ -187,7 +187,7 @@ mod tests {
             Some(ApprovalView {
                 call_id: "call-1".into(),
                 subject: "subject".into(),
-                kind: "allow".into(),
+                kind: "path".into(),
                 pattern: "pattern".into(),
                 access: Some("read".into()),
                 folders: vec!["folder".into()],

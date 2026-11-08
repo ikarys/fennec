@@ -7,7 +7,6 @@
 use crate::agent::ports::EventLog;
 use crate::domain::attention::{self, Attention};
 use crate::domain::budget::BudgetStatus;
-use crate::domain::lang::Lang;
 use crate::domain::project::SessionSummary;
 use crate::git;
 use crate::store::SqliteStore;
@@ -228,7 +227,7 @@ fn mark_conflict(
 
 /// The projects whose monthly budget is at alert or exceeded, sorted by id.
 fn budget_notices(app: &App, store: &SqliteStore) -> Result<Vec<Value>, String> {
-    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let lang = store.preferences()?.display.language;
     let mut notices = Vec::new();
     for project in store.projects()? {
         let Some(budget) = crate::budget::of_project(&app.settings, store, &project.id)? else {
