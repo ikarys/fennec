@@ -97,6 +97,7 @@ crates/fennec/src/
     ports.rs           Model, EventLog, Toolbox, ChildSessions, Commands: what the loop needs from outside
     turn.rs            the multi-turn loop
     round.rs           one model round: streaming, retries, continuation, timing
+    snapshot.rs        the frozen system prompt and tool definitions (`turn.snapshot`), re-frozen once when the MCP tools change
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      runs and records tool calls
     own_tools.rs       the loop's own tools (ask_user, propose_plan, delegate…) dispatched, each one's outcome

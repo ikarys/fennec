@@ -59,7 +59,7 @@ pub fn stream(turn: &mut Turn, message_id: &str, prompt: &RoundPrompt) -> Result
                 error,
                 recoverable: true,
             })?;
-            turn.append_user(CONTINUE_AFTER_STREAM_ERROR_PROMPT, true, None, Vec::new())?;
+            turn.append_system(CONTINUE_AFTER_STREAM_ERROR_PROMPT)?;
             return Ok(Round::Interrupted);
         }
         failures += 1;

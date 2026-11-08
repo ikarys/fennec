@@ -14,25 +14,15 @@
 //!
 //! Tool calls run one at a time; sub-agents are not a tool yet.
 
-use super::ask_user;
 use super::compaction::{self, Compacted};
-use super::delegate;
 use super::ports::{ChildSessions, EventLog, Model, Toolbox};
 use super::preflight;
-use super::prompt::system_prompt;
-use super::propose_criteria;
-use super::propose_plan;
-use super::propose_task;
-use super::record_decision;
-use super::request_waiver;
 use super::round::{self, CONTINUE_AFTER_STREAM_ERROR_PROMPT, Round, RoundPrompt};
-use super::submit_report;
-use super::suggest_agent;
+use super::snapshot::round_prompt_parts;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
 use crate::domain::attachment::Attachment;
 use crate::domain::compaction::{context_tokens, should_compact};
-use crate::domain::conversation::frozen_prompt;
 use crate::domain::criteria::{accepted_proposal, parse_done_when};
 use crate::domain::event::{
     DoneReason, Event, MessageMetadata, MetadataSource, ReminderKind, Role, ToolResult,
@@ -43,7 +33,6 @@ use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
 use crate::domain::skill::Skill;
 use crate::domain::workdir_notice;
-use serde_json::Value;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -103,6 +92,11 @@ impl Turn<'_> {
         self.log.append(self.session_id, &event)?;
         (self.on_event)(&event);
         Ok(())
+    }
+
+    /// A message fennec writes in the human's place (a notice, a feedback, a continuation).
+    pub(super) fn append_system(&mut self, content: &str) -> Result<(), String> {
+        self.append_user(content, true, None, Vec::new())
     }
 
     pub(super) fn append_user(
@@ -165,7 +159,7 @@ pub fn retry_turn(turn: &mut Turn) -> Result<DoneReason, String> {
         let prompt = retry_prompt(&events)?;
         let agent = resolve(turn.agents, &events).ok_or("no top-level agent")?;
         ensure_agent_reminder(turn, agent)?;
-        turn.append_user(&prompt, true, None, Vec::new())?;
+        turn.append_system(&prompt)?;
         run_top_level_agent_loop(turn, agent)
     })
 }
@@ -267,81 +261,6 @@ pub(super) fn with_running(
 
 /// The system prompt and tool definitions a round is sent with, built once
 /// so the loop and a manual compaction use an identical cached prefix.
-/// The system prompt, tools included: frozen at the session's first turn
-/// and read back, so a new day or a new build (a new tool, a reworded
-/// description) does not change the prompt's first bytes and void the whole
-/// session's prompt cache.
-fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
-    let events = turn.log.events(turn.session_id)?;
-    let (prompt, tools) = frozen_prompt(&events);
-    let current_mcp = turn.tools.mcp_tool_names();
-    if let (Some(prompt), Some(tools)) = (prompt, tools) {
-        // The MCP tool set changed since the last freeze (a global flag, a
-        // Connect refresh, or a per-session toggle): re-freeze the tools,
-        // keeping the prompt byte-identical. One deliberate cache miss.
-        let frozen_mcp = events
-            .iter()
-            .rev()
-            .find_map(|event| match event {
-                Event::TurnSnapshot { mcp_tool_names, .. } => Some(mcp_tool_names),
-                _ => None,
-            })
-            .cloned()
-            .unwrap_or_default();
-        if frozen_mcp != current_mcp {
-            let new_tools = tool_definitions(turn);
-            turn.append(Event::TurnSnapshot {
-                cached_system_prompt: prompt.to_string(),
-                cached_tools: Some(new_tools.clone()),
-                mcp_tool_names: current_mcp,
-            })?;
-            return Ok((prompt.to_string(), new_tools));
-        }
-        return Ok((prompt.to_string(), tools.clone()));
-    }
-
-    // A session from before the tools were frozen keeps its prompt and
-    // freezes the tools now: one cache miss, then none.
-    let prompt = prompt.map(str::to_string).unwrap_or_else(|| {
-        system_prompt(
-            turn.workdir,
-            turn.model.name(),
-            turn.instructions,
-            turn.skills,
-            turn.always_on,
-        )
-    });
-    let tools = tools.cloned().unwrap_or_else(|| tool_definitions(turn));
-    turn.append(Event::TurnSnapshot {
-        cached_system_prompt: prompt.clone(),
-        cached_tools: Some(tools.clone()),
-        mcp_tool_names: current_mcp,
-    })?;
-    Ok((prompt, tools))
-}
-
-/// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,
-/// `record_decision`, `propose_task`, `propose_plan`, `submit_report` and
-/// `suggest_agent` and `delegate`;
-/// they are not host tools, so their definitions are added to the toolbox's.
-/// `suggest_agent` and `delegate` list the session's agents as of the first turn;
-/// definitions are frozen then.
-fn tool_definitions(turn: &Turn) -> Value {
-    let mut tool_defs = turn.tools.definitions();
-    if let Some(arr) = tool_defs.as_array_mut() {
-        arr.push(ask_user::definition());
-        arr.push(request_waiver::definition());
-        arr.push(propose_criteria::definition());
-        arr.push(record_decision::definition());
-        arr.push(propose_task::definition());
-        arr.push(propose_plan::definition());
-        arr.push(submit_report::definition());
-        arr.push(suggest_agent::definition(turn.agents));
-        arr.push(delegate::definition(turn.agents));
-    }
-    tool_defs
-}
-
 /// Closes the open calls of a previous turn. The open call that awaits an
 /// answer gets the human's input as its result; every other open call gets
 /// the interrupted error. Returns true when an answer was given, so the
@@ -376,7 +295,7 @@ fn close_open_calls(turn: &mut Turn, prompt: &str) -> Result<bool, String> {
 /// session's worktree after the prompt was frozen): the prompt only grows.
 fn ensure_workdir_notice(turn: &mut Turn) -> Result<(), String> {
     match workdir_notice::needed(&turn.log.events(turn.session_id)?, turn.workdir) {
-        Some(notice) => turn.append_user(&notice, true, None, Vec::new()),
+        Some(notice) => turn.append_system(&notice),
         None => Ok(()),
     }
 }
@@ -477,7 +396,7 @@ pub(super) fn run_top_level_agent_loop(
             }
             truncation_retries += 1;
             max_tokens = max_tokens.saturating_mul(3) / 2;
-            turn.append_user(CONTINUE_AFTER_TRUNCATION_PROMPT, true, None, Vec::new())?;
+            turn.append_system(CONTINUE_AFTER_TRUNCATION_PROMPT)?;
             continue;
         }
 
@@ -501,7 +420,7 @@ pub(super) fn run_top_level_agent_loop(
                 && !turn.preflight_sent_back
             {
                 turn.preflight_sent_back = true;
-                turn.append_user(&feedback, true, None, Vec::new())?;
+                turn.append_system(&feedback)?;
                 continue;
             }
             return finish(
@@ -594,7 +513,7 @@ pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<D
 
     ensure_workdir_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
-    turn.append_user(prompt, true, None, Vec::new())?;
+    turn.append_system(prompt)?;
     run_top_level_agent_loop(turn, agent)
 }
 
