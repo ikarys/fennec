@@ -65,9 +65,7 @@ struct Gate {
 
 /// The session's gate; a 404 or 409 when there is nothing to gate.
 fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, HttpError> {
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return Err(HttpError::new(404, "no such session"));
-    };
+    let (session, project) = app.require_session(id)?;
     let Some(wt) = app.place(store, &session, &project)?.worktree else {
         return Err(HttpError::new(409, "the session has no worktree"));
     };
@@ -185,13 +183,6 @@ fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, HttpError> {
     })
 }
 
-/// The project's directory, where `.agents/protected` lives.
-fn gate_workdir(app: &App, id: &str) -> Result<String, String> {
-    app.session_and_project(id)?
-        .map(|(_, project)| project.workdir)
-        .ok_or_else(|| "no such session".into())
-}
-
 /// `GET /api/sessions/{id}/integration`: what the integration would do and
 /// what blocks it.
 pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
@@ -256,9 +247,7 @@ pub fn start_understanding(
     else {
         return error(stream, 400, "dialogueId is required");
     };
-    let Some((_, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (_, project) = app.require_session(id)?;
     let Some((_, dialogue_project)) = app.session_and_project(dialogue_id)? else {
         return error(stream, 404, "no such dialogue");
     };
@@ -331,9 +320,7 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
 /// without a worktree).
 pub fn get_repo(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     let Some((top, _)) = worktree::top(Path::new(&project.workdir)) else {
         return error(stream, 409, "the project is not in a git repository");
     };
@@ -426,7 +413,9 @@ pub fn integrate(
     let commits: Vec<String> = gate.preview.commits.iter().map(|c| c.sha.clone()).collect();
     // The integration is done: a failure here is reported, never undone.
     let (protected_tests, protect_error) = if protect_tests {
-        let workdir = gate_workdir(app, id)?;
+        // The project's directory, where `.agents/protected` lives.
+        let (_, project) = app.require_session(id)?;
+        let workdir = project.workdir;
         match protected::protect_tests(Path::new(&workdir), &gate.test_files) {
             Ok(added) => (added, None),
             Err(e) => (Vec::new(), Some(e.to_string())),
@@ -565,9 +554,7 @@ pub fn resolve_conflict(
         return send_json(stream, 200, &json!({ "conflicts": [], "started": false }));
     }
 
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     let agents = crate::agents::discover(Path::new(&project.workdir));
     let events = store.events(id)?;
     if let Ok(Some(Event::ModeChanged { mode, .. })) =

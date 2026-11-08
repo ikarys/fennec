@@ -105,6 +105,12 @@ impl App {
         Ok(store.project(&s.project_id)?.map(|p| (s, p)))
     }
 
+    /// The session and its project, or a 404 for the client.
+    fn require_session(&self, id: &str) -> Result<(SessionSummary, Project), HttpError> {
+        self.session_and_project(id)?
+            .ok_or_else(|| HttpError::new(404, "no such session"))
+    }
+
     /// Where the session's turns run (see `Place`). A child session shares
     /// its root session's worktree — or, for the chat, its root session's
     /// scratch directory.

@@ -13,9 +13,7 @@ use std::process::Command;
 /// `POST /api/sessions/{id}/terminal`.
 pub(crate) fn open(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     let place = app.place(&store, &session, &project)?;
     match spawn(&place.workdir) {
         Ok(()) => send_json(stream, 202, &json!({ "path": place.workdir })),

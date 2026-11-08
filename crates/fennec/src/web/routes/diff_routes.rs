@@ -17,9 +17,7 @@ pub fn get_diff(
     id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     let Some(wt) = app.place(&store, &session, &project)?.worktree else {
         return error(stream, 409, "the session has no worktree");
     };

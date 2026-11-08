@@ -20,9 +20,7 @@ pub(crate) fn answer_rule_approval(
     let body = req.json()?;
     let call_id = body["callId"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }

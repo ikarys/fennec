@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::domain::id::new_id;
 use crate::web::App;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 use crate::web::jobs::idea_queue;
 use crate::web::views::idea_board::{Board, board_json};
 use backlog::{BacklogEvent, IdeaAttachment, IdeaState, Status, queue_order};
@@ -69,9 +69,7 @@ fn parse_attachments(body: &Value) -> Result<Vec<IdeaAttachment>, String> {
 
 /// `GET /api/projects/{id}/ideas`.
 pub fn list_ideas(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
-    if app.store()?.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&app.store()?, project_id)?;
     send_board(app, stream, project_id)
 }
 
@@ -84,9 +82,7 @@ pub fn add_idea(
     project_id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, project_id)?;
     let body = req.json()?;
     let field = |name: &str| body[name].as_str().unwrap_or("").trim().to_string();
     let text = field("text");
@@ -142,9 +138,7 @@ pub fn update_idea(
     action: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, project_id)?;
     if !store
         .backlog(project_id)?
         .ideas
@@ -204,9 +198,7 @@ pub fn start_one(
     idea_id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(project_id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, project_id)?;
     let backlog = store.backlog(project_id)?;
     let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
         return error(stream, 404, "no such idea");
@@ -234,9 +226,7 @@ pub fn start_queue(
     stream: &mut TcpStream,
     project_id: &str,
 ) -> Result<(), HttpError> {
-    if app.store()?.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&app.store()?, project_id)?;
     let autonomous = req.json()?["autonomous"].as_bool().unwrap_or(false);
     idea_queue::start_queue(app, project_id, autonomous);
     send_board(app.as_ref(), stream, project_id)
@@ -246,9 +236,7 @@ pub fn start_queue(
 ///
 /// Stops the queue from starting the next idea; a running turn finishes.
 pub fn stop_queue(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
-    if app.store()?.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&app.store()?, project_id)?;
     idea_queue::stop_queue(app, project_id);
     send_board(app, stream, project_id)
 }
@@ -261,9 +249,7 @@ pub fn reorder(
     project_id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, project_id)?;
     let body = req.json()?;
     let Some(ids_value) = body["ids"].as_array() else {
         return error(stream, 400, "ids must be a list of idea ids");
@@ -292,18 +278,14 @@ pub fn reorder(
 /// `POST /api/projects/{id}/ideas/report/read`.
 pub fn report_read(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(project_id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, project_id)?;
     store.append_idea_event(project_id, &BacklogEvent::ReportRead {})?;
     send_board(app, stream, project_id)
 }
 
 fn send_board(app: &App, stream: &mut TcpStream, project_id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(project_id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, project_id)?;
     let backlog = store.backlog(project_id)?;
     send_json(
         stream,

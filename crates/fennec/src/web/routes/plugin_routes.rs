@@ -6,7 +6,7 @@ use crate::domain::plugin::PluginActivation;
 use crate::plugins::config;
 use crate::web::App;
 use crate::web::http::HttpError;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, require_session, send_json};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 
@@ -44,9 +44,7 @@ pub(crate) fn list(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
 /// plugins have emitted, for the right-hand panel.
 pub(crate) fn session_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id).map_err(|e| e.to_string())?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let blocks = app.plugins.blocks_for_session(id);
     send_json(stream, 200, &json!({ "blocks": blocks }))
 }
@@ -69,9 +67,7 @@ pub(crate) fn status_bar(
 /// plugins have emitted, for the project page's dashboard.
 pub(crate) fn project_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(id).map_err(|e| e.to_string())?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, id)?;
     let blocks = app.plugins.blocks_for_project(id);
     send_json(stream, 200, &json!({ "blocks": blocks }))
 }

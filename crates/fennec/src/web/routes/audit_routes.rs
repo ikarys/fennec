@@ -25,9 +25,7 @@ pub fn create_tasks(
     session_id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(session_id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(session_id)?;
 
     let body = req.json()?;
     // Every entry must be a finding number: a malformed list is refused whole.
