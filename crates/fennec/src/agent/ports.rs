@@ -63,6 +63,18 @@ pub struct RuleCheck<'r> {
     pub proposal: Option<rules::Proposal>,
 }
 
+#[cfg(test)]
+impl RuleCheck<'_> {
+    /// No rule applies: the call runs (the test doubles' answer).
+    pub fn allowed() -> Self {
+        RuleCheck {
+            decision: rules::Decision::Allow(None),
+            subject: String::new(),
+            proposal: None,
+        }
+    }
+}
+
 /// The tools a model can call (adapter: `tools::LocalTools`, on the host).
 /// `access` is what the calling agent's commands may do to the workdir.
 pub trait Toolbox {
@@ -89,14 +101,9 @@ pub trait Toolbox {
     ) -> ToolResult {
         self.execute(name, args, access, stop, on_output)
     }
-    /// The human's rules on this call, decided before it runs; the default allows.
-    fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
-        RuleCheck {
-            decision: rules::Decision::Allow(None),
-            subject: String::new(),
-            proposal: None,
-        }
-    }
+    /// The human's rules on this call, decided before it runs. No default: a
+    /// toolbox that forgot the rules would run every call unchecked.
+    fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_>;
     /// The MCP tool names offered; empty when the toolbox has no MCP servers.
     /// The snapshot re-freezes when this set changes.
     fn mcp_tool_names(&self) -> Vec<String> {

@@ -117,7 +117,7 @@ crates/fennec/src/
     compaction.rs      the summary round and the new window
     prompt.rs          the system prompt: what fennec does around the agent, the working method, the style
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
-                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
+                       workflow/ jobs (start, answer, continue, resume, stop), nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)
   tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
                      world of commands; sandbox/seatbelt.rs the same world as a macOS Seatbelt profile); rule_request (a tool call as the rules crate's requests, paths resolved here);

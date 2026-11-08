@@ -242,6 +242,9 @@ mod tests {
     }
 
     impl Toolbox for McpToolbox {
+        fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+            RuleCheck::allowed()
+        }
         fn definitions(&self) -> Value {
             json!([])
         }
@@ -1094,6 +1097,9 @@ mod tests {
     }
 
     impl Toolbox for PassingRunToolbox {
+        fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+            RuleCheck::allowed()
+        }
         fn definitions(&self) -> Value {
             json!([])
         }
