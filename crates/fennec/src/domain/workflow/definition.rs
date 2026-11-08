@@ -214,6 +214,14 @@ impl Workflow {
         region
     }
 
+    /// A node that runs inside a parallel's fork region cannot be relaunched alone.
+    pub fn in_branch(&self, node_id: &str) -> bool {
+        self.nodes
+            .iter()
+            .filter(|n| matches!(n.kind, NodeKind::Parallel))
+            .any(|p| self.branch_region(&p.id).contains(node_id))
+    }
+
     pub fn join_of(&self, parallel_id: &str) -> Option<String> {
         let mut queue = VecDeque::new();
         let mut seen = HashSet::new();
@@ -368,5 +376,95 @@ mod tests {
         };
 
         assert_eq!(workflow.join_of("p"), Some("j".into()));
+    }
+
+    #[test]
+    fn in_branch_flags_nodes_deep_in_a_branch() {
+        let workflow = Workflow {
+            id: "w".into(),
+            name: "w".into(),
+            description: String::new(),
+            max_steps: 50,
+            nodes: vec![
+                Node {
+                    id: "start".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Start,
+                },
+                Node {
+                    id: "p".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Parallel,
+                },
+                Node {
+                    id: "a".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Agent {
+                        agent: "plan".into(),
+                        prompt: "a".into(),
+                        retry_prompt: None,
+                        outputs: vec!["done".into()],
+                        context: AgentContext::Fresh,
+                        verdicts: false,
+                    },
+                },
+                Node {
+                    id: "b".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Agent {
+                        agent: "plan".into(),
+                        prompt: "b".into(),
+                        retry_prompt: None,
+                        outputs: vec!["done".into()],
+                        context: AgentContext::Fresh,
+                        verdicts: false,
+                    },
+                },
+                Node {
+                    id: "j".into(),
+                    name: None,
+                    position: Position::default(),
+                    kind: NodeKind::Join,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    from: "start".into(),
+                    port: "next".into(),
+                    to: "p".into(),
+                    max_passes: None,
+                    pause: false,
+                },
+                Edge {
+                    from: "p".into(),
+                    port: "branch".into(),
+                    to: "a".into(),
+                    max_passes: None,
+                    pause: false,
+                },
+                Edge {
+                    from: "a".into(),
+                    port: "done".into(),
+                    to: "b".into(),
+                    max_passes: None,
+                    pause: false,
+                },
+                Edge {
+                    from: "b".into(),
+                    port: "done".into(),
+                    to: "j".into(),
+                    max_passes: None,
+                    pause: false,
+                },
+            ],
+        };
+
+        assert!(workflow.in_branch("a"));
+        assert!(workflow.in_branch("b"));
+        assert!(!workflow.in_branch("start"));
     }
 }
