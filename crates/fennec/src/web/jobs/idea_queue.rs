@@ -102,8 +102,7 @@ pub(crate) fn start_idea(
     let place = app.open_place(store, &session, project, true)?;
     // The idea's pinned files become what the agent consumes: images for the
     // model, text inlined, binaries written into the worktree.
-    let (attachments, addendum) =
-        crate::web::routes::idea_assets::prepare(&idea.attachments, &place.workdir);
+    let (attachments, addendum) = super::idea_assets::prepare(&idea.attachments, &place.workdir);
     let task = if addendum.is_empty() {
         idea.text.clone()
     } else {

@@ -2,6 +2,7 @@
 //! replay one, compact one.
 
 pub mod doctor;
+pub mod password;
 mod transcript;
 pub mod update;
 

@@ -39,7 +39,6 @@ mod workflows;
 mod worktree;
 
 use config::Settings;
-use std::io::{BufRead, IsTerminal, Write};
 use store::SqliteStore;
 
 const USAGE: &str = "usage:
@@ -93,7 +92,7 @@ fn run(args: &[String]) -> Result<(), String> {
             let password = server_config::password()?;
             web::serve(port, listen, password, Settings::from_env()?)
         }
-        Some("password") => password_command(),
+        Some("password") => cli::password::run(),
         Some("run") => {
             let mut session = None;
             let mut agent = None;
@@ -126,48 +125,6 @@ fn run(args: &[String]) -> Result<(), String> {
         Some("log") => cli::replay(&open_store()?, args.get(1).ok_or(USAGE)?),
         _ => Err(USAGE.into()),
     }
-}
-
-fn password_command() -> Result<(), String> {
-    let first = read_password_line("New password: ")?;
-    let second = read_password_line("Again: ")?;
-    if first != second {
-        return Err("passwords do not match".into());
-    }
-
-    server_config::set_password(&server_config::new_hash(&first)?)?;
-
-    println!("wrote password to {}", server_config::path().display());
-    println!(
-        "allow remote connections in Settings → Network, or set `listen: 0.0.0.0` in that file"
-    );
-    Ok(())
-}
-
-fn read_password_line(prompt: &str) -> Result<String, String> {
-    eprint!("{prompt}");
-    std::io::stderr().flush().map_err(|e| e.to_string())?;
-
-    let stdin = std::io::stdin();
-    let interactive = stdin.is_terminal();
-    if interactive {
-        let _ = std::process::Command::new("stty").arg("-echo").status();
-    }
-
-    let mut line = String::new();
-    let read = stdin
-        .lock()
-        .read_line(&mut line)
-        .map_err(|e| e.to_string())?;
-
-    if interactive {
-        let _ = std::process::Command::new("stty").arg("echo").status();
-    }
-
-    if read == 0 {
-        return Err("no password entered".into());
-    }
-    Ok(line.trim_end_matches(['\r', '\n']).to_string())
 }
 
 /// `sessions` and `log` only read the store: no need to reach the model.

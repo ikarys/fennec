@@ -13,7 +13,6 @@ pub(super) mod changelog_routes;
 pub(super) mod contribution_routes;
 pub(super) mod diff_routes;
 pub(super) mod folder_routes;
-pub(super) mod idea_assets;
 pub(super) mod idea_routes;
 pub(super) mod indicator_routes;
 pub(super) mod integration;

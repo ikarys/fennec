@@ -170,7 +170,8 @@ crates/fennec/src/
                      the UI computes none); streams/ the SSE streams (a session's events, the human's notices);
                      os/ the human's own tools opened on a folder (terminal, editor, file manager) and the project's
                      servers; jobs/ background work (the idea queue, session naming, backfills, commit subjects)
-  cli/               terminal adapter: commands, transcript, doctor (the first-run checklist in the terminal)
+  cli/               terminal adapter: commands, transcript, doctor (the first-run checklist in the terminal),
+                     password (the remote-access password, read without echo)
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
 crates/rules/       the human's rules, a crate of its own and fennec-free: the model, the command and path matchers,
