@@ -96,11 +96,86 @@
       display: flex;
       gap: 24px;
       flex-wrap: wrap;
+      align-items: center;
       justify-content: flex-end;
     }
 
     .header-nav a {
       font-size: 15px;
+    }
+
+    .header-nav a.nav-guide {
+      color: var(--fox-ink);
+      background: var(--fox);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .header-nav a.nav-guide:hover {
+      background: #FFA36B;
+    }
+
+    .modes {
+      padding-top: clamp(96px, 12vw, 160px);
+    }
+
+    .modes h2 {
+      margin-bottom: 16px;
+    }
+
+    .modes-lede {
+      color: var(--dune);
+      max-width: 36em;
+      margin: 0 0 48px;
+    }
+
+    .modes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.3fr;
+      gap: 24px;
+    }
+
+    .mode {
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      background: var(--dusk);
+      padding: 28px;
+    }
+
+    .mode-workflow {
+      border-color: var(--fox);
+      box-shadow: 0 0 0 1px var(--fox) inset;
+    }
+
+    .mode h3 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      color: var(--sand);
+    }
+
+    .mode-where {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: var(--fox);
+    }
+
+    .mode p {
+      color: var(--dune);
+      font-size: 16px;
+      margin: 0 0 12px;
+    }
+
+    .mode ul {
+      margin: 0 0 12px;
+      padding-left: 18px;
+      color: var(--dune);
+      font-size: 15px;
+    }
+
+    .mode a {
+      color: var(--fox);
     }
 
     h1 {
@@ -662,11 +737,20 @@
         grid-template-columns: 1fr;
         gap: 40px;
       }
+
+      .modes-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 560px) {
       .header-nav {
         gap: 16px;
+      }
+
+      .nav-releases,
+      .nav-security {
+        display: none;
       }
 
       .details dl {
@@ -723,9 +807,9 @@
     <div class="container header-inner">
       <a class="wordmark" href="#"><img src="images/emblem.png" width="28" height="28" alt=""> fennec</a>
       <nav class="header-nav" aria-label="Primary">
-        <a href="#sandbox">Security</a>
-        <a href="https://github.com/ikarys/fennec/tree/main/docs">Docs</a>
-        <a href="https://github.com/ikarys/fennec/releases">Releases</a>
+        <a class="nav-security" href="#sandbox">Security</a>
+        <a class="nav-guide" href="docs/">User guide</a>
+        <a class="nav-releases" href="https://github.com/ikarys/fennec/releases">Releases</a>
         <a href="https://github.com/ikarys/fennec">GitHub</a>
       </nav>
     </div>
@@ -746,7 +830,7 @@
                 </div>
                 <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh">Copy</button>
               </div>
-              <p class="install-note">Linux or macOS, one Rust binary. Windows through WSL2. Then open <code>http://127.0.0.1:7777</code>.</p>
+              <p class="install-note">Linux or macOS, one Rust binary. Windows through WSL2. Then open <code>http://127.0.0.1:7777</code> and follow the <a href="docs/first-run.html">first run guide</a>.</p>
             </div>
           </div>
 
@@ -801,6 +885,39 @@
             </div>
           </div>
 
+        </div>
+      </div>
+    </section>
+
+    <section class="modes" id="modes" aria-labelledby="modes-title">
+      <div class="container">
+        <h2 id="modes-title">Three ways to work.</h2>
+        <p class="modes-lede">Pick the one that fits the job. The further right, the more fennec runs for you, and the more it checks before anything reaches your branch.</p>
+        <div class="modes-grid">
+          <article class="mode">
+            <h3>Chat</h3>
+            <p class="mode-where">New chat in the top bar, no project</p>
+            <p>A conversation with no folder and no git: ask, draft, try a snippet. The model works in a scratch folder created only when a tool needs it, deleted with the chat.</p>
+            <p><a href="docs/ways-to-work.html#chat">Chat in the guide</a></p>
+          </article>
+          <article class="mode">
+            <h3>An agent</h3>
+            <p class="mode-where">A session on a project</p>
+            <p>You pick the agent and talk to it directly:</p>
+            <ul>
+              <li><strong>Question</strong> answers about the project, read-only, each claim sourced.</li>
+              <li><strong>Plan</strong> explores and proposes a plan with its criteria, changing nothing.</li>
+              <li><strong>Builder</strong> changes the code and verifies it.</li>
+            </ul>
+            <p><a href="docs/sessions.html">Sessions in the guide</a></p>
+          </article>
+          <article class="mode mode-workflow">
+            <h3>A workflow</h3>
+            <p class="mode-where">The Workflow picker in the composer</p>
+            <p>You describe the task once, and a graph runs it: <strong>Plan, build, verify</strong> plans with you, builds in its own worktree, runs the criteria checks and has a fresh agent review the diff, then stops at the review gate. Step by step mode stops before each node.</p>
+            <p>The hero screenshot above is one such run. Draw your own in the visual editor: agent, shell, human, condition and parallel nodes.</p>
+            <p><a href="docs/workflows.html">Workflows in the guide</a></p>
+          </article>
         </div>
       </div>
     </section>
@@ -883,7 +1000,7 @@
           <h2 id="sandbox-title">The model works in a box. You don't.</h2>
           <p>A prompt injection in a README, a dependency or a web page can make a model run anything. So every command it runs, and every shell step of a workflow, runs isolated: bubblewrap on Linux, Seatbelt on macOS.</p>
           <p>You are never sandboxed. Your terminal, your editor, the servers you start and your own git keep your normal rights.</p>
-          <p><a href="https://github.com/ikarys/fennec/blob/main/docs/sandbox.md">What the sandbox blocks, and how to work with it</a></p>
+          <p><a href="docs/sandbox.html">What the sandbox blocks, and how to work with it</a></p>
         </div>
         <ul class="walls">
           <li><strong>Its own worktree</strong><span>The system is read-only. A session writes only its git worktree, on its own branch; your checkout stays untouched until you integrate.</span></li>
@@ -913,8 +1030,8 @@
             <dd>Protected files, silenced lints and tests, removed assertions, architecture rules and ADRs can block integration.</dd>
           </div>
           <div>
-            <dt>Workflows</dt>
-            <dd>A visual editor with agent, shell, human, condition and parallel nodes wired by named ports.</dd>
+            <dt>Usage and budgets</dt>
+            <dd>Tokens, cache hits, speed and cost per model and per project, and a monthly budget that alerts at 80 %.</dd>
           </div>
           <div>
             <dt>Project understanding</dt>
@@ -961,7 +1078,7 @@
           </div>
         </div>
 
-        <p class="links">Read the <a href="https://github.com/ikarys/fennec#readme">README</a> or the <a href="https://github.com/ikarys/fennec/blob/main/docs/sandbox.md">sandbox guide</a>.</p>
+        <p class="links">Read the <a href="https://github.com/ikarys/fennec#readme">README</a> or the <a href="docs/">user guide</a>.</p>
       </div>
     </section>
   </main>
@@ -971,7 +1088,7 @@
       <span>fennec, AGPL-3.0 license</span>
       <nav class="footer-nav" aria-label="Footer">
         <a href="https://github.com/ikarys/fennec">GitHub</a>
-        <a href="https://github.com/ikarys/fennec/tree/main/docs">Docs</a>
+        <a href="docs/">Docs</a>
         <a href="https://github.com/ikarys/fennec/releases">Releases</a>
       </nav>
     </div>

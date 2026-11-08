@@ -1,0 +1,14 @@
+[book]
+title = "fennec user guide"
+authors = ["fennec contributors"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/ikarys/fennec"
+edit-url-template = "https://github.com/ikarys/fennec/edit/develop/docs/guide/{path}"
+site-url = "/fennec/docs/"
+additional-css = ["theme/fennec.css"]
+no-section-label = true
