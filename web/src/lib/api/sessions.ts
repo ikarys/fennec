@@ -340,6 +340,14 @@ export interface ServedThread {
   decisions: DecisionView[];
   /** The ids of the messages the human may replay: typed, in the model's current view. */
   replayable: string[];
+  /** What the session's file tools changed: distinct files (relative to its workdir) and lines. */
+  modifiedFiles: ModifiedFiles;
+}
+
+export interface ModifiedFiles {
+  count: number;
+  added: number;
+  removed: number;
 }
 
 export function getThread(id: string): Promise<ServedThread> {

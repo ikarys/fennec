@@ -36,6 +36,7 @@ pub mod map_doc;
 pub mod mcp;
 pub mod mcp_oauth;
 pub mod model_choice;
+pub mod modified_files;
 pub mod module_map;
 pub mod named_paths;
 pub mod open_calls;

@@ -281,13 +281,14 @@ pub(crate) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     )
 }
 
-/// The session's pending blocks (approval, waiver, queue), folded by the domain.
+/// The session's pending blocks (approval, waiver, queue) and modified files, folded by the domain.
 /// `GET /api/sessions/{id}/thread`.
 pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    app.require_session(id)?;
+    let (session, project) = app.require_session(id)?;
     let events = store.events(id)?;
-    let view = thread_view::thread_view(&events);
+    let workdir = app.place(&store, &session, &project)?.workdir;
+    let view = thread_view::thread_view(&events, &workdir.to_string_lossy());
     send_json(
         stream,
         200,

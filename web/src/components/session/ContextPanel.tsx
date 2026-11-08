@@ -45,12 +45,12 @@ const RAIL_BLOCKS: readonly { id: PanelBlockId; icon: ReactNode }[] = [
   { id: 'plugins', icon: <PuzzleIcon className="h-4 w-4" /> },
 ];
 
-function railCount(id: PanelBlockId, view: ThreadView, served: ServedThread, vision: SeenImage[]): number | null {
+function railCount(id: PanelBlockId, served: ServedThread, vision: SeenImage[]): number | null {
   switch (id) {
     case 'criteria':
       return served.criteria.length;
     case 'modifiedFiles':
-      return view.modifiedFiles.length;
+      return served.modifiedFiles.count;
     case 'decisions':
       return served.decisions.length;
     case 'vision':
@@ -235,7 +235,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
       case 'criteria':
         return <CriteriaSection key={id} criteria={served.criteria} tally={served.criteriaTally} />;
       case 'modifiedFiles':
-        return <ModifiedFilesSection key={id} modifiedFiles={view.modifiedFiles} sessionId={sessionId} />;
+        return <ModifiedFilesSection key={id} totals={served.modifiedFiles} sessionId={sessionId} />;
       case 'workspace':
         return sessionId ? (
           <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree ?? null} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
@@ -260,7 +260,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
   }
 
   function renderRail(className: string) {
-    const openCount = openBlock ? railCount(openBlock, view, served, vision) : null;
+    const openCount = openBlock ? railCount(openBlock, served, vision) : null;
     return (
       <aside
         aria-label={t('sessionContextLabel')}
@@ -306,7 +306,7 @@ export function ContextPanel({ view, skills, usage, request, hasSession, worktre
         </div>
         {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
           const title = t(panelBlock(block.id).titleKey);
-          const count = railCount(block.id, view, served, vision);
+          const count = railCount(block.id, served, vision);
           return (
             <Button
               key={block.id}

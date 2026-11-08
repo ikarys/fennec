@@ -45,6 +45,7 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    modified_files.rs  the files and lines a session's file tools changed, counted from its tool calls
     named_paths.rs     paths the human wrote in their messages or answers: a read there needs no approval
     rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
     kernel_rules.rs    the rules fennec's kernel enforces itself: the git commands that push or move a branch, blocked

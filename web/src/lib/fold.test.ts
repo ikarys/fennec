@@ -350,23 +350,10 @@ describe('createThreadFold', () => {
     expect(tool?.contentPreview).toEqual(['line1', 'line2']);
     expect(tool?.addedLines).toBe(2);
     expect(tool?.removedLines).toBe(0);
-    expect(fold.view().modifiedFiles).toEqual([{ path: 'a.ts', added: 2, removed: 0 }]);
   });
 
-  it('accumulates modified file lines for repeated writes', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('tool.call', {
-      messageId: 'a1',
-      toolCall: { id: 't1', name: 'write_file', arguments: { path: 'a.ts', content: 'one\ntwo' } }
-    }));
-    fold.apply(ev('tool.call', {
-      messageId: 'a1',
-      toolCall: { id: 't2', name: 'write_file', arguments: { path: 'a.ts', content: 'three' } }
-    }));
-    expect(fold.view().modifiedFiles).toEqual([{ path: 'a.ts', added: 3, removed: 0 }]);
-  });
 
-  it('folds edit_file into modified files and diff', () => {
+  it('folds edit_file into a diff', () => {
     const fold = createThreadFold();
     fold.apply(ev('tool.call', {
       messageId: 'a1',
@@ -380,17 +367,8 @@ describe('createThreadFold', () => {
     expect(tool?.diff).toEqual({ removed: ['old1', 'old2'], added: ['new1'] });
     expect(tool?.addedLines).toBe(1);
     expect(tool?.removedLines).toBe(2);
-    expect(fold.view().modifiedFiles).toEqual([{ path: 'a.ts', added: 1, removed: 2 }]);
   });
 
-  it('counts read_file without modifying files', () => {
-    const fold = createThreadFold();
-    fold.apply(ev('tool.call', {
-      messageId: 'a1',
-      toolCall: { id: 't1', name: 'read_file', arguments: { path: 'a.ts' } }
-    }));
-    expect(fold.view().modifiedFiles).toHaveLength(0);
-  });
 
   it('attaches preflight results to an assistant', () => {
     const fold = createThreadFold();

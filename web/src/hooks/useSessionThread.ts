@@ -13,6 +13,7 @@ const PENDING_CUES = new Set([
   'queue.added',
   'queue.drained',
   'queue.cancelled',
+  'tool.call',
   'criteria.set',
   'criteria.preflight',
   'criterion.updated',
@@ -57,7 +58,7 @@ export interface SessionThread {
   served: ServedThread;
 }
 
-const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0 }, decisions: [], replayable: [] };
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0 } };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,
