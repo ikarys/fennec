@@ -10,7 +10,6 @@ import {
   gateState,
   narrativePrompt,
   scanBadge,
-  neverAcknowledged,
   understandingPrompt,
   type Acknowledged,
   type BlockerKind,
@@ -324,7 +323,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                     {preview.blockers.map((blocker) => (
                       <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
                         <span className="grow break-words text-text">{blockerSentence(lang, blocker)}</span>
-                        {!neverAcknowledged(blocker.kind) && (
+                        {blocker.acknowledgeable && (
                           <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
                             <input
                               type="checkbox"

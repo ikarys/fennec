@@ -11,8 +11,6 @@ export type Acknowledged = Partial<Record<BlockerKind, boolean>>;
 
 // These blockers cannot be fixed by an acceptance: the merge has nothing to
 // do, it cannot succeed, or it would overwrite the human's uncommitted work.
-export const neverAcknowledged = (kind: string) => kind === 'noCommits' || kind === 'conflict' || kind === 'localChanges' || kind === 'securityScanRunning';
-
 /** The narrate agent's prompt: the branch, its base and the files in the server's review order. */
 export function narrativePrompt(preview: IntegrationPreview): string {
   const lines = preview.files.map((file, index) => {
@@ -91,7 +89,7 @@ export function blockerSentence(lang: Lang, blocker: Blocker): string {
 /** The blocker kinds the human accepted, as the server expects them. */
 export function acknowledgedKinds(preview: IntegrationPreview, acknowledged: Acknowledged): BlockerKind[] {
   return preview.blockers
-    .filter((blocker) => !neverAcknowledged(blocker.kind) && acknowledged[blocker.kind])
+    .filter((blocker) => blocker.acknowledgeable && acknowledged[blocker.kind])
     .map((blocker) => blocker.kind);
 }
 
@@ -108,7 +106,7 @@ export function gateState({ preview, acknowledged, result, message, busy }: Gate
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   const hasUncheckedBlocker =
     preview?.blockers.some(
-      (blocker) => blocker.kind !== 'noCommits' && (neverAcknowledged(blocker.kind) || !acknowledged[blocker.kind]),
+      (blocker) => blocker.kind !== 'noCommits' && (!blocker.acknowledgeable || !acknowledged[blocker.kind]),
     ) ?? false;
   const integrateDisabled = busy || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
   const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
