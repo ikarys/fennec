@@ -20,6 +20,9 @@ import { attachmentAnchorId } from '../../lib/vision';
 import { usePlanActions } from './PlanActions';
 import { useT } from '../../i18n';
 
+// The model's prose stops at a readable line length; its stats and actions line up with it.
+const ANSWER_WIDTH = 'max-w-[46rem]';
+
 
 
 // Memoised on their text: while one message streams, the others are not
@@ -65,7 +68,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
     return (
       <>
         {contract.before && (
-          <Card className="px-3.5 py-2.5">
+          <Card className={`${ANSWER_WIDTH} px-3.5 py-2.5`}>
             <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
               <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
                 {contract.before}
@@ -78,7 +81,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
     );
   }
   return (
-    <Card className="px-3.5 py-2.5">
+    <Card className={`${ANSWER_WIDTH} px-3.5 py-2.5`}>
       <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
         {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
@@ -160,7 +163,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         return <ToolCard key={segment.id} tool={segment.tool} awaiting={segment.tool.id === pendingCallId} />;
       })}
       {showCopy && showStats ? (
-        <div className="flex items-center justify-between gap-3">
+        <div className={`flex items-center justify-between gap-3 ${ANSWER_WIDTH}`}>
           <MessageStatsLine item={item} streaming={streaming} />
           <CopyButton text={copyText} />
         </div>
@@ -168,13 +171,13 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         <>
           <MessageStatsLine item={item} streaming={streaming} />
           {showCopy && (
-            <div className="flex justify-end">
+            <div className={`flex justify-end ${ANSWER_WIDTH}`}>
               <CopyButton text={copyText} />
             </div>
           )}
         </>
       )}
-      {!streaming && call?.turnRecap && <div className="text-center text-xs text-muted tabular-nums">{call.turnRecap}</div>}
+      {!streaming && call?.turnRecap && <div className={`text-center text-xs text-muted tabular-nums ${ANSWER_WIDTH}`}>{call.turnRecap}</div>}
     </div>
   );
 }
