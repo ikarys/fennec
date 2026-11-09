@@ -16,11 +16,17 @@
   <a href="https://ikarys.github.io/fennec/">Website</a> &nbsp;·&nbsp; Linux &nbsp;·&nbsp; one Rust binary &nbsp;·&nbsp; local models first &nbsp;·&nbsp; AGPL-3.0
 </p>
 
+<p align="center">
+  <a href="VIBECODING.md"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ikarys/fennec/main/audit/status.json" alt="Vibecoding Convention"></a>
+</p>
+
 ---
 
 Most coding agents optimise for writing code fast. fennec is for professional developers who work with AI and want to stay the authors of their software: you frame the work, the agent loop runs the steps, then waits for your review. Nothing is integrated without a human decision.
 
 Status: early. Linux and macOS; on Windows, through WSL2.
+
+AI assistance: fennec is largely written with AI models, openly. What was used, how every change is reviewed and how to re-run the checks: [VIBECODING.md](VIBECODING.md) and [VERIFICATION.md](VERIFICATION.md).
 
 ## Why fennec
 

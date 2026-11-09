@@ -29,6 +29,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # No secret anywhere in the history, not only in this PR's diff.
+      - name: Secrets
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          PATH="$RUNNER_TEMP:$PATH" gitleaks git --no-banner --redact .
       # The squash title becomes the commit release-please reads. Checked here,
       # not in a workflow of its own: each job is billed at least a minute.
       # The title goes through a file, never into the script: no injection.
@@ -50,8 +58,12 @@ jobs:
       - uses: extractions/setup-just@v4
       - name: Build the UI
         run: just web
-      - name: Lint
-        run: just lint
+      - name: UI rules
+        run: node web/scripts/check-ui.mjs
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
       # A new dependency must come under a licence the AGPL can absorb.
       - name: Licenses
         run: just licenses
