@@ -56,7 +56,7 @@ const USAGE: &str = "usage:
   fennec update [--check]                  install the latest release (--check: only report it)
   fennec --version                         print the version
 
-env: FENNEC_LLM_URL (default http://127.0.0.1:8000/v1), FENNEC_MODEL (default: first of /models),
+env: FENNEC_LLM_URL (no default: or set it in Settings), FENNEC_MODEL (default: first of /models),
      FENNEC_API_KEY, FENNEC_MAX_TOKENS (default 32000), FENNEC_COMPACT_AT (default 0.85),
      FENNEC_MODEL_CONCURRENCY (local endpoints, default 1), FENNEC_DB (default ~/.local/share/fennec/fennec.db);
      these are defaults; the Settings page overrides them";

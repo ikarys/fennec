@@ -26,11 +26,13 @@ fennec starts with a `local` provider that uses an OpenAI-compatible endpoint.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `FENNEC_LLM_URL` | `http://127.0.0.1:8000/v1` | Endpoint for the `local` provider |
+| `FENNEC_LLM_URL` | none | Endpoint for the `local` provider |
 | `FENNEC_MODEL` | first model the endpoint lists | Model for the `local` provider |
 | `FENNEC_API_KEY` | none | API key for the `local` provider |
 
 You can also add providers on **Settings** > **Models**. The Settings page stores per-model parameters and applies them from the next turn. The composer changes a session's model.
+
+With no model named, fennec still starts and everything that needs no model works, but a new session takes you to **Settings** > **Models** first.
 
 If the endpoint is down, fennec still starts. You can reach the UI, and the chosen model is used once the endpoint is back.
 

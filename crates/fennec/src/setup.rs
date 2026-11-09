@@ -10,16 +10,20 @@ pub fn facts(settings: &Settings, store: &SqliteStore) -> Result<Facts, String> 
     let prefs = store.preferences().map_err(|e| e.to_string())?;
     let default = prefs.default_model(&settings.llm.defaults);
 
-    let model = match settings.endpoint(&prefs, &default.provider) {
-        Err(error) => ModelFact::Unreachable { error },
-        Ok(endpoint) => match list_models(&endpoint) {
-            Ok(listed) => ModelFact::Reachable {
-                listed: listed.iter().any(|m| m.id == default.model),
-                model: default.model.clone(),
-                base_url: endpoint.base_url.clone(),
-            },
+    let model = if !settings.model_configured(&prefs) {
+        ModelFact::NotConfigured
+    } else {
+        match settings.endpoint(&prefs, &default.provider) {
             Err(error) => ModelFact::Unreachable { error },
-        },
+            Ok(endpoint) => match list_models(&endpoint) {
+                Ok(listed) => ModelFact::Reachable {
+                    listed: listed.iter().any(|m| m.id == default.model),
+                    model: default.model.clone(),
+                    base_url: endpoint.base_url.clone(),
+                },
+                Err(error) => ModelFact::Unreachable { error },
+            },
+        }
     };
 
     let sandbox = if !prefs.sandbox.enabled {

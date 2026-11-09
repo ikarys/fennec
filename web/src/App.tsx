@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
-import { createProject, setProjectFavorite } from './lib/api';
+import { createProject, hasModel, setProjectFavorite } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
 import {
@@ -194,9 +194,17 @@ export default function App() {
         setProjectDialogOpen(true);
         return;
       }
-      const pseudoId = `new:${targetProjectId}`;
-      openTab(pseudoId);
-      navigate(`#/new/${encodeURIComponent(targetProjectId)}`);
+      // No model yet: the setup comes first. A failed check lets the server refuse instead.
+      void hasModel()
+        .catch(() => true)
+        .then((ready) => {
+          if (!ready) {
+            navigate('#/settings/models');
+            return;
+          }
+          openTab(`new:${targetProjectId}`);
+          navigate(`#/new/${encodeURIComponent(targetProjectId)}`);
+        });
     },
     [navigate, projects, openTab]
   );
