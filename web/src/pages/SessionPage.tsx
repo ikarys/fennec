@@ -697,11 +697,18 @@ export function SessionPage({
                       </div>
                     </div>
 
-                    <div className="relative min-h-0 grow">
+                    {/* The thread scrolls in its column, so the scrollbar sits beside it;
+                        a wheel over the margins still scrolls the thread. */}
+                    <div
+                      className="relative min-h-0 grow"
+                      onWheel={(event) => {
+                        if (event.target === event.currentTarget) scrollRef.current?.scrollBy({ top: event.deltaY });
+                      }}
+                    >
                       <div
                         ref={scrollRef}
                         onScroll={onScroll}
-                        className="h-full overflow-y-auto p-4 md:p-6"
+                        className="mx-auto h-full max-w-[calc(var(--container-page)+3rem)] overflow-y-auto p-4 md:p-6"
                       >
                         <div
                           ref={contentRef}
