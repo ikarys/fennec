@@ -9,15 +9,6 @@ export type RailStep =
 
 export type StepTone = 'ok' | 'err' | 'running' | 'waiting' | 'interrupted' | 'upcoming';
 
-export const STEP_DOT_CLASS: Record<StepTone, string> = {
-  ok: 'bg-ok',
-  err: 'bg-err',
-  running: 'bg-accent',
-  waiting: 'bg-attention',
-  interrupted: 'bg-border-strong',
-  upcoming: 'border border-dashed border-faint',
-};
-
 export const STEP_MARKER_CLASS: Record<StepTone, string> = {
   ok: 'bg-ok-soft text-ok',
   err: 'bg-err-soft text-err',
