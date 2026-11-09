@@ -169,20 +169,12 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         }
         return <ToolCard key={segment.id} tool={segment.tool} awaiting={segment.tool.id === pendingCallId} />;
       })}
-      {showCopy && showStats ? (
-        <div className={`flex items-center justify-between gap-3 ${ANSWER_WIDTH}`}>
+      {/* The copy button follows the stats line, so it stays by the answer whatever its width. */}
+      {(showStats || showCopy) && (
+        <div className="flex items-center gap-1">
           <MessageStatsLine item={item} streaming={streaming} />
-          <CopyButton text={copyText} />
+          {showCopy && <CopyButton text={copyText} />}
         </div>
-      ) : (
-        <>
-          <MessageStatsLine item={item} streaming={streaming} />
-          {showCopy && (
-            <div className={`flex justify-end ${ANSWER_WIDTH}`}>
-              <CopyButton text={copyText} />
-            </div>
-          )}
-        </>
       )}
       {!streaming && call?.turnRecap && <div className={`text-center text-xs text-muted tabular-nums ${ANSWER_WIDTH}`}>{call.turnRecap}</div>}
     </div>
