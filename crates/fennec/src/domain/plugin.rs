@@ -394,9 +394,134 @@ impl Hasher {
     }
 }
 
+/// A tab the session's context rail shows for the active plugins, from what they declare:
+/// the shared "Plugins" tab, or a plugin's own tab.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PluginTab {
+    Shared,
+    Own { plugin: String, icon: PluginIcon },
+}
+
+/// The rail tabs the given active definitions declare: `Shared` first if any declares a
+/// session `panel` block, then one `Own` per definition with a session `own_panel` block.
+pub fn session_tabs<'a>(defs: impl IntoIterator<Item = &'a PluginDef>) -> Vec<PluginTab> {
+    let mut tabs = Vec::new();
+    let mut has_shared = false;
+
+    for def in defs {
+        let mut has_own = false;
+        for block in &def.blocks {
+            if block.scope != BlockScope::Session {
+                continue;
+            }
+            match block.placement() {
+                Placement::Panel => has_shared = true,
+                Placement::OwnPanel if !has_own => {
+                    tabs.push(PluginTab::Own {
+                        plugin: def.name.clone(),
+                        icon: def.icon,
+                    });
+                    has_own = true;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if has_shared {
+        tabs.insert(0, PluginTab::Shared);
+    }
+    tabs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn plugin_tab_block(scope: BlockScope, placement: Placement) -> PluginBlockDef {
+        PluginBlockDef {
+            scope,
+            placement: Some(placement),
+            ..Default::default()
+        }
+    }
+
+    fn plugin_tab_def(name: &str, blocks: Vec<PluginBlockDef>) -> PluginDef {
+        PluginDef {
+            name: name.into(),
+            blocks,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn session_tabs_no_defs_is_empty() {
+        let defs: Vec<&PluginDef> = Vec::new();
+        assert_eq!(session_tabs(defs), Vec::new());
+    }
+
+    #[test]
+    fn session_tabs_panel_only_def_is_shared() {
+        let def = plugin_tab_def(
+            "a",
+            vec![plugin_tab_block(BlockScope::Session, Placement::Panel)],
+        );
+        assert_eq!(session_tabs(vec![&def]), vec![PluginTab::Shared]);
+    }
+
+    #[test]
+    fn session_tabs_panel_and_own_defs_are_shared_then_own() {
+        let panel_def = plugin_tab_def(
+            "a",
+            vec![plugin_tab_block(BlockScope::Session, Placement::Panel)],
+        );
+        let own_def = plugin_tab_def(
+            "b",
+            vec![plugin_tab_block(BlockScope::Session, Placement::OwnPanel)],
+        );
+        assert_eq!(
+            session_tabs(vec![&panel_def, &own_def]),
+            vec![
+                PluginTab::Shared,
+                PluginTab::Own {
+                    plugin: "b".into(),
+                    icon: PluginIcon::default(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn session_tabs_multiple_own_panel_blocks_yield_one_own_tab() {
+        let def = plugin_tab_def(
+            "a",
+            vec![
+                plugin_tab_block(BlockScope::Session, Placement::OwnPanel),
+                plugin_tab_block(BlockScope::Session, Placement::OwnPanel),
+            ],
+        );
+        assert_eq!(
+            session_tabs(vec![&def]),
+            vec![PluginTab::Own {
+                plugin: "a".into(),
+                icon: PluginIcon::default(),
+            }]
+        );
+    }
+
+    #[test]
+    fn session_tabs_non_session_or_status_bar_blocks_yield_nothing() {
+        let def = plugin_tab_def(
+            "a",
+            vec![
+                plugin_tab_block(BlockScope::Project, Placement::Panel),
+                plugin_tab_block(BlockScope::Global, Placement::OwnPanel),
+                plugin_tab_block(BlockScope::Session, Placement::StatusBar),
+            ],
+        );
+        assert_eq!(session_tabs(vec![&def]), Vec::new());
+    }
 
     #[test]
     fn a_definition_round_trips() {

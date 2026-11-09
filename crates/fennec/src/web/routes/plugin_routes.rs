@@ -41,12 +41,14 @@ pub(crate) fn list(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
 }
 
 /// `GET /api/sessions/{id}/plugins`: the session-scope blocks the session's
-/// plugins have emitted, for the right-hand panel.
+/// plugins have emitted, for the right-hand panel, plus the rail tabs the active
+/// plugins declare.
 pub(crate) fn session_blocks(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     require_session(&store, id)?;
     let blocks = app.plugins.blocks_for_session(id);
-    send_json(stream, 200, &json!({ "blocks": blocks }))
+    let tabs = app.plugins.session_tabs();
+    send_json(stream, 200, &json!({ "blocks": blocks, "tabs": tabs }))
 }
 
 /// `GET /api/plugins/status-bar`: every status-bar block — the global ones,

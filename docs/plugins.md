@@ -28,7 +28,7 @@ the prompt, the tools or a log. Plugins are global, never read from a project.
 
 | scope | placement (default first) | where it shows |
 | --- | --- | --- |
-| `session` | `panel` (default) | the "Plugins" tab of the session's context rail (shown while it has a block) |
+| `session` | `panel` (default) | the "Plugins" tab of the session's context rail (shown while an active plugin declares such a block) |
 | `session` | `own_panel` | a rail tab of the plugin's own, with its `icon`, one panel per block |
 | `session` | `status_bar` | the app's bottom status bar while that session is on screen |
 | `project` | `dashboard` (default) | a section of the project page's dashboard |
