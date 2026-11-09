@@ -269,3 +269,7 @@ delegate further, and the parent releases the model gate first so the
 child is not kept behind it. Only the web's top-level turns delegate; elsewhere `delegate` is withheld the same way. The tool
 card shows the agent and the task, and marks the answer indicative, with the time the child ran (`agent/delegate.rs`, `web/children.rs`,
 `web/turns.rs`, `ToolCard.tsx`).
+
+**The background service.** `fennec service install|start|stop|restart` keeps the server running without a terminal, as a systemd
+user service or a launchd agent. A service file already there is the human's and is kept; a path that could add a directive to the
+file is refused (`domain/service.rs`, `service.rs`, `cli/service.rs`).

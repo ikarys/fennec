@@ -84,6 +84,7 @@ crates/fennec/src/
     doc.rs             the project's documentation: markdown files and ADRs, as the Doc tab lists them
     mcp.rs             MCP servers as the human configured them; server.rs the project's servers (`.agents/servers.json`)
     scanner.rs         the security scanners fennec knows (the gate, the audit-security agent);
+    service.rs         the background service's systemd unit, launchd agent and manager arguments
     setup.rs           the first-run checklist: model, sandbox, git, a project, scanners, from gathered facts
     security_scan.rs   the scanners' JSON reports parsed into findings; which lockfiles a branch changed; attention.rs what a finished turn leaves for the human's eye
     audit.rs           an audit report parsed from the model's answer, and the backlog task each finding becomes
@@ -163,6 +164,7 @@ crates/fennec/src/
   turn_build.rs      the composition of a Turn, shared by both adapters (CLI, web): store, model, tools, sandbox
   mcp.rs             the synchronous MCP client (JSON-RPC over stdio); servers.rs the project's servers on disk
   scanners.rs        the security scanners found on PATH
+  service.rs         the background service: its file written (never overwritten), systemd or launchd called
   setup.rs           the first-run checklist's facts gathered (model listed, sandbox probed, git, projects, scanners)
   security_scan.rs   the gate's scanners run in the read-only sandbox, cached per (base, branch)
   server_config.rs   the server's settings.yaml (listen address, remote-access password hash)

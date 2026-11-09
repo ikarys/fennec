@@ -29,6 +29,7 @@ mod scanners;
 mod security_scan;
 mod server_config;
 mod servers;
+mod service;
 mod setup;
 mod skills;
 mod store;
@@ -54,6 +55,8 @@ const USAGE: &str = "usage:
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
   fennec update [--check]                  install the latest release (--check: only report it)
+  fennec service <install|start|stop|restart>
+                                           keep the server running in the background
   fennec --version                         print the version
 
 env: FENNEC_LLM_URL (no default: or set it in Settings), FENNEC_MODEL (default: first of /models),
@@ -121,6 +124,7 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         Some("compact") => cli::compact(&Settings::from_env()?, args.get(1).ok_or(USAGE)?),
         Some("update") => cli::update::run(&args[1..]),
+        Some("service") => cli::service::run(&args[1..]),
         Some("doctor") => cli::doctor::run(&Settings::from_env()?, &open_store()?),
         Some("sessions") => cli::list_sessions(&open_store()?),
         Some("log") => cli::replay(&open_store()?, args.get(1).ok_or(USAGE)?),
