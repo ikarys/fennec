@@ -153,6 +153,7 @@ export function ContextPanel({
       side="right"
       label={t('sessionContextLabel')}
       storageKey="fennec.contextPanel"
+      defaultPinned
       panels={panels}
       reveal={{ id: 'session', key: contextRevealKey }}
     />
