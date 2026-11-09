@@ -55,18 +55,21 @@ export const markdownComponents = {
       return <code className="font-mono text-xs">{children}</code>;
     }
     return (
-      <code className="rounded-md bg-raised px-1 py-0.5 font-mono text-xs text-text">{children}</code>
+      <code className="font-mono text-[0.9em] text-muted">{children}</code>
     );
   },
   // Tailwind's preflight unstyles headings; previewed documents rely on them.
   h1: ({ children }: { children?: ReactNode }) => <h1 className="mt-4 mb-2 text-xl font-semibold">{children}</h1>,
   h2: ({ children }: { children?: ReactNode }) => <h2 className="mt-4 mb-2 text-lg font-semibold">{children}</h2>,
   h3: ({ children }: { children?: ReactNode }) => <h3 className="mt-3 mb-1.5 text-base font-semibold">{children}</h3>,
-  p: ({ children }: { children?: ReactNode }) => <p className="my-2 leading-relaxed">{children}</p>,
+  // Prose uses the softer prose colour: near-white text tires the eye.
+  p: ({ children }: { children?: ReactNode }) => <p className="my-3 text-[15px] leading-7 text-prose">{children}</p>,
   // Tailwind's preflight removes list markers; plans are lists of lists.
-  ul: ({ children }: { children?: ReactNode }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
-  ol: ({ children }: { children?: ReactNode }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
-  li: ({ children }: { children?: ReactNode }) => <li className="my-0.5 leading-relaxed">{children}</li>,
+  ul: ({ children }: { children?: ReactNode }) => <ul className="my-3 list-disc pl-5">{children}</ul>,
+  ol: ({ children }: { children?: ReactNode }) => <ol className="my-3 list-decimal pl-5">{children}</ol>,
+  li: ({ children }: { children?: ReactNode }) => <li className="my-3 text-[15px] leading-7 text-prose">{children}</li>,
+  // Bold stands out by its tint against the softer prose colour, not by weight.
+  strong: ({ children }: { children?: ReactNode }) => <strong className="font-semibold text-accent-strong">{children}</strong>,
   a: ({ children, href }: { children?: ReactNode; href?: string }) => (
     <a href={href} className="text-accent-strong underline" target="_blank" rel="noreferrer">
       {children}
