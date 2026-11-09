@@ -37,7 +37,6 @@ export function NightReport({
     badges.push({
       label: t('attentionQuestions', {
         count: report.summary.question,
-        s: report.summary.question > 1 ? 's' : ''
       }),
       tone: 'accent'
     });
@@ -45,7 +44,6 @@ export function NightReport({
     badges.push({
       label: t('attentionHalted', {
         count: report.summary.halted,
-        s: report.summary.halted > 1 ? 's' : ''
       }),
       tone: 'err'
     });
@@ -53,7 +51,6 @@ export function NightReport({
     badges.push({
       label: t('reportFailed', {
         count: report.summary.failed,
-        s: report.summary.failed > 1 ? 's' : ''
       }),
       tone: 'err'
     });
@@ -61,7 +58,6 @@ export function NightReport({
     badges.push({
       label: t('integratedCount', {
         count: report.summary.integrated,
-        s: report.summary.integrated > 1 ? 's' : ''
       }),
       tone: 'ok'
     });

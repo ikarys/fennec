@@ -72,7 +72,7 @@ export function IdeaMeta({
       {idea.decisions.length > 0 ? (
         <Stat
           icon={<DecisionIcon />}
-          title={`${t('decisionsTitle', { count: idea.decisions.length, s: idea.decisions.length > 1 ? 's' : '' })}\n${idea.decisions.map((d) => `${d.title} : ${d.choice}`).join('\n')}`}
+          title={`${t('decisionsTitle', { count: idea.decisions.length })}\n${idea.decisions.map((d) => `${d.title} : ${d.choice}`).join('\n')}`}
         >
           {idea.decisions.length}
         </Stat>
@@ -81,14 +81,14 @@ export function IdeaMeta({
         <>
           <Stat
             icon={<CommitIcon />}
-            title={t('commitsCount', { count: idea.commits, s: idea.commits > 1 ? 's' : '' })}
+            title={t('commitsCount', { count: idea.commits })}
           >
             {idea.commits}
           </Stat>
           {idea.files != null ? (
             <Stat
               icon={<FileIcon />}
-              title={t('filesModified', { count: idea.files, s: idea.files > 1 ? 's' : '' })}
+              title={t('filesModified', { count: idea.files })}
             >
               {idea.files}
             </Stat>

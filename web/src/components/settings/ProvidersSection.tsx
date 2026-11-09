@@ -171,7 +171,7 @@ export function ProvidersSection({
                     </Badge>
                   ) : (
                     <Badge tone="neutral">
-                      {count === 0 ? t('noModels') : t('modelCount', { count, s: count > 1 ? 's' : '' })}
+                      {count === 0 ? t('noModels') : t('modelCount', { count })}
                     </Badge>
                   )}
                   <span className="ml-auto flex shrink-0 items-center gap-1">

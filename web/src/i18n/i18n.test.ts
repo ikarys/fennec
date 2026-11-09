@@ -15,6 +15,13 @@ describe('t', () => {
     expect(t('fr', 'integrateInto', { branch: 'main' })).toBe('Intégrer dans main');
   });
 
+  it('pluralises {s} from {count}', () => {
+    expect(t('en', 'homeConversationCount', { count: 2 })).toBe('2 conversations');
+    expect(t('en', 'homeConversationCount', { count: 1 })).toBe('1 conversation');
+    expect(t('en', 'homeConversationCount', { count: 0 })).toBe('0 conversations');
+    expect(t('fr', 'homeConversationCount', { count: 0 })).toBe('0 conversation');
+  });
+
   it('interpolates numbers as well', () => {
     expect(t('en', 'integrateInto', { branch: 42 })).toBe('Integrate into 42');
   });

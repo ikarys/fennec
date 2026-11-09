@@ -48,7 +48,7 @@ export function ProjectTile({
       <div className="mt-auto flex items-center gap-3 pt-1 font-mono text-xs text-muted">
         <span className="min-w-0 truncate">⎇ {project.branch ?? t('noBranch')}</span>
         <span className="shrink-0 tabular-nums">
-          {t('sessionCount', { count: project.sessions.length, s: project.sessions.length > 1 ? 's' : '' })}
+          {t('sessionCount', { count: project.sessions.length })}
         </span>
         <div className="relative z-10 ml-auto flex shrink-0 items-center gap-0.5">
           <FavoriteButton project={project} onToggle={onToggleFavorite} />

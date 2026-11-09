@@ -2840,7 +2840,11 @@ const DICTS: Record<Lang, Record<MsgKey, string>> = { en, fr };
 export function t(lang: Lang, key: MsgKey, vars?: Record<string, string | number>): string {
   let text = DICTS[lang][key] ?? DICTS.en[key];
   if (vars) {
-    text = text.replace(/\{(\w+)\}/g, (match, name) => (name in vars ? String(vars[name]) : match));
+    // `{s}` pluralises after `{count}` unless the caller gives it: French
+    // keeps 0 and 1 singular, English only 1.
+    const count = vars.count;
+    const all = typeof count === 'number' && !('s' in vars) ? { ...vars, s: count === 1 || (lang === 'fr' && count === 0) ? '' : 's' } : vars;
+    text = text.replace(/\{(\w+)\}/g, (match, name) => (name in all ? String(all[name]) : match));
   }
   return text;
 }

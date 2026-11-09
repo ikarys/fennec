@@ -7,6 +7,7 @@ import {
   CoinIcon,
   CpuIcon,
   InboxIcon,
+  InsightIcon,
   LayersIcon,
   ProjectIcon
 } from '../components/ui/Icons';
@@ -18,6 +19,7 @@ import { SectionLabel } from '../components/ui/SectionLabel';
 import { Segmented, type Segment } from '../components/ui/Segmented';
 import { Select } from '../components/ui/Field';
 import { useT } from '../i18n';
+import { PageHeader } from '../components/ui/PageHeader';
 import { type MsgKey } from '../i18n/messages';
 
 type Icon = ComponentType<{ className?: string }>;
@@ -160,39 +162,34 @@ export function InsightPage() {
   return (
     <div className="min-h-0 grow overflow-y-auto bg-bg">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-soft text-accent">
-              <ActivityIcon className="h-4 w-4" />
-            </span>
-            <div>
-              <h1 className="text-2xl font-semibold">{t('insight')}</h1>
-              <p className="text-xs text-muted">{t('insightUsageSubtitle')}</p>
-            </div>
-          </div>
+        <PageHeader
+          Icon={InsightIcon}
+          title={t('insight')}
+          subtitle={t('insightUsageSubtitle')}
+          actions={
+            <>
+              <Select
+                aria-label={t('homeProject')}
+                value={project ?? ''}
+                onChange={(event) => setProject(event.target.value === '' ? null : event.target.value)}
+              >
+                <option value="">{t('insightAllProjects')}</option>
+                {(view?.projectOptions ?? []).map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </Select>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              aria-label={t('homeProject')}
-              value={project ?? ''}
-              onChange={(event) => setProject(event.target.value === '' ? null : event.target.value)}
-            >
-              <option value="">{t('insightAllProjects')}</option>
-              {(view?.projectOptions ?? []).map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </Select>
-
-            <Segmented
-              label={t('insightPeriodLabel')}
-              segments={PERIOD_SEGMENTS.map((segment) => ({ ...segment, label: t(segment.label as MsgKey) }))}
-              value={period}
-              onChange={setPeriod}
-            />
-          </div>
-        </div>
+              <Segmented
+                label={t('insightPeriodLabel')}
+                segments={PERIOD_SEGMENTS.map((segment) => ({ ...segment, label: t(segment.label as MsgKey) }))}
+                value={period}
+                onChange={setPeriod}
+              />
+            </>
+          }
+        />
 
         {error ? <p className="text-err">{error}</p> : null}
         {!view && !error ? <div className="text-muted">{t('loading')}</div> : null}

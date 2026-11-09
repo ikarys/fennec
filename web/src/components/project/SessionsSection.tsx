@@ -55,7 +55,6 @@ export function SessionsSection({
         description={
           t('sessionsDescription', {
             count: sessions.length,
-            s: sessions.length > 1 ? 's' : '',
           })
         }
         actions={
@@ -64,7 +63,6 @@ export function SessionsSection({
               <span className="text-xs text-muted">
                 {t('sessionsSelectedCount', {
                   count: chosen.length,
-                  s: chosen.length > 1 ? 's' : '',
                 })}
               </span>
               <Button variant="danger" disabled={chosen.length === 0} onClick={() => setPendingDelete(chosen)}>
