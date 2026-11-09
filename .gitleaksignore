@@ -1,0 +1,4 @@
+# The fake GitHub token a security_scan test used to carry (history only); see VERIFICATION.md.
+f522a094e39d3e7eb4939bda9af1b806a5a0bb14:crates/fennec/src/security_scan.rs:github-pat:437
+3cbd779c8fc51f1a6b9118bab3113e51a5a54d68:crates/fennec/src/security_scan.rs:github-pat:437
+8962c47d8646d589c47c11d6c1cb29346a43f4cc:crates/fennec/src/security_scan.rs:github-pat:437

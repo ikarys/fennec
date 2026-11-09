@@ -354,3 +354,29 @@ Conventional Commits, imperative mood (`feat:`, `fix:`, `docs:`, `refactor:`,
 `test:`, `chore:`).
 Every commit, whoever writes it (human, agent, local model): the message is in
 English, subject and body, and follows Conventional Commits; no exception.
+
+## Vibecoding Convention (level 2)
+
+This project follows the Vibecoding Convention at level 2; see `VIBECODING.md`.
+
+Before calling a change done, these must pass:
+- `just check` (format, clippy, tests, UI lint, UI tests, UI build)
+- `just secrets` (gitleaks over the history)
+
+Rules while editing:
+- Every commit with AI-written content ends with the trailer
+  `Assisted-by: <Tool>:<model>`, one per model (`Assisted-by: Claude Code:claude-opus-5-5`,
+  `Assisted-by: local:qwen3.8-27b`); never `Co-Authored-By` for a model.
+- Deleting, skipping or weakening a test requires the reason in the commit message.
+- A new dependency is checked against the registry (exists under that exact name,
+  established, the one the code needs) and taken at the registry's current
+  version; the check is noted in the commit. An existing dependency is not held
+  back without a reason written in `VIBECODING.md`.
+- No secret in any file, prompt or config.
+- Every input is hostile: arguments, files, environment, network, model output.
+  A change that touches parsing, SQL or command building, authentication, crypto,
+  credentials or file import names the vulnerability class it guards against and
+  its test (`SECURITY.md`).
+- No TODO, placeholder, commented-out or dead code in a delivered change.
+
+Never without a human: merge to `main`, release, delete data.
