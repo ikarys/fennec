@@ -158,6 +158,14 @@ impl PluginManager {
         })
     }
 
+    /// The context-rail tabs the active plugins declare for a session.
+    pub fn session_tabs(&self) -> Vec<crate::domain::plugin::PluginTab> {
+        let hosts = crate::locks::lock(&self.hosts);
+        hosts.as_ref().map_or_else(Vec::new, |managed| {
+            crate::domain::plugin::session_tabs(managed.iter().map(|m| &m.def))
+        })
+    }
+
     /// The project-scope blocks placed in the project page's dashboard.
     pub fn blocks_for_project(&self, project_id: &str) -> Vec<ServedPluginBlock> {
         self.blocks(BlockScope::Project, None, Some(project_id), |placement| {

@@ -79,45 +79,38 @@ export function ContextPanel({
   const [pinned, setPinned] = useState(loadPinned);
   const [open, setOpen] = useState<string | null>(() => (pinned ? loadTab() ?? 'work' : null));
   const [runningServers, setRunningServers] = useState(0);
-  const blocks = useSessionPluginBlocks(sessionId);
+  const plugins = useSessionPluginBlocks(sessionId);
+  const blocks = plugins?.blocks ?? [];
 
   useEffect(() => {
     if (contextRevealKey > 0) setOpen('session');
   }, [contextRevealKey]);
 
-  const sharedBlocks = blocks?.filter((block) => block.placement !== 'own_panel') ?? [];
+  const sharedBlocks = blocks.filter((block) => block.placement !== 'own_panel');
 
   const ownPlugins: { name: string; icon: ServedPluginBlock['icon']; blocks: ServedPluginBlock[] }[] = [];
-  if (blocks !== null) {
-    const byPlugin = new Map<string, ServedPluginBlock[]>();
-    for (const block of blocks) {
-      if (block.placement !== 'own_panel') continue;
-      const existing = byPlugin.get(block.plugin);
-      if (existing) existing.push(block);
-      else byPlugin.set(block.plugin, [block]);
-    }
-    for (const [name, pluginBlocks] of byPlugin) {
-      ownPlugins.push({ name, icon: pluginBlocks[0]!.icon, blocks: pluginBlocks });
-    }
-  }
-
   const tabs: TabDescriptor[] = [
     { id: 'work', title: t('contextTabWork'), label: t('contextTabWork'), Icon: CheckIcon },
     { id: 'servers', title: t('contextTabServers'), label: t('contextTabServers'), Icon: ServerIcon },
     { id: 'session', title: t('contextTabSession'), label: t('contextTabSession'), Icon: LayersIcon },
   ];
 
-  if (sharedBlocks.length > 0) {
-    tabs.push({ id: 'plugins', title: t('panelPlugins'), label: t('panelPlugins'), Icon: PuzzleIcon });
-  }
-
-  for (const plugin of ownPlugins) {
-    tabs.push({
-      id: `plugin:${plugin.name}`,
-      title: t('pluginProvenance', { name: plugin.name }),
-      label: plugin.name,
-      Icon: PLUGIN_ICONS[plugin.icon],
-    });
+  for (const tab of plugins?.tabs ?? []) {
+    if (tab.kind === 'shared') {
+      tabs.push({ id: 'plugins', title: t('panelPlugins'), label: t('panelPlugins'), Icon: PuzzleIcon });
+    } else {
+      tabs.push({
+        id: `plugin:${tab.plugin}`,
+        title: t('pluginProvenance', { name: tab.plugin }),
+        label: tab.plugin,
+        Icon: PLUGIN_ICONS[tab.icon],
+      });
+      ownPlugins.push({
+        name: tab.plugin,
+        icon: tab.icon,
+        blocks: blocks.filter((block) => block.placement === 'own_panel' && block.plugin === tab.plugin),
+      });
+    }
   }
 
   // A plugin tab that is gone (or not fetched yet) shows the work tab; `open` keeps the wish.

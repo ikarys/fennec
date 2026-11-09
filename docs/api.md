@@ -564,8 +564,10 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   in the bwrap world (never with the sandbox off), its code directory read-only (and its working directory), a
   private scratch writable, no project mounted, the network only when `network`. 400 on an empty name or an
   invalid definition; 404 if no such plugin.
-- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks placed in the session's context
-  rail (`placement` `panel` or `own_panel`). 404 if no session. The event feed a plugin receives
+- `GET /api/sessions/{id}/plugins` → `{blocks, tabs}`: the session-scope blocks placed in the session's context
+  rail (`placement` `panel` or `own_panel`) and the rail tabs the active plugins declare
+  (`tabs` is `[{kind:"shared"} | {kind:"own", plugin, icon}]`, present even before any block arrives).
+  404 if no session. The event feed a plugin receives
   carries the `session` and `project` ids; a session seen for the first time by the pump is not replayed.
 - `GET /api/projects/{id}/plugins` → `{blocks}`: the project-scope blocks placed in the project page's
   dashboard (`placement` `dashboard`). 404 if no project.
