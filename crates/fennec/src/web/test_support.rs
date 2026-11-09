@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 pub(super) fn app(db_path: PathBuf) -> App {
     let settings = Settings {
         llm: LlmSettings {
-            base_url: "http://localhost".into(),
+            base_url: Some("http://localhost".into()),
             api_key: None,
             defaults: ModelParams {
                 provider: "local".into(),

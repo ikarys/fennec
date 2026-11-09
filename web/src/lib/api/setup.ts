@@ -12,6 +12,12 @@ export interface Setup {
   complete: boolean;
 }
 
+/** Whether a model is named: a session needs one. No probe, so a click stays instant. */
+export async function hasModel(): Promise<boolean> {
+  const config = await request<{ model: string }>("/api/config");
+  return config.model !== "";
+}
+
 /** The first-run checklist, probed by the server on each call. */
 export function getSetup(): Promise<Setup> {
   return request<Setup>("/api/setup");

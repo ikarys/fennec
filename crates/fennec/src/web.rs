@@ -228,11 +228,6 @@ pub fn serve(
     }
     let listener = TcpListener::bind((listen, port))
         .map_err(|e| format!("{}: {e}", std::net::SocketAddr::new(listen, port)))?;
-    eprintln!(
-        "fennec · {} · http://{}",
-        settings.llm.defaults.model,
-        std::net::SocketAddr::new(listen, port)
-    );
     let notifier = Arc::new(Notifier::default());
     // The agents home (`<home>/.agents`), resolved the way skills and agents
     // resolve it: the plugins live only there, never in a project.
@@ -242,6 +237,17 @@ pub fn serve(
     // The plugin manager's sandbox world and scratch root, from the stored
     // preferences. A plugin's network is its own choice, set per activation.
     let boot_store = SqliteStore::open(&settings.db_path)?;
+    let prefs = boot_store.preferences().map_err(|e| e.to_string())?;
+    let model = settings.llm.for_turn(&prefs, None).model;
+    eprintln!(
+        "fennec · {} · http://{}",
+        if model.is_empty() {
+            "no model yet, finish the setup"
+        } else {
+            &model
+        },
+        std::net::SocketAddr::new(listen, port)
+    );
     let prefs = boot_store.preferences()?;
     let plugins_temp = settings
         .db_path

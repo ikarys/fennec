@@ -209,7 +209,7 @@ The play button's servers and the preview still bind 127.0.0.1: open them throug
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `FENNEC_LLM_URL` | `http://127.0.0.1:8000/v1` | OpenAI-compatible endpoint of the `local` provider |
+| `FENNEC_LLM_URL` | none, set in Settings otherwise | OpenAI-compatible endpoint of the `local` provider |
 | `FENNEC_MODEL` | first model the endpoint lists | Model of the `local` provider |
 | `FENNEC_API_KEY` | none | API key of the `local` provider |
 | `FENNEC_MAX_TOKENS` | `32000` | Output token limit of a model call |
