@@ -277,6 +277,7 @@ for line in sys.stdin:
             command: "python3".into(),
             args: vec!["echo.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: vec![crate::domain::plugin::PluginBlockDef {
                 id: "calls".into(),
                 title: "Calls".into(),
@@ -351,6 +352,7 @@ for line in sys.stdin:
             command: "python3".into(),
             args: vec!["stray.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: Vec::new(),
         };
         let host = Host::spawn(
@@ -447,6 +449,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             command: "python3".into(),
             args: vec!["probe.py".into()],
             env,
+            icon: Default::default(),
             blocks: vec![crate::domain::plugin::PluginBlockDef {
                 id: "probe".into(),
                 title: "Probe".into(),
@@ -500,6 +503,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             command: "python3".into(),
             args: vec!["echo.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: Vec::new(),
         };
         let off = Sandbox::Off;

@@ -214,6 +214,7 @@ impl PluginManager {
                         title: block.title.clone(),
                         scope,
                         placement: block.placement(),
+                        icon: managed.def.icon,
                         content: content.clone(),
                     });
                 }

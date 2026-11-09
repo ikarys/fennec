@@ -1,73 +1,43 @@
 /**
- * The session's right context rail: three tabs that open a drawer with the work, server,
- * and session blocks. The drawer floats over the thread or pins beside it; only its open
- * state is persisted while pinned. SessionPage keys it by session, so a floating drawer closes
- * when the session changes.
+ * The session's right context rail: fixed tabs for work, servers, and session, plus a
+ * shared plugins tab and one tab per plugin that owns a panel. The drawer floats over the
+ * thread or pins beside it; only its open state is persisted while pinned. SessionPage keys it
+ * by session, so a floating drawer closes when the session changes.
  */
 import { useEffect, useState } from 'react';
-import type { SeenImage, ServedThread, SessionDetail, SessionSkills, SessionUsage, ServerView } from '../../lib/api';
+import type {
+  SeenImage,
+  ServedThread,
+  SessionDetail,
+  SessionSkills,
+  SessionUsage,
+  ServerView,
+  ServedPluginBlock,
+} from '../../lib/api';
 import type { ThreadView } from '../../lib/fold';
 import { useT } from '../../i18n';
+import { useSessionPluginBlocks } from '../../hooks/useSessionPluginBlocks';
 import { Button } from '../ui/Button';
-import { CheckIcon, CloseIcon, LayersIcon, PinIcon, ServerIcon } from '../ui/Icons';
+import { CheckIcon, CloseIcon, LayersIcon, PinIcon, ServerIcon, PuzzleIcon } from '../ui/Icons';
+import { PLUGIN_ICONS } from '../plugins/pluginIcons';
+import { loadPinned, loadTab, savePinned, saveTab } from './contextRailStorage';
+import { RailTab } from './RailTab';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
-import { PluginsSection } from './PluginsSection';
+import { PluginsSection, PluginOwnSection } from './PluginsSection';
 import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { VisionSection } from './VisionSection';
 import { WorkplaceSection } from './WorkplaceSection';
 
-const PINNED_KEY = 'fennec.contextPanel.pinned';
-const TAB_KEY = 'fennec.contextPanel.tab';
-
-const TABS = {
-  work: { titleKey: 'contextTabWork', Icon: CheckIcon },
-  servers: { titleKey: 'contextTabServers', Icon: ServerIcon },
-  session: { titleKey: 'contextTabSession', Icon: LayersIcon },
-} as const;
-
-const TAB_ORDER = ['work', 'servers', 'session'] as const;
-type ContextTab = (typeof TAB_ORDER)[number];
-
-function isContextTab(value: string | null): value is ContextTab {
-  return value === 'work' || value === 'servers' || value === 'session';
-}
-
-function loadPinned(): boolean {
-  try {
-    return localStorage.getItem(PINNED_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function loadTab(): ContextTab | null {
-  try {
-    const stored = localStorage.getItem(TAB_KEY);
-    return isContextTab(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
-function savePinned(pinned: boolean): void {
-  try {
-    localStorage.setItem(PINNED_KEY, pinned ? '1' : '0');
-  } catch {
-    // A blocked storage only loses the pin state on reload.
-  }
-}
-
-function saveTab(tab: ContextTab): void {
-  try {
-    localStorage.setItem(TAB_KEY, tab);
-  } catch {
-    // A blocked storage only loses the open tab on reload.
-  }
-}
+type TabDescriptor = {
+  id: string;
+  title: string;
+  label: string;
+  Icon: typeof PuzzleIcon;
+};
 
 interface ContextPanelProps {
   view: ThreadView;
@@ -100,16 +70,56 @@ export function ContextPanel({
 }: ContextPanelProps) {
   const t = useT();
   const [pinned, setPinned] = useState(loadPinned);
-  const [open, setOpen] = useState<ContextTab | null>(() => (pinned ? loadTab() ?? 'work' : null));
+  const [open, setOpen] = useState<string | null>(() => (pinned ? loadTab() ?? 'work' : null));
   const [runningServers, setRunningServers] = useState(0);
+  const blocks = useSessionPluginBlocks(sessionId);
+
+  const sharedBlocks = blocks?.filter((block) => block.placement !== 'own_panel') ?? [];
+
+  const ownPlugins: { name: string; icon: ServedPluginBlock['icon']; blocks: ServedPluginBlock[] }[] = [];
+  if (blocks !== null) {
+    const byPlugin = new Map<string, ServedPluginBlock[]>();
+    for (const block of blocks) {
+      if (block.placement !== 'own_panel') continue;
+      const existing = byPlugin.get(block.plugin);
+      if (existing) existing.push(block);
+      else byPlugin.set(block.plugin, [block]);
+    }
+    for (const [name, pluginBlocks] of byPlugin) {
+      ownPlugins.push({ name, icon: pluginBlocks[0]!.icon, blocks: pluginBlocks });
+    }
+  }
+
+  const tabs: TabDescriptor[] = [
+    { id: 'work', title: t('contextTabWork'), label: t('contextTabWork'), Icon: CheckIcon },
+    { id: 'servers', title: t('contextTabServers'), label: t('contextTabServers'), Icon: ServerIcon },
+    { id: 'session', title: t('contextTabSession'), label: t('contextTabSession'), Icon: LayersIcon },
+  ];
+
+  if (sharedBlocks.length > 0) {
+    tabs.push({ id: 'plugins', title: t('panelPlugins'), label: t('panelPlugins'), Icon: PuzzleIcon });
+  }
+
+  for (const plugin of ownPlugins) {
+    tabs.push({
+      id: `plugin:${plugin.name}`,
+      title: t('pluginProvenance', { name: plugin.name }),
+      label: plugin.name,
+      Icon: PLUGIN_ICONS[plugin.icon],
+    });
+  }
+
+  // A plugin tab that is gone (or not fetched yet) shows the work tab; `open` keeps the wish.
+  const openTab = tabs.find((tab) => tab.id === open);
+  const current = open === null ? null : (openTab?.id ?? 'work');
 
   useEffect(() => {
     savePinned(pinned);
   }, [pinned]);
 
   useEffect(() => {
-    if (pinned && open) saveTab(open);
-  }, [pinned, open]);
+    if (pinned && current !== null && current === open) saveTab(current);
+  }, [pinned, current, open]);
 
   useEffect(() => {
     if (pinned || open === null) return;
@@ -122,8 +132,9 @@ export function ContextPanel({
 
   if (!hasSession || sessionId === null) return null;
 
-  const drawerTitle = t(TABS[open ?? 'work'].titleKey);
-  const DrawerIcon = TABS[open ?? 'work'].Icon;
+  const drawerTab = openTab ?? tabs[0]!;
+  const drawerTitle = drawerTab.label;
+  const DrawerIcon = drawerTab.Icon;
 
   const header = (
     <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border pl-3 pr-2">
@@ -161,7 +172,7 @@ export function ContextPanel({
 
   const bodies = (
     <>
-      <div className={open === 'work' ? undefined : 'hidden'}>
+      <div className={current === 'work' ? undefined : 'hidden'}>
         <WorkplaceSection
           sessionId={sessionId}
           worktree={worktree ?? null}
@@ -173,19 +184,26 @@ export function ContextPanel({
         <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} />
         <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} />
       </div>
-      <div className={open === 'servers' ? undefined : 'hidden'}>
+      <div className={current === 'servers' ? undefined : 'hidden'}>
         <ServersSection
           sessionId={sessionId}
           onServers={(servers: ServerView[]) => setRunningServers(servers.filter((server) => server.running).length)}
         />
       </div>
-      <div className={open === 'session' ? undefined : 'hidden'}>
+      <div className={current === 'session' ? undefined : 'hidden'}>
         <TokensSection usage={usage} />
         <DecisionsSection decisions={served.decisions} />
         <SkillsSection skills={skills} hasSession={hasSession} />
         <VisionSection images={vision} />
-        <PluginsSection sessionId={sessionId} />
       </div>
+      <div className={current === 'plugins' ? undefined : 'hidden'}>
+        <PluginsSection blocks={sharedBlocks} />
+      </div>
+      {ownPlugins.map((plugin) => (
+        <div key={plugin.name} className={current === `plugin:${plugin.name}` ? undefined : 'hidden'}>
+          <PluginOwnSection plugin={plugin.name} blocks={plugin.blocks} />
+        </div>
+      ))}
     </>
   );
 
@@ -193,7 +211,7 @@ export function ContextPanel({
     <div
       role="complementary"
       aria-label={drawerTitle}
-      className={`flex min-h-0 w-[380px] shrink-0 flex-col border-l border-border bg-panel ${open === null ? 'hidden' : ''}`}
+      className={`flex min-h-0 w-[380px] shrink-0 flex-col border-l border-border bg-panel ${current === null ? 'hidden' : ''}`}
     >
       {header}
       <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">{bodies}</div>
@@ -202,7 +220,7 @@ export function ContextPanel({
     <div
       role="dialog"
       aria-label={drawerTitle}
-      className={`absolute inset-y-0 right-full z-20 flex w-[380px] min-h-0 flex-col border-l border-border bg-panel shadow-float ${open === null ? 'hidden' : ''}`}
+      className={`absolute inset-y-0 right-full z-20 flex w-[380px] min-h-0 flex-col border-l border-border bg-panel shadow-float ${current === null ? 'hidden' : ''}`}
     >
       {header}
       <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">{bodies}</div>
@@ -214,19 +232,21 @@ export function ContextPanel({
       {pinned ? drawer : null}
       <nav aria-label={t('sessionContextLabel')} className="relative w-[52px] shrink-0 flex flex-col items-center border-l border-border bg-bg pt-2">
         {!pinned ? drawer : null}
-        {TAB_ORDER.map((tab) => {
-          const TabIcon = TABS[tab].Icon;
-          const title = t(TABS[tab].titleKey);
-          const active = open === tab;
+        {tabs.map((tab) => {
+          let status: string | undefined;
+          let statusClass: string | undefined;
+          let alert = false;
 
-          let status = '';
-          let statusClass = 'text-muted';
-          if (tab === 'work') {
+          if (tab.id === 'work') {
             const { passed, total, failed } = served.criteriaTally;
             if (total > 0) status = `${passed}/${total}`;
-            if (failed > 0) statusClass = 'text-err';
-            else if (total > 0 && passed === total) statusClass = 'text-ok';
-          } else if (tab === 'servers') {
+            if (failed > 0) {
+              statusClass = 'text-err';
+              alert = true;
+            } else if (total > 0 && passed === total) {
+              statusClass = 'text-ok';
+            }
+          } else if (tab.id === 'servers') {
             if (runningServers > 0) {
               status = `● ${runningServers}`;
               statusClass = 'text-ok';
@@ -234,23 +254,17 @@ export function ContextPanel({
           }
 
           return (
-            <button
-              key={tab}
-              type="button"
-              title={title}
-              aria-label={title}
-              aria-pressed={active}
-              onClick={() => setOpen((current) => (current === tab ? null : tab))}
-              className={`relative flex h-16 w-full flex-col items-center justify-center gap-1 ${active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-raised hover:text-text'}`}
-            >
-              {active ? <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-accent" /> : null}
-              {tab === 'work' && served.criteriaTally.failed > 0 ? (
-                <span aria-hidden className="absolute right-2 top-2 size-1.5 rounded-full bg-err" />
-              ) : null}
-              <TabIcon className="h-4 w-4" />
-              <span className="text-[10px] leading-none">{title}</span>
-              <span className={`text-[10px] leading-none font-mono tabular-nums ${statusClass}`}>{status}</span>
-            </button>
+            <RailTab
+              key={tab.id}
+              title={tab.title}
+              label={tab.label}
+              Icon={tab.Icon}
+              active={current === tab.id}
+              status={status}
+              statusClass={statusClass}
+              alert={alert}
+              onClick={() => setOpen(current === tab.id ? null : tab.id)}
+            />
           );
         })}
       </nav>

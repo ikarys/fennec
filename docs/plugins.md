@@ -17,6 +17,10 @@ the prompt, the tools or a log. Plugins are global, never read from a project.
 
 - `name`: letters, digits, `-`, `_`; the code lives in `~/.agents/plugins/<name>/`.
 - `command`, `args`: run with that directory as the working directory.
+- `icon` (optional): the icon of the plugin's own tab in the session's context rail, a name from
+  fennec's set: `activity`, `alert`, `bell`, `branch`, `check`, `clock`, `cpu`, `eye`, `file`,
+  `globe`, `layers`, `server`, `terminal`, `tokens`, `puzzle` (the default, and what an unknown
+  name becomes). A plugin never ships an image.
 - `blocks`: what the plugin may show. Each block has a `scope` — `session` (per session),
   `project` (one block per project), or `global` (the whole server, the default) — and an optional
   `placement`, which picks the surface within that scope (its default is the scope's, below). An
@@ -24,8 +28,8 @@ the prompt, the tools or a log. Plugins are global, never read from a project.
 
 | scope | placement (default first) | where it shows |
 | --- | --- | --- |
-| `session` | `panel` (default) | the session's right-hand context panel, in the shared "Plugins" panel |
-| `session` | `own_panel` | that right-hand panel, in a panel of its own |
+| `session` | `panel` (default) | the "Plugins" tab of the session's context rail (shown while it has a block) |
+| `session` | `own_panel` | a rail tab of the plugin's own, with its `icon`, one panel per block |
 | `session` | `status_bar` | the app's bottom status bar while that session is on screen |
 | `project` | `dashboard` (default) | a section of the project page's dashboard |
 | `project` | `status_bar` | the status bar while a page or session of that project is on screen |
@@ -33,7 +37,8 @@ the prompt, the tools or a log. Plugins are global, never read from a project.
 | `global` | `status_bar` | the status bar, everywhere |
 
 Then enable it on Settings → Plugins. Editing the definition or any file in its directory
-deactivates it until the human enables it again (SHA-256 of definition and code).
+deactivates it until the human enables it again (SHA-256 of the command, arguments, environment
+and code; the blocks and the icon only choose where data shows).
 
 ## The world it runs in
 
