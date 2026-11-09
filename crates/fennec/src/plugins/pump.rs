@@ -4,6 +4,7 @@
 //! seen for the first time is not replayed: its high-water starts at its
 //! current last seq.
 
+use crate::domain::resources::{self, ProcessSample};
 use crate::notifier::Notifier;
 use crate::plugins::PluginManager;
 use crate::store::SqliteStore;
@@ -11,7 +12,10 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+/// How often the resource figures go to the plugins that asked.
+const RESOURCES_EVERY: Duration = Duration::from_secs(5);
 
 /// Run the pump on its own thread until `stop` is set.
 pub fn run(
@@ -26,6 +30,8 @@ pub fn run(
     let mut high_water = HashMap::new();
     // The first pass starts the active plugins; later ones wait for an append.
     let mut seen = None;
+    let mut previous: Option<ProcessSample> = None;
+    let mut last_tick = Instant::now();
     loop {
         if stop.load(Ordering::Relaxed) {
             break;
@@ -35,6 +41,17 @@ pub fn run(
         }
         if stop.load(Ordering::Relaxed) {
             break;
+        }
+        // The tick costs nothing without a plugin that asked (no /proc read).
+        if last_tick.elapsed() >= RESOURCES_EVERY {
+            last_tick = Instant::now();
+            let wants = manager.wants_resources();
+            if !wants {
+                previous = None;
+            } else if let Some(current) = crate::resources::sample() {
+                manager.push_resources(&resources::figures(previous.as_ref(), &current));
+                previous = Some(current);
+            }
         }
         // The timeout only checks `stop`: scanning every session each second
         // with nothing appended cost an idle server a few percent of a core.

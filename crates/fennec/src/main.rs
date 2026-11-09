@@ -23,6 +23,7 @@ mod module_map;
 mod notifier;
 mod plugins;
 mod protected;
+mod resources;
 mod risk;
 mod sandbox;
 mod scanners;

@@ -58,7 +58,12 @@ JSON-RPC 2.0, one JSON object per line, over stdin/stdout.
    `event` is a **string**: the stored event JSON, `{"type": "...", "data": {...}}`; for
    `tool.call`, the tool's name is at `data.toolCall.name`. A session's history before the
    plugin started is not replayed.
-3. The plugin sends blocks whenever it likes:
+3. fennec's own resources: a plugin whose `init` result also holds `"resources": true` gets,
+   every 5 s,
+   `{"jsonrpc":"2.0","method":"resources","params":{"rssBytes":<resident memory in bytes>,"cpuPercent":<CPU % of one core since the previous message, or null on the first>}}`.
+   fennec measures its own process only (not the commands and plugins it starts), on Linux;
+   elsewhere no message is sent. A plugin that did not ask costs nothing.
+4. The plugin sends blocks whenever it likes:
    `{"jsonrpc":"2.0","method":"block.update","params":{"block":"tools","session":"<sessionId>","project":"<projectId>","content":{"elements":[...]}}}`
    (`session` for a `session` block, `project` for a `project` block, neither for a `global` one).
    Each update replaces the block's content. Elements:
@@ -99,3 +104,11 @@ for line in sys.stdin:
         send({"jsonrpc": "2.0", "method": "block.update", "params": {
               "block": "tools", "session": params["sessionId"], "content": {"elements": elements}}})
 ```
+
+## A second example: fennec's resources
+
+`examples/plugins/resources/resources.py` asks for fennec's own resources and places a global
+block in the status bar. Copy the `examples/plugins/resources/` directory to
+`~/.agents/plugins/resources/`, add the definition from its `plugin.json` to
+`~/.agents/plugins.json`, and enable it on Settings → Plugins. It shows fennec's resident
+memory and CPU, measured by fennec's own process on Linux.

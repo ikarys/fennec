@@ -9,6 +9,7 @@ pub mod host;
 pub mod pump;
 
 use crate::domain::plugin::{BlockKey, BlockScope, Placement, PluginDef, ServedPluginBlock};
+use crate::domain::resources::ResourceFigures;
 use crate::notifier::Notifier;
 use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
@@ -139,6 +140,23 @@ impl PluginManager {
                 managed
                     .host
                     .push_event(project_id, session_id, seq, event_type, payload);
+            }
+        }
+    }
+
+    /// Whether any running host asked for fennec's resource figures.
+    pub fn wants_resources(&self) -> bool {
+        crate::locks::lock(&self.hosts)
+            .as_ref()
+            .is_some_and(|hosts| hosts.iter().any(|managed| managed.host.wants_resources()))
+    }
+
+    /// Send fennec's resource figures to the hosts that asked for them.
+    pub fn push_resources(&self, figures: &ResourceFigures) {
+        let hosts = crate::locks::lock(&self.hosts);
+        if let Some(managed) = hosts.as_ref() {
+            for managed in managed {
+                managed.host.push_resources(figures);
             }
         }
     }
