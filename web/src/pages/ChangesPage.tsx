@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
-import { ChevronsLeftIcon, ExternalIcon } from '../components/ui/Icons';
+import { BranchIcon, ChevronsLeftIcon, ExternalIcon, FileIcon } from '../components/ui/Icons';
 import { SIGNAL_KEYS } from '../components/session/IntegrationReview';
 
 export default function ChangesPage({ sessionId }: { sessionId: string }) {
@@ -92,6 +92,9 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
         >
           <ChevronsLeftIcon className="h-4 w-4" />
         </Button>
+        <span className="grid size-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+          <BranchIcon className="h-3.5 w-3.5" />
+        </span>
         <h1 className="text-sm font-semibold">{t('changesTitle')}</h1>
         {integration?.branch ? <span className="font-mono text-xs text-muted">{integration.branch}</span> : null}
         {integration ? <Badge tone="ok" title={t('verifiedFromLog')}>{t('verified')}</Badge> : null}
@@ -99,9 +102,8 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
       <div className="flex min-h-0 grow gap-3">
         <div className="w-96 shrink-0 overflow-y-auto">
           <ListCard title={t('panelModifiedFiles')} count={files.length}>
-            {integrationError ? (
-              <div className="px-4 py-2 text-xs text-muted">{integrationError}</div>
-            ) : !integration ? (
+            {/* An error is told once, in the diff card's empty state. */}
+            {integrationError ? null : !integration ? (
               <div className="px-4 py-2 text-xs text-muted">{t('loading')}</div>
             ) : (
               files.map((file) => {
@@ -148,68 +150,81 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
           </ListCard>
         </div>
         <Card className="flex min-w-0 grow flex-col overflow-hidden">
-          <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2.5">
-            <span className="grow truncate font-mono text-sm" title={selectedPath ?? ''}>
-              {selectedPath}
-            </span>
-            {selectedFile ? (
-              <>
-                <span className="text-xs text-ok tabular-nums">+{selectedFile.added}</span>
-                <span className="text-xs text-err tabular-nums">−{selectedFile.removed}</span>
-              </>
-            ) : null}
-            {diff ? (
-              <a
-                href={diff.editorUrl}
-                className="ml-auto rounded-md p-1 text-muted hover:bg-raised hover:text-accent"
-                title={openInEditor}
-                aria-label={openInEditor}
-              >
-                <ExternalIcon className="h-3.5 w-3.5" />
-              </a>
-            ) : null}
-          </div>
-          <div className="grow overflow-auto">
-            {diffLoading ? (
-              <div className="px-4 py-2 text-xs text-muted">{t('loading')}</div>
-            ) : diffError ? (
-              <div className="px-4 py-2 text-xs text-muted">{diffError}</div>
-            ) : diff?.binary ? (
-              <div className="px-4 py-2 text-xs text-muted">{t('diffBinary')}</div>
-            ) : diff && diff.hunks.length === 0 ? (
-              <div className="px-4 py-2 text-xs text-muted">{t('diffEmpty')}</div>
-            ) : diff ? (
-              <>
-                <table className="w-full border-collapse font-mono text-xs">
-                  <tbody>
-                    {diff.hunks.map((hunk, hunkIndex) => (
-                      <Fragment key={hunkIndex}>
-                        <tr>
-                          <td colSpan={3} className="bg-raised px-3 py-1 text-muted">
-                            {hunk.header ? `@@ ${hunk.header}` : '@@'}
-                          </td>
-                        </tr>
-                        {hunk.lines.map((line, lineIndex) => (
-                          <tr
-                            key={lineIndex}
-                            className={line.kind === 'added' ? 'bg-add-bg' : line.kind === 'removed' ? 'bg-del-bg' : ''}
-                          >
-                            <td className="w-12 select-none px-2 text-right text-faint tabular-nums">{line.old ?? ''}</td>
-                            <td className="w-12 select-none px-2 text-right text-faint tabular-nums">{line.new ?? ''}</td>
-                            <td className="whitespace-pre px-3">
-                              <span className="select-none">{line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' '}</span>
-                              {line.text}
-                            </td>
-                          </tr>
+          {selectedPath === null ? (
+            <div className="flex grow flex-col items-center justify-center gap-3 p-8 text-center">
+              <span className="grid size-10 place-items-center rounded-lg bg-accent-soft text-accent">
+                <FileIcon className="h-5 w-5" />
+              </span>
+              <p className="max-w-xs text-sm text-muted">
+                {integrationError ?? (integration && files.length === 0 ? t('changesNoFiles') : t('changesPickFile'))}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2.5">
+                <span className="grow truncate font-mono text-sm" title={selectedPath ?? ''}>
+                  {selectedPath}
+                </span>
+                {selectedFile ? (
+                  <>
+                    <span className="text-xs text-ok tabular-nums">+{selectedFile.added}</span>
+                    <span className="text-xs text-err tabular-nums">−{selectedFile.removed}</span>
+                  </>
+                ) : null}
+                {diff ? (
+                  <a
+                    href={diff.editorUrl}
+                    className="ml-auto rounded-md p-1 text-muted hover:bg-accent-soft hover:text-accent"
+                    title={openInEditor}
+                    aria-label={openInEditor}
+                  >
+                    <ExternalIcon className="h-3.5 w-3.5" />
+                  </a>
+                ) : null}
+              </div>
+              <div className="grow overflow-auto">
+                {diffLoading ? (
+                  <div className="px-4 py-2 text-xs text-muted">{t('loading')}</div>
+                ) : diffError ? (
+                  <div className="px-4 py-2 text-xs text-muted">{diffError}</div>
+                ) : diff?.binary ? (
+                  <div className="px-4 py-2 text-xs text-muted">{t('diffBinary')}</div>
+                ) : diff && diff.hunks.length === 0 ? (
+                  <div className="px-4 py-2 text-xs text-muted">{t('diffEmpty')}</div>
+                ) : diff ? (
+                  <>
+                    <table className="w-full border-collapse font-mono text-xs">
+                      <tbody>
+                        {diff.hunks.map((hunk, hunkIndex) => (
+                          <Fragment key={hunkIndex}>
+                            <tr>
+                              <td colSpan={3} className="bg-info-soft px-3 py-1 text-info">
+                                {hunk.header ? `@@ ${hunk.header}` : '@@'}
+                              </td>
+                            </tr>
+                            {hunk.lines.map((line, lineIndex) => (
+                              <tr
+                                key={lineIndex}
+                                className={line.kind === 'added' ? 'bg-add-bg' : line.kind === 'removed' ? 'bg-del-bg' : ''}
+                              >
+                                <td className="w-12 select-none px-2 text-right text-faint tabular-nums">{line.old ?? ''}</td>
+                                <td className="w-12 select-none px-2 text-right text-faint tabular-nums">{line.new ?? ''}</td>
+                                <td className="whitespace-pre px-3">
+                                  <span className="select-none">{line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' '}</span>
+                                  {line.text}
+                                </td>
+                              </tr>
+                            ))}
+                          </Fragment>
                         ))}
-                      </Fragment>
-                    ))}
-                  </tbody>
-                </table>
-                {diff.truncated ? <div className="px-4 py-2 text-xs text-muted">{t('diffTruncated')}</div> : null}
-              </>
-            ) : null}
-          </div>
+                      </tbody>
+                    </table>
+                    {diff.truncated ? <div className="px-4 py-2 text-xs text-muted">{t('diffTruncated')}</div> : null}
+                  </>
+                ) : null}
+              </div>
+            </>
+          )}
         </Card>
       </div>
     </div>
