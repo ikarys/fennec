@@ -101,6 +101,16 @@ pub fn launchd_plist(exe: &str, path: &str, log: &str) -> Result<String, String>
     ))
 }
 
+/// mise installs each version in its own folder and prunes the old ones: a
+/// service tied to one would stop starting after an upgrade. `latest` is the
+/// link mise keeps up to date; whether it is this binary is the adapter's check.
+pub fn mise_latest(exe: &str) -> Option<String> {
+    let (root, rest) = exe.rsplit_once("/installs/")?;
+    let mut parts = rest.splitn(3, '/');
+    let (tool, _version, file) = (parts.next()?, parts.next()?, parts.next()?);
+    Some(format!("{root}/installs/{tool}/latest/{file}"))
+}
+
 pub fn systemctl_args(control: Control) -> Vec<String> {
     vec!["--user".into(), control.verb().into(), SYSTEMD_UNIT.into()]
 }
@@ -157,6 +167,16 @@ mod tests {
     fn a_plist_path_cannot_close_its_element() {
         let plist = launchd_plist("/a</string>&/fennec", "/bin", "/log").unwrap();
         assert!(plist.contains("<string>/a&lt;/string&gt;&amp;/fennec</string>"));
+    }
+
+    #[test]
+    fn a_mise_install_is_reached_through_its_latest_link() {
+        assert_eq!(
+            mise_latest("/h/.local/share/mise/installs/github-x-fennec/0.2.2/fennec").unwrap(),
+            "/h/.local/share/mise/installs/github-x-fennec/latest/fennec"
+        );
+        assert_eq!(mise_latest("/home/me/.local/bin/fennec"), None);
+        assert_eq!(mise_latest("/installs/fennec"), None);
     }
 
     #[test]

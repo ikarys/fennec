@@ -50,7 +50,7 @@ just check
 
 ## Run as a service
 
-If you installed fennec another way (mise, by hand), `fennec service install` sets the service up; `fennec service start|stop|restart` controls it ([command line](cli.md)).
+If you installed fennec another way (mise, by hand), `fennec service install` sets the service up; `fennec service start|stop|restart` controls it ([command line](cli.md)). With mise, the service follows mise's `latest` link: run `fennec service restart` after `mise upgrade`.
 
 On Linux, `install.sh` writes a systemd user service at `~/.config/systemd/user/fennec.service` and starts it. It is never overwritten once present. Set `FENNEC_SERVICE=none` to skip it. Without a systemd user session, run `fennec serve` yourself. If you use model environment variables, put them in the unit as `Environment=` lines.
 

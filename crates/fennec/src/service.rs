@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::domain::service::{
-    Control, LAUNCHD_LABEL, SYSTEMD_UNIT, launchctl_args, launchd_plist, systemctl_args,
-    systemd_unit,
+    Control, LAUNCHD_LABEL, SYSTEMD_UNIT, launchctl_args, launchd_plist, mise_latest,
+    systemctl_args, systemd_unit,
 };
 use crate::folders::home;
 
@@ -91,9 +91,15 @@ fn own_binary() -> Result<String, String> {
     let exe = exe
         .canonicalize()
         .map_err(|e| format!("could not resolve {}: {e}", exe.display()))?;
-    exe.to_str()
+    let exe_text = exe
+        .to_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("{} is not valid UTF-8", exe.display()))
+        .ok_or_else(|| format!("{} is not valid UTF-8", exe.display()))?;
+    // A version pinned below the latest, or an `installs` folder that is not mise's, stays as is.
+    let same_binary = |link: &String| Path::new(link).canonicalize().is_ok_and(|p| p == exe);
+    Ok(mise_latest(&exe_text)
+        .filter(same_binary)
+        .unwrap_or(exe_text))
 }
 
 fn systemd_unit_file() -> PathBuf {
