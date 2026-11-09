@@ -182,7 +182,7 @@ fennec/src/tools/path_guard.rs                        723                34    9
 fennec/src/tools/read_file.rs                         252                30    88.10%           7                 1    85.71%         147                23    84.35%           0                 0         -
 fennec/src/tools/rule_request.rs                      303                 0   100.00%          17                 0   100.00%         201                 0   100.00%           0                 0         -
 fennec/src/tools/run_command.rs                       292                60    79.45%          11                 1    90.91%         168                30    82.14%           0                 0         -
-fennec/src/tools/run_command/process.rs               162                25    84.57%          10                 4    60.00%         122                15    87.70%           0                 0         -
+fennec/src/tools/run_command/process.rs               162                21    87.04%          10                 4    60.00%         122                13    89.34%           0                 0         -
 fennec/src/tools/run_command/report.rs                259                66    74.52%          12                 1    91.67%         153                41    73.20%           0                 0         -
 fennec/src/tools/test_support.rs                       34                 0   100.00%           5                 0   100.00%          30                 0   100.00%           0                 0         -
 fennec/src/tools/web_fetch.rs                         525                26    95.05%          33                 4    87.88%         289                17    94.12%           0                 0         -
@@ -275,4 +275,4 @@ token-usage/src/ledger.rs                             553                54    9
 token-usage/src/lib.rs                                 11                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
 token-usage/src/query.rs                             1054                62    94.12%          42                 1    97.62%         535                10    98.13%           0                 0         -
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                                               90780             17098    81.17%        5467               952    82.59%       54990              9009    83.62%           0                 0         -
+TOTAL                                               90780             17094    81.17%        5467               952    82.59%       54990              9007    83.62%           0                 0         -
