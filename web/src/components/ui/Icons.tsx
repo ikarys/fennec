@@ -683,3 +683,41 @@ export function KeyIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+/** A bar chart: the insight page. */
+export function InsightIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 3v18h18" />
+      <path d="M8 17v-5" />
+      <path d="M13 17v-9" />
+      <path d="M18 17v-3" />
+    </Svg>
+  );
+}
+
+/** Connected nodes: the workflows page. */
+export function WorkflowsIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="12" cy="18" r="3" />
+      <path d="M6 9v3a3 3 0 003 3h6a3 3 0 003-3V9" />
+    </Svg>
+  );
+}
+
+/** Checklist rows: the backlog page. */
+export function BacklogIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 6l2 2 3-3" />
+      <path d="M3 13l2 2 3-3" />
+      <path d="M3 20l2 2 3-3" />
+      <path d="M13 6h8" />
+      <path d="M13 13h8" />
+      <path d="M13 20h8" />
+    </Svg>
+  );
+}
