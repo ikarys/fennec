@@ -80,7 +80,11 @@ pub fn checks(facts: &Facts) -> Vec<Check> {
         } => Check {
             id: CheckId::Model,
             status: CheckStatus::Todo,
-            detail: Some(format!("{model} is not served by {base_url}")),
+            detail: Some(if model.is_empty() {
+                format!("no model chosen for {base_url}")
+            } else {
+                format!("{model} is not served by {base_url}")
+            }),
         },
         ModelFact::Unreachable { error } => Check {
             id: CheckId::Model,
@@ -220,6 +224,22 @@ mod tests {
         assert_eq!(
             checks[0].detail.as_deref(),
             Some("gpt is not served by http://example")
+        );
+    }
+
+    #[test]
+    fn endpoint_without_a_model_says_none_is_chosen() {
+        let mut facts = good();
+        facts.model = ModelFact::Reachable {
+            model: String::new(),
+            listed: false,
+            base_url: "http://example".into(),
+        };
+        let checks = checks(&facts);
+        assert_eq!(checks[0].status, CheckStatus::Todo);
+        assert_eq!(
+            checks[0].detail.as_deref(),
+            Some("no model chosen for http://example")
         );
     }
 
