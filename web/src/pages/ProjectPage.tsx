@@ -20,7 +20,9 @@ import {
   type ProjectOverview,
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
+import { useOpenInEditorLabel } from '../lib/editors';
 import { useT } from '../i18n';
+
 
 const TABS = [
   { id: 'overview', label: 'tasksTabOverview' },
@@ -108,6 +110,7 @@ export default function ProjectPage({
   onSessionsDeleted: (ids: string[]) => void;
 }) {
   const t = useT();
+  const openInEditor = useOpenInEditorLabel();
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -160,8 +163,8 @@ export default function ProjectPage({
         </Button>
         <a
           href={project.editorUrl}
-          title={t('openInVsCode')}
-          aria-label={t('openInVsCode')}
+          title={openInEditor}
+          aria-label={openInEditor}
           className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
         >
           <ExternalIcon className="h-4 w-4" />

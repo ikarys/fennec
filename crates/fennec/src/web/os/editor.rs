@@ -1,13 +1,15 @@
-//! The link that opens a directory in the human's VS Code. Under WSL the
-//! browser runs on Windows: a plain `vscode://file/` link would name a Windows
-//! path, so the link goes through VS Code's WSL remote instead.
+//! The link that opens a directory in the human's IDE. Under WSL the browser
+//! runs on Windows: a plain `<scheme>://file/` link would name a Windows path,
+//! so the link goes through the IDE's WSL remote instead.
 
-/// `vscode://` link to `path`; `wsl_distro` is `WSL_DISTRO_NAME` when set.
-pub(crate) fn vscode_link(path: &str, wsl_distro: Option<&str>) -> String {
+use crate::domain::editor::Editor;
+
+/// `editor.scheme()`:// link to `path`; `wsl_distro` is `WSL_DISTRO_NAME` when set.
+pub(crate) fn link(editor: Editor, path: &str, wsl_distro: Option<&str>) -> String {
     let encoded = encode_path(path);
     match wsl_distro.filter(|distro| !distro.is_empty()) {
-        Some(distro) => format!("vscode://vscode-remote/wsl+{distro}{encoded}"),
-        None => format!("vscode://file{encoded}"),
+        Some(distro) => format!("{}://vscode-remote/wsl+{distro}{encoded}", editor.scheme()),
+        None => format!("{}://file{encoded}", editor.scheme()),
     }
 }
 
@@ -32,13 +34,17 @@ mod tests {
     #[test]
     fn links_go_through_the_wsl_remote_when_under_wsl() {
         assert_eq!(
-            vscode_link("/home/t/a b", Some("Ubuntu")),
+            link(Editor::Vscode, "/home/t/a b", Some("Ubuntu")),
             "vscode://vscode-remote/wsl+Ubuntu/home/t/a%20b"
         );
         assert_eq!(
-            vscode_link("/home/t/x#1", None),
+            link(Editor::Vscode, "/home/t/x#1", None),
             "vscode://file/home/t/x%231"
         );
-        assert_eq!(vscode_link("/p", Some("")), "vscode://file/p");
+        assert_eq!(link(Editor::Vscode, "/p", Some("")), "vscode://file/p");
+        assert_eq!(
+            link(Editor::Cursor, "/p", Some("Ubuntu")),
+            "cursor://vscode-remote/wsl+Ubuntu/p"
+        );
     }
 }

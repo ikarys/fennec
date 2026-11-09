@@ -25,6 +25,7 @@ pub mod decision;
 pub mod diff;
 pub mod doc;
 pub mod drift;
+pub mod editor;
 pub mod event;
 pub mod frontmatter;
 pub mod id;

@@ -17,6 +17,8 @@ export interface PanelPage {
   blocks: string[];
 }
 
+export type EditorId = 'vscode' | 'vscode-insiders' | 'cursor' | 'windsurf' | 'vscodium';
+
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
@@ -26,6 +28,8 @@ export interface DisplayPrefs {
   panelPages: PanelPage[] | null;
   /** The UI's display language (server default "en"). */
   language?: 'en' | 'fr';
+  /** The IDE the "open in editor" links open (server default "vscode"). */
+  editor?: EditorId;
 }
 
 export interface SearchPrefs {

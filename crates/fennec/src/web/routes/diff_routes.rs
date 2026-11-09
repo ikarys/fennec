@@ -39,7 +39,8 @@ pub fn get_diff(
     };
 
     let file_diff = diff::file_diff(&raw);
-    let editor_url = crate::web::os::editor::vscode_link(
+    let editor_url = crate::web::os::editor::link(
+        store.preferences()?.display.editor,
         &wt.path.join(&path).to_string_lossy(),
         std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
     );

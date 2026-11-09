@@ -9,7 +9,9 @@ import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { Panel } from '../ui/Panel';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useOpenInEditorLabel } from '../../lib/editors';
 import { useT } from '../../i18n';
+
 
 function shortFolderName(path: string): string {
   const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -27,6 +29,7 @@ function shortAgentBranch(branch: string): string {
 
 export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarded, integrationVersion }: { sessionId: string | null; worktree: NonNullable<SessionDetail['worktree']> | null; running: boolean; onDiscarded: () => void; integrationVersion: number }) {
   const t = useT();
+  const openInEditor = useOpenInEditorLabel();
   const [preview, setPreview] = useState<IntegrationPreview | null>(null);
   const [repo, setRepo] = useState<RepoState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -226,8 +229,8 @@ export function AgentWorkspaceSection({ sessionId, worktree, running, onDiscarde
                 <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                   <a
                     href={worktree.editorUrl}
-                    title={t('openInVsCode')}
-                    aria-label={t('openInVsCode')}
+                    title={openInEditor}
+                    aria-label={openInEditor}
                     className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
                   >
                     <ExternalIcon className="h-3.5 w-3.5" />
