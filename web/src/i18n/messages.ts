@@ -251,6 +251,7 @@ export const en = {
   decisionAnswer: 'Answer',
   questionChoices: '{count} choices',
   approvalBadge: 'Approval',
+  workflowBadge: 'Workflow',
   verifyLine: 'Verify: {verify}',
   doneWhen: 'Done when',
   risksLabel: 'Risks',
@@ -1290,7 +1291,7 @@ export const en = {
   nodePanelOutcomeLabel: 'Outcome',
   nodePanelOutcomeBlocked: 'blocked',
   nodePanelDeleteNode: 'Delete the node',
-  // components/workflow/session/RunActionCard.tsx
+  // components/workflow/session/RunDecision.tsx
   runActionCardCommentPlaceholder: 'Comment (optional)…',
   runActionCardPausedBefore: 'Paused before “{toLabel}”',
   runActionCardContinue: 'Continue',
@@ -1705,6 +1706,7 @@ export const fr: Record<MsgKey, string> = {
   decisionAnswer: 'Répondre',
   questionChoices: '{count} choix',
   approvalBadge: 'Approbation',
+  workflowBadge: 'Workflow',
   verifyLine: 'Vérif. : {verify}',
   doneWhen: 'Terminé quand',
   risksLabel: 'Risques',
@@ -2748,7 +2750,7 @@ export const fr: Record<MsgKey, string> = {
   nodePanelOutcomeLabel: 'Issue',
   nodePanelOutcomeBlocked: 'bloqué',
   nodePanelDeleteNode: 'Supprimer le nœud',
-  // components/workflow/session/RunActionCard.tsx
+  // components/workflow/session/RunDecision.tsx
   runActionCardCommentPlaceholder: 'Commentaire (optionnel)…',
   runActionCardPausedBefore: 'En pause avant « {toLabel} »',
   runActionCardContinue: 'Continuer',

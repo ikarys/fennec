@@ -72,7 +72,8 @@ export function DecisionRow({
   onToggle: () => void;
   footer: ReactNode;
   danger?: boolean;
-  children: ReactNode;
+  /** The opened row's content; a row whose title says it all has none. */
+  children?: ReactNode;
 }) {
   const handleToggle = (event: ReactMouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('button')) return;
@@ -110,8 +111,8 @@ export function DecisionRow({
       </div>
       {open && (
         <div className="border-t border-border">
-          <div className="max-h-[40vh] overflow-y-auto py-2.5 pr-3.5 pl-11 text-sm text-prose">{children}</div>
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-bg py-1.5 pr-2.5 pl-11">{footer}</div>
+          {children && <div className="max-h-[40vh] overflow-y-auto py-2.5 pr-3.5 pl-11 text-sm text-prose">{children}</div>}
+          <div className={`flex flex-wrap items-center gap-1.5 bg-bg py-1.5 pr-2.5 pl-11 ${children ? 'border-t border-border' : ''}`}>{footer}</div>
         </div>
       )}
     </div>

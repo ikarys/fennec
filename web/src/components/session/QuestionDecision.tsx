@@ -10,13 +10,7 @@ import { markdownComponents } from './markdownComponents';
 import { ReplyIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { useT } from '../../i18n';
-
-function questionTitle(question: PendingQuestion): string {
-  return question.question
-    .split('\n')
-    .map((line) => line.replace(/[#*_`]/g, '').trim())
-    .find((line) => line.length > 0) ?? '';
-}
+import { splitTitle } from '../../lib/titleLine';
 
 export function QuestionDecision({
   question,
@@ -32,7 +26,7 @@ export function QuestionDecision({
   onToggle: () => void;
 }) {
   const t = useT();
-  const title = questionTitle(question);
+  const { title, rest } = splitTitle(question.question);
   const meta = question.type === 'choice'
     ? `${t('questionHeader')} · ${t('questionChoices', { count: question.options.length })}`
     : t('questionHeader');
@@ -97,14 +91,14 @@ export function QuestionDecision({
         )
       }
     >
-      <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {question.question}
-        </ReactMarkdown>
-      </div>
-      {question.type !== 'text' && (
-        <div className="mt-2 text-xs text-faint">{t('answerFreely')}</div>
+      {rest && (
+        <div className="mb-2 min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {rest}
+          </ReactMarkdown>
+        </div>
       )}
+      {question.type !== 'text' && <div className="text-xs text-faint">{t('answerFreely')}</div>}
     </DecisionRow>
   );
 }

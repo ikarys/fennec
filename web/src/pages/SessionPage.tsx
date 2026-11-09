@@ -41,7 +41,7 @@ import { QuestionDecision } from "../components/session/QuestionDecision";
 import { ApprovalDecision } from "../components/session/ApprovalDecision";
 import { WaiverDecision } from "../components/session/WaiverDecision";
 import { QueuedMessages } from "../components/session/QueuedMessages";
-import { RetryCard } from "../components/session/RetryCard";
+import { RetryDecision } from "../components/session/RetryDecision";
 import { ThreadItemView } from "../components/session/Thread";
 import { PendingPlanContext, planAnchorId } from "../components/session/PendingPlan";
 import { DecisionBar } from "../components/session/DecisionBar";
@@ -68,7 +68,7 @@ import { CanvasPane } from "../components/canvas/CanvasPane";
 import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
 import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
 import { RunRail } from "../components/workflow/session/RunRail";
-import { RunActionCard } from "../components/workflow/session/RunActionCard";
+import { RunDecision } from "../components/workflow/session/RunDecision";
 import { Button, buttonClass } from "../components/ui/Button";
 import {
   DEFAULT_WORKFLOW_ID,
@@ -353,11 +353,21 @@ export function SessionPage({
     approval: answerable ? served.pendingApproval : null,
     waiver: answerable ? served.pendingWaiver : null,
     question: answerable ? view.pendingQuestion : null,
+    run: waiting && !detail?.parentId ? waiting : null,
+    retry: answerable && view.lastDone === "error" && !view.pendingQuestion,
   };
+  const runDecisionId = blocking.run
+    ? `run-${blocking.run.kind === "human" ? blocking.run.nodeId : blocking.run.kind}`
+    : null;
   const decisionCount =
-    [blocking.approval, blocking.waiver, blocking.question].filter(Boolean).length +
+    [blocking.approval, blocking.waiver, blocking.question, blocking.run, blocking.retry].filter(Boolean).length +
     (!detail?.parentId && pendingPlan && planActions ? 1 : 0);
-  const blockingId = blocking.approval?.callId ?? blocking.waiver?.callId ?? blocking.question?.callId ?? null;
+  const blockingId =
+    blocking.approval?.callId ??
+    blocking.waiver?.callId ??
+    blocking.question?.callId ??
+    runDecisionId ??
+    (blocking.retry ? "retry" : null);
   // A blocking decision opens on arrival: the agent waits on it.
   useEffect(() => {
     if (blockingId) setOpenDecision(blockingId);
@@ -757,25 +767,6 @@ export function SessionPage({
                       </div>
                     </div>
 
-                    {waiting && !detail?.parentId && (
-                      <RunActionCard
-                        waiting={waiting}
-                        onAnswer={handleAnswerWorkflow}
-                        onContinue={handleContinueWorkflow}
-                        onResume={handleResumeWorkflow}
-                        onStop={handleStopWorkflow}
-                        disabled={running}
-                        comment={runComment}
-                        onCommentChange={setRunComment}
-                      />
-                    )}
-                    {view.lastDone === "error" &&
-                      !running &&
-                      !view.pendingQuestion &&
-                      !waiting &&
-                      !detail?.parentId && (
-                        <RetryCard onRetry={handleRetry} disabled={running} />
-                      )}
                     {/* A node's session is driven by its workflow: the human answers in the parent. */}
                     {detail?.parentId && (
                       <div className="mx-auto flex max-w-page items-center gap-3 border-t border-border px-1 py-2">
@@ -839,6 +830,28 @@ export function SessionPage({
                             disabled={running}
                             open={openDecision === blocking.question.callId}
                             onToggle={() => toggleDecision(blocking.question!.callId)}
+                          />
+                        )}
+                        {blocking.run && runDecisionId && (
+                          <RunDecision
+                            waiting={blocking.run}
+                            onAnswer={handleAnswerWorkflow}
+                            onContinue={handleContinueWorkflow}
+                            onResume={handleResumeWorkflow}
+                            onStop={handleStopWorkflow}
+                            disabled={running}
+                            comment={runComment}
+                            onCommentChange={setRunComment}
+                            open={openDecision === runDecisionId}
+                            onToggle={() => toggleDecision(runDecisionId)}
+                          />
+                        )}
+                        {blocking.retry && (
+                          <RetryDecision
+                            onRetry={handleRetry}
+                            disabled={running}
+                            open={openDecision === "retry"}
+                            onToggle={() => toggleDecision("retry")}
                           />
                         )}
                         {!detail?.parentId && pendingPlan && planActions && (

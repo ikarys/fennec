@@ -281,5 +281,6 @@ the discussion goes on; a row opens in place on the whole plan. The server folds
 plan card stays the record, marked pending. A plan marked idea ready leaves the bar for a note (the queue runs it;
 `handedPlan`, `web/views/thread_view.rs`), with a link to the project's tasks and a take-back while it waits (`web/src/components/session/DecisionBar.tsx`, `PlanDecision.tsx`).
 What blocks the agent joins the same bar, above the plan and opened on arrival: the model's question, the rule
-approval and the protected-file waiver, each folded to its primary action (`QuestionDecision.tsx`,
-`ApprovalDecision.tsx`, `WaiverDecision.tsx`).
+approval, the protected-file waiver, the workflow waiting on the human and the retry after an error, each
+folded to its primary action (`QuestionDecision.tsx`, `ApprovalDecision.tsx`, `WaiverDecision.tsx`,
+`workflow/session/RunDecision.tsx`, `RetryDecision.tsx`).
