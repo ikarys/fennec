@@ -3,7 +3,7 @@
  * optional summary, and a rotating chevron. Open state is remembered per section.
  */
 import { useState, type ReactNode } from 'react';
-import { ChevronRightIcon } from './Icons';
+import { ChevronRightIcon, InfoIcon } from './Icons';
 import type { BadgeTone } from './Badge';
 
 /** The header's block icon carries the block's state; neutral stays quiet. */
@@ -46,10 +46,12 @@ export interface PanelProps {
   icon?: ReactNode;
   /** The state the block's icon reports; neutral when the block has no state to report. */
   iconTone?: BadgeTone;
+  /** What the block is for, behind an info icon next to the title. */
+  hint?: string;
   children: ReactNode;
 }
 
-export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone = 'neutral', children }: PanelProps) {
+export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone = 'neutral', hint, children }: PanelProps) {
   const [open, setOpen] = useState(() => loadOpen(id, defaultOpen));
 
   return (
@@ -69,6 +71,11 @@ export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone =
           </span>
         ) : null}
         <h3 className="m-0 text-[11px] font-semibold text-muted group-hover:text-text">{title}</h3>
+        {hint !== undefined ? (
+          <span role="img" title={hint} aria-label={hint} className="cursor-help text-faint hover:text-accent">
+            <InfoIcon className="h-3 w-3" />
+          </span>
+        ) : null}
         {summary !== undefined ? (
           <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px] text-muted tabular-nums">
             {summary}

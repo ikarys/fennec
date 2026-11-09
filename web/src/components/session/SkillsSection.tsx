@@ -18,10 +18,10 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
     <Panel
       id="skills"
       title={t('panelSkills')}
+      hint={t('skillsHint')}
       icon={<WandIcon className="h-3.5 w-3.5" />}
       summary={skills !== null && loadedCount > 0 ? `${activeCount}/${loadedCount}` : undefined}
     >
-      <p className="m-0 text-xs text-muted">{t('skillsHint')}</p>
       {(!hasSession || (skills !== null && skills.loaded.length === 0 && skills.alwaysOn.length === 0)) && (
         <div className="text-xs text-muted">{t('noSkillsLoaded')}</div>
       )}
