@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-09T10:06:11.091Z",
+    "detectionDate": "2026-11-09T10:23:54.237Z",
     "formats": {
       "javascript": {
         "sources": {
@@ -6609,14 +6609,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/setup.rs": {
-            "lines": 279,
-            "tokens": 2171,
+            "lines": 299,
+            "tokens": 2335,
             "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 156,
+            "percentage": 5.35,
+            "percentageTokens": 6.68,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8458,14 +8458,14 @@
           }
         },
         "total": {
-          "lines": 68314,
-          "tokens": 639958,
+          "lines": 68334,
+          "tokens": 640122,
           "sources": 277,
-          "clones": 204,
-          "duplicatedLines": 2481,
-          "duplicatedTokens": 25624,
-          "percentage": 3.63,
-          "percentageTokens": 4,
+          "clones": 205,
+          "duplicatedLines": 2489,
+          "duplicatedTokens": 25702,
+          "percentage": 3.64,
+          "percentageTokens": 4.02,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -8984,13 +8984,13 @@
       }
     },
     "total": {
-      "lines": 117449,
-      "tokens": 1124182,
+      "lines": 117469,
+      "tokens": 1124346,
       "sources": 735,
-      "clones": 264,
-      "duplicatedLines": 3598,
-      "duplicatedTokens": 35932,
-      "percentage": 3.06,
+      "clones": 265,
+      "duplicatedLines": 3606,
+      "duplicatedTokens": 36010,
+      "percentage": 3.07,
       "percentageTokens": 3.2,
       "newDuplicatedLines": 0,
       "newClones": 0
@@ -13854,6 +13854,42 @@
           "line": 180,
           "column": 29,
           "position": 1832
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 9,
+      "fragment": "(),\n            listed: false,\n            base_url: \"http://example\".into(),\n        };\n        let checks = checks(&facts);\n        assert_eq!(checks[0].status, CheckStatus::Todo);\n        assert_eq!(\n            checks[0].detail.as_deref(),\n            Some(\"no model chosen for http://example\"",
+      "tokens": 78,
+      "firstFile": {
+        "name": "crates/fennec/src/domain/setup.rs",
+        "start": 234,
+        "end": 242,
+        "startLoc": {
+          "line": 234,
+          "column": 31,
+          "position": 1754
+        },
+        "endLoc": {
+          "line": 242,
+          "column": 54,
+          "position": 1832
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/domain/setup.rs",
+        "start": 218,
+        "end": 226,
+        "startLoc": {
+          "line": 218,
+          "column": 30,
+          "position": 1617
+        },
+        "endLoc": {
+          "line": 226,
+          "column": 55,
+          "position": 1695
         }
       }
     },

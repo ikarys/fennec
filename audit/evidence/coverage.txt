@@ -103,7 +103,7 @@ fennec/src/domain/password.rs                         122                 5    9
 fennec/src/domain/plan.rs                             188                 0   100.00%           9                 0   100.00%         129                 0   100.00%           0                 0         -
 fennec/src/domain/plan_scope.rs                       190                 3    98.42%          12                 0   100.00%         106                 2    98.11%           0                 0         -
 fennec/src/domain/plugin.rs                           537                23    95.72%          30                 0   100.00%         407                12    97.05%           0                 0         -
-fennec/src/domain/preferences.rs                     1090                 1    99.91%          67                 0   100.00%         792                 1    99.87%           0                 0         -
+fennec/src/domain/preferences.rs                     1140                 1    99.91%          73                 0   100.00%         826                 1    99.88%           0                 0         -
 fennec/src/domain/preflight.rs                        275                 2    99.27%          21                 0   100.00%         190                 2    98.95%           0                 0         -
 fennec/src/domain/pricing.rs                          235                 3    98.72%          17                 0   100.00%         174                 1    99.43%           0                 0         -
 fennec/src/domain/project.rs                           18                 6    66.67%           2                 0   100.00%          14                 6    57.14%           0                 0         -
@@ -123,7 +123,7 @@ fennec/src/domain/server.rs                           404                20    9
 fennec/src/domain/server_config.rs                    172                36    79.07%          18                 3    83.33%         105                22    79.05%           0                 0         -
 fennec/src/domain/session_name.rs                     198                 0   100.00%          19                 0   100.00%          92                 0   100.00%           0                 0         -
 fennec/src/domain/session_skills.rs                   386                19    95.08%          26                 4    84.62%         223                18    91.93%           0                 0         -
-fennec/src/domain/setup.rs                            192                11    94.27%          12                 0   100.00%         171                16    90.64%           0                 0         -
+fennec/src/domain/setup.rs                            211                11    94.79%          13                 0   100.00%         183                16    91.26%           0                 0         -
 fennec/src/domain/skill.rs                            168                 2    98.81%          15                 0   100.00%         104                 0   100.00%           0                 0         -
 fennec/src/domain/slash.rs                            301                 6    98.01%          29                 1    96.55%         173                 5    97.11%           0                 0         -
 fennec/src/domain/stats.rs                             46                 0   100.00%           3                 0   100.00%          41                 0   100.00%           0                 0         -
@@ -275,4 +275,4 @@ token-usage/src/ledger.rs                             553                54    9
 token-usage/src/lib.rs                                 11                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
 token-usage/src/query.rs                             1054                62    94.12%          42                 1    97.62%         535                10    98.13%           0                 0         -
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                                               90936             17371    80.90%        5476               968    82.32%       55074              9178    83.34%           0                 0         -
+TOTAL                                               91005             17371    80.91%        5483               968    82.35%       55120              9178    83.35%           0                 0         -
