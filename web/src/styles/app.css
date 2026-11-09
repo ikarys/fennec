@@ -10,6 +10,7 @@
   --border: #272C34;
   --border-strong: #6E7989;
   --text: #E7E9EC;
+  --prose: #C5CAD2;
   --muted: #9AA2AE;
   --faint: #7D848F;
   --accent: #F08A4B;
@@ -36,6 +37,7 @@
   --border: #E1E1DB;
   --border-strong: #6E6E64;
   --text: #1A1B1E;
+  --prose: #2E3036;
   --muted: #5C6066;
   --faint: #6B6F76;
   --accent: #A8440F;
@@ -65,6 +67,7 @@
   --border: #343C50;
   --border-strong: #8290AC;
   --text: #DDE3EF;
+  --prose: #C3CAD8;
   --muted: #A6B0C5;
   --faint: #929DB5;
   --accent: #82AAFF;
@@ -93,6 +96,7 @@
   --border: #0F3D17;
   --border-strong: #2E9944;
   --text: #B6FFC4;
+  --prose: #9FE8AE;
   --muted: #3FBF5A;
   --faint: #2E9944;
   --accent: #00FF41;
@@ -126,6 +130,8 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text: var(--text);
+  /* Long-form reading text (Markdown): softer than --text, which near-white tires the eye. */
+  --color-prose: var(--prose);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-accent: var(--accent);

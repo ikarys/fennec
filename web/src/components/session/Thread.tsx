@@ -65,7 +65,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
     return (
       <>
         {contract.before && (
-          <Card className="px-3.5 py-2.5">
+          <Card className="max-w-[46rem] px-3.5 py-2.5">
             <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
               <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
                 {contract.before}
@@ -78,7 +78,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
     );
   }
   return (
-    <Card className="px-3.5 py-2.5">
+    <Card className="max-w-[46rem] px-3.5 py-2.5">
       <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
         {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
