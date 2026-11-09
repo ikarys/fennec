@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Section, type SectionSave } from '../ui/Section';
-import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
+import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, ServerIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
 import { useT } from '../../i18n';
@@ -160,8 +160,11 @@ export function ProvidersSection({
                 open={error ? true : undefined}
                 className="group"
               >
-                <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded-md px-2 select-none hover:bg-raised [&::-webkit-details-marker]:hidden">
+                <summary className="-mx-2 flex h-10 cursor-pointer list-none items-center gap-2 rounded-md px-2 select-none transition-colors hover:bg-accent-soft [&::-webkit-details-marker]:hidden">
                   <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
+                  <span className={`grid size-6 shrink-0 place-items-center rounded-md ${error ? 'bg-err-soft text-err' : 'bg-accent-soft text-accent'}`}>
+                    <ServerIcon className="h-3.5 w-3.5" />
+                  </span>
                   <span className="min-w-0 truncate font-mono text-sm font-medium">
                     {provider.name || provider.id}
                   </span>
@@ -170,7 +173,7 @@ export function ProvidersSection({
                       {t('providerError')}
                     </Badge>
                   ) : (
-                    <Badge tone="neutral">
+                    <Badge tone={count === 0 ? 'neutral' : 'info'} appearance="pill">
                       {count === 0 ? t('noModels') : t('modelCount', { count })}
                     </Badge>
                   )}
