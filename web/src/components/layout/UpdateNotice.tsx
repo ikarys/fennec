@@ -1,29 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import { ArrowUpIcon, SpinnerIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { buttonClass } from '../ui/Button';
-import { getUpdate, applyUpdate, getVersion, type UpdateCheck } from '../../lib/api';
+import { getUpdate, type UpdateCheck } from '../../lib/api';
+import { useInstallUpdate } from '../../hooks/useInstallUpdate';
 
-// The human decides when to update; nothing installs on its own.
 export function UpdateNotice() {
   const t = useT();
-  const [state, setState] = useState<{
-    check: UpdateCheck | null;
-    installing: boolean;
-  }>({
-    check: null,
-    installing: false,
-  });
-  const restartTimer = useRef<number | null>(null);
+  const [check, setCheck] = useState<UpdateCheck | null>(null);
+  const { installing, install } = useInstallUpdate();
 
   useEffect(() => {
     const load = async () => {
       try {
-        const check = await getUpdate();
-        setState((prev) => ({ ...prev, check }));
+        setCheck(await getUpdate());
       } catch {
-        setState((prev) => ({ ...prev, check: prev.installing ? prev.check : null }));
+        setCheck(null);
       }
     };
 
@@ -39,58 +32,6 @@ export function UpdateNotice() {
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (restartTimer.current !== null) window.clearInterval(restartTimer.current);
-    };
-  }, []);
-
-  const handleClick = async () => {
-    const { check, installing } = state;
-    if (!check?.newer || installing) return;
-
-    if (!window.confirm(t('updateConfirm', { latest: check.latest }))) return;
-
-    setState((prev) => ({ ...prev, installing: true }));
-
-    try {
-      await applyUpdate();
-
-      let tries = 0;
-      const timer = window.setInterval(() => {
-        void (async () => {
-          tries += 1;
-
-          try {
-            const data = await getVersion();
-            const current = check.current.replace(/^v/, '');
-            const latest = data.version.replace(/^v/, '');
-            if (current && latest && current !== latest) {
-              window.clearInterval(timer);
-              window.location.reload();
-              return;
-            }
-          } catch {
-            // The server may not be up yet.
-          }
-
-          if (tries >= 60) {
-            window.clearInterval(timer);
-            setState((prev) => ({ ...prev, installing: false }));
-            window.alert(t('updateRestartTimeout'));
-          }
-        })();
-      }, 1000);
-
-      restartTimer.current = timer;
-    } catch (error) {
-      setState((prev) => ({ ...prev, installing: false }));
-      const message = error instanceof Error ? error.message : String(error);
-      window.alert(t('updateFailed', { error: message }));
-    }
-  };
-
-  const { check, installing } = state;
   if (!check?.newer && !installing) return null;
 
   const title = installing
@@ -104,7 +45,9 @@ export function UpdateNotice() {
       title={title}
       aria-label={title}
       disabled={installing}
-      onClick={() => void handleClick()}
+      onClick={() => {
+        if (check) void install(check);
+      }}
     >
       <span className="flex items-center gap-1">
         {installing ? (

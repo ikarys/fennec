@@ -6,6 +6,7 @@ import { ExternalIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { getVersion, getUpdate, type UpdateCheck } from '../../lib/api';
 import { useLoaded } from '../../hooks/useLoaded';
+import { useInstallUpdate } from '../../hooks/useInstallUpdate';
 
 type CheckResult =
   | { kind: 'checked'; check: UpdateCheck }
@@ -15,6 +16,7 @@ export function VersionSection() {
   const t = useT();
   const [checking, setChecking] = useState(false);
   const [check, setCheck] = useState<CheckResult | null>(null);
+  const { installing, install } = useInstallUpdate();
 
   const { data: info, error: loadError } = useLoaded(getVersion, []);
 
@@ -86,6 +88,9 @@ export function VersionSection() {
           >
             {t('versionReleaseLink')}
           </a>
+          <Button variant="primary" size="sm" disabled={installing} onClick={() => void install(check.check)}>
+            {installing ? t('updateInstalling') : t('versionInstall', { latest: check.check.latest })}
+          </Button>
         </div>
       )}
       {check && check.kind === 'checked' && !check.check.newer && (
