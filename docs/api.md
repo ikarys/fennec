@@ -564,8 +564,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   in the bwrap world (never with the sandbox off), its code directory read-only (and its working directory), a
   private scratch writable, no project mounted, the network only when `network`. 400 on an empty name or an
   invalid definition; 404 if no such plugin.
-- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks placed in the session's right-hand
-  context panel (`placement` `panel` or `own_panel`). 404 if no session. The event feed a plugin receives
+- `GET /api/sessions/{id}/plugins` → `{blocks}`: the session-scope blocks placed in the session's context
+  rail (`placement` `panel` or `own_panel`). 404 if no session. The event feed a plugin receives
   carries the `session` and `project` ids; a session seen for the first time by the pump is not replayed.
 - `GET /api/projects/{id}/plugins` → `{blocks}`: the project-scope blocks placed in the project page's
   dashboard (`placement` `dashboard`). 404 if no project.
@@ -574,7 +574,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   session's. Both query params optional; a missing one simply omits that surface's blocks.
 - The served-block shape of the four routes above:
   `[{plugin, title, scope: "session"|"project"|"global", placement: "panel"|"own_panel"|"status_bar"|"dashboard"|"settings",
-  content: {elements: [...]}}]`. Elements (data only, rendered by the UI, indicative):
+  icon: "puzzle"|"activity"|..., content: {elements: [...]}}]`. Elements (data only, rendered by the UI, indicative):
   `{"kind":"text","text"}`, `{"kind":"figure","label","value","tone"?}`, `{"kind":"badge","label","tone"?}`,
   `{"kind":"list","items":[{"text","tone"?}]}`, `{"kind":"progress","label","value","max","tone"?}` (finite
   numbers, `max > 0`), `{"kind":"link","label","url"}` (`url` starts with `http://` or `https://`),

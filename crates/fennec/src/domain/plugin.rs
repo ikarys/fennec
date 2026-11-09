@@ -27,6 +27,33 @@ pub struct PluginDef {
     pub args: Vec<String>,
     pub env: BTreeMap<String, String>,
     pub blocks: Vec<PluginBlockDef>,
+    /// The icon of the plugin's own tab in the session's context rail.
+    pub icon: PluginIcon,
+}
+
+/// The icons a plugin may pick for its tab, from fennec's own set: a plugin
+/// never ships an image or SVG (untrusted markup in the page). An unknown name
+/// falls back to the puzzle.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginIcon {
+    Activity,
+    Alert,
+    Bell,
+    Branch,
+    Check,
+    Clock,
+    Cpu,
+    Eye,
+    File,
+    Globe,
+    Layers,
+    Server,
+    Terminal,
+    Tokens,
+    #[default]
+    #[serde(other)]
+    Puzzle,
 }
 
 impl PluginDef {
@@ -290,6 +317,8 @@ pub struct ServedPluginBlock {
     pub title: String,
     pub scope: BlockScope,
     pub placement: Placement,
+    /// The plugin's tab icon, for an `own_panel` block.
+    pub icon: PluginIcon,
     pub content: BlockContent,
 }
 
@@ -376,6 +405,7 @@ mod tests {
             command: "python3".into(),
             args: vec!["counter.py".into()],
             env: BTreeMap::new(),
+            icon: Default::default(),
             blocks: vec![PluginBlockDef {
                 id: "calls".into(),
                 title: "Tool calls".into(),
@@ -686,6 +716,7 @@ mod tests {
             command: "python3".into(),
             args: vec!["counter.py".into()],
             env: BTreeMap::new(),
+            icon: Default::default(),
             blocks: Vec::new(),
         };
         let files = vec![("counter.py".to_string(), "print(1)".to_string())];
@@ -718,5 +749,15 @@ mod tests {
 
         // The same definition and files give the same hash.
         assert_eq!(code_hash(&def, &files), base);
+    }
+
+    #[test]
+    fn an_unknown_icon_falls_back_to_the_puzzle() {
+        let def: PluginDef =
+            serde_json::from_str(r#"{"name":"p","command":"c","icon":"<svg onload=x>"}"#).unwrap();
+        assert_eq!(def.icon, PluginIcon::Puzzle);
+        let def: PluginDef =
+            serde_json::from_str(r#"{"name":"p","command":"c","icon":"activity"}"#).unwrap();
+        assert_eq!(def.icon, PluginIcon::Activity);
     }
 }

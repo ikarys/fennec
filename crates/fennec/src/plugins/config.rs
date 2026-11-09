@@ -108,6 +108,7 @@ mod tests {
             command: "python3".into(),
             args: vec![format!("{name}.py")],
             env: Default::default(),
+            icon: Default::default(),
             blocks: Vec::new(),
         }
     }

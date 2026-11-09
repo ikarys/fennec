@@ -108,7 +108,7 @@ export const en = {
   panelPlugins: 'Plugins',
   pluginProvenance: 'plugin {name}',
   statusBarLabel: 'Status bar',
-  noPluginBlocks: 'No block yet: an active plugin fills it with the session’s next events.',
+
   noProjectBlocks: 'The active plugins emitted no global block.',
   pluginsDescription:
     'A plugin observes the session events of every project and displays typed blocks. It never touches the prompt, the tools or the log. The definitions live in ~/.agents/plugins.json, the code in ~/.agents/plugins/<name>/. Enabling it, and its network access, are your decisions; a changed definition or code deactivates it.',
@@ -1546,7 +1546,7 @@ export const fr: Record<MsgKey, string> = {
   panelPlugins: 'Plugins',
   pluginProvenance: 'plugin {name}',
   statusBarLabel: 'Barre d’état',
-  noPluginBlocks: 'Aucun bloc pour l’instant : un plugin actif le remplit avec les prochains événements de la session.',
+
   noProjectBlocks: 'Les plugins actifs n’ont émis aucun bloc global.',
   pluginsDescription:
     'Un plugin observe les événements de session de tous les projets et affiche des blocs typés. Il ne touche jamais au prompt, aux outils ni au journal. Les définitions vivent dans ~/.agents/plugins.json, le code dans ~/.agents/plugins/<nom>/. L’activer, et son accès au réseau, sont vos décisions ; une définition ou un code modifié le désactive.',

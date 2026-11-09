@@ -137,6 +137,7 @@ mod tests {
             command: "python3".into(),
             args: vec!["counter.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: Vec::new(),
         };
         let hash = config::compute_hash(&agents_home, &def);
