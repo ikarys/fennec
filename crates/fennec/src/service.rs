@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use crate::domain::service::{
-    Control, LAUNCHD_LABEL, SYSTEMD_UNIT, launchctl_args, launchd_plist, mise_latest,
+    Control, LAUNCHD_LABEL, SYSTEMD_UNIT, Status, launchctl_args, launchd_plist, mise_latest,
     systemctl_args, systemd_unit,
 };
 use crate::folders::home;
@@ -54,16 +54,48 @@ pub fn control(control: Control) -> Result<(), String> {
     }
 }
 
+/// The file says installed; the manager says running. Not installed wins.
+pub fn status() -> Result<Status, String> {
+    if cfg!(target_os = "macos") {
+        let installed = launchd_agent().exists();
+        let running = if installed {
+            launchd_loaded(&current_uid()?)?
+        } else {
+            false
+        };
+        Ok(Status::of(installed, running))
+    } else {
+        require_systemd()?;
+        let installed = systemd_unit_file().exists();
+        let running = systemd_unit_is_active()?;
+        Ok(Status::of(installed, running))
+    }
+}
+
+pub fn uninstall() -> Result<String, String> {
+    if cfg!(target_os = "macos") {
+        let agent = launchd_agent();
+        if !agent.exists() {
+            return Err(NO_SERVICE_FILE.into());
+        }
+        launchctl_control(Control::Stop)?;
+        remove_file(&agent)
+    } else {
+        require_systemd()?;
+        let unit = systemd_unit_file();
+        if !unit.exists() {
+            return Err(NO_SERVICE_FILE.into());
+        }
+        run("systemctl", &["--user", "disable", "--now", SYSTEMD_UNIT])?;
+        let removed = remove_file(&unit)?;
+        run("systemctl", &["--user", "daemon-reload"])?;
+        Ok(removed)
+    }
+}
+
 fn launchctl_control(control: Control) -> Result<(), String> {
     let uid = current_uid()?;
-    let target = format!("gui/{uid}/{LAUNCHD_LABEL}");
-    let loaded = Command::new("launchctl")
-        .args(["print", &target])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|e| format!("could not run launchctl: {e}"))?
-        .success();
+    let loaded = launchd_loaded(&uid)?;
     let agent = launchd_agent().display().to_string();
     match launchctl_args(control, loaded, &uid, &agent) {
         Some(args) => run(
@@ -72,6 +104,34 @@ fn launchctl_control(control: Control) -> Result<(), String> {
         ),
         None => Ok(()),
     }
+}
+
+fn launchd_loaded(uid: &str) -> Result<bool, String> {
+    let target = format!("gui/{uid}/{LAUNCHD_LABEL}");
+    let status = Command::new("launchctl")
+        .args(["print", &target])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|e| format!("could not run launchctl: {e}"))?;
+    Ok(status.success())
+}
+
+fn systemd_unit_is_active() -> Result<bool, String> {
+    // A non-zero exit means not running, not a failure of the manager.
+    let status = Command::new("systemctl")
+        .args(["--user", "is-active", "--quiet", SYSTEMD_UNIT])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|e| format!("could not run systemctl: {e}"))?;
+    Ok(status.success())
+}
+
+fn remove_file(file: &Path) -> Result<String, String> {
+    let path = file.display().to_string();
+    std::fs::remove_file(file).map_err(|e| format!("could not remove {path}: {e}"))?;
+    Ok(format!("removed {path}"))
 }
 
 fn require_systemd() -> Result<(), String> {

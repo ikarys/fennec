@@ -2,7 +2,7 @@
 
 use crate::domain::service::Control;
 
-const USAGE: &str = "usage: fennec service <install|start|stop|restart>";
+const USAGE: &str = "usage: fennec service <install|start|stop|restart|status|uninstall>";
 
 pub fn run(args: &[String]) -> Result<(), String> {
     let [action] = args else {
@@ -12,6 +12,16 @@ pub fn run(args: &[String]) -> Result<(), String> {
         "install" => {
             let logs = crate::service::install()?;
             println!("fennec runs as a service. Logs: {logs}");
+            return Ok(());
+        }
+        "status" => {
+            let message = crate::service::status()?.message();
+            println!("{message}");
+            return Ok(());
+        }
+        "uninstall" => {
+            let removed = crate::service::uninstall()?;
+            println!("{removed}");
             return Ok(());
         }
         "start" => Control::Start,

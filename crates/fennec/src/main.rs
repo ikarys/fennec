@@ -55,7 +55,7 @@ const USAGE: &str = "usage:
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
   fennec update [--check]                  install the latest release (--check: only report it)
-  fennec service <install|start|stop|restart>
+  fennec service <install|start|stop|restart|status|uninstall>
                                            keep the server running in the background
   fennec --version                         print the version
 
