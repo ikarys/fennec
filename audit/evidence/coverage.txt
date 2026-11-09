@@ -28,7 +28,7 @@ fennec/src/agent/propose_task.rs                      102                 0   10
 fennec/src/agent/queue.rs                              30                 3    90.00%           1                 0   100.00%          10                 0   100.00%           0                 0         -
 fennec/src/agent/record_decision.rs                   137                 1    99.27%          14                 0   100.00%          93                 0   100.00%           0                 0         -
 fennec/src/agent/request_waiver.rs                    139                 0   100.00%          12                 0   100.00%          85                 0   100.00%           0                 0         -
-fennec/src/agent/round.rs                             189                28    85.19%           7                 0   100.00%         119                10    91.60%           0                 0         -
+fennec/src/agent/round.rs                             189                29    84.66%           7                 0   100.00%         119                11    90.76%           0                 0         -
 fennec/src/agent/rule_approval.rs                     403                14    96.53%          27                 3    88.89%         223                 4    98.21%           0                 0         -
 fennec/src/agent/rule_check.rs                        256                 0   100.00%          13                 0   100.00%         192                 0   100.00%           0                 0         -
 fennec/src/agent/snapshot.rs                          107                 5    95.33%           5                 0   100.00%          59                 1    98.31%           0                 0         -
@@ -118,7 +118,7 @@ fennec/src/domain/risk/test_subject.rs                284                 5    9
 fennec/src/domain/rule_approval.rs                    173                14    91.91%          14                 1    92.86%         115                10    91.30%           0                 0         -
 fennec/src/domain/rule_bridge.rs                      178                 6    96.63%          11                 0   100.00%         117                 3    97.44%           0                 0         -
 fennec/src/domain/scanner.rs                           35                 5    85.71%           2                 1    50.00%          20                 5    75.00%           0                 0         -
-fennec/src/domain/security_scan.rs                    456                42    90.79%          49                19    61.22%         289                21    92.73%           0                 0         -
+fennec/src/domain/security_scan.rs                    456                47    89.69%          49                21    57.14%         289                27    90.66%           0                 0         -
 fennec/src/domain/server.rs                           404                20    95.05%          28                 1    96.43%         249                12    95.18%           0                 0         -
 fennec/src/domain/server_config.rs                    172                36    79.07%          18                 3    83.33%         105                22    79.05%           0                 0         -
 fennec/src/domain/session_name.rs                     198                 0   100.00%          19                 0   100.00%          92                 0   100.00%           0                 0         -
@@ -143,7 +143,7 @@ fennec/src/git.rs                                     689               125    8
 fennec/src/instructions.rs                            183                 0   100.00%          14                 0   100.00%          96                 0   100.00%           0                 0         -
 fennec/src/integration.rs                            1899                92    95.16%          74                10    86.49%         820                50    93.90%           0                 0         -
 fennec/src/llm/concurrency.rs                         332                 1    99.70%          20                 0   100.00%         154                 1    99.35%           0                 0         -
-fennec/src/llm/openai.rs                              291                21    92.78%          20                 2    90.00%         166                10    93.98%           0                 0         -
+fennec/src/llm/openai.rs                              291                30    89.69%          20                 2    90.00%         166                20    87.95%           0                 0         -
 fennec/src/locks.rs                                    51                 0   100.00%           6                 0   100.00%          28                 0   100.00%           0                 0         -
 fennec/src/main.rs                                    145               145     0.00%           4                 4     0.00%          59                59     0.00%           0                 0         -
 fennec/src/mcp.rs                                     653               139    78.71%          51                18    64.71%         422                82    80.57%           0                 0         -
@@ -157,10 +157,10 @@ fennec/src/plugins/host.rs                            551                29    9
 fennec/src/plugins/pump.rs                            232                44    81.03%           7                 1    85.71%         146                34    76.71%           0                 0         -
 fennec/src/protected.rs                               299                36    87.96%          16                 2    87.50%         169                18    89.35%           0                 0         -
 fennec/src/risk.rs                                    392               101    74.23%          27                 6    77.78%         217                53    75.58%           0                 0         -
-fennec/src/sandbox.rs                                1201                19    98.42%          51                 0   100.00%         878                15    98.29%           0                 0         -
+fennec/src/sandbox.rs                                1201                40    96.67%          51                 1    98.04%         878                36    95.90%           0                 0         -
 fennec/src/sandbox/seatbelt.rs                        520                 8    98.46%          23                 1    95.65%         287                 6    97.91%           0                 0         -
 fennec/src/scanners.rs                                170                 1    99.41%          12                 0   100.00%          78                 0   100.00%           0                 0         -
-fennec/src/security_scan.rs                           640               183    71.41%          36                 8    77.78%         424               131    69.10%           0                 0         -
+fennec/src/security_scan.rs                           640               541    15.47%          36                27    25.00%         424               370    12.74%           0                 0         -
 fennec/src/server_config.rs                           152               152     0.00%          22                22     0.00%          87                87     0.00%           0                 0         -
 fennec/src/servers.rs                                 139                48    65.47%          14                 6    57.14%          80                25    68.75%           0                 0         -
 fennec/src/setup.rs                                    63                63     0.00%           4                 4     0.00%          36                36     0.00%           0                 0         -
@@ -203,8 +203,8 @@ fennec/src/web/jobs/commit_subject.rs                  53                53     
 fennec/src/web/jobs/idea_assets.rs                    312                 7    97.76%          15                 1    93.33%         170                 3    98.24%           0                 0         -
 fennec/src/web/jobs/idea_queue.rs                     458               346    24.45%          20                14    30.00%         289               217    24.91%           0                 0         -
 fennec/src/web/jobs/run_stats_backfill.rs             172                 6    96.51%           8                 0   100.00%         123                 6    95.12%           0                 0         -
-fennec/src/web/jobs/session_name.rs                   109                27    75.23%           5                 2    60.00%          58                12    79.31%           0                 0         -
-fennec/src/web/listings.rs                             75                 3    96.00%           4                 0   100.00%          41                 1    97.56%           0                 0         -
+fennec/src/web/jobs/session_name.rs                   109                48    55.96%           5                 2    60.00%          58                23    60.34%           0                 0         -
+fennec/src/web/listings.rs                             75                13    82.67%           4                 0   100.00%          41                 4    90.24%           0                 0         -
 fennec/src/web/login.rs                               317                81    74.45%          29                 7    75.86%         209                90    56.94%           0                 0         -
 fennec/src/web/os/editor.rs                            44                 0   100.00%           4                 0   100.00%          23                 0   100.00%           0                 0         -
 fennec/src/web/os/file_manager.rs                      56                56     0.00%           5                 5     0.00%          31                31     0.00%           0                 0         -
@@ -275,4 +275,4 @@ token-usage/src/ledger.rs                             553                54    9
 token-usage/src/lib.rs                                 11                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
 token-usage/src/query.rs                             1054                62    94.12%          42                 1    97.62%         535                10    98.13%           0                 0         -
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                                               90780             16673    81.63%        5467               930    82.99%       54990              8718    84.15%           0                 0         -
+TOTAL                                               90780             17098    81.17%        5467               952    82.59%       54990              9009    83.62%           0                 0         -

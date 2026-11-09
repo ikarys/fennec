@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-09T08:00:38.554Z",
+    "detectionDate": "2026-11-09T09:23:34.186Z",
     "formats": {
       "javascript": {
         "sources": {
@@ -7965,14 +7965,14 @@
             "newClones": 0
           },
           "crates/fennec/src/security_scan.rs": {
-            "lines": 561,
-            "tokens": 5317,
+            "lines": 562,
+            "tokens": 5326,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 46,
             "duplicatedTokens": 304,
-            "percentage": 8.2,
-            "percentageTokens": 5.72,
+            "percentage": 8.19,
+            "percentageTokens": 5.71,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8446,8 +8446,8 @@
           }
         },
         "total": {
-          "lines": 68207,
-          "tokens": 638873,
+          "lines": 68208,
+          "tokens": 638882,
           "sources": 277,
           "clones": 204,
           "duplicatedLines": 2481,
@@ -8897,8 +8897,8 @@
       "toml": {
         "sources": {
           "crates/token-usage/Cargo.toml": {
-            "lines": 10,
-            "tokens": 83,
+            "lines": 13,
+            "tokens": 94,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8909,8 +8909,8 @@
             "newClones": 0
           },
           "crates/rules/Cargo.toml": {
-            "lines": 12,
-            "tokens": 88,
+            "lines": 15,
+            "tokens": 99,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8921,8 +8921,8 @@
             "newClones": 0
           },
           "crates/fennec/Cargo.toml": {
-            "lines": 18,
-            "tokens": 190,
+            "lines": 21,
+            "tokens": 201,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8933,8 +8933,8 @@
             "newClones": 0
           },
           "crates/canvas/Cargo.toml": {
-            "lines": 12,
-            "tokens": 88,
+            "lines": 15,
+            "tokens": 99,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8945,8 +8945,8 @@
             "newClones": 0
           },
           "crates/backlog/Cargo.toml": {
-            "lines": 11,
-            "tokens": 65,
+            "lines": 14,
+            "tokens": 76,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8958,8 +8958,8 @@
           }
         },
         "total": {
-          "lines": 63,
-          "tokens": 514,
+          "lines": 78,
+          "tokens": 569,
           "sources": 5,
           "clones": 0,
           "duplicatedLines": 0,
@@ -8972,8 +8972,8 @@
       }
     },
     "total": {
-      "lines": 117286,
-      "tokens": 1122660,
+      "lines": 117302,
+      "tokens": 1122724,
       "sources": 734,
       "clones": 264,
       "duplicatedLines": 3598,
