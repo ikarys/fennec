@@ -29,7 +29,7 @@ Models used appear in each commit as `Assisted-by: <tool>:<model>` trailers: Cla
 
 The workflows run on GitHub Actions.
 
-`ci.yml` runs on pull requests to `develop` and `main` and skips documentation-only paths. Its `check` job validates the PR title with the commit-msg hook, builds the UI, runs lint, checks licenses, and runs UI tests, while the `tests` job installs bubblewrap, allows unprivileged user namespaces on Ubuntu, and runs `just test`.
+`ci.yml` runs on pull requests to `develop` and `main`. Its `guard` job runs on every pull request: it scans the history for secrets and validates the PR title with the commit-msg hook. The `check` and `tests` jobs are skipped on documentation-only changes. The `check` job builds the UI, runs lint, checks licenses, and runs UI tests, while the `tests` job installs bubblewrap, allows unprivileged user namespaces on Ubuntu, and runs `just test`.
 
 `convention.yml` runs on pushes to `main`: it regenerates the evidence, runs `vibecheck --strict` and commits `audit/status.json` and `audit/evidence/` back to `main`.
 
