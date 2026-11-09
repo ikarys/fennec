@@ -12,6 +12,11 @@ import { SectionLabel } from '../../ui/SectionLabel';
 
 type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
 
+/** The DOM id of a node run's divider (the fold's item id), so the run drawer can scroll the thread to it. */
+export function nodeAnchorId(runId: string, nodeId: string, pass: number): string {
+  return `wf-${runId}-${nodeId}-${pass}`;
+}
+
 function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
   const tone = portTone(port);
   if (tone === 'positive') return 'ok';
@@ -57,7 +62,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
   }, [running, finished, item.startedAt]);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div id={item.id} className="flex scroll-mt-4 flex-col gap-1.5">
       <div className="flex items-center gap-2 text-xs text-muted">
         <span className="h-px grow bg-border" />
         <span className="flex min-w-0 items-center gap-1.5">

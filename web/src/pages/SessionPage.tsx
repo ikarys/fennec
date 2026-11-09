@@ -69,6 +69,7 @@ import { CanvasPane } from "../components/canvas/CanvasPane";
 import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
 import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
 import { RunRail } from "../components/workflow/session/RunRail";
+import { useJumpToNode } from "../hooks/useJumpToNode";
 import { RunDecision } from "../components/workflow/session/RunDecision";
 import { Button, buttonClass } from "../components/ui/Button";
 import {
@@ -222,6 +223,7 @@ export function SessionPage({
     onScroll,
     handleLoadOlder,
   } = useScrollFollow({ sessionId, view, detail, loadOlder });
+  const jumpToNode = useJumpToNode({ view, hasMore, loadOlder, setFollow });
   const {
     compactError,
     handleStop,
@@ -622,7 +624,7 @@ export function SessionPage({
             <CallUsageContext.Provider value={calls}>
               <WorkflowUsageContext.Provider value={workflowUsage}>
                 <div className="flex min-h-0 min-w-0 grow">
-                  {run && <RunRail run={run} />}
+                  {run && <RunRail run={run} onJump={jumpToNode} />}
                   <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
                     {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
                     <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
