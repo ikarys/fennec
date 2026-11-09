@@ -37,9 +37,9 @@ import { RuleProposalCard } from "../components/session/RuleProposalCard";
 import { AgentSuggestionCard } from "../components/session/AgentSuggestionCard";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
-import { QuestionCard } from "../components/session/QuestionCard";
-import { RuleApprovalCard } from "../components/session/RuleApprovalCard";
-import { WaiverCard } from "../components/session/WaiverCard";
+import { QuestionDecision } from "../components/session/QuestionDecision";
+import { ApprovalDecision } from "../components/session/ApprovalDecision";
+import { WaiverDecision } from "../components/session/WaiverDecision";
 import { QueuedMessages } from "../components/session/QueuedMessages";
 import { RetryCard } from "../components/session/RetryCard";
 import { ThreadItemView } from "../components/session/Thread";
@@ -347,6 +347,22 @@ export function SessionPage({
           disabled: running || planBuildInFlight,
         }
       : null;
+  // What blocks the agent until the human answers; a node's session is answered in its parent.
+  const answerable = !running && !waiting && !detail?.parentId;
+  const blocking = {
+    approval: answerable ? served.pendingApproval : null,
+    waiver: answerable ? served.pendingWaiver : null,
+    question: answerable ? view.pendingQuestion : null,
+  };
+  const decisionCount =
+    [blocking.approval, blocking.waiver, blocking.question].filter(Boolean).length +
+    (!detail?.parentId && pendingPlan && planActions ? 1 : 0);
+  const blockingId = blocking.approval?.callId ?? blocking.waiver?.callId ?? blocking.question?.callId ?? null;
+  // A blocking decision opens on arrival: the agent waits on it.
+  useEffect(() => {
+    if (blockingId) setOpenDecision(blockingId);
+  }, [blockingId]);
+  const toggleDecision = (id: string) => setOpenDecision((open) => (open === id ? null : id));
   const lastRunEndId = useMemo(() => {
     for (let i = view.items.length - 1; i >= 0; i -= 1) {
       const item = view.items[i];
@@ -741,36 +757,6 @@ export function SessionPage({
                       </div>
                     </div>
 
-                    {served.pendingApproval &&
-                      !running &&
-                      !waiting &&
-                      !detail?.parentId && (
-                        <RuleApprovalCard
-                          approval={served.pendingApproval}
-                          onAnswer={handleApproval}
-                          disabled={running}
-                        />
-                      )}
-                    {served.pendingWaiver &&
-                      !running &&
-                      !waiting &&
-                      !detail?.parentId && (
-                        <WaiverCard
-                          waiver={served.pendingWaiver}
-                          onAnswer={handleWaiver}
-                          disabled={running}
-                        />
-                      )}
-                    {view.pendingQuestion &&
-                      !running &&
-                      !waiting &&
-                      !detail?.parentId && (
-                        <QuestionCard
-                          question={view.pendingQuestion}
-                          onAnswer={(answer) => handleSend(answer)}
-                          disabled={running}
-                        />
-                      )}
                     {waiting && !detail?.parentId && (
                       <RunActionCard
                         waiting={waiting}
@@ -826,15 +812,44 @@ export function SessionPage({
                     {!detail?.parentId && (
                       <QueuedMessages queued={served.queued} onCancel={handleCancelQueued} />
                     )}
-                    {!detail?.parentId && pendingPlan && planActions && (
-                      <DecisionBar count={1} onEscape={() => setOpenDecision(null)}>
-                        <PlanDecision
-                          plan={pendingPlan.plan}
-                          preflight={pendingPlan.preflight}
-                          actions={planActions}
-                          open={openDecision === pendingPlan.id}
-                          onToggle={() => setOpenDecision((id) => (id === pendingPlan.id ? null : pendingPlan.id))}
-                        />
+                    {decisionCount > 0 && (
+                      <DecisionBar count={decisionCount} onEscape={() => setOpenDecision(null)}>
+                        {blocking.approval && (
+                          <ApprovalDecision
+                            approval={blocking.approval}
+                            onAnswer={handleApproval}
+                            disabled={running}
+                            open={openDecision === blocking.approval.callId}
+                            onToggle={() => toggleDecision(blocking.approval!.callId)}
+                          />
+                        )}
+                        {blocking.waiver && (
+                          <WaiverDecision
+                            waiver={blocking.waiver}
+                            onAnswer={handleWaiver}
+                            disabled={running}
+                            open={openDecision === blocking.waiver.callId}
+                            onToggle={() => toggleDecision(blocking.waiver!.callId)}
+                          />
+                        )}
+                        {blocking.question && (
+                          <QuestionDecision
+                            question={blocking.question}
+                            onAnswer={(answer) => handleSend(answer)}
+                            disabled={running}
+                            open={openDecision === blocking.question.callId}
+                            onToggle={() => toggleDecision(blocking.question!.callId)}
+                          />
+                        )}
+                        {!detail?.parentId && pendingPlan && planActions && (
+                          <PlanDecision
+                            plan={pendingPlan.plan}
+                            preflight={pendingPlan.preflight}
+                            actions={planActions}
+                            open={openDecision === pendingPlan.id}
+                            onToggle={() => toggleDecision(pendingPlan.id)}
+                          />
+                        )}
                       </DecisionBar>
                     )}
                     {!detail?.parentId && detail && served.handedPlan && (
