@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-09T09:52:17.886Z",
+    "detectionDate": "2026-11-09T10:06:11.091Z",
     "formats": {
       "javascript": {
         "sources": {
@@ -641,8 +641,8 @@
             "newClones": 0
           },
           "web/src/components/settings/VersionSection.tsx": {
-            "lines": 41,
-            "tokens": 405,
+            "lines": 48,
+            "tokens": 478,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1817,8 +1817,8 @@
             "newClones": 0
           },
           "web/src/components/layout/UpdateNotice.tsx": {
-            "lines": 5,
-            "tokens": 53,
+            "lines": 7,
+            "tokens": 65,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2070,14 +2070,14 @@
           }
         },
         "total": {
-          "lines": 12571,
-          "tokens": 121595,
+          "lines": 12580,
+          "tokens": 121680,
           "sources": 172,
           "clones": 5,
           "duplicatedLines": 563,
           "duplicatedTokens": 4725,
           "percentage": 4.48,
-          "percentageTokens": 3.89,
+          "percentageTokens": 3.88,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -2733,8 +2733,8 @@
             "newClones": 0
           },
           "web/src/components/settings/VersionSection.tsx": {
-            "lines": 99,
-            "tokens": 1043,
+            "lines": 104,
+            "tokens": 1154,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3969,8 +3969,8 @@
             "newClones": 0
           },
           "web/src/components/layout/UpdateNotice.tsx": {
-            "lines": 119,
-            "tokens": 1214,
+            "lines": 62,
+            "tokens": 584,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4246,14 +4246,14 @@
           }
         },
         "total": {
-          "lines": 24338,
-          "tokens": 236495,
+          "lines": 24286,
+          "tokens": 235976,
           "sources": 180,
           "clones": 25,
           "duplicatedLines": 292,
           "duplicatedTokens": 2492,
           "percentage": 1.2,
-          "percentageTokens": 1.05,
+          "percentageTokens": 1.06,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -5040,6 +5040,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/hooks/useInstallUpdate.ts": {
+            "lines": 64,
+            "tokens": 612,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/hooks/useFetchedText.ts": {
             "lines": 51,
             "tokens": 511,
@@ -5078,14 +5090,14 @@
           }
         },
         "total": {
-          "lines": 10672,
-          "tokens": 107132,
-          "sources": 68,
+          "lines": 10736,
+          "tokens": 107744,
+          "sources": 69,
           "clones": 30,
           "duplicatedLines": 262,
           "duplicatedTokens": 3091,
-          "percentage": 2.46,
-          "percentageTokens": 2.89,
+          "percentage": 2.44,
+          "percentageTokens": 2.87,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -8972,9 +8984,9 @@
       }
     },
     "total": {
-      "lines": 117428,
-      "tokens": 1124004,
-      "sources": 734,
+      "lines": 117449,
+      "tokens": 1124182,
+      "sources": 735,
       "clones": 264,
       "duplicatedLines": 3598,
       "duplicatedTokens": 35932,
