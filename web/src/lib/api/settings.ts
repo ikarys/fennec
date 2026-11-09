@@ -12,11 +12,6 @@ export interface ModelPrefs {
   price?: { inputPerM: number; cachedPerM: number; outputPerM: number } | null;
 }
 
-export interface PanelPage {
-  name: string;
-  blocks: string[];
-}
-
 export type EditorId = 'vscode' | 'vscode-insiders' | 'cursor' | 'windsurf' | 'vscodium';
 
 export interface DisplayPrefs {
@@ -24,8 +19,6 @@ export interface DisplayPrefs {
   toolResultsOpen: boolean;
   /** The UI's base font size in pixels (server default 14, range 13..=16). */
   fontSize: number;
-  /** The context panel's pages; null means the UI's defaults (lib/panelBlocks). */
-  panelPages: PanelPage[] | null;
   /** The UI's display language (server default "en"). */
   language?: 'en' | 'fr';
   /** The IDE the "open in editor" links open (server default "vscode"). */

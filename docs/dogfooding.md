@@ -16,7 +16,7 @@ Fixed: a session that starts a workflow runs in its own git worktree
 files included, is copied in and committed as a snapshot; the base ref
 `refs/fennec/base/<session>` marks where the agent's work starts. fennec
 commits the worktree after each job, as `fennec`. The human integrates with
-`git cherry-pick <base>..<branch>` (the context panel shows the command).
+`git cherry-pick <base>..<branch>` (the decision bar offers the integration).
 A project outside a git repository still runs in place.
 
 Open edges:

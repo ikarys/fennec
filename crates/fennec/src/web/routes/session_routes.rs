@@ -11,7 +11,7 @@ use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
 use crate::domain::clock;
-use crate::domain::conversation::{first_request, last_assistant_text};
+use crate::domain::conversation::last_assistant_text;
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
 use crate::domain::preferences::ModelRef;
@@ -202,8 +202,6 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
         Some(idea) => json!({ "id": idea.id, "state": idea.state }),
         None => Value::Null,
     };
-    // The first human request, so the context panel can show what was asked.
-    v["request"] = json!(first_request(&events));
     // The audit report of the last answer, if it is one: the context panel lists its findings.
     let mut audit_json = json!(audit::parse(&last_assistant_text(&events)));
     if audit_json.is_object() {
@@ -245,18 +243,23 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
             }))
         })
         .unwrap_or(Value::Null);
-    v["worktree"] = match app.place(&store, &s, &p)?.worktree {
+    let place = app.place(&store, &s, &p)?;
+    let ide = store.preferences()?.display.editor;
+    let wsl_distro = std::env::var("WSL_DISTRO_NAME").ok();
+    // Opens the folder the agent works in (its worktree, else the project) in the chosen IDE.
+    v["editorUrl"] = json!(editor::link(
+        ide,
+        &place.workdir.to_string_lossy(),
+        wsl_distro.as_deref()
+    ));
+    v["worktree"] = match place.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
             // What the integration would bring: none means nothing to review.
             "commits": wt.branch.strip_prefix("fennec/")
                 .and_then(|id| git::branch_stats(Path::new(&p.workdir), id))
                 .map_or(0, |stats| stats.commits),
-            "editorUrl": editor::link(
-                store.preferences()?.display.editor,
-                &wt.path.to_string_lossy(),
-                std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
-            ),
+            "editorUrl": editor::link(ide, &wt.path.to_string_lossy(), wsl_distro.as_deref()),
         }),
         None => Value::Null,
     };

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, openTerminal, saveServers, startServer, stopServer } from '../../lib/api';
 import { serverBadge, serversPollMs } from '../../lib/servers';
-import { ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../ui/Icons';
+import { ActivityIcon, ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { useLang, useT } from '../../i18n';
@@ -35,9 +35,12 @@ interface ServerListProps {
 export function ServerList({ sessionId, onConfigure, onServers }: ServerListProps) {
   const t = useT();
   const lang = useLang();
+
   const [servers, setServers] = useState<ServerView[] | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openLogs, setOpenLogs] = useState<Set<string>>(() => new Set());
+
   const fetchId = useRef(0);
   const onServersRef = useRef(onServers);
   const tRef = useRef(t);
@@ -137,6 +140,15 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
     }
   };
 
+  const toggleLogs = (name: string) => {
+    setOpenLogs((current) => {
+      const next = new Set(current);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
   return (
     <div className="flex flex-col gap-1.5">
       {servers === null && <div className="text-xs text-muted">{t('loading')}</div>}
@@ -147,17 +159,33 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
 
       {servers?.map((server) => {
         const badge = serverBadge(lang, server);
+        const showOutput =
+          server.output.length > 0 && (openLogs.has(server.name) || badge.tone === 'err');
+        const stopLabel = t('stopServer', { name: server.name });
+        const startLabel = t('startServer', { name: server.name });
 
         return (
           <div key={server.name} className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent-soft">
+            <div className="flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent-soft">
               <Badge tone={badge.tone} dot pulse={badge.pulse}>
                 {badge.text}
               </Badge>
 
-              <span className="min-w-0 grow truncate font-mono text-xs" title={server.command}>
+              <span
+                className="truncate font-mono text-xs text-text shrink-0"
+                title={server.command}
+              >
                 {server.suggested ? server.command : server.name}
               </span>
+
+              {!server.suggested && (
+                <span
+                  className="min-w-0 grow truncate font-mono text-[11px] text-muted"
+                  title={server.command}
+                >
+                  {server.command}
+                </span>
+              )}
 
               {server.url !== null && server.state === 'ready' && (
                 <a
@@ -182,27 +210,51 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
                   {busyName === server.name && <SpinnerIcon className="h-3.5 w-3.5" />}
                   {t('useThisCommand')}
                 </Button>
-              ) : (
+              ) : server.running ? (
                 <Button
                   variant="ghost"
                   size="sm"
                   iconOnly
                   disabled={busyName !== null}
-                  aria-label={
-                    server.running
-                      ? t('stopServer', { name: server.name })
-                      : t('startServer', { name: server.name })
-                  }
-                  title={server.command}
+                  aria-label={stopLabel}
+                  title={stopLabel}
                   onClick={() => void toggle(server)}
                 >
                   {busyName === server.name ? (
                     <SpinnerIcon className="h-3.5 w-3.5" />
-                  ) : server.running ? (
+                  ) : (
                     <StopIcon className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={busyName !== null}
+                  aria-label={startLabel}
+                  title={startLabel}
+                  onClick={() => void toggle(server)}
+                >
+                  {busyName === server.name ? (
+                    <SpinnerIcon className="h-3.5 w-3.5" />
                   ) : (
                     <PlayIcon className="h-3.5 w-3.5" />
                   )}
+                  {t('serverStart')}
+                </Button>
+              )}
+
+              {server.output.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  aria-pressed={openLogs.has(server.name)}
+                  title={t('serverLogs')}
+                  aria-label={t('serverLogs')}
+                  onClick={() => toggleLogs(server.name)}
+                >
+                  <ActivityIcon className="h-3.5 w-3.5" />
                 </Button>
               )}
             </div>
@@ -211,16 +263,14 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
               <p className="m-0 text-[11px] text-muted">{t('suggestedCommand')}</p>
             )}
 
-            {server.output.length > 0 && server.state !== 'stopped' && (
-              <ServerOutput lines={server.output} />
-            )}
+            {showOutput && <ServerOutput lines={server.output} />}
           </div>
         );
       })}
 
       {error !== null && <div className="text-xs text-err">{error}</div>}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-0.5">
         <Button
           variant="ghost"
           size="sm"
@@ -233,9 +283,15 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
         </Button>
 
         {onConfigure && (
-          <Button variant="soft" size="sm" onClick={onConfigure}>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title={t('configure')}
+            aria-label={t('configure')}
+            onClick={onConfigure}
+          >
             <SettingsIcon className="h-3.5 w-3.5" />
-            {t('configure')}
           </Button>
         )}
       </div>

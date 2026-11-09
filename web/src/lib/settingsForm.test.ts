@@ -52,7 +52,6 @@ function preferences(overrides: Partial<Preferences> = {}): Preferences {
       reasoningOpen: true,
       toolResultsOpen: true,
       fontSize: 14,
-      panelPages: null,
     },
     ...overrides,
   };

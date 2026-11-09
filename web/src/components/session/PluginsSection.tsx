@@ -7,7 +7,6 @@ import { getSessionPluginBlocks, type ServedPluginBlock } from '../../lib/api';
 import { usePluginsVersion } from '../../hooks/usePluginsVersion';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
-import { panelBlock } from '../../lib/panelBlocks';
 import { PuzzleIcon } from '../ui/Icons';
 import { BlockElements } from '../plugins/BlockElements';
 import { PluginBlockCard } from '../plugins/PluginBlockCard';
@@ -48,7 +47,7 @@ export function PluginsSection({ sessionId }: { sessionId: string | null }) {
     <>
       <Panel
         id="plugins"
-        title={t(panelBlock('plugins').titleKey)}
+        title={t('panelPlugins')}
         icon={<PuzzleIcon className="h-3.5 w-3.5" />}
         iconTone={blocks !== null && blocks.length > 0 ? 'accent' : 'neutral'}
         summary={blocks !== null ? String(sharedBlocks.length) : undefined}
