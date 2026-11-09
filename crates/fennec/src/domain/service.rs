@@ -21,6 +21,33 @@ impl Control {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    Running,
+    Stopped,
+    NotInstalled,
+}
+
+impl Status {
+    pub fn of(installed: bool, running: bool) -> Status {
+        if !installed {
+            Status::NotInstalled
+        } else if running {
+            Status::Running
+        } else {
+            Status::Stopped
+        }
+    }
+
+    pub fn message(self) -> &'static str {
+        match self {
+            Status::Running => "fennec service is running",
+            Status::Stopped => "fennec service is installed but not running",
+            Status::NotInstalled => "fennec service is not installed: run `fennec service install`",
+        }
+    }
+}
+
 /// The paths come from the environment: a newline in one would add directives
 /// to a file the service manager runs at every login.
 fn refuse_control_chars(value: &str) -> Result<(), String> {
@@ -216,5 +243,13 @@ mod tests {
             ["bootout", "gui/501", "/p"]
         );
         assert_eq!(launchctl_args(Control::Stop, false, "501", "/p"), None);
+    }
+
+    #[test]
+    fn status_of_all_combinations() {
+        assert_eq!(Status::of(false, false), Status::NotInstalled);
+        assert_eq!(Status::of(false, true), Status::NotInstalled);
+        assert_eq!(Status::of(true, false), Status::Stopped);
+        assert_eq!(Status::of(true, true), Status::Running);
     }
 }

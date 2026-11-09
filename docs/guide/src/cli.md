@@ -97,9 +97,13 @@ fennec service install
 fennec service start
 fennec service stop
 fennec service restart
+fennec service status
+fennec service uninstall
 ```
 
 `fennec service install` writes a systemd user service on Linux or a launchd agent on macOS, then starts it now and at each login. It runs the binary that ran the command, with the `PATH` of your shell. A service file already there is yours: it is kept as it is.
+
+`fennec service status` reports running, installed but stopped, or not installed. `fennec service uninstall` stops the service, disables it, and deletes its file (the systemd unit or launchd agent); the binary stays.
 
 ## Environment defaults
 
