@@ -415,7 +415,7 @@ export function McpSection({
     >
       {error ? <p className="text-xs text-err">{error}</p> : null}
       {value.length === 0 ? (
-        <p className="text-sm text-muted">{t('noMcpServers')}</p>
+        <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">{t('noMcpServers')}</p>
       ) : (
         value.map((server, index) => (
           <ServerCard
