@@ -35,12 +35,12 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
       icon={<ServerIcon className="h-3.5 w-3.5" />}
       iconTone={runningCount > 0 ? 'accent' : 'neutral'}
       summary={summary}
+      hint={note}
     >
       <div className="flex flex-col gap-1.5">
         <ServerList
           key={refreshKey}
           sessionId={sessionId}
-          note={note}
           onConfigure={() => setEditorOpen(true)}
           onServers={(nextServers) => {
             setServers(nextServers);
