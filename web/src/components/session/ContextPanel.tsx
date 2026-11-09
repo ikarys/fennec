@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import type {
+  ContextView,
   SeenImage,
   ServedThread,
   SessionDetail,
@@ -23,6 +24,7 @@ import { PLUGIN_ICONS } from '../plugins/pluginIcons';
 import { loadPinned, loadTab, savePinned, saveTab } from './contextRailStorage';
 import { RailTab } from './RailTab';
 import { CriteriaSection } from './CriteriaSection';
+import { ContextSection } from './ContextSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
 import { PluginsSection, PluginOwnSection } from './PluginsSection';
@@ -53,6 +55,9 @@ interface ContextPanelProps {
   integrationVersion: number;
   vision: SeenImage[];
   served: ServedThread;
+  context: ContextView | null;
+  /** Bumped by the header's gauge: opens the Session tab on its Context section. */
+  contextRevealKey: number;
 }
 
 export function ContextPanel({
@@ -67,12 +72,18 @@ export function ContextPanel({
   integrationVersion,
   vision,
   served,
+  context,
+  contextRevealKey,
 }: ContextPanelProps) {
   const t = useT();
   const [pinned, setPinned] = useState(loadPinned);
   const [open, setOpen] = useState<string | null>(() => (pinned ? loadTab() ?? 'work' : null));
   const [runningServers, setRunningServers] = useState(0);
   const blocks = useSessionPluginBlocks(sessionId);
+
+  useEffect(() => {
+    if (contextRevealKey > 0) setOpen('session');
+  }, [contextRevealKey]);
 
   const sharedBlocks = blocks?.filter((block) => block.placement !== 'own_panel') ?? [];
 
@@ -192,6 +203,7 @@ export function ContextPanel({
       </div>
       <div className={current === 'session' ? undefined : 'hidden'}>
         <TokensSection usage={usage} />
+        <ContextSection context={context} revealKey={contextRevealKey} />
         <DecisionsSection decisions={served.decisions} />
         <SkillsSection skills={skills} hasSession={hasSession} />
         <VisionSection images={vision} />

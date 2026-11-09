@@ -1,5 +1,5 @@
 /**
- * What a context is made of (the gauge's popover, Insight's consumers): a
+ * What a context is made of (the Session drawer's Context section, Insight's consumers): a
  * stacked bar by kind, then each part with its share. Every figure comes from the server.
  */
 import type { ContextComposition as Composition, ContextPartKind } from '../../lib/api';

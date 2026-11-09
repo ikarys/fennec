@@ -1,7 +1,6 @@
 import type { ContextView } from '../../lib/api';
 import { CompressIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
-import { ContextComposition } from './ContextComposition';
 import { useT } from '../../i18n';
 
 interface ContextGaugeProps {
@@ -10,6 +9,8 @@ interface ContextGaugeProps {
   compactDisabled: boolean;
   onCompact: () => void;
   compactError: string | null;
+  /** Opens the Session drawer on its Context section. */
+  onOpen: () => void;
 }
 
 const TONE_CLASS: Record<ContextView['tone'], string> = {
@@ -18,7 +19,7 @@ const TONE_CLASS: Record<ContextView['tone'], string> = {
   err: 'bg-err'
 };
 
-export function ContextGauge({ context, compactDisabled, onCompact, compactError }: ContextGaugeProps) {
+export function ContextGauge({ context, compactDisabled, onCompact, compactError, onOpen }: ContextGaugeProps) {
   const t = useT();
   const percent = context?.percent ?? 0;
   return (
@@ -30,25 +31,21 @@ export function ContextGauge({ context, compactDisabled, onCompact, compactError
       aria-valuenow={percent}
       className="flex shrink-0 items-center gap-2"
     >
-      {/* Hover or keyboard focus opens the popover; no state to keep. */}
-      <div tabIndex={0} className="group relative flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent-soft">
-        <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-raised">
-          <div className={`h-full ${TONE_CLASS[context?.tone ?? 'ok']}`} style={{ width: `${percent}%` }} />
+      <button
+        type="button"
+        onClick={onOpen}
+        title={context?.title ?? t('contextOfModel')}
+        aria-label={t('contextOpenDetail')}
+        className="flex items-center gap-2 rounded-md px-1 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent-soft"
+      >
+        <span className="relative block h-1.5 w-24 overflow-hidden rounded-full bg-raised">
+          <span className={`block h-full ${TONE_CLASS[context?.tone ?? 'ok']}`} style={{ width: `${percent}%` }} />
           {context?.compactMark != null && (
             <span aria-hidden className="absolute inset-y-0 w-px bg-text/60" style={{ left: `${context.compactMark}%` }} />
           )}
-        </div>
-        <span className="text-xs text-muted tabular-nums whitespace-nowrap" title={context?.title}>{context?.line ?? '…'}</span>
-        {context && (
-          <div
-            role="tooltip"
-            className="invisible absolute top-full left-0 z-30 mt-2 flex w-96 flex-col gap-3 rounded-lg border border-border-strong bg-panel p-4 opacity-0 shadow-float transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
-          >
-            <p className="m-0 text-xs text-muted">{context.title}</p>
-            {context.composition && <ContextComposition composition={context.composition} />}
-          </div>
-        )}
-      </div>
+        </span>
+        <span className="text-xs text-muted tabular-nums whitespace-nowrap">{context?.line ?? '…'}</span>
+      </button>
       <Button
         variant="secondary"
         size="sm"

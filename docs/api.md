@@ -615,7 +615,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `cost` is the estimate at each model's price (Settings, models), `—` when none has one, indicative;
   `costDetail` says how or why not; `inputCost` (all prompt tokens, as `promptTokens`), `cachedCost` and
   `outputCost` are the parts' costs, null when no model has a price; 404 if no session
-- `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title, composition}`: the header's gauge, from
+- `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title, summary, composition}`: the header's gauge and the Session drawer's Context section (`summary`, its collapsed line), from
   the last `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off);
   events without `compactAt` and sessions without a measure use the current settings. `composition` (null while
   nothing is measured) is what the context holds: `kinds` `[{kind, label, tokens, percent}]` for the stacked bar

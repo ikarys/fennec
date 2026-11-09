@@ -131,6 +131,7 @@ export function SessionPage({
   // The decision bar opens one row at a time; the id is the decision's (a plan's call id).
   const [openDecision, setOpenDecision] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [contextRevealKey, setContextRevealKey] = useState(0);
   const [canvasId, setCanvasId] = useState<number | null>(null);
   const [runComment, setRunComment] = useState("");
   const [detailVersion, setDetailVersion] = useState(0);
@@ -690,6 +691,7 @@ export function SessionPage({
                             }
                             onCompact={handleCompact}
                             compactError={compactError}
+                            onOpen={() => setContextRevealKey((key) => key + 1)}
                           />
                         </div>
                       </div>
@@ -942,6 +944,8 @@ export function SessionPage({
                     view={view}
                     skills={skills}
                     usage={usage}
+                    context={context}
+                    contextRevealKey={contextRevealKey}
                     hasSession={sessionId !== null}
                     worktree={detail?.worktree ?? null}
                     editorUrl={detail?.editorUrl ?? null}
