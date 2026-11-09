@@ -123,6 +123,9 @@ pub(crate) fn create_session(
         }
         _ => None,
     };
+    if let Err(refusal) = app.settings.require_model(&prefs, model_ref.as_ref()) {
+        return error(stream, 409, &refusal);
+    }
     let mode = body.get("mode").and_then(Value::as_str).map(str::to_string);
     let mode_event = match &mode {
         Some(mode) => {
@@ -448,6 +451,13 @@ pub(crate) fn send_message(
     // Refused before the message is recorded, so the composer keeps the text;
     // `turn_build` refuses the other paths.
     if let Err(refusal) = crate::budget::check(&app.settings, &store, &p.id) {
+        return error(stream, 409, &refusal);
+    }
+    let (chosen, _) = model_routes::session_choice(&store, id)?;
+    if let Err(refusal) = app
+        .settings
+        .require_model(&store.preferences()?, chosen.as_ref())
+    {
         return error(stream, 409, &refusal);
     }
     if app.turns.is_running(id) {

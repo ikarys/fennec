@@ -412,6 +412,9 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
             {error && <p className="m-0 text-xs text-err">{error}</p>}
             {tab === 'models' && (
               <>
+                {!form.model && !settings.defaults.model && (
+                  <p className="m-0 text-sm text-attention">{t('modelSetupNotice')}</p>
+                )}
                 <ModelSection
                   save={groupSave('model')}
                   value={form.model}

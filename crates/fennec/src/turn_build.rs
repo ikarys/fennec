@@ -72,6 +72,7 @@ pub fn with_turn<R>(
         None => &metered,
     };
     let prefs = store.preferences()?;
+    settings.require_model(&prefs, options.model_choice.as_ref())?;
     let params = settings.llm.for_turn(&prefs, options.model_choice.as_ref());
     let instructions = all_instructions(prefs.global_instructions.as_deref(), workdir);
     let skills = skills::discover(workdir);
@@ -269,7 +270,7 @@ mod tests {
     fn settings(dir: &Path) -> Settings {
         Settings {
             llm: LlmSettings {
-                base_url: "http://127.0.0.1:8000/v1".into(),
+                base_url: Some("http://127.0.0.1:8000/v1".into()),
                 api_key: None,
                 defaults: ModelParams {
                     provider: LOCAL_PROVIDER.to_string(),

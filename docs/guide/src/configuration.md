@@ -6,7 +6,7 @@ Reference for environment variables, `settings.yaml`, and the files and folders 
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `FENNEC_LLM_URL` | `http://127.0.0.1:8000/v1` | OpenAI-compatible endpoint of the `local` provider. |
+| `FENNEC_LLM_URL` | None | OpenAI-compatible endpoint of the `local` provider. Without it, set one on **Settings** > **Models**. |
 | `FENNEC_MODEL` | First model the endpoint lists | Model of the `local` provider. |
 | `FENNEC_API_KEY` | None | API key of the `local` provider. |
 | `FENNEC_MAX_TOKENS` | `32000` | Output token limit of a model call. |

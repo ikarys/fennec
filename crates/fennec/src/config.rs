@@ -13,7 +13,8 @@ pub struct Settings {
 
 #[derive(Clone)]
 pub struct LlmSettings {
-    pub base_url: String,
+    /// `FENNEC_LLM_URL`. None: the local provider's endpoint comes from Settings.
+    pub base_url: Option<String>,
     pub api_key: Option<String>,
     /// Defaults from the environment (or the startup listing).
     pub defaults: ModelParams,
@@ -46,7 +47,8 @@ impl Settings {
             let base_url = entry
                 .map(|p| p.base_url.clone())
                 .filter(|url| !url.is_empty())
-                .unwrap_or_else(|| self.llm.base_url.clone());
+                .or_else(|| self.llm.base_url.clone())
+                .ok_or("the local provider has no endpoint: set it in Settings, Models")?;
             (base_url, self.llm.api_key.clone())
         } else {
             let entry = entry.ok_or_else(|| format!("unknown provider {provider}"))?;
@@ -57,6 +59,25 @@ impl Settings {
             None => env_key,
         };
         Ok(Endpoint { base_url, api_key })
+    }
+
+    /// Whether the human has named a model or an endpoint yet. An endpoint that
+    /// is merely down is configured: it must not send them back to the setup.
+    pub fn model_configured(&self, prefs: &Preferences) -> bool {
+        let default = prefs.default_model(&self.llm.defaults);
+        !default.model.is_empty() || self.endpoint(prefs, &default.provider).is_ok()
+    }
+
+    /// A turn needs a model: refused here rather than sent to an endpoint with an empty name.
+    pub fn require_model(
+        &self,
+        prefs: &Preferences,
+        chosen: Option<&ModelRef>,
+    ) -> Result<(), String> {
+        if self.llm.for_turn(prefs, chosen).model.is_empty() {
+            return Err("no model chosen yet: pick one in Settings, Models".into());
+        }
+        Ok(())
     }
 
     /// The master key file is read only when a sealed key is used.
@@ -100,21 +121,24 @@ impl Settings {
 
 impl LlmSettings {
     fn from_env() -> Result<LlmSettings, String> {
-        let base_url =
-            std::env::var("FENNEC_LLM_URL").unwrap_or_else(|_| "http://127.0.0.1:8000/v1".into());
+        let base_url = std::env::var("FENNEC_LLM_URL")
+            .ok()
+            .filter(|url| !url.is_empty());
         let api_key = std::env::var("FENNEC_API_KEY").ok();
-        // fennec still starts when the endpoint is down: the human reaches
-        // the UI, and the model chosen in Settings (or FENNEC_MODEL) is used
-        // once the endpoint is back.
-        let endpoint = Endpoint {
-            base_url: base_url.clone(),
-            api_key: api_key.clone(),
-        };
-        let listed = list_models(&endpoint).unwrap_or_else(|e| {
-            eprintln!(
-                "fennec: the model endpoint did not answer ({e}); starting without its listing"
-            );
-            Vec::new()
+        // fennec still starts when the endpoint is down or not set: the human
+        // reaches the UI, and the model chosen in Settings (or FENNEC_MODEL) is
+        // used once the endpoint is back. Only a URL they named is worth a warning.
+        let listed = base_url.as_ref().map_or_else(Vec::new, |url| {
+            let endpoint = Endpoint {
+                base_url: url.clone(),
+                api_key: api_key.clone(),
+            };
+            list_models(&endpoint).unwrap_or_else(|e| {
+                eprintln!(
+                    "fennec: the model endpoint did not answer ({e}); starting without its listing"
+                );
+                Vec::new()
+            })
         });
         let model = std::env::var("FENNEC_MODEL")
             .ok()
@@ -235,7 +259,7 @@ mod tests {
     fn settings(dir: &Path) -> Settings {
         Settings {
             llm: LlmSettings {
-                base_url: "http://127.0.0.1:8000/v1".into(),
+                base_url: Some("http://127.0.0.1:8000/v1".into()),
                 api_key: Some("env-key".into()),
                 defaults: ModelParams {
                     provider: LOCAL_PROVIDER.to_string(),
@@ -253,7 +277,7 @@ mod tests {
 
     fn env_endpoint(settings: &Settings) -> Endpoint {
         Endpoint {
-            base_url: settings.llm.base_url.clone(),
+            base_url: settings.llm.base_url.clone().unwrap(),
             api_key: settings.llm.api_key.clone(),
         }
     }
@@ -266,6 +290,51 @@ mod tests {
             api_key,
             models: BTreeMap::new(),
         }
+    }
+
+    fn unconfigured(dir: &Path) -> Settings {
+        let mut settings = settings(dir);
+        settings.llm.base_url = None;
+        settings.llm.defaults.model = String::new();
+        settings
+    }
+
+    #[test]
+    fn nothing_named_is_not_configured_and_refuses_a_turn() {
+        let settings = unconfigured(&test_dir("unconfigured"));
+        let prefs = Preferences::default();
+        assert!(!settings.model_configured(&prefs));
+        assert!(settings.endpoint(&prefs, LOCAL_PROVIDER).is_err());
+        assert!(settings.require_model(&prefs, None).is_err());
+    }
+
+    #[test]
+    fn a_stored_endpoint_is_configured_even_before_a_model_is_chosen() {
+        let settings = unconfigured(&test_dir("stored-endpoint"));
+        let prefs = Preferences {
+            providers: vec![local_provider("http://models.example/v1", None)],
+            ..Preferences::default()
+        };
+        assert!(settings.model_configured(&prefs));
+        assert_eq!(
+            settings.endpoint(&prefs, LOCAL_PROVIDER).unwrap().base_url,
+            "http://models.example/v1"
+        );
+        assert!(settings.require_model(&prefs, None).is_err());
+    }
+
+    #[test]
+    fn a_session_s_chosen_model_is_enough_for_a_turn() {
+        let settings = unconfigured(&test_dir("chosen-model"));
+        let chosen = ModelRef {
+            provider: LOCAL_PROVIDER.to_string(),
+            model: "m".into(),
+        };
+        assert!(
+            settings
+                .require_model(&Preferences::default(), Some(&chosen))
+                .is_ok()
+        );
     }
 
     #[test]

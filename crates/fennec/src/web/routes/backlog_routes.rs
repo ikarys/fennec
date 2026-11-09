@@ -131,7 +131,7 @@ mod tests {
     fn app() -> App {
         let settings = Settings {
             llm: LlmSettings {
-                base_url: "http://localhost".into(),
+                base_url: Some("http://localhost".into()),
                 api_key: None,
                 defaults: ModelParams {
                     provider: "local".into(),

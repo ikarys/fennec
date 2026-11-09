@@ -30,6 +30,8 @@ pub struct Check {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModelFact {
+    /// No model and no endpoint named yet: the human has a choice to make.
+    NotConfigured,
     Reachable {
         model: String,
         listed: bool,
@@ -59,6 +61,11 @@ pub struct Facts {
 
 pub fn checks(facts: &Facts) -> Vec<Check> {
     let model = match &facts.model {
+        ModelFact::NotConfigured => Check {
+            id: CheckId::Model,
+            status: CheckStatus::Todo,
+            detail: Some("no model yet: add its endpoint and pick one".to_owned()),
+        },
         ModelFact::Reachable {
             model,
             listed,
@@ -189,6 +196,15 @@ mod tests {
             checks[0].detail.as_deref(),
             Some("http://example/models: timeout")
         );
+    }
+
+    #[test]
+    fn no_model_named_is_todo() {
+        let mut facts = good();
+        facts.model = ModelFact::NotConfigured;
+        let checks = checks(&facts);
+        assert_eq!(checks[0].status, CheckStatus::Todo);
+        assert!(!complete(&checks));
     }
 
     #[test]
