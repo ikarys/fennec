@@ -3,7 +3,7 @@ import {
   planFromProposal,
   reportFromSubmission,
   splitContract,
-  planSourceOf,
+  pendingPlanOf,
   lastHumanMessage,
   type Plan,
   type Report
@@ -285,52 +285,26 @@ describe('reportFromSubmission', () => {
   });
 });
 
-describe('planSourceOf', () => {
-  it('returns null when there is no assistant', () => {
-    const items: ThreadItem[] = [
-      { kind: 'user', id: 'u1', content: 'hello', isSystemGenerated: false, attachments: [] },
-    ];
-    expect(planSourceOf(items)).toBeNull();
+describe('pendingPlanOf', () => {
+  it('returns null when no plan waits', () => {
+    expect(pendingPlanOf(null)).toBeNull();
   });
 
-  it('lets a plan segment win over a text plan contract', () => {
-    const planObject: Plan = {
-      kind: 'plan',
-      title: 'P',
-      goal: 'G',
-      steps: [],
-      doneWhen: [],
-      risks: []
-    };
-    const items: ThreadItem[] = [
-      {
-        kind: 'assistant',
-        id: 'a1',
-        done: true,
-        segments: [
-          { kind: 'text', id: 't1', content: '## Plan: Text\n## Step 1: A\n- Change: a' },
-          { kind: 'plan', id: 'p1', plan: planObject, markdown: 'plan markdown' }
-        ],
-      },
-    ];
-    expect(planSourceOf(items)).toEqual({ id: 'p1', content: 'plan markdown' });
-  });
-
-  it('uses the text segment id and content for a text-only plan contract', () => {
-    const items: ThreadItem[] = [
-      {
-        kind: 'assistant',
-        id: 'a1',
-        done: true,
-        segments: [
-          { kind: 'text', id: 't1', content: '## Plan: Text\n## Step 1: A\n- Change: a' },
-        ],
-      },
-    ];
-    expect(planSourceOf(items)).toEqual({
-      id: 't1',
-      content: '## Plan: Text\n## Step 1: A\n- Change: a',
+  it('turns the served plan into the card plan and its preflight into views', () => {
+    const found = pendingPlanOf({
+      callId: 'call-1',
+      plan: { title: 'Add feature', goal: 'Goal', steps: [{ title: 'Do' }], doneWhen: [{ text: 'tests pass', check: 'npm test' }], risks: [] },
+      markdown: 'plan markdown',
+      preflight: [
+        { criterionId: 'c1', command: 'npm test', verdict: 'fails', exitCode: 1, output: 'fail', existenceOnly: false },
+        { criterionId: 'c2', command: 'rg x', verdict: 'cannotRun', exitCode: null, output: '', existenceOnly: true }
+      ]
     });
+    expect(found?.id).toBe('call-1');
+    expect(found?.plan.title).toBe('Add feature');
+    expect(found?.plan.steps[0]?.number).toBe(1);
+    expect(found?.markdown).toBe('plan markdown');
+    expect(found?.preflight.map((result) => result.exitCode)).toEqual([1, undefined]);
   });
 });
 

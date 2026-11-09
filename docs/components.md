@@ -274,3 +274,9 @@ card shows the agent and the task, and marks the answer indicative, with the tim
 **The background service.** `fennec service install|start|stop|restart` keeps the server running without a terminal, as a systemd
 user service or a launchd agent. A service file already there is the human's and is kept; a path that could add a directive to the
 file is refused (`domain/service.rs`, `service.rs`, `cli/service.rs`).
+Decision bar, done: the plan waiting for the human's decision sits in a bar docked above the composer, so its
+actions (build in a worktree or in the human's checkout, build alone, revise, idea ready) stay at hand while
+the discussion goes on; a row opens in place on the whole plan. The server folds which plan waits
+(`domain/plan.rs` `pending`, served as `pendingPlan`): a question after the plan keeps it offered; the thread's
+plan card stays the record, marked pending. A plan marked idea ready leaves the bar for a note (the queue runs it;
+`handedPlan`, `web/views/thread_view.rs`), with a link to the project's tasks and a take-back while it waits (`web/src/components/session/DecisionBar.tsx`, `PlanDecision.tsx`).

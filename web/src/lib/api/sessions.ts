@@ -1,5 +1,6 @@
 import { request } from "./request";
 import type { ModelRef, SessionModel } from "./settings";
+import type { PlanProposal } from "../plan";
 
 export type SessionState =
   | "running"
@@ -327,10 +328,22 @@ export interface CriteriaTally {
   indicative: number;
 }
 
+/** A `plan.proposed` still waiting for the human, with the preflight of its turn. */
+export interface ServedPendingPlan {
+  callId: string;
+  plan: PlanProposal;
+  markdown: string;
+  preflight: { criterionId: string; command: string; verdict: 'fails' | 'passesAlready' | 'cannotRun'; exitCode: number | null; output: string; existenceOnly: boolean }[];
+}
+
 /** The session's blocks folded by the server: the UI computes none. */
 export interface ServedThread {
   pendingApproval: PendingApproval | null;
   pendingWaiver: PendingWaiver | null;
+  /** The plan waiting for the human's decision, served whole; null once built or left. */
+  pendingPlan: ServedPendingPlan | null;
+  /** The plan the session's idea carried to the backlog; undoable while the idea only waits. */
+  handedPlan: { ideaId: string; undoable: boolean } | null;
   /** Messages queued while a turn runs, in order. */
   queued: QueuedMessage[];
   /** The criteria in force: the last criteria.set and the updates since. */
