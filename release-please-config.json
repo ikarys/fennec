@@ -39,7 +39,12 @@
         {
           "type": "toml",
           "path": "Cargo.lock",
-          "jsonpath": "$.package[?(@.name.value==='llm-providers')].version"
+          "jsonpath": "$.package[?(@.name.value==='rules')].version"
+        },
+        {
+          "type": "toml",
+          "path": "Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value==='canvas')].version"
         },
         {
           "type": "toml",
