@@ -6,7 +6,7 @@ import type {
   SessionDetail,
   SessionState,
 } from "../lib/api";
-import { lastHumanMessage, planSourceOf } from "../lib/plan";
+import { lastHumanMessage, pendingPlanOf } from "../lib/plan";
 import {
   createSession,
   getSession,
@@ -43,7 +43,10 @@ import { WaiverCard } from "../components/session/WaiverCard";
 import { QueuedMessages } from "../components/session/QueuedMessages";
 import { RetryCard } from "../components/session/RetryCard";
 import { ThreadItemView } from "../components/session/Thread";
-import { PlanActionsContext, type PlanActions } from "../components/session/PlanActions";
+import { PendingPlanContext, planAnchorId } from "../components/session/PendingPlan";
+import { DecisionBar } from "../components/session/DecisionBar";
+import { HandedPlanNote } from "../components/session/HandedPlanNote";
+import { PlanDecision, type PlanDecisionActions } from "../components/session/PlanDecision";
 import {
   CallUsageContext,
   WorkflowUsageContext,
@@ -124,6 +127,8 @@ export function SessionPage({
   // the default build workflow (a "go on" there once ran a whole build).
   const framingIdea = detail?.idea?.state === "framing";
   const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
+  // The decision bar opens one row at a time; the id is the decision's (a plan's call id).
+  const [openDecision, setOpenDecision] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [canvasId, setCanvasId] = useState<number | null>(null);
   const [runComment, setRunComment] = useState("");
@@ -145,6 +150,7 @@ export function SessionPage({
     context,
     vision,
     served,
+    refreshThread,
   } = useSessionThread(sessionId);
   const lang = useLang();
   const t = useT();
@@ -311,23 +317,25 @@ export function SessionPage({
   const title =
     view.name ?? detail?.title ?? (sessionId ? t('session') : isChat ? t('paletteNewChat') : t('newSession'));
 
-  const planSource = planSourceOf(view.items);
-  const planActions: PlanActions | null =
-    planSource &&
-    !running &&
-    !view.pendingQuestion &&
-    (!run || run.finished) &&
-    mode === "plan"
+  // The server serves the plan that waits whole: the thread holds only the log's tail, an
+  // older plan would be missing from it. A question after the plan keeps it offered.
+  const pendingPlan = useMemo(() => pendingPlanOf(served.pendingPlan), [served.pendingPlan]);
+  const planSource = pendingPlan ? { id: pendingPlan.id, content: pendingPlan.markdown } : null;
+  const planActions: PlanDecisionActions | null =
+    pendingPlan && !view.pendingQuestion && (!run || run.finished)
       ? {
-          segmentId: planSource.id,
           onBuild: handlePlanBuild,
           onBuildAlone: handlePlanBuildAlone,
           onRevise: handlePlanRevise,
+          onShowInThread: () =>
+            document.getElementById(planAnchorId(pendingPlan.id))?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          // Without the default workflow, Launch falls back to the builder alone, in the folder.
+          worktreeAvailable: !isChat && workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID),
           ideaReady: detail
             ? {
                 onMark: () => void handleIdeaReady(),
                 idea:
-                  backlogSegment === planSource.id
+                  backlogSegment === pendingPlan.id
                     ? "saved"
                     : detail.idea?.state === "ready"
                       ? "ready"
@@ -524,6 +532,8 @@ export function SessionPage({
       }
       setBacklogSegment(planSource.id);
       setDetailVersion((version) => version + 1);
+      // A backlog event is not in the session's log: the bar learns of it by asking again.
+      refreshThread();
     } catch (err) {
       setSendError(err instanceof Error ? err.message : t('unknownError'));
     }
@@ -544,6 +554,18 @@ export function SessionPage({
     }
   }
 
+  async function handleTakeBackPlan(ideaId: string) {
+    if (!detail) return;
+    setSendError(null);
+    try {
+      await frameIdea(detail.project.id, ideaId, detail.id);
+      setDetailVersion((version) => version + 1);
+      refreshThread();
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : t('unknownError'));
+    }
+  }
+
   function handlePlanRevise() {
     // The revision is an ordinary message to the planner, not a workflow start.
     setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
@@ -556,7 +578,7 @@ export function SessionPage({
       <CanvasSessionContext.Provider value={sessionId ?? undefined}>
       {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
       <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
-        <PlanActionsContext.Provider value={planActions}>
+        <PendingPlanContext.Provider value={served.pendingPlan?.callId ?? null}>
           <IntegrationInviteContext.Provider value={integrationInvite}>
             <CallUsageContext.Provider value={calls}>
               <WorkflowUsageContext.Provider value={workflowUsage}>
@@ -804,6 +826,23 @@ export function SessionPage({
                     {!detail?.parentId && (
                       <QueuedMessages queued={served.queued} onCancel={handleCancelQueued} />
                     )}
+                    {!detail?.parentId && pendingPlan && planActions && (
+                      <DecisionBar count={1} onEscape={() => setOpenDecision(null)}>
+                        <PlanDecision
+                          plan={pendingPlan.plan}
+                          preflight={pendingPlan.preflight}
+                          actions={planActions}
+                          open={openDecision === pendingPlan.id}
+                          onToggle={() => setOpenDecision((id) => (id === pendingPlan.id ? null : pendingPlan.id))}
+                        />
+                      </DecisionBar>
+                    )}
+                    {!detail?.parentId && detail && served.handedPlan && (
+                      <HandedPlanNote
+                        projectId={detail.project.id}
+                        onUndo={served.handedPlan.undoable ? () => void handleTakeBackPlan(served.handedPlan!.ideaId) : undefined}
+                      />
+                    )}
                     {!detail?.parentId && (
                       <Composer
                         text={text}
@@ -896,7 +935,7 @@ export function SessionPage({
               </WorkflowUsageContext.Provider>
             </CallUsageContext.Provider>
           </IntegrationInviteContext.Provider>
-        </PlanActionsContext.Provider>
+        </PendingPlanContext.Provider>
       </PreviewWorkdirContext.Provider>
       </CanvasSessionContext.Provider>
      </CanvasOpenerContext.Provider>

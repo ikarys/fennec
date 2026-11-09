@@ -3,6 +3,8 @@
 //! ever parse that markdown.
 
 use super::criteria::{self, Criterion};
+use super::event::{Event, Role};
+use super::preflight::PreflightResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,6 +86,61 @@ impl Plan {
     pub fn criteria(&self) -> Vec<Criterion> {
         criteria::parse_done_when(&self.to_markdown())
     }
+}
+
+/// The plan still waiting for the human, served whole: the UI loads only the log's tail, so
+/// it cannot look an older plan up by its id.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pending {
+    pub call_id: String,
+    pub plan: Plan,
+    pub markdown: String,
+    /// The plan's checks run at the end of the planner's turn, empty when none ran.
+    pub preflight: Vec<PreflightResult>,
+}
+
+/// The last `plan.proposed`, unless a workflow started since or the human wrote after leaving
+/// the plan agent. A later human question in plan mode keeps it pending: the decision stays
+/// offered while they discuss.
+pub fn pending(events: &[Event]) -> Option<Pending> {
+    let mut pending: Option<Pending> = None;
+    let mut left_plan = false;
+
+    for event in events {
+        match event {
+            Event::PlanProposed {
+                call_id,
+                plan,
+                markdown,
+            } => {
+                pending = Some(Pending {
+                    call_id: call_id.clone(),
+                    plan: plan.clone(),
+                    markdown: markdown.clone(),
+                    preflight: Vec::new(),
+                });
+                left_plan = false;
+            }
+            Event::CriteriaPreflight { results, .. } => {
+                if let Some(pending) = pending.as_mut() {
+                    pending.preflight = results.clone();
+                }
+            }
+            Event::WorkflowStarted { .. } => pending = None,
+            Event::ModeChanged { mode, .. } => {
+                left_plan = mode.as_str() != "plan";
+            }
+            Event::MessageStart {
+                role: Role::User,
+                is_system_generated: false,
+                ..
+            } if left_plan => pending = None,
+            _ => {}
+        }
+    }
+
+    pending
 }
 
 #[cfg(test)]
@@ -203,5 +260,131 @@ mod tests {
         );
         let back: Plan = serde_json::from_value(value).unwrap();
         assert_eq!(back, plan());
+    }
+
+    fn pending_id(events: &[Event]) -> Option<String> {
+        pending(events).map(|pending| pending.call_id)
+    }
+
+    fn proposed(id: &str) -> Event {
+        Event::PlanProposed {
+            call_id: id.into(),
+            plan: Plan {
+                title: String::new(),
+                goal: String::new(),
+                steps: vec![],
+                done_when: vec![],
+                risks: vec![],
+            },
+            markdown: String::new(),
+        }
+    }
+
+    fn human(text: &str) -> Event {
+        Event::MessageStart {
+            message_id: "m".into(),
+            role: Role::User,
+            content: Some(text.into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: vec![],
+        }
+    }
+
+    fn mode(m: &str) -> Event {
+        Event::ModeChanged {
+            mode: m.into(),
+            auto: false,
+            reason: None,
+        }
+    }
+
+    fn started() -> Event {
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: serde_json::from_value(serde_json::json!({
+                "id": "w",
+                "name": "w",
+                "nodes": []
+            }))
+            .unwrap(),
+            task: String::new(),
+            step_by_step: false,
+            started_at: None,
+        }
+    }
+
+    #[test]
+    fn no_plan_none_pending() {
+        assert_eq!(pending_id(&[]), None);
+    }
+
+    #[test]
+    fn a_proposed_plan_is_pending() {
+        assert_eq!(pending_id(&[proposed("p1")]), Some("p1".into()));
+    }
+
+    #[test]
+    fn a_question_in_plan_mode_keeps_it_pending() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), human("why?")]),
+            Some("p1".into())
+        );
+    }
+
+    #[test]
+    fn a_newer_plan_replaces_the_older() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), proposed("p2")]),
+            Some("p2".into())
+        );
+    }
+
+    #[test]
+    fn a_started_workflow_clears_it() {
+        assert_eq!(pending_id(&[proposed("p1"), started()]), None);
+    }
+
+    #[test]
+    fn writing_after_leaving_plan_clears_it() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), mode("builder"), human("go")]),
+            None
+        );
+    }
+
+    #[test]
+    fn switching_back_to_plan_keeps_it() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), mode("builder"), mode("plan"), human("hm")]),
+            Some("p1".into())
+        );
+    }
+
+    #[test]
+    fn switching_away_without_writing_keeps_it() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), mode("builder")]),
+            Some("p1".into())
+        );
+    }
+
+    #[test]
+    fn carries_the_preflight_of_its_turn() {
+        let result = PreflightResult {
+            criterion_id: "c1".into(),
+            command: "cargo test".into(),
+            verdict: super::super::preflight::PreflightVerdict::Fails,
+            exit_code: Some(1),
+            output: String::new(),
+            existence_only: false,
+        };
+        let preflight = Event::CriteriaPreflight {
+            message_id: "m".into(),
+            results: vec![result.clone()],
+        };
+        let served = pending(&[proposed("p1"), preflight]).unwrap();
+        assert_eq!(served.preflight, vec![result]);
+        assert!(pending(&[proposed("p1")]).unwrap().preflight.is_empty());
     }
 }

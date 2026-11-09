@@ -18,7 +18,7 @@ import { RunEndCard } from '../workflow/session/RunEndCard';
 import { markdownComponents } from './markdownComponents';
 import { splitSources } from '../../lib/sources';
 import { attachmentAnchorId } from '../../lib/vision';
-import { usePlanActions } from './PlanActions';
+import { planAnchorId, usePendingPlan } from './PendingPlan';
 import { useT } from '../../i18n';
 
 // The model's prose stops at a readable line length; its stats and actions line up with it.
@@ -53,17 +53,12 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 
 const REMARK_PLUGINS = [remarkGfm];
 
-const TextSegment = memo(function TextSegment({ content, caret, id, preflight }: { content: string; caret: boolean; id?: string; preflight?: PreflightResultView[] }) {
+const TextSegment = memo(function TextSegment({ content, caret, preflight }: { content: string; caret: boolean; preflight?: PreflightResultView[] }) {
   const t = useT();
-  const actions = usePlanActions();
   // Parsed only when settled: a half-written contract would flicker between the
   // two renderings while the message streams.
   const contract = useMemo(() => (caret ? null : splitContract(content)), [content, caret]);
   const split = useMemo(() => splitSources(content), [content]);
-  const planActions =
-    actions && id !== undefined && actions.segmentId === id && contract?.contract.kind === 'plan'
-      ? actions
-      : null;
   // The model's words sit on a surface, like the plan card, so they are told
   // apart from the thread's chrome at a glance. A plan or report card is itself
   // a Card: it renders bare, the leading prose is surfaced.
@@ -79,7 +74,7 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
             </div>
           </Card>
         )}
-        {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} preflight={preflight} /> : <ReportCard report={contract.contract} />}
+        {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} preflight={preflight} /> : <ReportCard report={contract.contract} />}
       </>
     );
   }
@@ -104,11 +99,10 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
 });
 
 // The plan a plan agent recorded with propose_plan: the same card a text
-// contract renders, the actions and preflight keyed on the segment's id.
+// contract renders. Its actions live in the decision bar; the card stays the record.
 const PlanSegment = memo(function PlanSegment({ id, plan, preflight }: { id: string; plan: Plan; preflight?: PreflightResultView[] }) {
-  const actions = usePlanActions();
-  const planActions = actions && actions.segmentId === id ? actions : null;
-  return <PlanCard plan={plan} actions={planActions} preflight={preflight} />;
+  const pending = usePendingPlan() === id;
+  return <PlanCard plan={plan} preflight={preflight} pending={pending} anchorId={planAnchorId(id)} />;
 });
 
 // The report a builder recorded with submit_report: the same card a text
@@ -165,7 +159,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
           return <ThinkingSegment key={segment.id} content={segment.content} />;
         }
         if (segment.kind === 'text') {
-          return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
+          return <TextSegment key={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
         }
         if (segment.kind === 'plan') {
           return <PlanSegment key={segment.id} id={segment.id} plan={segment.plan} preflight={item.preflight} />;

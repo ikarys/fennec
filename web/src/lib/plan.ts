@@ -1,4 +1,5 @@
-import type { AssistantItem, Segment, ThreadItem } from './threadView';
+import type { ServedPendingPlan } from './api/sessions';
+import type { PreflightResultView, ThreadItem } from './threadView';
 
 /** The plan and report contracts of the plan and builder agents (crates/fennec/agents/*.agent.md), read back for display. */
 
@@ -349,37 +350,17 @@ export function splitContract(text: string): { before: string; contract: Plan | 
   return { before, contract };
 }
 
-/** The plan the session's actions point at: the last answer's plan segment, else its text plan contract. */
-export function planSourceOf(items: ThreadItem[]): { id: string; content: string } | null {
-  const lastAssistant = [...items]
-    .reverse()
-    .find((item): item is AssistantItem => item.kind === 'assistant');
-  const lastTextSegment = lastAssistant
-    ? [...lastAssistant.segments]
-        .reverse()
-        .find(
-          (segment): segment is Extract<Segment, { kind: 'text' }> =>
-            segment.kind === 'text'
-        )
-    : undefined;
-  const planContract = lastTextSegment
-    ? splitContract(lastTextSegment.content)
-    : null;
-  // The plan a plan agent recorded with propose_plan is a plan segment, not a
-  // text contract: it is the plan's canonical form, and it wins over any text.
-  const planSegment = lastAssistant
-    ? [...lastAssistant.segments].reverse().find(
-        (segment): segment is Extract<Segment, { kind: 'plan' }> =>
-          segment.kind === 'plan'
-      )
-    : undefined;
-  // The plan the actions point at: the segment's id, and the text sent as the
-  // workflow's plan and saved to the backlog.
-  return planSegment
-    ? { id: planSegment.id, content: planSegment.markdown }
-    : planContract?.contract.kind === 'plan' && lastTextSegment
-      ? { id: lastTextSegment.id, content: lastTextSegment.content }
-      : null;
+/** The served pending plan as the decision bar shows it; null when none waits. */
+export function pendingPlanOf(
+  served: ServedPendingPlan | null
+): { id: string; plan: Plan; markdown: string; preflight: PreflightResultView[] } | null {
+  if (served === null) return null;
+  return {
+    id: served.callId,
+    plan: planFromProposal(served.plan),
+    markdown: served.markdown,
+    preflight: served.preflight.map(({ exitCode, ...result }) => ({ ...result, exitCode: exitCode ?? undefined }))
+  };
 }
 
 /** The last message the human typed (not one fennec sent on their behalf). */

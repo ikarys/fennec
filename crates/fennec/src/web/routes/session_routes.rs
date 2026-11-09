@@ -293,7 +293,8 @@ pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     let window = store.window(id)?;
     let session_events = store.events_of(id, thread_view::SESSION_KINDS)?;
     let workdir = app.place(&store, &session, &project)?.workdir;
-    let view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
+    let mut view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
+    view.hand_to_backlog(idea_for_session(&store.ideas(&project.id)?, id));
     send_json(
         stream,
         200,

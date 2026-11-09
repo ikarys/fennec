@@ -41,11 +41,15 @@ export function Segmented<T extends string | number>({
             disabled={disabled}
             onClick={() => onChange(segment.value)}
             className={`flex h-7 min-w-0 items-center gap-1.5 px-3 text-xs transition-colors disabled:opacity-60 ${
-              selected ? 'bg-accent font-medium text-on-accent' : 'text-muted hover:bg-raised hover:text-text'
+              selected ? 'bg-accent text-on-accent' : 'text-muted hover:bg-raised hover:text-text'
             }`}
           >
-            {/* Long labels (user-set panel page names) truncate instead of clipping the segment. */}
-            <span className="min-w-0 truncate">{segment.label}</span>
+            {/* Long labels (user-set panel page names) truncate instead of clipping the segment.
+                A hidden medium-weight copy holds the width: selecting a segment does not move its neighbours. */}
+            <span className="grid min-w-0">
+              <span className={`col-start-1 row-start-1 truncate ${selected ? 'font-medium' : ''}`}>{segment.label}</span>
+              <span aria-hidden="true" className="invisible col-start-1 row-start-1 truncate font-medium">{segment.label}</span>
+            </span>
           </button>
         );
       })}

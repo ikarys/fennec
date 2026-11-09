@@ -629,9 +629,14 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `GET /api/sessions/{id}/vision` → `[{label, anchorId, src, inContext}]`: the images the model received over the
   whole log, in log order; `inContext` false once a compaction, a replay or the image window (4 to 6 latest images)
   took it out of the model's view; deterministic; 404 if no session.
-- `GET /api/sessions/{id}/thread` → `{pendingApproval, pendingWaiver, queued, criteria, criteriaTally, decisions, replayable, modifiedFiles}`: the session's
+- `GET /api/sessions/{id}/thread` → `{pendingApproval, pendingWaiver, pendingPlan, handedPlan, queued, criteria, criteriaTally, decisions, replayable, modifiedFiles}`: the session's
   blocks, folded by the server (the UI computes none): `pendingApproval` `{callId, subject, kind, pattern, access,
   folders}` or null, the tool call waiting for the human's answer; `pendingWaiver` `{callId, path, reason}` or null;
+  `pendingPlan` `{callId, plan, markdown, preflight}` the last `plan.proposed` still waiting for the human, served whole
+  (the UI loads only the log's tail), with the `criteria.preflight` results of its turn, or null: a `workflow.started` clears
+  it, so does a human message once the session left the plan agent; a question in plan mode keeps it (the decision bar);
+  `handedPlan` `{ideaId, undoable}` or null: the session's idea carries that plan to the backlog (`idea.ready` with the same
+  markdown, trimmed), so `pendingPlan` is null instead; `undoable` while the idea only waits (a `framing` takes it back);
   `queued` `[{queueId, content}]` the messages queued for the next rounds, in order; `criteria`
   `[{id, description, check?, status, passedBefore, existenceOnly}]` the criteria in force (the last `criteria.set` and the
   `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight, `existenceOnly` true when the check only searches the code: it proves the code exists, not that it works);

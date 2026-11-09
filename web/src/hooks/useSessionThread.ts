@@ -56,9 +56,11 @@ export interface SessionThread {
   vision: SeenImage[];
   /** The pending approval, waiver, queue, criteria and decisions, folded server-side; empty until the first fetch. */
   served: ServedThread;
+  /** Asks the server for the blocks again, after a change outside the session's log (the backlog). */
+  refreshThread: () => void;
 }
 
-const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0 } };
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, pendingPlan: null, handedPlan: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0 } };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,
@@ -336,5 +338,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served, refreshThread };
 }
