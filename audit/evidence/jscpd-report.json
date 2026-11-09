@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-09T10:23:54.237Z",
+    "detectionDate": "2026-11-09T10:45:51.283Z",
     "formats": {
       "javascript": {
         "sources": {
@@ -6644,6 +6644,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "crates/fennec/src/domain/service.rs": {
+            "lines": 220,
+            "tokens": 1943,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "crates/fennec/src/domain/server_config.rs": {
             "lines": 177,
             "tokens": 1383,
@@ -7364,6 +7376,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "crates/fennec/src/cli/service.rs": {
+            "lines": 23,
+            "tokens": 221,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "crates/fennec/src/cli/password.rs": {
             "lines": 47,
             "tokens": 455,
@@ -7952,6 +7976,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "crates/fennec/src/service.rs": {
+            "lines": 150,
+            "tokens": 1662,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "crates/fennec/src/servers.rs": {
             "lines": 106,
             "tokens": 1104,
@@ -8085,8 +8121,8 @@
             "newClones": 0
           },
           "crates/fennec/src/main.rs": {
-            "lines": 134,
-            "tokens": 1593,
+            "lines": 138,
+            "tokens": 1653,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8157,8 +8193,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain.rs": {
-            "lines": 77,
-            "tokens": 515,
+            "lines": 78,
+            "tokens": 522,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8193,8 +8229,8 @@
             "newClones": 0
           },
           "crates/fennec/src/cli.rs": {
-            "lines": 308,
-            "tokens": 3236,
+            "lines": 309,
+            "tokens": 3243,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8458,14 +8494,14 @@
           }
         },
         "total": {
-          "lines": 68334,
-          "tokens": 640122,
-          "sources": 277,
+          "lines": 68733,
+          "tokens": 644022,
+          "sources": 280,
           "clones": 205,
           "duplicatedLines": 2489,
           "duplicatedTokens": 25702,
-          "percentage": 3.64,
-          "percentageTokens": 4.02,
+          "percentage": 3.62,
+          "percentageTokens": 3.99,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -8984,14 +9020,14 @@
       }
     },
     "total": {
-      "lines": 117469,
-      "tokens": 1124346,
-      "sources": 735,
+      "lines": 117868,
+      "tokens": 1128246,
+      "sources": 738,
       "clones": 265,
       "duplicatedLines": 3606,
       "duplicatedTokens": 36010,
-      "percentage": 3.07,
-      "percentageTokens": 3.2,
+      "percentage": 3.06,
+      "percentageTokens": 3.19,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
