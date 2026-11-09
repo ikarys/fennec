@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/ikarys/fennec/compare/v0.2.1...v0.2.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* default to a provider's model when none is selected ([#276](https://github.com/ikarys/fennec/issues/276)) ([9d3a209](https://github.com/ikarys/fennec/commit/9d3a209d4576641377cef3cea00091ba3acc6a28))
+
 ## [0.2.1](https://github.com/ikarys/fennec/compare/v0.2.0...v0.2.1) (2026-11-09)
 
 
