@@ -153,6 +153,9 @@ just check      # the contributor gate: formatting, clippy, tests, UI build
 once there) and starts it; `FENNEC_SERVICE=none` skips that. Without a systemd user session, run `fennec serve`
 yourself. Put the model variables of "Configuration" in the unit as `Environment=` lines if you use them.
 
+Installed another way (mise, by hand)? `fennec service install` sets the service up, on Linux and macOS, and
+`fennec service start|stop|restart` controls it.
+
 ```bash
 journalctl --user -u fennec -f         # its logs
 sudo loginctl enable-linger "$USER"    # start at boot, before any login
