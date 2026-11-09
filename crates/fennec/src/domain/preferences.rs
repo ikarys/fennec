@@ -361,17 +361,35 @@ impl Preferences {
     }
 
     /// The model a session runs on until the human picks one: `selected`,
-    /// else the environment's default. An empty `selected` is ignored.
+    /// else the environment's default, else the first model a provider lists
+    /// (without an environment, a provider's model is all the human named).
+    /// An empty `selected` is ignored.
     /// Favourites only fill the composer's menu: they are not a default.
     pub fn default_model(&self, defaults: &ModelParams) -> ModelRef {
         self.selected
             .as_ref()
             .filter(|m| !m.model.is_empty())
             .cloned()
+            .or_else(|| {
+                defaults
+                    .model
+                    .is_empty()
+                    .then(|| self.first_model())
+                    .flatten()
+            })
             .unwrap_or_else(|| ModelRef {
                 provider: defaults.provider.clone(),
                 model: defaults.model.clone(),
             })
+    }
+
+    fn first_model(&self) -> Option<ModelRef> {
+        self.providers.iter().find_map(|provider| {
+            provider.models.keys().next().map(|model| ModelRef {
+                provider: provider.id.clone(),
+                model: model.clone(),
+            })
+        })
     }
 
     /// The parameters of the model a turn runs on: a session's chosen model
@@ -709,6 +727,26 @@ mod tests {
         let mut p = valid();
         p.search.searxng_url = Some("ftp://example.com".into());
         assert!(p.validate().unwrap_err().contains("searxng_url"));
+    }
+
+    #[test]
+    fn a_provider_model_is_the_default_when_nothing_else_names_one() {
+        let mut p = valid();
+        p.selected = None;
+        p.providers[0].models.clear();
+        p.providers[0]
+            .models
+            .insert("listed".into(), ModelPrefs::default());
+        let no_environment = ModelParams {
+            model: String::new(),
+            ..defaults()
+        };
+
+        let chosen = p.default_model(&no_environment);
+        assert_eq!(chosen.model, "listed");
+        assert_eq!(chosen.provider, p.providers[0].id);
+
+        assert_eq!(p.default_model(&defaults()).model, defaults().model);
     }
 
     #[test]
