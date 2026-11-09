@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/ikarys/fennec/compare/v0.2.2...v0.2.3) (2026-11-09)
+
+
+### Features
+
+* add fennec service commands ([#279](https://github.com/ikarys/fennec/issues/279)) ([d6b6f00](https://github.com/ikarys/fennec/commit/d6b6f00fe65a0b619114efb9e949dadea3f0a4bf))
+
 ## [0.2.2](https://github.com/ikarys/fennec/compare/v0.2.1...v0.2.2) (2026-11-09)
 
 
