@@ -136,7 +136,7 @@ crates/fennec/src/
                      store/settings.rs the stored preferences; store/ideas.rs the per-project backlog events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
-  git.rs             what fennec reads from a repository
+  git.rs             what fennec reads from a repository; git/contributions.rs the branches that could come in, squashed ones left out
   worktree.rs        a session's git worktree: a workflow never writes the human's tree; the main
                      checkout's node_modules/.venv mounted read-only into its sandbox; one Cargo
                      target per project shared by its worktrees (`CARGO_TARGET_DIR`)
