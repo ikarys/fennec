@@ -1,0 +1,14 @@
+{
+  "name": "resources",
+  "command": "python3",
+  "args": ["resources.py"],
+  "icon": "cpu",
+  "blocks": [
+    {
+      "id": "usage",
+      "title": "fennec",
+      "scope": "global",
+      "placement": "status_bar"
+    }
+  ]
+}

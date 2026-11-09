@@ -26,6 +26,7 @@ import { useProjects } from './hooks/useProjects';
 import { useTabs } from './hooks/useTabs';
 import { useTurnNotices } from './hooks/useTurnNotices';
 import { PluginsVersionContext } from './hooks/usePluginsVersion';
+import { useFooterShown } from './hooks/useFooterShown';
 import { StatusBar } from './components/layout/StatusBar';
 
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
@@ -38,6 +39,7 @@ export default function App() {
   const { settings, handleSettingsSaved, handleListing } = useSettings();
   const { tabs, setTabs, activeTabId, setActiveTabId, openTab } = useTabs();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [footerShown, toggleFooter] = useFooterShown();
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -355,6 +357,8 @@ export default function App() {
           onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           splitActive={route.name === 'split'}
           onToggleSplit={toggleSplit}
+          footerShown={footerShown}
+          onToggleFooter={toggleFooter}
         />
 
         <div className="flex min-h-0 grow">
@@ -433,10 +437,12 @@ export default function App() {
           )}
         </div>
 
-        <StatusBar
-          sessionId={statusBarIds.sessionId ?? null}
-          projectId={statusBarIds.projectId ?? null}
-        />
+        {footerShown && (
+          <StatusBar
+            sessionId={statusBarIds.sessionId ?? null}
+            projectId={statusBarIds.projectId ?? null}
+          />
+        )}
 
         <Palette
           open={paletteOpen}

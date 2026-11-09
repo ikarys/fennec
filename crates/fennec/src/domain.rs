@@ -54,6 +54,7 @@ pub mod queue;
 pub mod release;
 pub mod replay;
 pub mod report;
+pub mod resources;
 pub mod review_map;
 pub mod risk;
 pub mod rule_approval;

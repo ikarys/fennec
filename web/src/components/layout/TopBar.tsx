@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import { getVersion, type AttentionItem } from '../../lib/api';
-import { ChatIcon, SearchIcon, SplitIcon } from '../ui/Icons';
+import { ChatIcon, FooterIcon, SearchIcon, SplitIcon } from '../ui/Icons';
 import { buttonClass } from '../ui/Button';
 import { AttentionBell } from './AttentionBell';
 import { PageNav, type PageId } from './PageNav';
@@ -49,6 +49,9 @@ interface TopBarProps {
   onOpenPage: (page: PageId) => void;
   splitActive: boolean;
   onToggleSplit: () => void;
+  /** Whether the footer (status bar) is shown. */
+  footerShown: boolean;
+  onToggleFooter: () => void;
 }
 
 export function TopBar({
@@ -64,7 +67,9 @@ export function TopBar({
   onNewSession,
   onOpenPage,
   splitActive,
-  onToggleSplit
+  onToggleSplit,
+  footerShown,
+  onToggleFooter
 }: TopBarProps) {
   const t = useT();
   const versionLabel = useVersionLabel();
@@ -128,16 +133,29 @@ export function TopBar({
 
         <Divider />
 
-        <button
-          type="button"
-          onClick={onToggleSplit}
-          aria-label={t('topBarSplitAria')}
-          aria-pressed={splitActive}
-          title={t('topBarSplitTitle')}
-          className={buttonClass({ variant: 'ghost', size: 'sm' }, splitActive ? 'bg-accent-soft text-accent' : undefined)}
-        >
-          <SplitIcon className="h-4 w-4" />
-        </button>
+        <div role="group" className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onToggleSplit}
+            aria-label={t('topBarSplitAria')}
+            aria-pressed={splitActive}
+            title={t('topBarSplitTitle')}
+            className={buttonClass({ variant: 'ghost', size: 'sm' }, splitActive ? 'bg-accent-soft text-accent' : undefined)}
+          >
+            <SplitIcon className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleFooter}
+            aria-label={t('statusBarLabel')}
+            aria-pressed={footerShown}
+            title={t(footerShown ? 'statusBarHide' : 'statusBarShow')}
+            className={buttonClass({ variant: 'ghost', size: 'sm' }, footerShown ? 'bg-accent-soft text-accent' : undefined)}
+          >
+            <FooterIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </header>
   );

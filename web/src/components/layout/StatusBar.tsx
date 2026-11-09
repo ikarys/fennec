@@ -1,6 +1,7 @@
 // The app's status bar: the blocks a plugin placed there, in the order the
-// server stacks the surfaces (global, project, session). A thin bar below
-// every page; nothing when no block is placed.
+// server stacks the surfaces (global, project, session). Shown only when the
+// human opened it from the header toggle; when no block is placed it says so
+// and points to Settings › Plugins.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { getStatusBarPluginBlocks, type ServedPluginBlock } from '../../lib/api';
@@ -31,24 +32,32 @@ export function StatusBar({ sessionId, projectId }: { sessionId: string | null; 
     void fetchBlocks();
   }, [fetchBlocks]);
 
-  if (blocks.length === 0) return null;
-
   return (
     <div
+      role="region"
       aria-label={t('statusBarLabel')}
       className="flex items-center gap-x-3 overflow-x-auto border-t border-border bg-raised px-3 py-1"
     >
-      {blocks.map((block) => {
-        const provenance = t('pluginProvenance', { name: block.plugin });
-        return (
-          <span key={`${block.plugin}:${block.title}`} className="flex shrink-0 items-center gap-1.5">
-            <Badge tone="info" appearance="pill" title={provenance}>
-              {provenance}
-            </Badge>
-            <BlockElements elements={block.content.elements} compact />
-          </span>
-        );
-      })}
+      {blocks.length === 0 ? (
+        <>
+          <span className="text-xs text-muted">{t('statusBarEmpty')}</span>
+          <a href="#/settings/extensions" className="text-xs text-accent hover:underline">
+            {t('statusBarEmptyLink')}
+          </a>
+        </>
+      ) : (
+        blocks.map((block) => {
+          const provenance = t('pluginProvenance', { name: block.plugin });
+          return (
+            <span key={`${block.plugin}:${block.title}`} className="flex shrink-0 items-center gap-1.5">
+              <Badge tone="info" appearance="pill" title={provenance}>
+                {provenance}
+              </Badge>
+              <BlockElements elements={block.content.elements} compact />
+            </span>
+          );
+        })
+      )}
     </div>
   );
 }

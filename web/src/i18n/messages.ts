@@ -109,6 +109,10 @@ export const en = {
   pluginProvenance: 'plugin {name}',
   pluginWaiting: "Nothing yet: the plugin shows its blocks from the session's next event.",
   statusBarLabel: 'Status bar',
+  statusBarShow: 'Show the status bar',
+  statusBarHide: 'Hide the status bar',
+  statusBarEmpty: 'No plugin shows anything here yet.',
+  statusBarEmptyLink: 'Plugins',
 
   noProjectBlocks: 'The active plugins emitted no global block.',
   pluginsDescription:
@@ -1554,6 +1558,10 @@ export const fr: Record<MsgKey, string> = {
   pluginProvenance: 'plugin {name}',
   pluginWaiting: "Rien pour l'instant : le plugin affiche ses blocs dès le prochain événement de la session.",
   statusBarLabel: 'Barre d’état',
+  statusBarShow: 'Afficher la barre d’état',
+  statusBarHide: 'Masquer la barre d’état',
+  statusBarEmpty: 'Aucun plugin n’affiche encore rien ici.',
+  statusBarEmptyLink: 'Plugins',
 
   noProjectBlocks: 'Les plugins actifs n’ont émis aucun bloc global.',
   pluginsDescription:
