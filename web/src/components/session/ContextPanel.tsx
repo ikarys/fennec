@@ -1,10 +1,7 @@
 /**
- * The session's right context rail: fixed tabs for work, servers, and session, plus a
- * shared plugins tab and one tab per plugin that owns a panel. The drawer floats over the
- * thread or pins beside it; only its open state is persisted while pinned. SessionPage keys it
- * by session, so a floating drawer closes when the session changes.
+ * The session's right context rail: a SideRail of work, servers, session, and plugin panels.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type {
   ContextView,
   SeenImage,
@@ -18,11 +15,9 @@ import type {
 import type { ThreadView } from '../../lib/fold';
 import { useT } from '../../i18n';
 import { useSessionPluginBlocks } from '../../hooks/useSessionPluginBlocks';
-import { Button } from '../ui/Button';
-import { CheckIcon, CloseIcon, LayersIcon, PinIcon, ServerIcon, PuzzleIcon } from '../ui/Icons';
+import { CheckIcon, LayersIcon, PuzzleIcon, ServerIcon } from '../ui/Icons';
+import { SideRail, type RailPanel } from '../ui/SideRail';
 import { PLUGIN_ICONS } from '../plugins/pluginIcons';
-import { loadPinned, loadTab, savePinned, saveTab } from './contextRailStorage';
-import { RailTab } from './RailTab';
 import { CriteriaSection } from './CriteriaSection';
 import { ContextSection } from './ContextSection';
 import { DecisionsSection } from './DecisionsSection';
@@ -33,13 +28,6 @@ import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { VisionSection } from './VisionSection';
 import { WorkplaceSection } from './WorkplaceSection';
-
-type TabDescriptor = {
-  id: string;
-  title: string;
-  label: string;
-  Icon: typeof PuzzleIcon;
-};
 
 interface ContextPanelProps {
   view: ThreadView;
@@ -76,107 +64,29 @@ export function ContextPanel({
   contextRevealKey,
 }: ContextPanelProps) {
   const t = useT();
-  const [pinned, setPinned] = useState(loadPinned);
-  const [open, setOpen] = useState<string | null>(() => (pinned ? loadTab() ?? 'work' : null));
   const [runningServers, setRunningServers] = useState(0);
   const plugins = useSessionPluginBlocks(sessionId);
-  const blocks = plugins?.blocks ?? [];
-
-  useEffect(() => {
-    if (contextRevealKey > 0) setOpen('session');
-  }, [contextRevealKey]);
-
-  const sharedBlocks = blocks.filter((block) => block.placement !== 'own_panel');
-
-  const ownPlugins: { name: string; icon: ServedPluginBlock['icon']; blocks: ServedPluginBlock[] }[] = [];
-  const tabs: TabDescriptor[] = [
-    { id: 'work', title: t('contextTabWork'), label: t('contextTabWork'), Icon: CheckIcon },
-    { id: 'servers', title: t('contextTabServers'), label: t('contextTabServers'), Icon: ServerIcon },
-    { id: 'session', title: t('contextTabSession'), label: t('contextTabSession'), Icon: LayersIcon },
-  ];
-
-  for (const tab of plugins?.tabs ?? []) {
-    if (tab.kind === 'shared') {
-      tabs.push({ id: 'plugins', title: t('panelPlugins'), label: t('panelPlugins'), Icon: PuzzleIcon });
-    } else {
-      tabs.push({
-        id: `plugin:${tab.plugin}`,
-        title: t('pluginProvenance', { name: tab.plugin }),
-        label: tab.plugin,
-        Icon: PLUGIN_ICONS[tab.icon],
-      });
-      ownPlugins.push({
-        name: tab.plugin,
-        icon: tab.icon,
-        blocks: blocks.filter((block) => block.placement === 'own_panel' && block.plugin === tab.plugin),
-      });
-    }
-  }
-
-  // A plugin tab that is gone (or not fetched yet) shows the work tab; `open` keeps the wish.
-  const openTab = tabs.find((tab) => tab.id === open);
-  const current = open === null ? null : (openTab?.id ?? 'work');
-
-  useEffect(() => {
-    savePinned(pinned);
-  }, [pinned]);
-
-  useEffect(() => {
-    if (pinned && current !== null && current === open) saveTab(current);
-  }, [pinned, current, open]);
-
-  useEffect(() => {
-    if (pinned || open === null) return;
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(null);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [pinned, open]);
 
   if (!hasSession || sessionId === null) return null;
 
-  const drawerTab = openTab ?? tabs[0]!;
-  const drawerTitle = drawerTab.label;
-  const DrawerIcon = drawerTab.Icon;
+  const blocks = plugins?.blocks ?? [];
+  const sharedBlocks = blocks.filter((block) => block.placement !== 'own_panel');
+  const panels: RailPanel[] = [];
 
-  const header = (
-    <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border pl-3 pr-2">
-      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
-        <DrawerIcon className="h-3.5 w-3.5" />
-      </span>
-      <span className="truncate text-sm font-semibold text-text">{drawerTitle}</span>
-      <div className="ml-auto flex items-center gap-0.5">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          iconOnly
-          aria-pressed={pinned}
-          title={pinned ? t('contextUnpin') : t('contextPin')}
-          aria-label={pinned ? t('contextUnpin') : t('contextPin')}
-          onClick={() => setPinned((current) => !current)}
-        >
-          <PinIcon className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title={t('contextClose')}
-          aria-label={t('contextClose')}
-          onClick={() => setOpen(null)}
-        >
-          <CloseIcon className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </header>
-  );
+  const { passed, total, failed } = served.criteriaTally;
+  const criteriaAlert = failed > 0;
+  const criteriaClass = criteriaAlert ? 'text-err' : total > 0 && passed === total ? 'text-ok' : undefined;
 
-  const bodies = (
-    <>
-      <div className={current === 'work' ? undefined : 'hidden'}>
+  panels.push({
+    id: 'work',
+    title: t('contextTabWork'),
+    label: t('contextTabWork'),
+    Icon: CheckIcon,
+    status: total > 0 ? `${passed}/${total}` : undefined,
+    statusClass: criteriaClass,
+    alert: criteriaAlert,
+    body: (
+      <>
         <WorkplaceSection
           sessionId={sessionId}
           worktree={worktree ?? null}
@@ -187,92 +97,64 @@ export function ContextPanel({
         />
         <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} />
         <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} />
-      </div>
-      <div className={current === 'servers' ? undefined : 'hidden'}>
-        <ServersSection
-          sessionId={sessionId}
-          onServers={(servers: ServerView[]) => setRunningServers(servers.filter((server) => server.running).length)}
-        />
-      </div>
-      <div className={current === 'session' ? undefined : 'hidden'}>
+      </>
+    ),
+  });
+
+  panels.push({
+    id: 'servers',
+    title: t('contextTabServers'),
+    label: t('contextTabServers'),
+    Icon: ServerIcon,
+    status: runningServers > 0 ? `● ${runningServers}` : undefined,
+    statusClass: runningServers > 0 ? 'text-ok' : undefined,
+    body: <ServersSection sessionId={sessionId} onServers={(servers: ServerView[]) => setRunningServers(servers.filter((server) => server.running).length)} />,
+  });
+
+  panels.push({
+    id: 'session',
+    title: t('contextTabSession'),
+    label: t('contextTabSession'),
+    Icon: LayersIcon,
+    body: (
+      <>
         <TokensSection usage={usage} />
         <ContextSection context={context} revealKey={contextRevealKey} />
         <DecisionsSection decisions={served.decisions} />
         <SkillsSection skills={skills} hasSession={hasSession} />
         <VisionSection images={vision} />
-      </div>
-      <div className={current === 'plugins' ? undefined : 'hidden'}>
-        <PluginsSection blocks={sharedBlocks} />
-      </div>
-      {ownPlugins.map((plugin) => (
-        <div key={plugin.name} className={current === `plugin:${plugin.name}` ? undefined : 'hidden'}>
-          <PluginOwnSection plugin={plugin.name} blocks={plugin.blocks} />
-        </div>
-      ))}
-    </>
-  );
+      </>
+    ),
+  });
 
-  const drawer = pinned ? (
-    <div
-      role="complementary"
-      aria-label={drawerTitle}
-      className={`flex min-h-0 w-[380px] shrink-0 flex-col border-l border-border bg-panel ${current === null ? 'hidden' : ''}`}
-    >
-      {header}
-      <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">{bodies}</div>
-    </div>
-  ) : (
-    <div
-      role="dialog"
-      aria-label={drawerTitle}
-      className={`absolute inset-y-0 right-full z-20 flex w-[380px] min-h-0 flex-col border-l border-border bg-panel shadow-float ${current === null ? 'hidden' : ''}`}
-    >
-      {header}
-      <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">{bodies}</div>
-    </div>
-  );
+  for (const tab of plugins?.tabs ?? []) {
+    if (tab.kind === 'shared') {
+      panels.push({
+        id: 'plugins',
+        title: t('panelPlugins'),
+        label: t('panelPlugins'),
+        Icon: PuzzleIcon,
+        body: <PluginsSection blocks={sharedBlocks} />,
+      });
+    } else {
+      const pluginBlocks: ServedPluginBlock[] = blocks.filter((block) => block.placement === 'own_panel' && block.plugin === tab.plugin);
+      panels.push({
+        id: `plugin:${tab.plugin}`,
+        title: t('pluginProvenance', { name: tab.plugin }),
+        label: tab.plugin,
+        Icon: PLUGIN_ICONS[tab.icon],
+        body: <PluginOwnSection plugin={tab.plugin} blocks={pluginBlocks} />,
+      });
+    }
+  }
 
   return (
-    <>
-      {pinned ? drawer : null}
-      <nav aria-label={t('sessionContextLabel')} className="relative w-[52px] shrink-0 flex flex-col items-center border-l border-border bg-bg pt-2">
-        {!pinned ? drawer : null}
-        {tabs.map((tab) => {
-          let status: string | undefined;
-          let statusClass: string | undefined;
-          let alert = false;
-
-          if (tab.id === 'work') {
-            const { passed, total, failed } = served.criteriaTally;
-            if (total > 0) status = `${passed}/${total}`;
-            if (failed > 0) {
-              statusClass = 'text-err';
-              alert = true;
-            } else if (total > 0 && passed === total) {
-              statusClass = 'text-ok';
-            }
-          } else if (tab.id === 'servers') {
-            if (runningServers > 0) {
-              status = `● ${runningServers}`;
-              statusClass = 'text-ok';
-            }
-          }
-
-          return (
-            <RailTab
-              key={tab.id}
-              title={tab.title}
-              label={tab.label}
-              Icon={tab.Icon}
-              active={current === tab.id}
-              status={status}
-              statusClass={statusClass}
-              alert={alert}
-              onClick={() => setOpen(current === tab.id ? null : tab.id)}
-            />
-          );
-        })}
-      </nav>
-    </>
+    <SideRail
+      side="right"
+      label={t('sessionContextLabel')}
+      storageKey="fennec.contextPanel"
+      panels={panels}
+      reveal={{ id: 'session', key: contextRevealKey }}
+    />
   );
 }

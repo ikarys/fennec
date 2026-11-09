@@ -1166,6 +1166,11 @@ export const en = {
   runRailRound: 'Round {index}',
   runRailStepCount: '{count} step{plural}',
   runRailWorkflow: 'Workflow',
+  runRailRun: 'Run',
+  runRailStateDone: 'Finished',
+  runRailStateFailed: 'Failed',
+  runRailStateStopped: 'Stopped',
+  runRailStateRunning: 'Running',
   // components/workflow/session/WorkflowPicker.tsx
   workflowPickerLabel: 'Workflow',
   workflowPickerNone: 'No workflow',
@@ -2610,6 +2615,11 @@ export const fr: Record<MsgKey, string> = {
   runRailRound: 'Tour {index}',
   runRailStepCount: '{count} étape{plural}',
   runRailWorkflow: 'Workflow',
+  runRailRun: 'Run',
+  runRailStateDone: 'Terminé',
+  runRailStateFailed: 'Échoué',
+  runRailStateStopped: 'Arrêté',
+  runRailStateRunning: 'En cours',
   // components/workflow/session/WorkflowPicker.tsx
   workflowPickerLabel: 'Workflow',
   workflowPickerNone: 'Aucun workflow',
