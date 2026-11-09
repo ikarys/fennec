@@ -21,11 +21,6 @@ import { attachmentAnchorId } from '../../lib/vision';
 import { planAnchorId, usePendingPlan } from './PendingPlan';
 import { useT } from '../../i18n';
 
-// The model's prose stops at a readable line length; its stats and actions line up with it.
-const ANSWER_WIDTH = 'max-w-[46rem]';
-
-
-
 // Memoised on their text: while one message streams, the others are not
 // parsed again on every frame.
 const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: string }) {
@@ -66,7 +61,7 @@ const TextSegment = memo(function TextSegment({ content, caret, preflight }: { c
     return (
       <>
         {contract.before && (
-          <Card className={`${ANSWER_WIDTH} px-3.5 py-2.5`}>
+          <Card className="px-3.5 py-2.5">
             <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
               <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
                 {contract.before}
@@ -80,7 +75,7 @@ const TextSegment = memo(function TextSegment({ content, caret, preflight }: { c
   }
   const { body, sources } = split;
   return (
-    <Card className={`${ANSWER_WIDTH} px-3.5 py-2.5`}>
+    <Card className="px-3.5 py-2.5">
       <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
         <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{body}</ReactMarkdown>
         {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
@@ -176,7 +171,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
           {showCopy && <CopyButton text={copyText} />}
         </div>
       )}
-      {!streaming && call?.turnRecap && <div className={`text-center text-xs text-muted tabular-nums ${ANSWER_WIDTH}`}>{call.turnRecap}</div>}
+      {!streaming && call?.turnRecap && <div className="text-center text-xs text-muted tabular-nums">{call.turnRecap}</div>}
     </div>
   );
 }
