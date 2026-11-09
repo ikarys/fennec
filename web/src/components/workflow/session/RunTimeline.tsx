@@ -20,7 +20,7 @@ function Marker({ tone }: { tone: StepTone }) {
   return <span className={className} />;
 }
 
-function StepRow({ step, isLast, onShowOutput }: { step: RailStep; isLast: boolean; onShowOutput: (run: NodeRun) => void }) {
+function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLast: boolean; onShowOutput: (run: NodeRun) => void; onJump: (run: NodeRun) => void }) {
   const lang = useLang();
   const t = useT();
   const tone = stepTone(step);
@@ -79,9 +79,15 @@ function StepRow({ step, isLast, onShowOutput }: { step: RailStep; isLast: boole
       <Marker tone={tone} />
       <div className={`min-w-0 grow ${isRunning ? 'rounded-md bg-accent-soft/40 -mx-1.5 px-1.5 py-0.5' : ''}`}>
         <div className="flex items-baseline gap-2">
-          <span className={`truncate text-sm ${labelClass}`} title={title}>
-            {label}
-          </span>
+          {nodeRun ? (
+            <button type="button" title={title} onClick={() => onJump(nodeRun)} className={`cursor-pointer truncate text-left text-sm hover:text-accent ${labelClass}`}>
+              {label}
+            </button>
+          ) : (
+            <span className={`truncate text-sm ${labelClass}`} title={title}>
+              {label}
+            </span>
+          )}
           {time ? <span className="ml-auto shrink-0 text-xs text-muted tabular-nums">{time}</span> : null}
         </div>
         {hasMeta ? (
@@ -123,6 +129,7 @@ function RoundRow({
   isLast,
   onToggle,
   onShowOutput,
+  onJump,
 }: {
   index: number;
   round: NodeRun[];
@@ -130,6 +137,7 @@ function RoundRow({
   isLast: boolean;
   onToggle: (index: number) => void;
   onShowOutput: (run: NodeRun) => void;
+  onJump: (run: NodeRun) => void;
 }) {
   const lang = useLang();
   const t = useT();
@@ -166,6 +174,7 @@ function RoundRow({
                 step={{ kind: 'run' as const, run: nodeRun }}
                 isLast={runIndex === round.length - 1}
                 onShowOutput={onShowOutput}
+                onJump={onJump}
               />
             ))}
           </ol>
@@ -175,7 +184,7 @@ function RoundRow({
   );
 }
 
-export function RunTimeline({ run }: { run: RunView }) {
+export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: string, nodeId: string, pass: number) => void }) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
@@ -189,6 +198,8 @@ export function RunTimeline({ run }: { run: RunView }) {
     const current = rootRef.current?.querySelector('[data-current]');
     if (current) current.scrollIntoView({ block: 'nearest' });
   }, [count]);
+
+  const jump = (nodeRun: NodeRun): void => onJump(run.runId, nodeRun.nodeId, nodeRun.pass);
 
   const toggleRound = (index: number): void => {
     setExpandedRounds((previous) => {
@@ -228,6 +239,7 @@ export function RunTimeline({ run }: { run: RunView }) {
           isLast={isLast}
           onToggle={toggleRound}
           onShowOutput={setOutputRun}
+          onJump={jump}
         />
       ),
     });
@@ -243,6 +255,7 @@ export function RunTimeline({ run }: { run: RunView }) {
             step={{ kind: 'run' as const, run: nodeRun }}
             isLast={isLast}
             onShowOutput={setOutputRun}
+            onJump={jump}
           />
         ),
       });
@@ -253,7 +266,7 @@ export function RunTimeline({ run }: { run: RunView }) {
     rows.push({
       key: `upcoming-${step.nodeId}`,
       render: (isLast) => (
-        <StepRow step={{ kind: 'upcoming' as const, step }} isLast={isLast} onShowOutput={setOutputRun} />
+        <StepRow step={{ kind: 'upcoming' as const, step }} isLast={isLast} onShowOutput={setOutputRun} onJump={jump} />
       ),
     });
   });
