@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/ikarys/fennec/compare/v0.1.0...v0.2.0) (2026-11-09)
+
+
+### Features
+
+* ask for a model at first run instead of assuming a local endpoint ([#270](https://github.com/ikarys/fennec/issues/270)) ([77432c8](https://github.com/ikarys/fennec/commit/77432c80552508b45440a5bb7a2b98d378b39c6d))
+
 ## 0.1.0 (2026-11-09)
 
 
