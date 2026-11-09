@@ -16,11 +16,14 @@ export function NewIdeaDialog({
   open,
   run,
   onClose,
+  onCreated,
 }: {
   projectId: string;
   open: boolean;
   run: (action: () => Promise<IdeaBoard>) => Promise<boolean>;
   onClose: () => void;
+  /** Called after a successful add, so the parent can navigate (e.g. to the drafts). */
+  onCreated?: () => void;
 }) {
   const lang = useLang();
   const t = useT();
@@ -76,6 +79,7 @@ export function NewIdeaDialog({
       if (ok) {
         reset();
         onClose();
+        onCreated?.();
       }
     } finally {
       setBusy(false);
