@@ -2,7 +2,9 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { getFileDiff, getIntegration, type FileDiff, type IntegrationPreview, type ReviewSignal } from '../lib/api/integration';
 import { tabPath } from '../lib/route';
+import { useOpenInEditorLabel } from '../lib/editors';
 import { useT } from '../i18n';
+
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -12,6 +14,7 @@ import { SIGNAL_KEYS } from '../components/session/IntegrationReview';
 
 export default function ChangesPage({ sessionId }: { sessionId: string }) {
   const t = useT();
+  const openInEditor = useOpenInEditorLabel('openInEditor');
   const [integration, setIntegration] = useState<IntegrationPreview | null>(null);
   const [integrationError, setIntegrationError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -159,8 +162,8 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
               <a
                 href={diff.editorUrl}
                 className="ml-auto rounded-md p-1 text-muted hover:bg-raised hover:text-accent"
-                title={t('openInEditor')}
-                aria-label={t('openInEditor')}
+                title={openInEditor}
+                aria-label={openInEditor}
               >
                 <ExternalIcon className="h-3.5 w-3.5" />
               </a>

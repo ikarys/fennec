@@ -21,6 +21,7 @@ pub(crate) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Htt
     let store = app.store()?;
     let favorites = store.favorite_projects()?;
     let recent = store.recent_project_ids()?;
+    let ide = store.preferences()?.display.editor;
     let mut out = Vec::new();
     for p in store.projects()? {
         // The log says a workflow ended; git says whether its work still waits.
@@ -49,7 +50,8 @@ pub(crate) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Htt
                 .as_deref()
                 .and_then(git::web_url)
         );
-        v["editorUrl"] = json!(editor::vscode_link(
+        v["editorUrl"] = json!(editor::link(
+            ide,
             &p.workdir,
             std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
         ));

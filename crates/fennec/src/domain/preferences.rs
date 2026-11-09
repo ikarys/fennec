@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::editor::Editor;
 use super::lang::Lang;
 use super::mcp::McpServer;
 pub use llm_providers_connector::{
@@ -172,6 +173,8 @@ pub struct Display {
     pub panel_pages: Option<Vec<PanelPage>>,
     /// The UI's display language.
     pub language: Lang,
+    /// The IDE the "open in editor" links open.
+    pub editor: Editor,
 }
 
 /// fennec's own: a named list of the context panel's blocks; the UI owns the block ids.
@@ -190,6 +193,7 @@ impl Default for Display {
             font_size: DEFAULT_FONT_SIZE,
             panel_pages: None,
             language: Lang::En,
+            editor: Editor::default(),
         }
     }
 }

@@ -87,7 +87,7 @@ export const en = {
   backToSession: 'Back to the session',
   seeChanges: 'See the changes',
   protectedBadge: 'protected',
-  openInEditor: 'Open the whole file in the editor',
+  openInEditor: 'Open the whole file in {editor}',
   diffBinary: 'Binary file: no line diff.',
   diffEmpty: 'No line changed (mode or empty file).',
   diffTruncated: 'Diff cut at 5,000 lines: open the file in the editor for the rest.',
@@ -144,7 +144,7 @@ export const en = {
   commitsFiles: '{commits} commits · {files} files',
   nothingToIntegrate: 'Nothing to integrate for now.',
   protectedCount: '{count} protected',
-  openInVsCode: 'Open in VS Code',
+  openInIde: 'Open in {editor}',
   copyPath: 'Copy the path',
   worksInYourFolder: 'Works directly in your folder.',
   yourRepo: 'Your repository',
@@ -1058,6 +1058,8 @@ export const en = {
   // components/settings/DisplaySection.tsx
   displayLanguageEnglish: 'English',
   displayLanguageFrench: 'Français',
+  editorLabel: 'IDE',
+  editorHint: "The open-in-editor buttons open the project or the agent's copy in this IDE.",
   // components/preview/CodeBlockWithPreview.tsx
   previewCode: 'Code',
   previewHtmlTitle: 'HTML preview',
@@ -1540,7 +1542,7 @@ export const fr: Record<MsgKey, string> = {
   backToSession: 'Retour à la session',
   seeChanges: 'Voir les changements',
   protectedBadge: 'protégé',
-  openInEditor: "Ouvrir le fichier entier dans l'éditeur",
+  openInEditor: 'Ouvrir le fichier entier dans {editor}',
   diffBinary: 'Fichier binaire : pas de diff par ligne.',
   diffEmpty: 'Aucune ligne modifiée (mode ou fichier vide).',
   diffTruncated: "Diff coupé à 5 000 lignes : ouvre le fichier dans l'éditeur pour la suite.",
@@ -1597,7 +1599,7 @@ export const fr: Record<MsgKey, string> = {
   commitsFiles: '{commits} commits · {files} fichiers',
   nothingToIntegrate: "Rien à intégrer pour l'instant.",
   protectedCount: '{count} protégés',
-  openInVsCode: 'Ouvrir dans VS Code',
+  openInIde: 'Ouvrir dans {editor}',
   copyPath: 'Copier le chemin',
   worksInYourFolder: 'Travaille directement dans ton dossier.',
   yourRepo: 'Ton dépôt',
@@ -2515,6 +2517,8 @@ export const fr: Record<MsgKey, string> = {
   // components/settings/DisplaySection.tsx
   displayLanguageEnglish: 'English',
   displayLanguageFrench: 'Français',
+  editorLabel: 'IDE',
+  editorHint: "Les boutons « ouvrir dans l'IDE » ouvrent le projet ou la copie de l'agent dans cet IDE.",
   // components/preview/CodeBlockWithPreview.tsx
   previewCode: 'Code',
   previewHtmlTitle: 'Aperçu HTML',

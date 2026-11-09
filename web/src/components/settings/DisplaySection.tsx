@@ -1,4 +1,5 @@
-import type { DisplayPrefs } from '../../lib/api';
+import type { DisplayPrefs, EditorId } from '../../lib/api';
+import { EDITORS } from '../../lib/editors';
 import { Segmented } from '../ui/Segmented';
 import { Section, type SectionSave } from '../ui/Section';
 import { themes, type ThemeId } from '../../lib/theme';
@@ -48,6 +49,22 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
           segments={LANGUAGES.map((language) => ({ value: language.value, label: t(language.label) }))}
         />
       </div>
+      <div className="flex items-center gap-3 text-sm text-text">
+        <span>{t('editorLabel')}</span>
+        <select
+          aria-label={t('editorLabel')}
+          className="rounded-md border border-border bg-raised px-2 py-1 text-sm text-text"
+          value={value.editor ?? 'vscode'}
+          onChange={(event) => onChange({ ...value, editor: event.target.value as EditorId })}
+        >
+          {EDITORS.map((editor) => (
+            <option key={editor.value} value={editor.value}>
+              {editor.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-xs text-muted">{t('editorHint')}</p>
       <label className="flex items-center gap-2 text-sm text-text">
         <input
           type="checkbox"
