@@ -227,6 +227,8 @@ export interface ContextView {
   line: string;
   /** Taken, left, total, threshold. */
   title: string;
+  /** The Context section's collapsed summary: "31 % · 165,9k left". */
+  summary: string;
   /** Null while nothing is measured. */
   composition: ContextComposition | null;
 }

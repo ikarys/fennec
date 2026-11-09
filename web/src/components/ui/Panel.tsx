@@ -2,7 +2,7 @@
  * A collapsible section of a drawer: a quiet hairline block with a small icon, title,
  * optional summary, and a rotating chevron. Open state is remembered per section.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRightIcon, InfoIcon } from './Icons';
 import type { BadgeTone } from './Badge';
 
@@ -48,14 +48,26 @@ export interface PanelProps {
   iconTone?: BadgeTone;
   /** What the block is for, behind an info icon next to the title. */
   hint?: string;
+  /** Bumping it opens the section and scrolls it into view (a link from elsewhere on the page). */
+  revealKey?: number;
   children: ReactNode;
 }
 
-export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone = 'neutral', hint, children }: PanelProps) {
+export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone = 'neutral', hint, revealKey, children }: PanelProps) {
   const [open, setOpen] = useState(() => loadOpen(id, defaultOpen));
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    if (revealKey === undefined || revealKey === 0) return;
+    setOpen(true);
+    saveOpen(id, true);
+    const frame = requestAnimationFrame(() => detailsRef.current?.scrollIntoView({ block: 'nearest' }));
+    return () => cancelAnimationFrame(frame);
+  }, [revealKey, id]);
 
   return (
     <details
+      ref={detailsRef}
       open={open}
       onToggle={(event) => {
         const nextOpen = event.currentTarget.open;
