@@ -131,7 +131,7 @@ crates/fennec/src/
                      its rounds so the server's prompt cache stays warm (`FENNEC_MODEL_AFFINITY_SECS`)
   sandbox.rs         the bwrap world of commands (tools, MCP servers, plugins, scanners);
                      sandbox/seatbelt.rs the same world as a macOS Seatbelt profile
-  store.rs           EventLog adapter: SQLite (schema frozen: stored logs depend on it), projects and sessions;
+  store.rs           EventLog adapter: SQLite (schema frozen: stored logs depend on it), projects and sessions; targeted reads (window, by kind) per docs/adr/0001;
                      store/settings.rs the stored preferences; store/ideas.rs the per-project backlog events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log

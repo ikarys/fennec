@@ -53,6 +53,29 @@ pub trait EventLog {
     /// Appends `event`, returns its sequence number in the session.
     fn append(&self, session_id: &str, event: &Event) -> Result<u64, String>;
     fn events(&self, session_id: &str) -> Result<Vec<Event>, String>;
+
+    /// The model's window: what a round folds. From the last `context.compacted` on, the cut
+    /// included, so `model_view` gives on it what it gives on the whole log.
+    fn window(&self, session_id: &str) -> Result<Vec<Event>, String> {
+        let mut events = self.events(session_id)?;
+        if let Some(i) = events
+            .iter()
+            .rposition(|event| matches!(event, Event::ContextCompacted { .. }))
+        {
+            events.drain(..i);
+        }
+        Ok(events)
+    }
+
+    /// Only the events of `kinds`, in log order: for the folds that read a few kinds over the
+    /// whole session.
+    fn events_of(&self, session_id: &str, kinds: &[&str]) -> Result<Vec<Event>, String> {
+        Ok(self
+            .events(session_id)?
+            .into_iter()
+            .filter(|event| kinds.contains(&event.kind()))
+            .collect())
+    }
 }
 
 /// What the human's rules say about one tool call, and what it was about (the command,

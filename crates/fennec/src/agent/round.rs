@@ -89,7 +89,8 @@ fn stream_once(
     prompt: &RoundPrompt,
     started: &mut bool,
 ) -> Result<Result<(Completion, MessageStats), String>, String> {
-    let events = turn.log.events(turn.session_id)?;
+    // The window, not the whole log: a round costs the window's size, not the session's.
+    let events = turn.log.window(turn.session_id)?;
     let messages = fold_messages(&events);
     let req = Request {
         system_prompt: prompt.system_prompt,
