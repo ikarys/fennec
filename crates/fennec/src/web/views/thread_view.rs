@@ -651,7 +651,7 @@ mod tests {
                 "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0},
                 "decisions": [],
                 "replayable": [],
-                "modifiedFiles": {"count": 0, "added": 0, "removed": 0}
+                "modifiedFiles": {"count": 0, "added": 0, "removed": 0, "files": []}
             })
         );
     }

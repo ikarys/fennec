@@ -938,12 +938,13 @@ export function SessionPage({
                   </main>
 
                   <ContextPanel
+                    key={sessionId ?? ''}
                     view={view}
                     skills={skills}
                     usage={usage}
-                    request={detail?.request ?? null}
                     hasSession={sessionId !== null}
                     worktree={detail?.worktree ?? null}
+                    editorUrl={detail?.editorUrl ?? null}
                     sessionId={sessionId}
                     onWorktreeChanged={() =>
                       setDetailVersion((version) => version + 1)

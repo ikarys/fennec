@@ -1,388 +1,259 @@
+/**
+ * The session's right context rail: three tabs that open a drawer with the work, server,
+ * and session blocks. The drawer floats over the thread or pins beside it; only its open
+ * state is persisted while pinned. SessionPage keys it by session, so a floating drawer closes
+ * when the session changes.
+ */
+import { useEffect, useState } from 'react';
+import type { SeenImage, ServedThread, SessionDetail, SessionSkills, SessionUsage, ServerView } from '../../lib/api';
 import type { ThreadView } from '../../lib/fold';
-import type { SeenImage, ServedThread, SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
-import { useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
-import { useDisplayPrefs } from '../../lib/display';
-import { pageBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
+import { useT } from '../../i18n';
 import { Button } from '../ui/Button';
-import { ChoiceMenu } from '../ui/ChoiceMenu';
-import { Segmented } from '../ui/Segmented';
-import {
-  BranchIcon,
-  CheckIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
-  CloseIcon,
-  DecisionIcon,
-  EyeIcon,
-  FileIcon,
-  PuzzleIcon,
-} from '../ui/Icons';
-import { AgentWorkspaceSection } from './AgentWorkspaceSection';
+import { CheckIcon, CloseIcon, LayersIcon, PinIcon, ServerIcon } from '../ui/Icons';
 import { CriteriaSection } from './CriteriaSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
 import { PluginsSection } from './PluginsSection';
-import { RequestSection } from './RequestSection';
 import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { VisionSection } from './VisionSection';
-import { useLang, useT } from '../../i18n';
+import { WorkplaceSection } from './WorkplaceSection';
 
-const WIDTH_KEY = 'fennec.contextPanelWidth';
-const PAGE_KEY = 'fennec.contextPanel.page';
-const COLLAPSED_KEY = 'fennec.contextPanel.collapsed';
-const MIN_WIDTH = 240;
-const MAX_WIDTH = 560;
-const DEFAULT_WIDTH = 300;
+const PINNED_KEY = 'fennec.contextPanel.pinned';
+const TAB_KEY = 'fennec.contextPanel.tab';
 
-const RAIL_BLOCKS: readonly { id: PanelBlockId; icon: ReactNode }[] = [
-  { id: 'criteria', icon: <CheckIcon className="h-4 w-4" /> },
-  { id: 'modifiedFiles', icon: <FileIcon className="h-4 w-4" /> },
-  { id: 'workspace', icon: <BranchIcon className="h-4 w-4" /> },
-  { id: 'decisions', icon: <DecisionIcon className="h-4 w-4" /> },
-  { id: 'vision', icon: <EyeIcon className="h-4 w-4" /> },
-  { id: 'plugins', icon: <PuzzleIcon className="h-4 w-4" /> },
-];
+const TABS = {
+  work: { titleKey: 'contextTabWork', Icon: CheckIcon },
+  servers: { titleKey: 'contextTabServers', Icon: ServerIcon },
+  session: { titleKey: 'contextTabSession', Icon: LayersIcon },
+} as const;
 
-function railCount(id: PanelBlockId, served: ServedThread, vision: SeenImage[]): number | null {
-  switch (id) {
-    case 'criteria':
-      return served.criteria.length;
-    case 'modifiedFiles':
-      return served.modifiedFiles.count;
-    case 'decisions':
-      return served.decisions.length;
-    case 'vision':
-      return vision.length;
-    default:
-      return null;
-  }
+const TAB_ORDER = ['work', 'servers', 'session'] as const;
+type ContextTab = (typeof TAB_ORDER)[number];
+
+function isContextTab(value: string | null): value is ContextTab {
+  return value === 'work' || value === 'servers' || value === 'session';
 }
 
-/** The rail's count badge is tinted only when it signals a state worth seeing. */
-function railCountClass(id: PanelBlockId, served: ServedThread): string {
-  if (id === 'criteria' && served.criteriaTally.failed > 0) {
-    return 'text-err';
-  }
-  return 'text-muted';
-}
-
-function clampWidth(width: number): number {
-  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
-}
-
-function loadWidth(): number {
+function loadPinned(): boolean {
   try {
-    const stored = Number(localStorage.getItem(WIDTH_KEY));
-    return stored ? clampWidth(stored) : DEFAULT_WIDTH;
-  } catch {
-    return DEFAULT_WIDTH;
-  }
-}
-
-function loadPageName(): string {
-  try {
-    return localStorage.getItem(PAGE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function savePageName(name: string): void {
-  try {
-    localStorage.setItem(PAGE_KEY, name);
-  } catch {
-    // A blocked storage only loses the page on reload.
-  }
-}
-
-function loadCollapsed(): boolean {
-  try {
-    return localStorage.getItem(COLLAPSED_KEY) === '1';
+    return localStorage.getItem(PINNED_KEY) === '1';
   } catch {
     return false;
   }
 }
 
-function saveCollapsed(collapsed: boolean): void {
+function loadTab(): ContextTab | null {
   try {
-    localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
+    const stored = localStorage.getItem(TAB_KEY);
+    return isContextTab(stored) ? stored : null;
   } catch {
-    // A blocked storage only loses the collapsed state on reload.
+    return null;
+  }
+}
+
+function savePinned(pinned: boolean): void {
+  try {
+    localStorage.setItem(PINNED_KEY, pinned ? '1' : '0');
+  } catch {
+    // A blocked storage only loses the pin state on reload.
+  }
+}
+
+function saveTab(tab: ContextTab): void {
+  try {
+    localStorage.setItem(TAB_KEY, tab);
+  } catch {
+    // A blocked storage only loses the open tab on reload.
   }
 }
 
 interface ContextPanelProps {
   view: ThreadView;
-  /** The session's skills, folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
-  /** The session's token totals, computed server-side; null while the first fetch is in flight. */
   usage: SessionUsage | null;
-  /** The first message the human typed, verbatim; null while unknown or absent. */
-  request: string | null;
-  /** False on the « Nouvelle session » tab, where there is no log to fold. */
+  /** False on the new-session tab, where there is no log to fold: the panel is not shown. */
   hasSession: boolean;
-  /** Where the agent's work lands; null when the session runs in place. */
   worktree: SessionDetail['worktree'];
-  /** The session id, for the integration dialog; null on a new-session tab. */
+  /** Opens the folder the agent works in (worktree, else project) in the chosen IDE; null while unknown. */
+  editorUrl: string | null;
   sessionId: string | null;
-  /** Re-fetch the session detail after the worktree changed (discard). */
   onWorktreeChanged: () => void;
-  /** Bumped when the review dialog closes: the workspace block re-reads the preview. */
   integrationVersion: number;
-  /** The images the model received, computed server-side. */
   vision: SeenImage[];
-  /** The criteria and decisions, folded server-side. */
   served: ServedThread;
 }
 
-export function ContextPanel({ view, skills, usage, request, hasSession, worktree, sessionId, onWorktreeChanged, integrationVersion, vision, served }: ContextPanelProps) {
+export function ContextPanel({
+  view,
+  skills,
+  usage,
+  hasSession,
+  worktree,
+  editorUrl,
+  sessionId,
+  onWorktreeChanged,
+  integrationVersion,
+  vision,
+  served,
+}: ContextPanelProps) {
   const t = useT();
-  const lang = useLang();
-  const [width, setWidth] = useState(loadWidth);
-  const [selectedPageName, setSelectedPageName] = useState(loadPageName);
-  const [collapsed, setCollapsed] = useState(loadCollapsed);
-  const [openBlock, setOpenBlock] = useState<PanelBlockId | null>(null);
-  const pages = panelPages(lang, useDisplayPrefs().panelPages);
-  const page = pages.find((candidate) => candidate.name === selectedPageName) ?? pages[0] ?? { name: '', blocks: [] };
+  const [pinned, setPinned] = useState(loadPinned);
+  const [open, setOpen] = useState<ContextTab | null>(() => (pinned ? loadTab() ?? 'work' : null));
+  const [runningServers, setRunningServers] = useState(0);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {
-      // A blocked storage only loses the width on reload.
-    }
-  }, [width]);
+    savePinned(pinned);
+  }, [pinned]);
 
   useEffect(() => {
-    saveCollapsed(collapsed);
-  }, [collapsed]);
+    if (pinned && open) saveTab(open);
+  }, [pinned, open]);
 
   useEffect(() => {
-    if (!openBlock) return;
+    if (pinned || open === null) return;
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenBlock(null);
+      if (event.key === 'Escape') setOpen(null);
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openBlock]);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [pinned, open]);
 
-  useEffect(() => {
-    setOpenBlock(null);
-  }, [sessionId]);
+  if (!hasSession || sessionId === null) return null;
 
-  const startResize = (event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = width;
-    // The panel is on the right: dragging left widens it.
-    const move = (moveEvent: globalThis.PointerEvent) => setWidth(clampWidth(startWidth + startX - moveEvent.clientX));
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true });
-  };
+  const drawerTitle = t(TABS[open ?? 'work'].titleKey);
+  const DrawerIcon = TABS[open ?? 'work'].Icon;
 
-  const resizeWithKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === 'ArrowLeft' ? 16 : event.key === 'ArrowRight' ? -16 : 0;
-    if (step !== 0) {
-      event.preventDefault();
-      setWidth((current) => clampWidth(current + step));
-    }
-  };
+  const header = (
+    <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border pl-3 pr-2">
+      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+        <DrawerIcon className="h-3.5 w-3.5" />
+      </span>
+      <span className="truncate text-sm font-semibold text-text">{drawerTitle}</span>
+      <div className="ml-auto flex items-center gap-0.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-pressed={pinned}
+          title={pinned ? t('contextUnpin') : t('contextPin')}
+          aria-label={pinned ? t('contextUnpin') : t('contextPin')}
+          onClick={() => setPinned((current) => !current)}
+        >
+          <PinIcon className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title={t('contextClose')}
+          aria-label={t('contextClose')}
+          onClick={() => setOpen(null)}
+        >
+          <CloseIcon className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </header>
+  );
 
-  function selectPage(name: string) {
-    setSelectedPageName(name);
-    savePageName(name);
-  }
-
-  /**
-   * The panel's page, themed like the composer's agent pick: a segmented
-   * control up to three pages, a menu beyond (docs/ui.md: no native select).
-   */
-  function renderPageSwitch() {
-    if (pages.length > 3) {
-      return (
-        <ChoiceMenu
-          label={t('panelPageLabel')}
-          groups={[{ choices: pages.map((candidate) => ({ value: candidate.name, label: candidate.name })) }]}
-          value={page.name}
-          onChange={selectPage}
-          direction="down"
-          className="w-full"
-          trigger={
-            // The trigger fills the panel width so a long page name truncates instead of overflowing.
-            <span className="min-w-0 grow truncate text-left" title={page.name}>
-              {page.name}
-            </span>
-          }
+  const bodies = (
+    <>
+      <div className={open === 'work' ? undefined : 'hidden'}>
+        <WorkplaceSection
+          sessionId={sessionId}
+          worktree={worktree ?? null}
+          editorUrl={editorUrl}
+          running={view.running}
+          onDiscarded={onWorktreeChanged}
+          integrationVersion={integrationVersion}
         />
-      );
-    }
-    return (
-      <Segmented
-        label={t('panelPageLabel')}
-        value={page.name}
-        onChange={selectPage}
-        segments={pages.map((candidate) => ({ value: candidate.name, label: candidate.name, title: candidate.name }))}
-      />
-    );
-  }
+        <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} />
+        <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} />
+      </div>
+      <div className={open === 'servers' ? undefined : 'hidden'}>
+        <ServersSection
+          sessionId={sessionId}
+          onServers={(servers: ServerView[]) => setRunningServers(servers.filter((server) => server.running).length)}
+        />
+      </div>
+      <div className={open === 'session' ? undefined : 'hidden'}>
+        <TokensSection usage={usage} />
+        <DecisionsSection decisions={served.decisions} />
+        <SkillsSection skills={skills} hasSession={hasSession} />
+        <VisionSection images={vision} />
+        <PluginsSection sessionId={sessionId} />
+      </div>
+    </>
+  );
 
-  function renderBlock(id: PanelBlockId) {
-    switch (id) {
-      case 'request':
-        return <RequestSection key={id} request={request} />;
-      case 'criteria':
-        return <CriteriaSection key={id} criteria={served.criteria} tally={served.criteriaTally} />;
-      case 'modifiedFiles':
-        return <ModifiedFilesSection key={id} totals={served.modifiedFiles} sessionId={sessionId} />;
-      case 'workspace':
-        return sessionId ? (
-          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree ?? null} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
-        ) : null;
-      case 'servers':
-        return <ServersSection key={id} sessionId={sessionId} />;
-      case 'tokens':
-        return <TokensSection key={id} usage={usage} />;
-      case 'skills':
-        return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
-      case 'decisions':
-        return <DecisionsSection key={id} decisions={served.decisions} />;
-      case 'vision':
-        return <VisionSection key={id} images={vision} />;
-      case 'plugins':
-        return <PluginsSection key={id} sessionId={sessionId} />;
-      default: {
-        const exhaustive: never = id;
-        return exhaustive;
-      }
-    }
-  }
-
-  function renderRail(className: string) {
-    const openCount = openBlock ? railCount(openBlock, served, vision) : null;
-    return (
-      <aside
-        aria-label={t('sessionContextLabel')}
-        className={`${openBlock ? 'relative ' : ''}w-10 shrink-0 flex-col items-center gap-1 border-l border-border bg-bg py-1 ${className}`}
-      >
-        {openBlock ? (
-          <div
-            className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border border-border bg-bg shadow-xl"
-            role="dialog"
-            aria-label={t(panelBlock(openBlock).titleKey)}
-          >
-            <div className="flex items-center gap-1 px-2 py-2">
-              <span className="min-w-0 truncate text-xs font-medium text-text">{t(panelBlock(openBlock).titleKey)}</span>
-              {openCount !== null ? <span className="font-mono text-xs text-muted tabular-nums">{openCount}</span> : null}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                iconOnly
-                aria-label={t('close')}
-                onClick={() => setOpenBlock(null)}
-                className="ml-auto"
-              >
-                <CloseIcon className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
-              {renderBlock(openBlock)}
-            </div>
-          </div>
-        ) : null}
-        <div className="hidden min-[1100px]:flex">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label={t('expand')}
-            onClick={() => setCollapsed(false)}
-          >
-            <ChevronsLeftIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
-          const title = t(panelBlock(block.id).titleKey);
-          const count = railCount(block.id, served, vision);
-          return (
-            <Button
-              key={block.id}
-              type="button"
-              variant={openBlock === block.id ? 'secondary' : 'ghost'}
-              size="sm"
-              iconOnly
-              aria-label={title}
-              title={title}
-              aria-pressed={openBlock === block.id}
-              onClick={() => setOpenBlock((current) => (current === block.id ? null : block.id))}
-              className="relative"
-            >
-              {block.icon}
-              {count ? (
-                <span className={`absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 tabular-nums ${railCountClass(block.id, served)}`}>
-                  {count}
-                </span>
-              ) : null}
-            </Button>
-          );
-        })}
-      </aside>
-    );
-  }
-
-  if (collapsed) {
-    return renderRail('flex');
-  }
+  const drawer = pinned ? (
+    <div
+      role="complementary"
+      aria-label={drawerTitle}
+      className={`flex min-h-0 w-[380px] shrink-0 flex-col border-l border-border bg-panel ${open === null ? 'hidden' : ''}`}
+    >
+      {header}
+      <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">{bodies}</div>
+    </div>
+  ) : (
+    <div
+      role="dialog"
+      aria-label={drawerTitle}
+      className={`absolute inset-y-0 right-full z-20 flex w-[380px] min-h-0 flex-col border-l border-border bg-panel shadow-float ${open === null ? 'hidden' : ''}`}
+    >
+      {header}
+      <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">{bodies}</div>
+    </div>
+  );
 
   return (
     <>
-      {renderRail('flex min-[1100px]:hidden')}
-      <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={t('panelWidthLabel')}
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={MAX_WIDTH}
-        aria-valuenow={width}
-        tabIndex={0}
-        title={t('panelResizeTitle')}
-        onPointerDown={startResize}
-        onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
-        onKeyDown={resizeWithKeys}
-        className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
-      />
-      <aside
-        aria-label={t('sessionContextLabel')}
-        className="flex min-h-0 w-full flex-col border-l border-border bg-bg"
-      >
-        <div className="flex items-center gap-1 px-2 py-2">
-          <span className="min-w-0 truncate text-xs font-medium text-text" title={t('sessionContextLabel')}>
-            {t('panelPageContext')}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label={t('collapse')}
-            onClick={() => setCollapsed(true)}
-            className="ml-auto"
-          >
-            <ChevronsRightIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        {pages.length > 1 && (
-          <div className="px-2 pb-2">{renderPageSwitch()}</div>
-        )}
-        <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
-          {hasSession ? pageBlocks(page, page === pages[0]).map(renderBlock) : <p className="m-0 px-3 py-2 text-xs text-muted">{t('contextEmpty')}</p>}
-        </div>
-      </aside>
-      </div>
+      {pinned ? drawer : null}
+      <nav aria-label={t('sessionContextLabel')} className="relative w-[52px] shrink-0 flex flex-col items-center border-l border-border bg-bg pt-2">
+        {!pinned ? drawer : null}
+        {TAB_ORDER.map((tab) => {
+          const TabIcon = TABS[tab].Icon;
+          const title = t(TABS[tab].titleKey);
+          const active = open === tab;
+
+          let status = '';
+          let statusClass = 'text-muted';
+          if (tab === 'work') {
+            const { passed, total, failed } = served.criteriaTally;
+            if (total > 0) status = `${passed}/${total}`;
+            if (failed > 0) statusClass = 'text-err';
+            else if (total > 0 && passed === total) statusClass = 'text-ok';
+          } else if (tab === 'servers') {
+            if (runningServers > 0) {
+              status = `● ${runningServers}`;
+              statusClass = 'text-ok';
+            }
+          }
+
+          return (
+            <button
+              key={tab}
+              type="button"
+              title={title}
+              aria-label={title}
+              aria-pressed={active}
+              onClick={() => setOpen((current) => (current === tab ? null : tab))}
+              className={`relative flex h-16 w-full flex-col items-center justify-center gap-1 ${active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-raised hover:text-text'}`}
+            >
+              {active ? <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-accent" /> : null}
+              {tab === 'work' && served.criteriaTally.failed > 0 ? (
+                <span aria-hidden className="absolute right-2 top-2 size-1.5 rounded-full bg-err" />
+              ) : null}
+              <TabIcon className="h-4 w-4" />
+              <span className="text-[10px] leading-none">{title}</span>
+              <span className={`text-[10px] leading-none font-mono tabular-nums ${statusClass}`}>{status}</span>
+            </button>
+          );
+        })}
+      </nav>
     </>
   );
 }

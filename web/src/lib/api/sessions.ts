@@ -79,8 +79,8 @@ export interface SessionDetail {
   };
   /** The idea this session frames, or null. */
   idea: { id: string; state: "inbox" | "framing" | "ready" } | null;
-  /** The first message the human typed, verbatim, or null. */
-  request: string | null;
+  /** Opens the folder the agent works in (its worktree, else the project) in the chosen IDE. */
+  editorUrl: string;
   /** The last answer read as an audit report, or null. */
   audit: Audit | null;
   /** The tasks agents proposed in this session, in order. */
@@ -357,10 +357,19 @@ export interface ServedThread {
   modifiedFiles: ModifiedFiles;
 }
 
+/** One file a session's tools changed, with its line counts. */
+export interface ModifiedFile {
+  path: string;
+  added: number;
+  removed: number;
+}
+
 export interface ModifiedFiles {
   count: number;
   added: number;
   removed: number;
+  /** The most-changed files, at most five, most lines first. */
+  files: ModifiedFile[];
 }
 
 export function getThread(id: string): Promise<ServedThread> {

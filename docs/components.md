@@ -288,3 +288,10 @@ The agent's proposals follow, folded, and leave once taken: the audit findings t
 tasks, the AGENTS.md draft, the architecture rules, the suggested next agent, and the invite to review a finished
 run's work before integration (`AuditDecision.tsx`, `ProposedTasksDecision.tsx`, `AgentsMdDecision.tsx`,
 `RuleProposalDecision.tsx`, `AgentSuggestionDecision.tsx`, `IntegrationDecision.tsx`).
+Context rail, done: the session's right side is a thin rail of three tabs, each with its live status (Travail
+with the criteria tally, red on a failure; Serveurs with the running count; Session); a tab opens a floating
+drawer, the pin docks it as a column, Escape or the tab closes it (`web/src/components/session/ContextPanel.tsx`).
+Travail shows where the work lands (the human's folder and branch, or the agent's worktree with its commits and
+a discard), a terminal and the IDE there, the criteria, and the five most changed files served by the fold
+(`domain/modified_files.rs`) with a link to the changes page (`WorkplaceSection.tsx`, `ModifiedFilesSection.tsx`).
+The configurable panel pages are gone.

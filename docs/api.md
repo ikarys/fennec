@@ -139,8 +139,7 @@ as the `local` provider's, and written back in the new shape.
   "display": {
     "reasoningOpen": true,
     "toolResultsOpen": false,
-    "fontSize": 14,
-    "panelPages": null
+    "fontSize": 14
   },
   "globalInstructions": "string | null",
   "search": {
@@ -156,9 +155,7 @@ as the `local` provider's, and written back in the new shape.
 
 Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
 `compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty,
-`fontSize` in `13..=16` (default 14), `panelPages` 1..=12 pages with
-non-empty names ≤40 chars, unique names, and non-empty block ids (`null`
-means the UI's default pages), `searxngUrl` blank or starting with `http://`
+`fontSize` in `13..=16` (default 14), `searxngUrl` blank or starting with `http://`
 or `https://`. `reasoningEffort` is sent as the
 `reasoning_effort` field of the model request when set; `null` omits it.
 
@@ -482,7 +479,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `agentsMdDraft` is `{exists, written}` when the last answer holds an AGENTS.md draft (`## AGENTS.md draft` then a ```md block), else null;
   `ruleProposal` is `{lines, added}` when the last answer proposes rules (`## Executable rules` then a fenced block of rule lines and `#` comments): `lines` those not yet in `.agents/architecture`, `added` once the human appended them; else null;
   `agentSuggestion` is `{callId, agent, name, color, reason, brief}`, the last `agent.suggested` since the human last wrote, while that agent exists as a mode, else null;
-  `request` is the first message the human typed in the session, verbatim, or null;
+  `editorUrl` opens the session's workdir in the IDE of `display.editor`, through the WSL remote under WSL;
   `model` is `{provider, model, providerName, contextWindow, compactAt, source}`,
   what the next turn runs on; `source` is `session`, `parent` or `default`;
   `worktree` is `{path, branch, base, editorUrl, commits}` (`commits`: the agent's commits past the base, 0 when there is nothing to integrate; `editorUrl` opens the copy in the IDE of `display.editor`, through the WSL remote under WSL) when the session (or its root session) runs a workflow in
@@ -643,7 +640,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `criteriaTally` `{total, passed, failed, indicative}` those criteria counted (`indicative`: the passes an agent judged);
   `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; `replayable` the ids
   of the messages the human may replay (typed, in the model's current view: the UI offers the action on those only);
-  `modifiedFiles` `{count, added, removed}` what the `write_file` and `edit_file` calls changed (files merged by their path
+  `modifiedFiles` `{count, added, removed, files: [{path, added, removed}]}` (`files`: the 5 most changed, most lines first) what the `write_file` and `edit_file` calls changed (files merged by their path
   relative to the session's workdir, lines as the calls wrote them);
   deterministic (the decisions and the indicative statuses record what a model said); 404 if no session.
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under

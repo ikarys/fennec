@@ -30,7 +30,6 @@ import { ModelSection } from '../components/settings/ModelSection';
 import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
 import { ModelPrefsSection, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
-import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { NetworkSection } from '../components/settings/NetworkSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
@@ -513,11 +512,6 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
                   onChange={updateDisplay}
                   theme={theme}
                   onThemeChange={onThemeChange}
-                />
-                <PanelPagesSection
-                  save={groupSave('display')}
-                  value={form.display.panelPages ?? null}
-                  onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
                 />
               </>
             )}

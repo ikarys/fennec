@@ -75,7 +75,7 @@ dead: every list and grid shows the human where they are and what reacts.
   their own. A group saved on its own takes `save`: a dot before its label
   while it has unsaved edits, and its own "Enregistrer · Au prochain tour".
   Lists are rows separated by space or a hairline (`border-border`); the
-  entries of a group that are edited as a whole (a panel page, an MCP server)
+  entries of a group that are edited as a whole (an MCP server)
   are `Card variant="inset"` blocks, never a bordered box inside a box.
 - Only the accent gets a filled `Badge` (`appearance="solid"`); ok and err are coloured text,
   or an `appearance="pill"` tag. Tinted backgrounds use the `*-soft` tokens (`bg-err-soft`,
