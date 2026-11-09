@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
-import { ExternalIcon, PlusIcon, TrashIcon } from '../components/ui/Icons';
+import { ExternalIcon, PlusIcon, ProjectIcon, TrashIcon } from '../components/ui/Icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
@@ -152,52 +153,55 @@ export default function ProjectPage({
   }
 
   const header = (
-    <>
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">
-          {project.name}
-        </h1>
-        <Button variant="primary" size="sm" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
-          <PlusIcon className="h-4 w-4" />
-          {t('newSession')}
-        </Button>
-        <a
-          href={project.editorUrl}
-          title={openInEditor}
-          aria-label={openInEditor}
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-        >
-          <ExternalIcon className="h-4 w-4" />
-        </a>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title={t('deleteProjectBtn')}
-          aria-label={t('deleteProjectBtn')}
-          onClick={() => setDeleting(true)}
-        >
-          <TrashIcon className="h-4 w-4" />
-        </Button>
-      </div>
-      <p className="mt-0.5 break-all font-mono text-xs text-muted">
-        {project.workdir} · ⎇ {project.branch ?? t('noBranch')}
-        {project.remote ? (
-          <>
-            {' · '}
-            <a
-              href={project.remote}
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent-strong underline"
-              title={project.remote}
-            >
-              {project.remote.replace(/^https?:\/\//, '')}
-            </a>
-          </>
-        ) : null}
-      </p>
-    </>
+    <PageHeader
+      Icon={ProjectIcon}
+      title={project.name}
+      subtitle={
+        <span className="break-all font-mono text-xs">
+          {project.workdir} · ⎇ {project.branch ?? t('noBranch')}
+          {project.remote ? (
+            <>
+              {' · '}
+              <a
+                href={project.remote}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent-strong underline"
+                title={project.remote}
+              >
+                {project.remote.replace(/^https?:\/\//, '')}
+              </a>
+            </>
+          ) : null}
+        </span>
+      }
+      actions={
+        <>
+          <a
+            href={project.editorUrl}
+            title={openInEditor}
+            aria-label={openInEditor}
+            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+          >
+            <ExternalIcon className="h-4 w-4" />
+          </a>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title={t('deleteProjectBtn')}
+            aria-label={t('deleteProjectBtn')}
+            onClick={() => setDeleting(true)}
+          >
+            <TrashIcon className="h-4 w-4" />
+          </Button>
+          <Button variant="primary" size="md" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
+            <PlusIcon className="h-4 w-4" />
+            {t('newSession')}
+          </Button>
+        </>
+      }
+    />
   );
 
   return shell(
