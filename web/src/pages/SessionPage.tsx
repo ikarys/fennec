@@ -30,11 +30,12 @@ import { Composer } from "../components/session/Composer";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
 import { Badge } from "../components/ui/Badge";
-import { AuditCard } from "../components/session/AuditCard";
-import { ProposedTasksCard } from "../components/session/ProposedTasksCard";
-import { AgentsMdCard } from "../components/session/AgentsMdCard";
-import { RuleProposalCard } from "../components/session/RuleProposalCard";
-import { AgentSuggestionCard } from "../components/session/AgentSuggestionCard";
+import { AuditDecision } from "../components/session/AuditDecision";
+import { ProposedTasksDecision } from "../components/session/ProposedTasksDecision";
+import { AgentsMdDecision } from "../components/session/AgentsMdDecision";
+import { RuleProposalDecision } from "../components/session/RuleProposalDecision";
+import { AgentSuggestionDecision } from "../components/session/AgentSuggestionDecision";
+import { IntegrationDecision } from "../components/session/IntegrationDecision";
 import { ContextPanel } from "../components/session/ContextPanel";
 import { ContextGauge } from "../components/session/ContextGauge";
 import { QuestionDecision } from "../components/session/QuestionDecision";
@@ -359,9 +360,34 @@ export function SessionPage({
   const runDecisionId = blocking.run
     ? `run-${blocking.run.kind === "human" ? blocking.run.nodeId : blocking.run.kind}`
     : null;
+  // The last run ended done and its work is not integrated yet: the bar invites to review it.
+  const runWorkReady = useMemo(() => {
+    for (let i = view.items.length - 1; i >= 0; i -= 1) {
+      const item = view.items[i];
+      if (item?.id.startsWith("integration-applied-")) return false;
+      if (item && item.kind === "workflow-end") return item.outcome === "done";
+    }
+    return false;
+  }, [view.items]);
+  const integrationInvite = useMemo<IntegrationInvite | null>(() => {
+    // No commit on the agent's branch: nothing to review, no invitation.
+    if (!sessionId || !detail?.worktree?.commits) return null;
+    return { open: () => setIntegrationOpen(true) };
+  }, [sessionId, detail?.worktree?.commits]);
+  // The agent's proposals wait in the bar until taken; none of them blocks the agent.
+  const offered = detail && sessionId && !running ? detail : null;
+  const proposals = {
+    audit: offered?.audit && offered.audit.findings.some((finding) => !offered.audit!.taken.includes(finding.number)) ? offered.audit : null,
+    tasks: offered?.proposedTasks.some((task) => task.ideaId === null) ? offered.proposedTasks : null,
+    agentsMd: offered?.agentsMdDraft && !offered.agentsMdDraft.written ? offered.agentsMdDraft : null,
+    rules: offered?.ruleProposal && !offered.ruleProposal.added && offered.ruleProposal.lines.length > 0 ? offered.ruleProposal : null,
+    suggestion: offered?.agentSuggestion && offered.project.id ? offered.agentSuggestion : null,
+    integration: !running && runWorkReady ? integrationInvite : null,
+  };
   const decisionCount =
     [blocking.approval, blocking.waiver, blocking.question, blocking.run, blocking.retry].filter(Boolean).length +
-    (!detail?.parentId && pendingPlan && planActions ? 1 : 0);
+    (!detail?.parentId && pendingPlan && planActions ? 1 : 0) +
+    Object.values(proposals).filter(Boolean).length;
   const blockingId =
     blocking.approval?.callId ??
     blocking.waiver?.callId ??
@@ -373,20 +399,6 @@ export function SessionPage({
     if (blockingId) setOpenDecision(blockingId);
   }, [blockingId]);
   const toggleDecision = (id: string) => setOpenDecision((open) => (open === id ? null : id));
-  const lastRunEndId = useMemo(() => {
-    for (let i = view.items.length - 1; i >= 0; i -= 1) {
-      const item = view.items[i];
-      // Once integrated, the run's work is in the human's branch: no invite left.
-      if (item?.id.startsWith("integration-applied-")) return null;
-      if (item && item.kind === "workflow-end") return item.id;
-    }
-    return null;
-  }, [view.items]);
-  const integrationInvite = useMemo<IntegrationInvite | null>(() => {
-    // No commit on the agent's branch: nothing to review, no invitation.
-    if (!sessionId || !detail?.worktree?.commits) return null;
-    return { lastRunEndId, open: () => setIntegrationOpen(true) };
-  }, [sessionId, detail?.worktree?.commits, lastRunEndId]);
   const projectName =
     detail?.project.name ??
     projects.find((project) => project.id === projectId)?.name ??
@@ -726,43 +738,6 @@ export function SessionPage({
                               onReplay={sessionId && served.replayable.includes(item.id) ? handleReplay : undefined}
                             />
                           ))}
-                          {detail && detail.audit && detail.audit.findings.length > 0 && !running ? (
-                            <AuditCard
-                              audit={detail.audit}
-                              sessionId={sessionId}
-                              projectId={detail.project.id ?? null}
-                              onCreated={() => setDetailVersion((version) => version + 1)}
-                            />
-                          ) : null}
-                          {detail && detail.proposedTasks.length > 0 && !running ? (
-                            <ProposedTasksCard
-                              tasks={detail.proposedTasks}
-                              sessionId={sessionId}
-                              projectId={detail.project.id ?? null}
-                              onAccepted={() => setDetailVersion((version) => version + 1)}
-                            />
-                          ) : null}
-                          {detail && detail.agentsMdDraft && !running ? (
-                            <AgentsMdCard
-                              draft={detail.agentsMdDraft}
-                              sessionId={sessionId}
-                              onWritten={() => setDetailVersion((version) => version + 1)}
-                            />
-                          ) : null}
-                          {detail && detail.ruleProposal && !running ? (
-                            <RuleProposalCard
-                              proposal={detail.ruleProposal}
-                              sessionId={sessionId}
-                              onAdded={() => setDetailVersion((version) => version + 1)}
-                            />
-                          ) : null}
-                          {detail && detail.agentSuggestion && sessionId && detail.project.id && !running ? (
-                            <AgentSuggestionCard
-                              suggestion={detail.agentSuggestion}
-                              sessionId={sessionId}
-                              projectId={detail.project.id}
-                            />
-                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -861,6 +836,59 @@ export function SessionPage({
                             actions={planActions}
                             open={openDecision === pendingPlan.id}
                             onToggle={() => toggleDecision(pendingPlan.id)}
+                          />
+                        )}
+                        {proposals.integration && (
+                          <IntegrationDecision
+                            onOpen={proposals.integration.open}
+                            open={openDecision === "integration"}
+                            onToggle={() => toggleDecision("integration")}
+                          />
+                        )}
+                        {proposals.audit && sessionId && (
+                          <AuditDecision
+                            audit={proposals.audit}
+                            sessionId={sessionId}
+                            projectId={detail?.project.id ?? null}
+                            onCreated={() => setDetailVersion((version) => version + 1)}
+                            open={openDecision === "audit"}
+                            onToggle={() => toggleDecision("audit")}
+                          />
+                        )}
+                        {proposals.tasks && sessionId && (
+                          <ProposedTasksDecision
+                            tasks={proposals.tasks}
+                            sessionId={sessionId}
+                            onAccepted={() => setDetailVersion((version) => version + 1)}
+                            open={openDecision === "tasks"}
+                            onToggle={() => toggleDecision("tasks")}
+                          />
+                        )}
+                        {proposals.agentsMd && sessionId && (
+                          <AgentsMdDecision
+                            draft={proposals.agentsMd}
+                            sessionId={sessionId}
+                            onWritten={() => setDetailVersion((version) => version + 1)}
+                            open={openDecision === "agents-md"}
+                            onToggle={() => toggleDecision("agents-md")}
+                          />
+                        )}
+                        {proposals.rules && sessionId && (
+                          <RuleProposalDecision
+                            proposal={proposals.rules}
+                            sessionId={sessionId}
+                            onAdded={() => setDetailVersion((version) => version + 1)}
+                            open={openDecision === "rules"}
+                            onToggle={() => toggleDecision("rules")}
+                          />
+                        )}
+                        {proposals.suggestion && sessionId && detail?.project.id && (
+                          <AgentSuggestionDecision
+                            suggestion={proposals.suggestion}
+                            sessionId={sessionId}
+                            projectId={detail.project.id}
+                            open={openDecision === "suggestion"}
+                            onToggle={() => toggleDecision("suggestion")}
                           />
                         )}
                       </DecisionBar>

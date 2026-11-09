@@ -1,15 +1,14 @@
 /**
- * The audit findings, offered as tasks inside the thread.
- *
- * It sits right after the report so the human sees the proposed tasks where
- * they read the audit, not hidden in the right-hand context panel.
+ * The audit findings not taken yet, a row of the decision bar: the human
+ * picks which ones become backlog tasks.
  */
 import { useState } from 'react';
 
 import { createAuditTasks, type Audit } from '../../lib/api';
+import { DecisionRow } from './DecisionBar';
+import { ReviewIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 
@@ -19,16 +18,20 @@ const SEVERITY: Record<'high' | 'medium' | 'low', { label: MsgKey; tone: 'err' |
   low: { label: 'severityLow', tone: 'neutral' },
 };
 
-export function AuditCard({
+export function AuditDecision({
   audit,
   sessionId,
   projectId,
   onCreated,
+  open,
+  onToggle,
 }: {
-  audit: Audit | null;
-  sessionId: string | null;
+  audit: Audit;
+  sessionId: string;
   projectId: string | null;
   onCreated: () => void;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const t = useT();
   const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -36,30 +39,7 @@ export function AuditCard({
   const [created, setCreated] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!audit || audit.findings.length === 0 || !sessionId) return null;
-
   const taken = new Set(audit.taken);
-  const allTaken = audit.findings.every((finding) => taken.has(finding.number));
-
-  if (allTaken) {
-    const count = audit.findings.length;
-    return (
-      <Card className="p-4">
-        <p className="m-0 flex items-center gap-2 text-sm text-muted">
-          {count === 1 ? t('findingInBacklog') : t('findingsInBacklog', { count })}
-          {projectId ? (
-            <a
-              href={'#/project/' + encodeURIComponent(projectId) + '/tasks'}
-              className="text-xs text-accent-strong underline"
-            >
-              {t('viewTasks')}
-            </a>
-          ) : null}
-        </p>
-      </Card>
-    );
-  }
-
   const untaken = audit.findings
     .filter((finding) => !taken.has(finding.number))
     .map((finding) => finding.number);
@@ -95,14 +75,39 @@ export function AuditCard({
     }
   };
 
+  const reviewButton = (
+    <Button variant="secondary" size="sm" onClick={onToggle}>
+      {t('decisionReview')}
+    </Button>
+  );
+
   return (
-    <Card className="flex flex-col gap-3 p-4">
-      <div className="flex flex-col gap-1">
-        <p className="m-0 text-sm font-medium text-text">{t('whichFindingsQuestion')}</p>
-        <p className="m-0 text-xs text-muted">
-          {t('findingsHint')}
-        </p>
-      </div>
+    <DecisionRow
+      icon={<ReviewIcon className="h-3.5 w-3.5" />}
+      title={t('whichFindingsQuestion')}
+      meta={`${t('auditBadge')} · ${untaken.length}`}
+      primary={reviewButton}
+      open={open}
+      onToggle={onToggle}
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={toggleAll} disabled={busy}>
+            {allChecked ? t('uncheckAll') : t('checkAll')}
+          </Button>
+          <span className="flex-1" />
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleCreate}
+            disabled={checked.size === 0 || busy}
+            title={t('createFindingsTitle')}
+          >
+            {checked.size === 0 ? t('createTasks') : t('createTasksCount', { count: checked.size })}
+          </Button>
+        </>
+      }
+    >
+      <p className="m-0 mb-2 text-xs text-muted">{t('findingsHint')}</p>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {audit.findings.map((finding) => {
           const isTaken = taken.has(finding.number);
@@ -130,23 +135,8 @@ export function AuditCard({
           );
         })}
       </ul>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={toggleAll} disabled={busy}>
-          {allChecked ? t('uncheckAll') : t('checkAll')}
-        </Button>
-        <Button
-          variant="primary"
-          size="md"
-          onClick={handleCreate}
-          disabled={checked.size === 0 || busy}
-          title={t('createFindingsTitle')}
-        >
-          {checked.size === 0 ? t('createTasks') : t('createTasksCount', { count: checked.size })}
-        </Button>
-      </div>
-      {error ? <p className="m-0 text-xs text-err">{error}</p> : null}
       {created !== null ? (
-        <div className="flex items-center gap-2">
+        <div className="mt-1.5 flex items-center gap-2">
           <p className="m-0 text-xs text-ok">{t('tasksAddedNote', { count: created })}</p>
           {projectId ? (
             <a
@@ -158,6 +148,7 @@ export function AuditCard({
           ) : null}
         </div>
       ) : null}
-    </Card>
+      {error ? <div className="mt-1.5 text-xs text-err">{error}</div> : null}
+    </DecisionRow>
   );
 }

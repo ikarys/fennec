@@ -4,11 +4,9 @@ import type { ThreadItem, WorkflowNodeStat } from '../../../lib/fold';
 import { formatClockTime, formatDuration } from '../../../lib/format';
 import { AlertIcon, CheckIcon, ChevronRightIcon, ClockIcon, CloseIcon, CpuIcon, FileIcon, PauseIcon, TokensIcon, WandIcon } from '../../ui/Icons';
 import { Badge } from '../../ui/Badge';
-import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { Tile } from '../../ui/Tile';
 import { useRunUsage } from '../../session/CallUsage';
-import { useIntegrationInvite } from '../../session/IntegrationInvite';
 import { useLang, useT } from '../../../i18n';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
@@ -82,7 +80,6 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
   const t = useT();
   const outcome = outcomeView(item.outcome, t);
   const stats = item.stats;
-  const invite = useIntegrationInvite();
   const usage = useRunUsage(item.runId);
 
   const startAt = stats?.startedAt;
@@ -192,14 +189,6 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
         </div>
       )}
 
-      {item.outcome === 'done' && invite && invite.lastRunEndId === item.id && (
-        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
-          <span className="text-xs text-muted">{t('runEndWorkReady')}</span>
-          <Button variant="primary" size="sm" onClick={invite.open}>
-            {t('reviewAndIntegrate')}
-          </Button>
-        </div>
-      )}
     </Card>
   );
 }

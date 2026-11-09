@@ -98,7 +98,7 @@ Questions, done (C10): the Analyses tab of the project page takes a question and
 read-only `ask` agent (`crates/fennec/agents/ask.agent.md`), which answers with a `path:line` source per claim
 (indicative).
 Audits, done: the read-only `audit-architecture` and `audit-security` agents, launched from the Analyses
-tab, report findings as cards the human turns into backlog tasks (never offered twice); the security
+tab, report findings the human turns into backlog tasks from the decision bar (never offered twice); the security
 audit first runs the scanners found on PATH (Settings, never installed: the start of C23).
 Review map, done (C9, part 1): the integration dialog lists the branch's files riskiest first, each with
 its signals (the gate's checks per file, churn, untested, large), read from git (verified; `domain/review_map.rs`).
@@ -118,13 +118,13 @@ human writes that in their message when they want it.
 Project kickoff, done: the read-only `kickoff` agent ("Démarrer le projet" in the Analyses tab) asks what a new
 project is for, has the human choose its stack and architecture (`record_decision`), drafts its AGENTS.md and
 proposes its first tasks in build order, a walking skeleton first, with `propose_task` (`task.proposed`); the human
-adds each to the backlog from a card in the thread (`task.accepted`). AGENTS.md stays protected from agents: the human
+adds each to the backlog from the decision bar (`task.accepted`). AGENTS.md stays protected from agents: the human
 writes the draft to it in one click (`agents_md.written`).
 Agent phases, done: a `phase:` in each agent's frontmatter (start, frame, build, understand, check); the server
 sends the agents in that order and the composer's menu groups them under Démarrer, Cadrer, Construire, Comprendre,
 Contrôler.
 Agent suggestions, done: `suggest_agent` (the turn goes on) lets an agent suggest the human go on in a new
-session with another agent, with a reason and a brief (`agent.suggested`); a card after the turn opens the new
+session with another agent, with a reason and a brief (`agent.suggested`); a row of the decision bar opens the new
 session's page on that agent with the brief in the composer, and nothing starts until the human sends it.
 Rules, done: the human's rules, global, per project or granted to a session, owned by the `rules`
 crate (model, matching, decision, its own SQLite file `rules.db`) and enforced by fennec's code, never the model: a
@@ -284,3 +284,7 @@ What blocks the agent joins the same bar, above the plan and opened on arrival: 
 approval, the protected-file waiver, the workflow waiting on the human and the retry after an error, each
 folded to its primary action (`QuestionDecision.tsx`, `ApprovalDecision.tsx`, `WaiverDecision.tsx`,
 `workflow/session/RunDecision.tsx`, `RetryDecision.tsx`).
+The agent's proposals follow, folded, and leave once taken: the audit findings to turn into tasks, the proposed
+tasks, the AGENTS.md draft, the architecture rules, the suggested next agent, and the invite to review a finished
+run's work before integration (`AuditDecision.tsx`, `ProposedTasksDecision.tsx`, `AgentsMdDecision.tsx`,
+`RuleProposalDecision.tsx`, `AgentSuggestionDecision.tsx`, `IntegrationDecision.tsx`).
