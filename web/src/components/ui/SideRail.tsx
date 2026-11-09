@@ -30,8 +30,6 @@ interface SideRailProps {
   reveal?: { id: string; key: number };
   /** Drawer width class, default 'w-[380px]'. */
   width?: string;
-  /** Under the tabs, in the rail (e.g. a glance at the run's steps). */
-  footer?: ReactNode;
 }
 
 function loadPinned(storageKey: string): boolean | null {
@@ -77,7 +75,6 @@ export function SideRail({
   panels,
   reveal,
   width = 'w-[380px]',
-  footer,
 }: SideRailProps) {
   const t = useT();
   const [pinned, setPinned] = useState(() => loadPinned(storageKey) ?? defaultPinned ?? false);
@@ -198,7 +195,6 @@ export function SideRail({
           onClick={() => setOpen(current === panel.id ? null : panel.id)}
         />
       ))}
-      {footer ? <div className="min-h-0 w-full grow overflow-y-auto [scrollbar-width:thin]">{footer}</div> : null}
     </nav>
   );
 
