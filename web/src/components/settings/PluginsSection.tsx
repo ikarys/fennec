@@ -70,10 +70,10 @@ export function PluginsSection() {
   return (
     <div className="space-y-4">
       <Section title={t('panelPlugins')} flush description={t('pluginsDescription')}>
-        {error ? <div className="px-4 pb-3 text-err text-xs">{error}</div> : null}
-        {plugins === null && !error && <div className="px-4 py-3 text-sm text-muted">{t('loading')}</div>}
+        {error ? <div className="pb-3 text-err text-xs">{error}</div> : null}
+        {plugins === null && !error && <div className="py-3 text-sm text-muted">{t('loading')}</div>}
         {problems.length > 0 && (
-          <Card className="mx-4 mb-3 overflow-hidden">
+          <Card className="mb-3 overflow-hidden">
             <div className="border-b border-border bg-attention-soft px-3 py-1.5 text-xs font-medium text-attention">
               {t('pluginProblems')}
             </div>
@@ -87,19 +87,23 @@ export function PluginsSection() {
           </Card>
         )}
         {plugins !== null && plugins.length === 0 && problems.length === 0 && (
-          <div className="px-4 py-3 text-sm text-muted">{t('noPluginsDefined')}</div>
+          <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">{t('noPluginsDefined')}</div>
         )}
         {plugins !== null && plugins.length > 0 && (
           <Card className="overflow-hidden">
             {plugins.map((plugin, index) => (
               <div
                 key={plugin.name}
-                className={`flex flex-wrap items-center gap-2 px-4 py-2.5 ${index > 0 ? 'border-t border-border' : ''}`}
+                className={`flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent-soft ${index > 0 ? 'border-t border-border' : ''}`}
               >
-                <PuzzleIcon className={`h-4 w-4 shrink-0 ${plugin.active ? 'text-accent' : 'text-faint'}`} />
+                <span
+                  className={`grid size-8 shrink-0 place-items-center rounded-md ${plugin.active ? 'bg-accent-soft text-accent' : 'bg-raised text-faint'}`}
+                >
+                  <PuzzleIcon className="h-4 w-4" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-mono text-xs text-text">{plugin.name}</span>
+                    <span className="truncate font-mono text-sm font-medium text-text">{plugin.name}</span>
                     {plugin.active ? (
                       <Badge tone="ok" appearance="pill" dot pulse={plugin.enabled}>
                         {t('pluginEnabled')}
@@ -144,14 +148,15 @@ export function PluginsSection() {
                   <GlobeIcon className="h-3.5 w-3.5" />
                 </Button>
                 <Button
-                  variant={plugin.enabled ? 'soft' : 'primary'}
+                  variant={plugin.enabled ? 'soft' : 'secondary'}
                   size="sm"
+                  iconOnly
                   disabled={busyName !== null}
                   aria-label={plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
+                  title={plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
                   onClick={() => void toggle(plugin, { enabled: !plugin.enabled })}
                 >
-                  {plugin.enabled ? <StopIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
-                  {plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
+                  {plugin.enabled ? <StopIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
                 </Button>
               </div>
             ))}
@@ -160,7 +165,7 @@ export function PluginsSection() {
       </Section>
       <Section title={t('pluginBlocksTitle')} flush>
         {blocks.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-muted">{t('noProjectBlocks')}</div>
+          <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">{t('noProjectBlocks')}</div>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {blocks.map((block) => (
