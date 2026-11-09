@@ -85,4 +85,5 @@ within 7 days ([SECURITY.md](SECURITY.md)).
 - T8: complexity is enforced, not recorded: clippy's `cognitive_complexity` lint
   at the declared threshold fails the lint step. File and function length and the
   markers are measured by `vibecheck`; the thresholds sit just above the state at
-  adoption and only go down.
+  adoption and only go down. No public API documentation lint: the library crates
+  are not published and only this workspace uses them. Declared 2026-11-09.

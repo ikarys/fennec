@@ -1,11 +1,11 @@
 {
   "color": "yellow",
   "label": "vibecoding",
-  "message": "level 2 · checked 2026-11-09 · 4447579",
+  "message": "level 2 · checked 2026-11-09 · e9c06c6",
   "schemaVersion": 1,
   "vibecoding": {
     "checked_by": "vibecheck 0.4.0",
-    "commit": "4447579",
+    "commit": "e9c06c6",
     "date": "2026-11-09",
     "evidence": {
       "audit": "audit/evidence/audit.json",
@@ -18,7 +18,7 @@
       "coverage": 84.15,
       "file_max": 2822,
       "function_max": 106,
-      "markers": 170,
+      "markers": 136,
       "outdated": 8
     },
     "open_findings": {
