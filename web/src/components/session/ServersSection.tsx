@@ -1,10 +1,9 @@
 /**
- * The session's servers block: a quiet toolbar, the server list, and the editor.
+ * The session's servers block: the server list and its editor.
  */
 import { useState } from 'react';
 import type { ServerView } from '../../lib/api';
-import { InfoIcon, ServerIcon, SettingsIcon } from '../ui/Icons';
-import { Button } from '../ui/Button';
+import { ServerIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { ServerEditor } from './ServerEditor';
 import { ServerList } from './ServerList';
@@ -38,25 +37,11 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
       summary={summary}
     >
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-end gap-0.5">
-          <span role="img" className="text-muted p-1 cursor-help" title={note} aria-label={note}>
-            <InfoIcon className="h-3.5 w-3.5" />
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => setEditorOpen(true)}
-            title={t('configure')}
-            aria-label={t('configure')}
-          >
-            <SettingsIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-
         <ServerList
           key={refreshKey}
           sessionId={sessionId}
+          note={note}
+          onConfigure={() => setEditorOpen(true)}
           onServers={(nextServers) => {
             setServers(nextServers);
             onServers?.(nextServers);

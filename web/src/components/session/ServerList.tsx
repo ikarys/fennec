@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, openTerminal, saveServers, startServer, stopServer } from '../../lib/api';
 import { serverBadge, serversPollMs } from '../../lib/servers';
-import { ActivityIcon, ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../ui/Icons';
+import { ActivityIcon, ExternalIcon, InfoIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
 import { useLang, useT } from '../../i18n';
@@ -29,10 +29,12 @@ function ServerOutput({ lines }: { lines: string[] }) {
 interface ServerListProps {
   sessionId: string;
   onConfigure?: () => void;
+  /** A hint shown as an info icon in the toolbar. */
+  note?: string;
   onServers?: (servers: ServerView[]) => void;
 }
 
-export function ServerList({ sessionId, onConfigure, onServers }: ServerListProps) {
+export function ServerList({ sessionId, onConfigure, note, onServers }: ServerListProps) {
   const t = useT();
   const lang = useLang();
 
@@ -151,6 +153,37 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
 
   return (
     <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-end gap-0.5">
+        {note !== undefined && (
+          <span role="img" className="cursor-help p-1 text-muted" title={note} aria-label={note}>
+            <InfoIcon className="h-3.5 w-3.5" />
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          title={t('openTerminalInWorktree')}
+          aria-label={t('openTerminalInWorktree')}
+          onClick={() => void openTerminalHere()}
+        >
+          <TerminalIcon className="h-3.5 w-3.5" />
+        </Button>
+
+        {onConfigure && (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title={t('configure')}
+            aria-label={t('configure')}
+            onClick={onConfigure}
+          >
+            <SettingsIcon className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
       {servers === null && <div className="text-xs text-muted">{t('loading')}</div>}
 
       {servers !== null && servers.length === 0 && (
@@ -269,32 +302,6 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
       })}
 
       {error !== null && <div className="text-xs text-err">{error}</div>}
-
-      <div className="flex items-center gap-0.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title={t('openTerminalInWorktree')}
-          aria-label={t('openTerminalInWorktree')}
-          onClick={() => void openTerminalHere()}
-        >
-          <TerminalIcon className="h-3.5 w-3.5" />
-        </Button>
-
-        {onConfigure && (
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            title={t('configure')}
-            aria-label={t('configure')}
-            onClick={onConfigure}
-          >
-            <SettingsIcon className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
     </div>
   );
 }
