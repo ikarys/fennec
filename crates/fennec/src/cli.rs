@@ -3,6 +3,7 @@
 
 pub mod doctor;
 pub mod password;
+pub mod service;
 mod transcript;
 pub mod update;
 
