@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section, type SectionSave } from '../ui/Section';
 import { SectionLabel } from '../ui/SectionLabel';
-import { ChevronRightIcon, CloseIcon, HeartIcon, InfoIcon, PinIcon, StarIcon } from '../ui/Icons';
+import { ChevronRightIcon, CloseIcon, HeartIcon, InfoIcon, PinIcon, ServerIcon, StarIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
 import { billedByDefault, percentFromFraction } from '../../lib/settingsForm';
@@ -151,7 +151,7 @@ function ModelRow({
 
   return (
     <div className="flex flex-col border-t border-border/60 first:border-t-0">
-      <div className="-mx-2 flex h-8 items-center gap-2 rounded-md px-2 hover:bg-raised">
+      <div className="-mx-2 flex h-8 items-center gap-2 rounded-md px-2 transition-colors hover:bg-accent-soft">
         <button
           type="button"
           aria-expanded={open}
@@ -403,10 +403,13 @@ export function ModelPrefsSection({
           const count = listing.models.length + formOnly.length;
           return (
             <div key={listing.provider} className="border-t border-border first:border-t-0 pt-3 first:pt-0">
-              <SectionLabel className="pb-1">
-                <span className="font-mono">{listing.name}</span>
-                {count > 0 && <span className="text-faint"> · {count}</span>}
-              </SectionLabel>
+              <div className="flex items-center gap-2 pb-1">
+                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+                  <ServerIcon className="h-3.5 w-3.5" />
+                </span>
+                <SectionLabel className="font-mono">{listing.name}</SectionLabel>
+                {count > 0 && <Badge tone="info" appearance="pill">{count}</Badge>}
+              </div>
               {listing.models.length === 0 && formOnly.length === 0 && (
                 <p className="m-0 pb-2 text-xs text-faint">{t('noModelsListed')}</p>
               )}
