@@ -17,15 +17,14 @@ mod path_guard;
 mod read_file;
 mod rule_request;
 mod run_command;
-mod sandbox;
+
 #[cfg(test)]
-mod test_support;
+pub(crate) mod test_support;
 mod web_fetch;
 mod web_search;
 mod write_file;
 
 pub use canvas::CanvasTarget;
-pub use sandbox::{Sandbox, SandboxHealth, probe, remove_private_tmp};
 
 use crate::agent::ports::{CommandRun, Commands, RuleCheck, Toolbox};
 use crate::domain::agent::CommandAccess;
@@ -33,6 +32,7 @@ use crate::domain::event::{OutputStream, ToolResult};
 use crate::domain::mcp::{self, McpServer, McpTransport};
 use crate::domain::preferences::SearchPrefs;
 use crate::domain::protection::Protection;
+use crate::sandbox::Sandbox;
 use rules::{Decision, Request, Rules};
 use serde_json::Value;
 use std::path::{Path, PathBuf};

@@ -18,7 +18,8 @@ Models used appear in each commit as `Assisted-by: <tool>:<model>` trailers: Cla
 | UI build | `just check` runs `just web` |
 | Architecture rules | Human review of every change, AGENTS.md "Layout" and "Style" (no automated test) |
 | Security claims | SECURITY.md table |
-| No secrets in history | gitleaks run on the whole history before the first public release; one finding was a fake test token in `crates/fennec/src/security_scan.rs` |
+| No secrets in history | `just secrets` (gitleaks) in CI on every pull request and in the pre-commit hook on staged files; `.gitleaksignore` lists the one known finding, a fake test token once in `crates/fennec/src/security_scan.rs` |
+| Coverage, advisories, outdated dependencies, duplication | `just evidence` writes them to `audit/evidence/`; `vibecheck` checks them against the thresholds in VIBECODING.md and writes `audit/status.json` (the README badge) |
 | Dependencies | Human review of the commit body: Rule 5 requires SQLite and no new dependency without a stated reason |
 | Dependency licences | `just licenses` |
 | Commit format | Conventional Commits, enforced by the git hook from `just setup` |
@@ -28,7 +29,9 @@ Models used appear in each commit as `Assisted-by: <tool>:<model>` trailers: Cla
 
 The workflows run on GitHub Actions.
 
-`ci.yml` runs on pull requests to `develop` and `main` and skips documentation-only paths. Its `check` job validates the PR title with the commit-msg hook, builds the UI, runs lint, checks licenses, and runs UI tests, while the `tests` job installs bubblewrap, allows unprivileged user namespaces on Ubuntu, and runs `just test`.
+`ci.yml` runs on pull requests to `develop` and `main`. Its `guard` job runs on every pull request: it scans the history for secrets and validates the PR title with the commit-msg hook. The `check` and `tests` jobs are skipped on documentation-only changes. The `check` job builds the UI, runs lint, checks licenses, and runs UI tests, while the `tests` job installs bubblewrap, allows unprivileged user namespaces on Ubuntu, and runs `just test`.
+
+`convention.yml` runs on pushes to `main`: it regenerates the evidence, runs `vibecheck --strict` and commits `audit/status.json` and `audit/evidence/` back to `main`.
 
 `build.yml` is called by `release-please.yml` or by hand. It builds the web UI and the Rust binary for Linux x86_64, Linux aarch64, macOS aarch64, and macOS x86_64, packs a release tarball, copies `LICENSE`, `README.md`, and `THIRD_PARTY.md`, generates `THIRD_PARTY_LICENSES.md`, writes a SHA-256 file, and uploads the tarball and checksum as artifacts.
 

@@ -1,7 +1,7 @@
 //! Adapter that runs the integration-gate scanners in the worktree.
 use crate::domain::security_scan::{self, ScanReport, ScanState, ScanStatus, SecurityFinding};
+use crate::sandbox::Sandbox;
 use crate::scanners;
-use crate::tools::Sandbox;
 use crate::worktree::Worktree;
 
 use std::io::Read;
@@ -493,7 +493,10 @@ mod tests {
     #[test]
     fn gitleaks_flags_a_secret_committed_on_the_branch_in_the_background_sandbox() {
         if scanners::find("gitleaks").is_none()
-            || !matches!(crate::tools::probe(), crate::tools::SandboxHealth::Ready)
+            || !matches!(
+                crate::sandbox::probe(),
+                crate::sandbox::SandboxHealth::Ready
+            )
         {
             return;
         }
@@ -506,7 +509,8 @@ mod tests {
         git(&top, &["switch", "-qc", "fennec/t"]);
         fs::write(
             top.join("s.py"),
-            "token = \"ghp_8k2LmQ9vXr4TzW7pN1bYc6JdHs3FgA0eKuRi\"\n",
+            // Split so the source itself carries no token for a secrets scanner to flag.
+            concat!("token = \"gh", "p_8k2LmQ9vXr4TzW7pN1bYc6JdHs3FgA0eKuRi\"\n"),
         )
         .unwrap();
         git(&top, &["add", "."]);

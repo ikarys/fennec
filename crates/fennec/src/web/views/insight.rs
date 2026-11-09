@@ -274,7 +274,7 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Htt
     let preferences = app.store()?.preferences()?;
     let prices = prices(&preferences);
     // The human's display language drives the server-built texts.
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
 
     send_json(
         stream,

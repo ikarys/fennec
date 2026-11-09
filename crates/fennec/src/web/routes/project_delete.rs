@@ -3,7 +3,7 @@
 
 use crate::web::App;
 use crate::web::http::HttpError;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 use crate::web::routes::session_delete;
 use serde_json::{Value, json};
 use std::net::TcpStream;
@@ -23,9 +23,7 @@ pub(crate) fn delete_project(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     if crate::web::jobs::idea_queue::queue_running(app, id) {
         return send_json(
             stream,

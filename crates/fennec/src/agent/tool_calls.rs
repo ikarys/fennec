@@ -5,36 +5,19 @@
 //! recorded, the calls after it in the batch are not run, and the turn ends
 //! complete.
 
-use super::ask_user;
-use super::delegate;
-use super::preflight;
-use super::propose_criteria;
-use super::propose_plan;
-use super::propose_task;
-use super::record_decision;
-use super::request_waiver;
+use super::own_tools::{self, Handled};
 use super::rule_check;
-use super::submit_report;
-use super::suggest_agent;
 use super::turn::Turn;
 use crate::agent::ports::RuleCheck;
 use crate::domain::agent::{AgentDefinition, WriteScope};
-use crate::domain::criteria;
 use crate::domain::event::{Event, ToolCall, ToolResult};
 use crate::domain::named_paths::{human_texts, named_by_human};
 use crate::domain::test_files;
-use crate::domain::workflow::run;
 use std::sync::atomic::Ordering;
 
 /// `INTERRUPTED_ERROR`: a call the human stopped before it ran.
 pub(super) const INTERRUPTED_ERROR: &str = "Tool execution was interrupted by user";
 /// A call queued after an `ask_user` that paused the turn.
-/// `ask_user`'s result while the human is away (`Turn::autonomous`).
-const AWAY_ANSWER: &str = "The human is away (autonomous run) and cannot answer. Decide yourself, choosing the safest option that stays within the approved plan, record the question and your choice with record_decision, and continue.";
-/// `propose_criteria`'s result while the human is away.
-const AWAY_CRITERIA: &str = "The human is away (autonomous run): the criteria stay as approved. Record your proposed change with record_decision for the human to review, and continue against the current criteria.";
-/// `request_waiver`'s result while the human is away.
-const AWAY_WAIVER: &str = "The human is away (autonomous run): a protected file cannot be waived. Say in your report what should change there and why, and continue.";
 const NOT_RUN_AFTER_ASK: &str = "Not run: the turn paused for the human (a question or an approval). Call it again after the answer if it is still needed.";
 
 /// A default read ask can be skipped only when the human already named the path.
@@ -132,6 +115,34 @@ fn scope_refusal(agent: &AgentDefinition, call: &ToolCall) -> Option<String> {
     }
 }
 
+/// A Toolbox call: the human's rules first (the model's call never reaches a refused tool), then the run.
+fn run_checked(
+    turn: &mut Turn,
+    agent: &AgentDefinition,
+    message_id: &str,
+    call: &ToolCall,
+) -> Result<Handled, String> {
+    let tools = turn.tools;
+    let check = tools.check_rules(&call.name, &call.arguments);
+    if !turn.autonomous
+        && let rules::Decision::Ask(rule) = check.decision
+    {
+        if rule.is_none() && named_by_the_human(turn, &check)? {
+            let r = run_tool(turn, agent, message_id, call, true)?;
+            return Ok(Handled::Result(r));
+        }
+
+        turn.append(rule_check::approval(&call.id, rule, &check))?;
+        return Ok(Handled::Waiting);
+    }
+    if let Some(rule) = rule_check::refusal(&check) {
+        turn.append(rule_check::event(&call.id, rule, &check.subject))?;
+        return Ok(Handled::Result(ToolResult::failure(rule.refusal())));
+    }
+    let r = run_tool(turn, agent, message_id, call, false)?;
+    Ok(Handled::Result(r))
+}
+
 /// Runs the round's tool calls, sequential for now.
 pub(super) fn execute_tools(
     turn: &mut Turn,
@@ -189,212 +200,18 @@ pub(super) fn execute_tools(
             )?;
             continue;
         }
-        if call.name == ask_user::NAME {
-            match ask_user::parse(&call.arguments) {
-                // The model reads the failure and the loop goes on.
-                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
-                // Nobody would answer before morning: the agent decides.
-                Ok(_) if turn.autonomous => record(
-                    turn,
-                    message_id,
-                    call,
-                    ToolResult::success(AWAY_ANSWER.into(), false),
-                )?,
-                // No result is recorded: the answer will be the result.
-                Ok(q) => {
-                    turn.append(Event::ChatAskUser {
-                        call_id: call.id.clone(),
-                        question: q.question,
-                        ask_type: q.ask_type,
-                        options: q.options,
-                    })?;
-                    waiting = true;
-                }
+        let handled = match own_tools::handle(turn, agent, message_id, call)? {
+            Some(handled) => handled,
+            None => run_checked(turn, agent, message_id, call)?,
+        };
+        match handled {
+            Handled::Result(result) => record(turn, message_id, call, result)?,
+            Handled::Waiting => waiting = true,
+            Handled::Done(result) => {
+                record(turn, message_id, call, result)?;
+                done = true;
             }
-            continue;
         }
-        if call.name == request_waiver::NAME {
-            match request_waiver::parse(&call.arguments) {
-                // The model reads the failure and the loop goes on.
-                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
-                // A waiver is the human's decision; while they are away it is refused.
-                Ok(_) if turn.autonomous => record(
-                    turn,
-                    message_id,
-                    call,
-                    ToolResult::failure(AWAY_WAIVER.into()),
-                )?,
-                // No result is recorded: the human's answer will be the result.
-                Ok((path, reason)) => {
-                    turn.append(Event::WaiverRequested {
-                        call_id: call.id.clone(),
-                        path,
-                        reason,
-                    })?;
-                    waiting = true;
-                }
-            }
-            continue;
-        }
-        if call.name == propose_criteria::NAME {
-            match propose_criteria::parse(&call.arguments) {
-                // The model reads the failure and the loop goes on.
-                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
-                // The contract is the human's: it never changes while they are away.
-                Ok(_) if turn.autonomous => record(
-                    turn,
-                    message_id,
-                    call,
-                    ToolResult::failure(AWAY_CRITERIA.into()),
-                )?,
-                // The question shows the delta against the criteria in force;
-                // a proposal that changes nothing is accepted without asking.
-                Ok(proposal) => {
-                    let in_force = run::criteria_in_force(&turn.log.events(turn.session_id)?);
-                    if criteria::is_noop(&in_force, &proposal.criteria) {
-                        turn.append(Event::CriteriaProposed {
-                            call_id: call.id.clone(),
-                            criteria: proposal.criteria.clone(),
-                            reason: proposal.reason.clone(),
-                        })?;
-                        record(
-                            turn,
-                            message_id,
-                            call,
-                            ToolResult::success(
-                                "The criteria are unchanged; nothing to accept.".into(),
-                                false,
-                            ),
-                        )?;
-                    } else {
-                        for event in
-                            propose_criteria::events(&call.id, proposal, &in_force, turn.lang)
-                        {
-                            turn.append(event)?;
-                        }
-                        waiting = true;
-                    }
-                }
-            }
-            continue;
-        }
-        if call.name == record_decision::NAME {
-            // Not blocking: the result is recorded and the turn goes on.
-            let result = match record_decision::parse(&call.arguments) {
-                Err(e) => ToolResult::failure(e),
-                Ok(decision) => {
-                    turn.append(record_decision::event(&call.id, decision))?;
-                    ToolResult::success(record_decision::RECORDED.into(), false)
-                }
-            };
-            record(turn, message_id, call, result)?;
-            continue;
-        }
-        if call.name == propose_task::NAME {
-            // Not blocking: the proposal is recorded and the turn goes on.
-            let result = match propose_task::parse(&call.arguments) {
-                Err(e) => ToolResult::failure(e),
-                Ok(proposal) => {
-                    turn.append(propose_task::event(&call.id, proposal))?;
-                    ToolResult::success(propose_task::PROPOSED.into(), false)
-                }
-            };
-            record(turn, message_id, call, result)?;
-            continue;
-        }
-        if call.name == propose_plan::NAME {
-            match propose_plan::parse(&call.arguments) {
-                // The model reads the failure and the loop goes on.
-                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
-                Ok(plan) => {
-                    // The plan's checks run before the human sees the plan,
-                    // once per turn: sent back as this tool's error when one
-                    // cannot run or already passes, so the model fixes the
-                    // plan and calls the tool again.
-                    if !turn.preflight_sent_back
-                        && let Some(feedback) =
-                            preflight::run(turn, agent, message_id, &plan.criteria())?
-                    {
-                        turn.preflight_sent_back = true;
-                        record(turn, message_id, call, ToolResult::failure(feedback))?;
-                        continue;
-                    }
-                    // While the human is away the plan is still recorded: a
-                    // workflow's plan node must get its output.
-                    turn.append(propose_plan::event(&call.id, plan))?;
-                    record(
-                        turn,
-                        message_id,
-                        call,
-                        ToolResult::success(propose_plan::RECORDED.into(), false),
-                    )?;
-                    done = true;
-                }
-            }
-            continue;
-        }
-        if call.name == submit_report::NAME {
-            match submit_report::parse(&call.arguments) {
-                // The model reads the failure and the loop goes on.
-                Err(e) => record(turn, message_id, call, ToolResult::failure(e))?,
-                Ok(report) => {
-                    // The report is the turn's end: no preflight, no second
-                    // chance — the human reviews what the builder claims.
-                    turn.append(submit_report::event(&call.id, report))?;
-                    record(
-                        turn,
-                        message_id,
-                        call,
-                        ToolResult::success(submit_report::RECORDED.into(), false),
-                    )?;
-                    done = true;
-                }
-            }
-            continue;
-        }
-
-        if call.name == suggest_agent::NAME {
-            // Not blocking: the suggestion is recorded and the turn goes on.
-            let current = agent.id.clone();
-            let result = match suggest_agent::parse(&call.arguments, turn.agents, &current) {
-                Err(e) => ToolResult::failure(e),
-                Ok(suggestion) => {
-                    turn.append(suggest_agent::event(&call.id, suggestion))?;
-                    ToolResult::success(suggest_agent::SUGGESTED.into(), false)
-                }
-            };
-            record(turn, message_id, call, result)?;
-            continue;
-        }
-        if call.name == delegate::NAME {
-            // Blocking: the child runs to its turn's end, then the loop goes on.
-            let result = delegate::run(turn, &call.arguments);
-            record(turn, message_id, call, result)?;
-            continue;
-        }
-        // The human's rules run before the tool: the model's call never reaches it.
-        let tools = turn.tools;
-        let check = tools.check_rules(&call.name, &call.arguments);
-        if !turn.autonomous
-            && let rules::Decision::Ask(rule) = check.decision
-        {
-            if rule.is_none() && named_by_the_human(turn, &check)? {
-                let r = run_tool(turn, agent, message_id, call, true)?;
-                record(turn, message_id, call, r)?;
-                continue;
-            }
-
-            turn.append(rule_check::approval(&call.id, rule, &check))?;
-            waiting = true; // no result: the human's answer will produce it
-            continue;
-        }
-        if let Some(rule) = rule_check::refusal(&check) {
-            turn.append(rule_check::event(&call.id, rule, &check.subject))?;
-            record(turn, message_id, call, ToolResult::failure(rule.refusal()))?;
-            continue;
-        }
-        let r = run_tool(turn, agent, message_id, call, false)?;
-        record(turn, message_id, call, r)?;
     }
     Ok(if waiting {
         Flow::WaitingForUser
@@ -425,6 +242,9 @@ mod tests {
     }
 
     impl Toolbox for McpToolbox {
+        fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+            RuleCheck::allowed()
+        }
         fn definitions(&self) -> Value {
             json!([])
         }
@@ -866,15 +686,15 @@ mod tests {
             vec![
                 (
                     "c1".to_string(),
-                    ToolResult::success(super::AWAY_ANSWER.into(), false)
+                    ToolResult::success(crate::agent::own_tools::AWAY_ANSWER.into(), false)
                 ),
                 (
                     "c2".to_string(),
-                    ToolResult::failure(super::AWAY_WAIVER.into())
+                    ToolResult::failure(crate::agent::own_tools::AWAY_WAIVER.into())
                 ),
                 (
                     "c3".to_string(),
-                    ToolResult::failure(super::AWAY_CRITERIA.into())
+                    ToolResult::failure(crate::agent::own_tools::AWAY_CRITERIA.into())
                 ),
             ]
         );
@@ -1277,6 +1097,9 @@ mod tests {
     }
 
     impl Toolbox for PassingRunToolbox {
+        fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+            RuleCheck::allowed()
+        }
         fn definitions(&self) -> Value {
             json!([])
         }
@@ -1439,7 +1262,10 @@ mod tests {
             vec![(
                 "child".to_string(),
                 "plan".to_string(),
-                format!("{}Where are sessions stored?", super::delegate::CHILD_BRIEF)
+                format!(
+                    "{}Where are sessions stored?",
+                    crate::agent::delegate::CHILD_BRIEF
+                )
             )]
         );
         let (id, result) = &results(&h.log)[0];

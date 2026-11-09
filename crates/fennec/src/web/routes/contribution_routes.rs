@@ -8,14 +8,12 @@ use std::path::Path;
 use serde_json::json;
 
 use crate::web::App;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 
 /// `GET /api/projects/{id}/contributions`.
 pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     let Some((top, _)) = crate::worktree::top(Path::new(&project.workdir)) else {
         return send_json(stream, 200, &json!([]));
     };
@@ -30,9 +28,7 @@ pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError
 /// `POST /api/projects/{id}/contributions` with `{"branch": string}`.
 pub fn adopt(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     let body = req.json()?;
     let Some(branch) = body.get("branch").and_then(|value| value.as_str()) else {
         return error(stream, 400, "branch is missing");

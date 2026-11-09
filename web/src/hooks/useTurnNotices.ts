@@ -60,11 +60,13 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): {
   useEffect(() => {
     const source = new EventSource('/api/notices');
     source.onmessage = (event) => {
-      const snapshot = JSON.parse(event.data) as {
-        items: AttentionItem[];
-        budgets?: BudgetNotice[];
-        pluginsVersion?: number;
-      };
+      let snapshot: { items: AttentionItem[]; budgets?: BudgetNotice[]; pluginsVersion?: number };
+      try {
+        snapshot = JSON.parse(event.data);
+      } catch {
+        // A truncated frame (a dropped connection) waits for the next snapshot.
+        return;
+      }
       const budgets = snapshot.budgets ?? [];
       setItems(snapshot.items);
       setPluginsVersion(snapshot.pluginsVersion ?? 0);

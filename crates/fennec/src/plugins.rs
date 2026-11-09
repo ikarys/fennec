@@ -10,8 +10,8 @@ pub mod pump;
 
 use crate::domain::plugin::{BlockKey, BlockScope, Placement, PluginDef, ServedPluginBlock};
 use crate::notifier::Notifier;
+use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
-use crate::tools::Sandbox;
 use host::Host;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -108,9 +108,7 @@ impl PluginManager {
 
     /// Whether any plugin host is running.
     pub fn has_hosts(&self) -> bool {
-        self.hosts
-            .lock()
-            .unwrap()
+        crate::locks::lock(&self.hosts)
             .as_ref()
             .is_some_and(|h| !h.is_empty())
     }

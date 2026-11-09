@@ -2,6 +2,7 @@
 
 pub(super) mod context_view;
 pub(super) mod idea_board;
+pub(super) mod indicators;
 pub(super) mod insight;
 pub(super) mod model_view;
 pub(super) mod project_dashboard;

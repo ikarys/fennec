@@ -291,19 +291,28 @@ pub fn blockers(
     out
 }
 
-/// The blockers the human did not acknowledge (by key). `NoCommits`,
-/// `Conflict` and `LocalChanges` can never be acknowledged: there is nothing
-/// to integrate, accepting a conflict would not make the merge succeed, and
-/// the pick refuses to overwrite uncommitted work.
+impl Blocker {
+    /// Whether the human may accept it. `NoCommits`, `Conflict`, `LocalChanges` and a
+    /// running scan never: there is nothing to integrate, accepting a conflict would not
+    /// make the merge succeed, the pick refuses to overwrite uncommitted work, and a scan
+    /// still running has no verdict yet.
+    pub fn acknowledgeable(&self) -> bool {
+        !matches!(
+            self,
+            Blocker::NoCommits
+                | Blocker::Conflict { .. }
+                | Blocker::LocalChanges { .. }
+                | Blocker::SecurityScanRunning
+        )
+    }
+}
+
+/// The blockers the human did not acknowledge (by key).
 pub fn unacknowledged<'a>(blockers: &'a [Blocker], acknowledged: &[String]) -> Vec<&'a Blocker> {
     blockers
         .iter()
-        .filter(|blocker| match blocker {
-            Blocker::NoCommits
-            | Blocker::Conflict { .. }
-            | Blocker::LocalChanges { .. }
-            | Blocker::SecurityScanRunning => true,
-            _ => !acknowledged.contains(&blocker.key().to_string()),
+        .filter(|blocker| {
+            !blocker.acknowledgeable() || !acknowledged.contains(&blocker.key().to_string())
         })
         .collect()
 }

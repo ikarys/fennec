@@ -6,8 +6,8 @@ mod report;
 
 use super::args;
 use super::path_guard::resolve_in_workdir;
-use super::sandbox::Sandbox;
 use crate::domain::event::{OutputStream, ToolResult};
+use crate::sandbox::Sandbox;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;

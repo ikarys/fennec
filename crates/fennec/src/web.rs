@@ -23,8 +23,8 @@ use crate::domain::project::{Project, SessionSummary};
 use crate::domain::session_skills::{SessionSkills, fold_skills};
 use crate::domain::skill::Skill;
 use crate::notifier::Notifier;
+use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
-use crate::tools::Sandbox;
 use crate::web::http::HttpError;
 use crate::worktree;
 use os::servers::RunningServer;
@@ -103,6 +103,12 @@ impl App {
             return Ok(None);
         };
         Ok(store.project(&s.project_id)?.map(|p| (s, p)))
+    }
+
+    /// The session and its project, or a 404 for the client.
+    fn require_session(&self, id: &str) -> Result<(SessionSummary, Project), HttpError> {
+        self.session_and_project(id)?
+            .ok_or_else(|| HttpError::new(404, "no such session"))
     }
 
     /// Where the session's turns run (see `Place`). A child session shares

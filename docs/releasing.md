@@ -51,9 +51,11 @@ One-time, done with `gh api`:
 Add branch protection/rulesets for `main` and `develop`:
 
 - Require PR.
-- Require the `check`, `tests` and `title` status checks. `ci.yml` skips documentation-only changes
-  (`paths-ignore`), and a skipped workflow leaves a required check pending forever: when
-  they become required, move the docs filter into the jobs (a paths step) instead.
+- Require the `guard`, `check` and `tests` status checks. `guard` (secrets, PR title) runs on every
+  pull request; on documentation-only changes `check` and `tests` are skipped by a job condition,
+  which a required check accepts.
+- Let GitHub Actions bypass the "Require PR" rule: `convention.yml` pushes the evidence to `main`
+  and the back-merge in `release-please.yml` pushes to `develop`.
 - No force-push.
 - No deletion.
 

@@ -5,6 +5,7 @@ use crate::domain::criteria::{CriterionState, CriterionStatus};
 use crate::domain::criteria_fold;
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
+use crate::domain::modified_files::{self, ModifiedFiles};
 use crate::domain::preflight;
 use crate::domain::queue;
 use crate::domain::replay;
@@ -61,6 +62,7 @@ pub struct ThreadView {
     pub decisions: Vec<Decision>,
     /// The messages the human may replay: typed, in the model's current view.
     pub replayable: Vec<String>,
+    pub modified_files: ModifiedFiles,
 }
 
 impl From<rule_approval::Pending> for ApprovalView {
@@ -68,7 +70,7 @@ impl From<rule_approval::Pending> for ApprovalView {
         Self {
             call_id: pending.call_id,
             subject: pending.subject,
-            kind: pending.kind,
+            kind: pending.kind.as_str().to_string(),
             pattern: pending.pattern,
             access: pending.access,
             folders: pending.folders,
@@ -113,14 +115,29 @@ impl CriterionView {
     }
 }
 
-pub fn thread_view(events: &[Event]) -> ThreadView {
+/// The kinds the thread's whole-session folds read; a fold that reads another kind must add it
+/// here (`targeted_reads_fold_like_the_whole_log` guards it).
+pub const SESSION_KINDS: &[&str] = &[
+    "criteria.set",
+    "criterion.updated",
+    "criteria.preflight",
+    "queue.added",
+    "queue.drained",
+    "queue.cancelled",
+    "decision.recorded",
+    "tool.call",
+];
+
+/// `window` is the model's window (`EventLog::window`), `session` the `SESSION_KINDS` events;
+/// either may be the whole log.
+pub fn thread_view(window: &[Event], session: &[Event], workdir: &str) -> ThreadView {
     // The domain folds each block; the view only shapes it for the UI.
-    let passed_before = preflight::passed_before(events);
-    let criteria = criteria_fold::in_force(events);
+    let passed_before = preflight::passed_before(session);
+    let criteria = criteria_fold::in_force(session);
     ThreadView {
-        pending_approval: rule_approval::pending(events).map(ApprovalView::from),
-        pending_waiver: waiver::pending(events).map(WaiverView::from),
-        queued: queue::pending(events)
+        pending_approval: rule_approval::pending(window).map(ApprovalView::from),
+        pending_waiver: waiver::pending(window).map(WaiverView::from),
+        queued: queue::pending(session)
             .into_iter()
             .map(QueuedView::from)
             .collect(),
@@ -129,8 +146,9 @@ pub fn thread_view(events: &[Event]) -> ThreadView {
             .iter()
             .map(|state| CriterionView::new(state, &passed_before))
             .collect(),
-        decisions: decisions_in_force(events),
-        replayable: replay::replayable_ids(events),
+        decisions: decisions_in_force(session),
+        replayable: replay::replayable_ids(window),
+        modified_files: modified_files::tally(session, workdir),
     }
 }
 
@@ -153,7 +171,7 @@ mod tests {
 
     #[test]
     fn empty_log_has_nothing_pending() {
-        let view = thread_view(&[]);
+        let view = thread_view(&[], &[], "/w");
 
         assert!(view.pending_approval.is_none());
         assert!(view.pending_waiver.is_none());
@@ -173,21 +191,21 @@ mod tests {
                 call_id: "call-1".into(),
                 subject: "subject".into(),
                 rule_id: None,
-                kind: "allow".into(),
+                kind: "path".into(),
                 pattern: "pattern".into(),
                 access: Some("read".into()),
                 folders: vec!["folder".into()],
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, &events, "/w");
 
         assert_eq!(
             view.pending_approval,
             Some(ApprovalView {
                 call_id: "call-1".into(),
                 subject: "subject".into(),
-                kind: "allow".into(),
+                kind: "path".into(),
                 pattern: "pattern".into(),
                 access: Some("read".into()),
                 folders: vec!["folder".into()],
@@ -222,7 +240,11 @@ mod tests {
             },
         ];
 
-        assert!(thread_view(&events).pending_approval.is_none());
+        assert!(
+            thread_view(&events, &events, "/w")
+                .pending_approval
+                .is_none()
+        );
     }
 
     #[test]
@@ -239,7 +261,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, &events, "/w");
 
         assert_eq!(
             view.pending_waiver,
@@ -284,7 +306,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, &events, "/w");
 
         assert_eq!(
             view.queued,
@@ -334,7 +356,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, &events, "/w");
 
         assert_eq!(
             view.criteria,
@@ -385,7 +407,97 @@ mod tests {
             typed("u2", true),
         ];
 
-        assert_eq!(thread_view(&events).replayable, vec!["u1".to_string()]);
+        assert_eq!(
+            thread_view(&events, &events, "/w").replayable,
+            vec!["u1".to_string()]
+        );
+    }
+
+    #[test]
+    fn targeted_reads_fold_like_the_whole_log() {
+        use crate::agent::ports::EventLog;
+        use crate::domain::criteria::Criterion;
+        use crate::store::SqliteStore;
+
+        let write = ToolCall {
+            name: "write_file".into(),
+            arguments: serde_json::json!({"path": "/w/a.rs", "content": "x\ny\n"}),
+            ..make_tool_call("call-w")
+        };
+        let typed = |id: &str| Event::MessageStart {
+            message_id: id.into(),
+            role: Role::User,
+            content: Some("text".into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: Vec::new(),
+        };
+        let events = vec![
+            typed("u0"),
+            Event::CriteriaSet {
+                criteria: vec![Criterion {
+                    id: "C1".into(),
+                    description: "d1".into(),
+                    check: Some("true".into()),
+                }],
+            },
+            Event::DecisionRecorded {
+                call_id: "call-d".into(),
+                title: "t".into(),
+                choice: "a".into(),
+                reason: "r".into(),
+                alternatives: vec![],
+            },
+            Event::QueueAdded {
+                queue_id: "q1".into(),
+                mode: QueueMode::Asap,
+                content: "queued".into(),
+                queued_at: 1,
+            },
+            Event::ToolCall {
+                message_id: "m0".into(),
+                tool_call: write,
+            },
+            Event::ContextCompacted {
+                before_tokens: 1,
+                after_tokens: 2,
+                summary: "s".into(),
+            },
+            typed("u1"),
+            Event::CriterionUpdated {
+                criterion_id: "C1".into(),
+                status: CriterionStatus::Failed {
+                    provenance: Provenance::Indicative {
+                        agent: "verify".into(),
+                        reason: "no".into(),
+                    },
+                },
+            },
+            Event::ToolCall {
+                message_id: "m1".into(),
+                tool_call: make_tool_call("call-1"),
+            },
+            Event::WaiverRequested {
+                call_id: "call-1".into(),
+                path: "path".into(),
+                reason: "reason".into(),
+            },
+        ];
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/tmp/thread-targeted").unwrap();
+        let session = store.create_session(&project, "t").unwrap();
+        for event in &events {
+            store.append(&session, event).unwrap();
+        }
+
+        let targeted = thread_view(
+            &store.window(&session).unwrap(),
+            &store.events_of(&session, super::SESSION_KINDS).unwrap(),
+            "/w",
+        );
+        assert_eq!(targeted, thread_view(&events, &events, "/w"));
+        assert!(targeted.pending_waiver.is_some());
+        assert_eq!(targeted.modified_files.count, 1);
     }
 
     #[test]
@@ -407,7 +519,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events);
+        let view = thread_view(&events, &events, "/w");
 
         assert_eq!(
             view.decisions
@@ -420,7 +532,7 @@ mod tests {
 
     #[test]
     fn serializes_with_camel_case_and_nulls() {
-        let value = serde_json::to_value(thread_view(&[])).unwrap();
+        let value = serde_json::to_value(thread_view(&[], &[], "/w")).unwrap();
 
         assert_eq!(
             value,
@@ -431,7 +543,8 @@ mod tests {
                 "criteria": [],
                 "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0},
                 "decisions": [],
-                "replayable": []
+                "replayable": [],
+                "modifiedFiles": {"count": 0, "added": 0, "removed": 0}
             })
         );
     }

@@ -89,9 +89,7 @@ pub(crate) fn set_model(
     let provider = body["provider"].as_str().unwrap_or("").to_string();
     let model_id = body["model"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((_, _)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (_, _) = app.require_session(id)?;
     if model_id.is_empty() {
         return error(stream, 400, "model is empty");
     }

@@ -18,8 +18,8 @@ use crate::domain::mcp_oauth::{
     self as domain, AuthServerMetadata, McpCredentials, Pkce, Registration, ResourceMetadata,
     TokenResponse,
 };
+use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
-use crate::tools::Sandbox;
 
 /// The sealed-credential store and master key location for MCP OAuth.
 #[derive(Debug, Clone)]

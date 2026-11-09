@@ -189,6 +189,26 @@ pub fn send_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<(
     )
 }
 
+/// The project, or a 404 for the client.
+pub fn require_project(
+    store: &crate::store::SqliteStore,
+    id: &str,
+) -> Result<crate::domain::project::Project, HttpError> {
+    store
+        .project(id)?
+        .ok_or_else(|| HttpError::new(404, "no such project"))
+}
+
+/// The session, or a 404 for the client.
+pub fn require_session(
+    store: &crate::store::SqliteStore,
+    id: &str,
+) -> Result<crate::domain::project::SessionSummary, HttpError> {
+    store
+        .session(id)?
+        .ok_or_else(|| HttpError::new(404, "no such session"))
+}
+
 pub fn error(stream: &mut TcpStream, status: u16, message: &str) -> Result<(), HttpError> {
     send_json(stream, status, &json!({ "error": message }))
 }

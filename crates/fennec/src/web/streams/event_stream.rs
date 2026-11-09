@@ -3,8 +3,8 @@
 
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
-use crate::web::http::HttpError;
-use crate::web::http::{Request, error};
+use crate::web::http::Request;
+use crate::web::http::{HttpError, require_session};
 use std::io::Write;
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
@@ -19,9 +19,7 @@ pub fn serve(
     stream: &mut TcpStream,
     id: &str,
 ) -> Result<(), HttpError> {
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(store, id)?;
     let mut last = resume_point(req);
     stream
         .write_all(

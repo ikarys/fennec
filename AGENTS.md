@@ -23,7 +23,9 @@ Next, one PR each: fennec's own layer, the tools that keep the human the author.
 Clean architecture, applied where it pays: dependencies point inward
 (adapters → agent → domain). The agent loop only knows the ports in
 `agent/ports.rs`; a port exists because it decouples a layer or has a
-second implementation (a test double), not for show. One responsibility per file; no catch-all module (`utils`, `misc`,
+second implementation (a test double), not for show. A root file named like a domain
+file is its adapter: `domain/budget.rs` decides, `budget.rs` reads the store and the ledger for it.
+`main.rs` and `turn_build.rs` are the composition roots: they may import every adapter. One responsibility per file; no catch-all module (`utils`, `misc`,
 `common`).
 
 ```
@@ -45,12 +47,14 @@ crates/fennec/src/
     agent.rs           an agent (mode) and its reminder; frontmatter.rs the shared YAML header
     attachment.rs      images sent to the model: sniffing, data URLs, limits
     replay.rs          which message the human may replay
+    modified_files.rs  the files and lines a session's file tools changed, counted from its tool calls
     named_paths.rs     paths the human wrote in their messages or answers: a read there needs no approval
     rule_approval.rs   the call paused for the human's approval, folded from the log; the four answers
     kernel_rules.rs    the rules fennec's kernel enforces itself: the git commands that push or move a branch, blocked
     waiver.rs          a protected file's waiver: the pending request, the active grants, the ADR a grant writes
     queue.rs           the messages queued while a turn runs: pending, those the loop may drop in, what a turn's end does
     criteria.rs        acceptance criteria: the plan's "Done when", checks, verdicts, provenance
+    check_kind.rs      what a criterion's check proves (a search proves the code exists, not that it works)
     criteria_fold.rs   the criteria in force, folded from the log (a workflow run's state and the served thread share it)
     preflight.rs       a plan's checks run before any change: fails, passes already, cannot run
     protection.rs      protected files: the defaults, the gitignore-like patterns, the matcher
@@ -91,14 +95,17 @@ crates/fennec/src/
     indicators.rs      the project's indicators counted from the integrations the gate recorded
     lang.rs            the language the human reads fennec in (Settings); the server-built texts follow it
     password.rs        the remote-access password's PBKDF2 hash, made and checked
+    mcp_oauth.rs       the MCP servers' OAuth 2.1 flow, pure: randomness and the clock passed in
     id.rs, clock.rs
     (domain uses `rules::path`, the gitignore-like matcher, as a library: one matcher for rules, protection and architecture)
   agent/             application layer: the agent loop
     ports.rs           Model, EventLog, Toolbox, ChildSessions, Commands: what the loop needs from outside
     turn.rs            the multi-turn loop
     round.rs           one model round: streaming, retries, continuation, timing
+    snapshot.rs        the frozen system prompt and tool definitions (`turn.snapshot`), re-frozen once when the MCP tools change
     delta_buffer.rs    coalesces streamed chunks into one event per 100 ms
     tool_calls.rs      runs and records tool calls
+    own_tools.rs       the loop's own tools (ask_user, propose_plan, delegate…) dispatched, each one's outcome
     ask_user.rs        the loop's own tool; the turn ends waiting for the human
     propose_task.rs    the loop's propose_task tool: a backlog task proposed, the turn goes on
     propose_plan.rs    the loop's propose_plan tool: the plan validated and recorded, the turn ends
@@ -115,15 +122,16 @@ crates/fennec/src/
     compaction.rs      the summary round and the new window
     prompt.rs          the system prompt: what fennec does around the agent, the working method, the style
     workflow.rs        the workflow walk and its jobs (start, answer, continue, resume, stop);
-                       workflow/ nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
+                       workflow/ jobs (start, answer, continue, resume, stop), nodes (one node run), fork (parallel branches), outcome (`Outcome:` line),
                        criteria (the criteria node and the agents' verdicts)
-  tools/             Toolbox adapter: one file per tool, path_guard, args; sandbox (the bwrap
-                     world of commands; sandbox/seatbelt.rs the same world as a macOS Seatbelt profile); rule_request (a tool call as the rules crate's requests, paths resolved here);
+  tools/             Toolbox adapter: one file per tool, path_guard, args; rule_request (a tool call as the rules crate's requests, paths resolved here);
                      web_search queries the SearXNG instance from the Settings page; canvas writes the session's canvas store
   llm/               Model adapter: openai.rs, the Model port over llm-providers-connector (tool-call arguments parsed here)
                      concurrency.rs the local model's gate: one round at a time, the same session kept between
                      its rounds so the server's prompt cache stays warm (`FENNEC_MODEL_AFFINITY_SECS`)
-  store.rs           EventLog adapter: SQLite (schema frozen: stored logs depend on it), projects and sessions;
+  sandbox.rs         the bwrap world of commands (tools, MCP servers, plugins, scanners);
+                     sandbox/seatbelt.rs the same world as a macOS Seatbelt profile
+  store.rs           EventLog adapter: SQLite (schema frozen: stored logs depend on it), projects and sessions; targeted reads (window, by kind) per docs/adr/0001;
                      store/settings.rs the stored preferences; store/ideas.rs the per-project backlog events
   metering.rs        the usage ledger adapter: MeteredLog (an EventLog that also writes each model call
                      to the ledger) and the backfill of past calls; store/calls.rs reads them from the log
@@ -157,6 +165,9 @@ crates/fennec/src/
   scanners.rs        the security scanners found on PATH
   setup.rs           the first-run checklist's facts gathered (model listed, sandbox probed, git, projects, scanners)
   security_scan.rs   the gate's scanners run in the read-only sandbox, cached per (base, branch)
+  server_config.rs   the server's settings.yaml (listen address, remote-access password hash)
+  update.rs          fetches and installs a fennec release on the human's click
+  locks.rs           locks that recover from a poisoned mutex instead of panicking the server
   notifier.rs        wakes event streams when a turn appends to a log, so an open tab costs nothing idle
   architecture.rs    `.agents/architecture` read from disk
   agents/crud.rs     the human's own agents read, written, deleted (Settings)
@@ -169,8 +180,9 @@ crates/fennec/src/
                      views/ display-ready figures and folds (thread, context, insight, usage, dashboard, ideas board:
                      the UI computes none); streams/ the SSE streams (a session's events, the human's notices);
                      os/ the human's own tools opened on a folder (terminal, editor, file manager) and the project's
-                     servers; jobs/ background work (the idea queue, session naming, backfills, commit subjects)
-  cli/               terminal adapter: commands, transcript, doctor (the first-run checklist in the terminal)
+                     servers; jobs/ background work (the idea queue and its assets, session naming, backfills, commit subjects)
+  cli/               terminal adapter: commands, transcript, doctor (the first-run checklist in the terminal),
+                     password (the remote-access password, read without echo)
 crates/backlog/     the ideas backlog, a crate of its own and fennec-free, no I/O: its events folded, the queue
                      order, the night-mode caps, an idea's status, stage and next action, a run's summary
 crates/rules/       the human's rules, a crate of its own and fennec-free: the model, the command and path matchers,
@@ -227,7 +239,7 @@ tests.
 2. **The trusted kernel**: code that decides (integration, plugin activation).
    It never runs what a model wrote.
 3. **The untrusted zone**: everything a model outputs. Commands run in the
-   sandbox world (`tools/sandbox.rs`: bwrap on Linux, Seatbelt on macOS) unless the human turns it off. Protected
+   sandbox world (`sandbox.rs`: bwrap on Linux, Seatbelt on macOS) unless the human turns it off. Protected
    files are refused to the file tools and read-only in the sandbox; so is the workdir's `.git`
    (no waiver). Every git command the kernel runs (`git.rs`, the one runner) disables hooks and
    fsmonitor (`-c core.hooksPath=/dev/null -c core.fsmonitor=false`), the human's own hooks
@@ -342,3 +354,29 @@ Conventional Commits, imperative mood (`feat:`, `fix:`, `docs:`, `refactor:`,
 `test:`, `chore:`).
 Every commit, whoever writes it (human, agent, local model): the message is in
 English, subject and body, and follows Conventional Commits; no exception.
+
+## Vibecoding Convention (level 2)
+
+This project follows the Vibecoding Convention at level 2; see `VIBECODING.md`.
+
+Before calling a change done, these must pass:
+- `just check` (format, clippy, tests, UI lint, UI tests, UI build)
+- `just secrets` (gitleaks over the history)
+
+Rules while editing:
+- Every commit with AI-written content ends with the trailer
+  `Assisted-by: <Tool>:<model>`, one per model (`Assisted-by: Claude Code:claude-opus-5-5`,
+  `Assisted-by: local:qwen3.8-27b`); never `Co-Authored-By` for a model.
+- Deleting, skipping or weakening a test requires the reason in the commit message.
+- A new dependency is checked against the registry (exists under that exact name,
+  established, the one the code needs) and taken at the registry's current
+  version; the check is noted in the commit. An existing dependency is not held
+  back without a reason written in `VIBECODING.md`.
+- No secret in any file, prompt or config.
+- Every input is hostile: arguments, files, environment, network, model output.
+  A change that touches parsing, SQL or command building, authentication, crypto,
+  credentials or file import names the vulnerability class it guards against and
+  its test (`SECURITY.md`).
+- No TODO, placeholder, commented-out or dead code in a delivered change.
+
+Never without a human: merge to `main`, release, delete data.

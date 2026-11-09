@@ -1,13 +1,12 @@
 //! The Settings routes (contract: docs/api.md): the stored preferences and what each provider lists.
 //! `routes.rs` only dispatches here.
 
-use crate::domain::lang::Lang;
 use crate::domain::mcp;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
+use crate::sandbox::{SandboxHealth, probe};
 use crate::scanners;
 use crate::skills;
-use crate::tools::{SandboxHealth, probe};
 use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{Request, error, send_json};
@@ -79,7 +78,7 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> 
             json!({
                 "id": scanner.id,
                 "name": scanner.name,
-                "covers": scanner.covers(Lang::from_code(&prefs.display.language)),
+                "covers": scanner.covers(prefs.display.language),
                 "install": scanner.install,
                 "url": scanner.url,
                 "path": scanners::find(scanner.binary),

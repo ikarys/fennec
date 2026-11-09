@@ -10,7 +10,7 @@ use std::path::Path;
 use crate::domain::clock;
 use crate::domain::project::SessionSummary;
 use crate::web::App;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 use crate::worktree::usage;
 use crate::worktree::usage::WorktreeUsage;
 use serde_json::{Value, json};
@@ -41,9 +41,7 @@ pub fn summary(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> {
 
 pub fn list(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
 
     let fresh = req.query_param("fresh").is_some_and(|value| value == "1");
     let (scanned_at, entries) = cached_scan(app, fresh);

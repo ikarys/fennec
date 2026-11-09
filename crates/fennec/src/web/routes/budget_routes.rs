@@ -11,7 +11,7 @@ use crate::budget::ProjectBudget;
 use crate::domain::budget::{self, BudgetStatus};
 use crate::domain::lang::Lang;
 use crate::web::App;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, send_json};
 use crate::web::views::project_dashboard::Tone;
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -28,11 +28,9 @@ pub struct BudgetView {
 /// `GET /api/projects/{id}/budget`.
 pub fn get(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, id)?;
     let budget = crate::budget::of_project(&app.settings, &store, id)?;
-    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let lang = store.preferences()?.display.language;
     let view = view(budget.as_ref(), lang);
     send_json(stream, 200, &json!(view))
 }
@@ -40,9 +38,7 @@ pub fn get(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError>
 /// `POST /api/projects/{id}/budget` with `{"limitUsd": number | null}`.
 pub fn set(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.project(id)?.is_none() {
-        return error(stream, 404, "no such project");
-    }
+    require_project(&store, id)?;
     let body = req.json()?;
     let limit = match body.get("limitUsd") {
         Some(value) if value.is_null() => None,
@@ -54,7 +50,7 @@ pub fn set(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result
     };
     store.set_project_budget(id, limit)?;
     let budget = crate::budget::of_project(&app.settings, &store, id)?;
-    let lang = Lang::from_code(&store.preferences()?.display.language);
+    let lang = store.preferences()?.display.language;
     let view = view(budget.as_ref(), lang);
     send_json(stream, 200, &json!(view))
 }

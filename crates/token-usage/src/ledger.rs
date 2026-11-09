@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 use rusqlite::{Connection, params};
 
@@ -156,7 +156,7 @@ impl Ledger {
     }
 
     pub fn record(&self, call: &Call) -> Result<bool, Error> {
-        let conn = self.db.lock().unwrap();
+        let conn = self.db.lock().unwrap_or_else(PoisonError::into_inner);
         let inserted = write(&conn, &insert_sql(false), call)?;
         Ok(inserted > 0)
     }
@@ -165,7 +165,7 @@ impl Ledger {
     /// breakdown it lacked, so an importer that learned to break down its calls can fill in its
     /// past rows; nothing else of a stored call ever changes. Returns the rows inserted or filled.
     pub fn import<I: IntoIterator<Item = Call>>(&self, calls: I) -> Result<usize, Error> {
-        let mut conn = self.db.lock().unwrap();
+        let mut conn = self.db.lock().unwrap_or_else(PoisonError::into_inner);
         let tx = conn.transaction()?;
 
         let mut inserted = 0usize;
@@ -180,7 +180,7 @@ impl Ledger {
     /// The external ids of `product`'s calls that already have a breakdown, so an
     /// importer computes breakdowns only for the calls still lacking one.
     pub fn external_ids_with_breakdown(&self, product: &str) -> Result<HashSet<String>, Error> {
-        let conn = self.db.lock().unwrap();
+        let conn = self.db.lock().unwrap_or_else(PoisonError::into_inner);
         let mut stmt = conn.prepare(
             "SELECT external_id FROM calls WHERE product = ?1 \
              AND external_id IS NOT NULL AND breakdown != '{}'",

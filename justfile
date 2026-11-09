@@ -81,6 +81,22 @@ test:
 test-web:
     cd web && npm test
 
+# No secret in the history (the pre-commit hook scans what is staged)
+secrets:
+    gitleaks git --no-banner --redact .
+
+# The evidence VIBECODING.md declares: coverage, advisories, outdated dependencies, duplication
+evidence:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p audit/evidence
+    dir="${TMPDIR:-/tmp}/fennec-tests/$(basename "{{justfile_directory()}}")"
+    rm -rf "$dir" && mkdir -p "$dir"
+    TMPDIR="$dir" cargo llvm-cov --workspace --summary-only > audit/evidence/coverage.txt
+    cargo audit --json > audit/evidence/audit.json
+    python3 scripts/outdated.py > audit/evidence/outdated.txt
+    npx -y jscpd@4 crates web/src --silent --reporters json --output audit/evidence
+
 # The project site and its user guide, as GitHub Pages serves them, on :8080 (needs mdbook)
 site:
     mdbook build docs/guide -d ../../site/docs

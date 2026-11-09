@@ -1,7 +1,7 @@
 //! Test doubles shared by the agent's test modules: a scripted model and an
 //! in-memory log, so each test module keeps one copy.
 
-use crate::agent::ports::{Completion, Delta, EventLog, Model, Request, Toolbox};
+use crate::agent::ports::{Completion, Delta, EventLog, Model, Request, RuleCheck, Toolbox};
 use crate::domain::agent::{AgentDefinition, AgentOrigin, CommandAccess};
 use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
 use serde_json::{Value, json};
@@ -114,6 +114,9 @@ pub fn plan() -> AgentDefinition {
 pub struct FakeToolbox;
 
 impl Toolbox for FakeToolbox {
+    fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
+        RuleCheck::allowed()
+    }
     fn definitions(&self) -> Value {
         json!([])
     }

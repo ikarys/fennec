@@ -1,0 +1,63 @@
+name: convention
+
+# The Vibecoding Convention's evidence, regenerated on main only (the Actions
+# minutes are a budget): coverage, advisories, outdated dependencies and
+# duplication, then vibecheck writes audit/status.json, which the README badge reads.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install bubblewrap
+        run: sudo apt-get update -y && sudo apt-get install -y bubblewrap
+      # Ubuntu 24.04's AppArmor blocks bwrap's network namespace setup.
+      - name: Allow unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-audit,cargo-outdated
+      - name: Coverage
+        run: TMPDIR="$RUNNER_TEMP" cargo llvm-cov --workspace --summary-only > audit/evidence/coverage.txt
+      - name: Advisories
+        run: cargo audit --json > audit/evidence/audit.json
+      - name: Outdated dependencies
+        run: |
+          (cd web && npm ci)
+          python3 scripts/outdated.py > audit/evidence/outdated.txt
+      - name: Duplication
+        run: npx -y jscpd@4 crates web/src --silent --reporters json --output audit/evidence
+      - name: vibecheck
+        run: |
+          cargo install --locked --git https://github.com/ikarys/vibecoding-convention vibecheck
+          # Not --strict: a warning (a declared model not yet attributed since
+          # adoption) shows in the status, it does not fail main.
+          vibecheck . --write-status
+      - name: Commit the status
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/status.json audit/evidence
+          git diff --cached --quiet || git commit -m "chore: refresh the Vibecoding Convention status [skip ci]"
+          git push

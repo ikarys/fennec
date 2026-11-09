@@ -13,3 +13,7 @@ license = "AGPL-3.0-only"
 lto = true
 codegen-units = 1
 strip = true
+
+# The complexity ceiling VIBECODING.md declares (threshold in clippy.toml).
+[workspace.lints.clippy]
+cognitive_complexity = "warn"

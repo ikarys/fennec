@@ -5,6 +5,7 @@ mod ask_user;
 mod compaction;
 pub mod delegate;
 mod delta_buffer;
+mod own_tools;
 pub mod ports;
 mod preflight;
 mod prompt;
@@ -17,6 +18,7 @@ mod request_waiver;
 mod round;
 pub mod rule_approval;
 mod rule_check;
+mod snapshot;
 mod submit_report;
 mod suggest_agent;
 #[cfg(test)]

@@ -20,9 +20,7 @@ pub(crate) fn answer_rule_approval(
     let body = req.json()?;
     let call_id = body["callId"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((session, project)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, project) = app.require_session(id)?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
@@ -38,7 +36,7 @@ pub(crate) fn answer_rule_approval(
     // answer with a folder the server did not offer.
     let chosen_pattern = body["pattern"].as_str().map(str::to_string);
     if let Some(chosen) = &chosen_pattern {
-        let allowed = pending.kind == "path"
+        let allowed = pending.kind == TargetKind::Path
             && rules::broader_folders(&pending.pattern)
                 .iter()
                 .any(|folder| folder.as_str() == chosen.as_str());
@@ -58,14 +56,11 @@ pub(crate) fn answer_rule_approval(
     let rule_id = match stored {
         None => None,
         Some((scope, action)) => {
-            let Some(kind) = TargetKind::parse(&pending.kind) else {
-                return error(stream, 400, &format!("unknown rule kind: {}", pending.kind));
-            };
             let rule_store =
                 RuleStore::open(&app.settings.rules_path()).map_err(|e| e.to_string())?;
             let new_rule = NewRule {
                 scope,
-                kind,
+                kind: pending.kind,
                 pattern: pattern.clone(),
                 access: pending.access.as_deref().and_then(Access::parse),
                 action,

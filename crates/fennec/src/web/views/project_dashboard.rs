@@ -2,7 +2,7 @@
 //! recent sessions the project page draws, computed here so the UI only draws
 //! them. Every string is final French display text.
 
-use crate::web::http::HttpError;
+use crate::web::http::{HttpError, require_project};
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -16,7 +16,7 @@ use crate::domain::lang::Lang;
 use crate::domain::map_doc::MapFileState;
 use crate::domain::pricing::{priced, prices};
 use crate::web::App;
-use crate::web::http::{error, send_json};
+use crate::web::http::send_json;
 use crate::web::views::idea_board::Board;
 use crate::web::views::insight::Period;
 use crate::{adr, doc, module_map};
@@ -101,9 +101,7 @@ struct Facts {
 /// `GET /api/projects/{id}/dashboard`.
 pub fn serve(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some(project) = store.project(id)? else {
-        return error(stream, 404, "no such project");
-    };
+    let project = require_project(&store, id)?;
     let workdir = Path::new(&project.workdir);
 
     let facts = gather(app, &store, &project, workdir)?;
@@ -158,7 +156,7 @@ fn gather(
         .map_err(|e| e.to_string())?;
     // The dashboard's cost text follows the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     let pricing = priced(&models, &prices(&preferences));
 
     let map = module_map::load(workdir);

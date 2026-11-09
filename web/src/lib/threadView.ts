@@ -98,12 +98,6 @@ export type ThreadItem =
   | { kind: 'workflow-node'; id: string; nodeId: string; label: string; nodeKind: NodeKind; pass: number; port?: string; output?: string; exitCode?: number; childSessionId?: string; prompt?: string; durationMs?: number; startedAt?: number }
   | { kind: 'workflow-end'; id: string; runId: string; outcome: 'done' | 'blocked' | 'stopped' | 'error'; reason?: string; stats?: WorkflowStats };
 
-export interface ModifiedFile {
-  path: string;
-  added: number;
-  removed: number;
-}
-
 export interface PendingQuestion {
   callId: string;
   question: string;
@@ -124,7 +118,6 @@ export interface ThreadView {
   /** The unanswered `ask_user` question, if any. */
   pendingQuestion?: PendingQuestion;
   /** The tool call waiting for the human's approval, if any. */
-  modifiedFiles: ModifiedFile[];
   /**
    * The last `mode.changed` value, or null when the session detail should
    * provide the server's resolved mode.

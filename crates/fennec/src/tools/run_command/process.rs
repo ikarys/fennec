@@ -2,7 +2,7 @@
 //! killing the whole group on timeout or stop.
 
 use crate::domain::event::OutputStream;
-use crate::tools::sandbox::Sandbox;
+use crate::sandbox::Sandbox;
 use std::io::BufRead;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};

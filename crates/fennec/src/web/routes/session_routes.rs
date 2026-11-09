@@ -14,7 +14,6 @@ use crate::domain::clock;
 use crate::domain::conversation::{first_request, last_assistant_text};
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
-use crate::domain::lang::Lang;
 use crate::domain::preferences::ModelRef;
 use crate::domain::project::SessionSummary;
 use crate::domain::queue;
@@ -30,7 +29,7 @@ use crate::skills;
 use crate::store::SqliteStore;
 use crate::web::App;
 use crate::web::http::HttpError;
-use crate::web::http::{Request, error, send_json};
+use crate::web::http::{Request, error, require_project, require_session, send_json};
 use crate::web::os::editor;
 use crate::web::routes::folder_routes::store_dir;
 use crate::web::routes::project_list_routes::project_json;
@@ -96,10 +95,7 @@ pub(crate) fn create_session(
         let dir = chat::workdir(&app.settings.db_path);
         store.chat_project(&dir.display().to_string())?
     } else {
-        let Some(project) = store.project(body["projectId"].as_str().unwrap_or(""))? else {
-            return error(stream, 404, "no such project");
-        };
-        project
+        require_project(&store, body["projectId"].as_str().unwrap_or(""))?
     };
     // A workflow start is validated before the session is created.
     let workflow = match &workflow_id {
@@ -190,9 +186,7 @@ pub(crate) fn create_session(
 
 pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((s, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (s, p) = app.require_session(id)?;
     let events = store.events(&s.id)?;
     let list = agents::discover(Path::new(&p.workdir));
     let mode = agent_resolve(&list, &events).map(|agent| agent.id.clone());
@@ -270,9 +264,7 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
 /// always-on ones chosen after its prompt froze. `GET /api/sessions/{id}/skills`.
 pub(crate) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((_, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (_, p) = app.require_session(id)?;
     let skills = skills::discover(Path::new(&p.workdir));
     let folded = app.folded_skills(&store, id, &skills)?;
     let chosen = store.preferences()?.always_on_skills;
@@ -289,15 +281,16 @@ pub(crate) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     )
 }
 
-/// The session's pending blocks (approval, waiver, queue), folded by the domain.
+/// The session's pending blocks (approval, waiver, queue) and modified files, folded by the domain.
 /// `GET /api/sessions/{id}/thread`.
 pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if app.session_and_project(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
-    let events = store.events(id)?;
-    let view = thread_view::thread_view(&events);
+    let (session, project) = app.require_session(id)?;
+    // Targeted reads: the thread is refetched at each tool call, the whole log need not be decoded.
+    let window = store.window(id)?;
+    let session_events = store.events_of(id, thread_view::SESSION_KINDS)?;
+    let workdir = app.place(&store, &session, &project)?.workdir;
+    let view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
     send_json(
         stream,
         200,
@@ -311,13 +304,11 @@ pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Resul
 /// to the current settings.
 pub(crate) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let (chosen, _) = model_routes::session_choice(&store, id)?;
     // The context gauge's texts follow the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     let params = app.settings.llm.for_turn(&preferences, chosen.as_ref());
     let view = context_view(
         &store.events(id)?,
@@ -330,17 +321,13 @@ pub(crate) fn serve_context(app: &App, stream: &mut TcpStream, id: &str) -> Resu
 
 pub(crate) fn serve_vision(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     send_json(stream, 200, &json!(seen_images(&store.events(id)?)))
 }
 
 pub(crate) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let ledger =
         token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
     let filter = token_usage::Filter {
@@ -354,7 +341,7 @@ pub(crate) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
         .map_err(|e| e.to_string())?;
     // The usage panel's cost text follows the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     let pricing =
         crate::domain::pricing::priced(&rows, &crate::domain::pricing::prices(&preferences));
     send_json(
@@ -375,9 +362,7 @@ pub(crate) fn serve_usage_calls(
     id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let events = store.events(id)?;
     let ledger =
         token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
@@ -388,7 +373,7 @@ pub(crate) fn serve_usage_calls(
     let calls = ledger.calls(&filter).map_err(|e| e.to_string())?;
     // The call lines follow the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     send_json(stream, 200, &json!(call_views(&events, &calls, lang)))
 }
 
@@ -398,9 +383,7 @@ pub(crate) fn serve_usage_workflow(
     id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let events = store.events(id)?;
     let ledger =
         token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
@@ -414,7 +397,7 @@ pub(crate) fn serve_usage_workflow(
     }
     // The workflow usage lines follow the human's display language.
     let preferences = store.preferences()?;
-    let lang = Lang::from_code(&preferences.display.language);
+    let lang = preferences.display.language;
     send_json(
         stream,
         200,
@@ -431,9 +414,7 @@ pub(crate) fn set_session_mode(
     let body = req.json()?;
     let mode = body["mode"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((_, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (_, p) = app.require_session(id)?;
     if workflow_routes::waiting_for(app, id)?.is_some() {
         return error(stream, 409, "a workflow is running in this session");
     }
@@ -463,9 +444,7 @@ pub(crate) fn send_message(
         return error(stream, 400, "empty message");
     }
     let store = app.store()?;
-    let Some((session, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, p) = app.require_session(id)?;
     // Refused before the message is recorded, so the composer keeps the text;
     // `turn_build` refuses the other paths.
     if let Err(refusal) = crate::budget::check(&app.settings, &store, &p.id) {
@@ -537,9 +516,7 @@ pub(crate) fn cancel_queued(
     queue_id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let events = store.events(id)?;
     if !queue::pending(&events)
         .iter()
@@ -569,9 +546,7 @@ pub(crate) fn replay_message(
     let body = req.json()?;
     let message_id = body["messageId"].as_str().unwrap_or("").to_string();
     let store = app.store()?;
-    let Some((session, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, p) = app.require_session(id)?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
@@ -594,9 +569,7 @@ pub(crate) fn replay_message(
 /// with a system-generated continuation prompt.
 pub(crate) fn retry_session(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, p) = app.require_session(id)?;
     if app.turns.is_running(id) {
         return error(stream, 409, "a turn is already running");
     }
@@ -636,9 +609,7 @@ pub(crate) fn compact_session(
     id: &str,
 ) -> Result<(), HttpError> {
     let store = app.store()?;
-    let Some((session, p)) = app.session_and_project(id)? else {
-        return error(stream, 404, "no such session");
-    };
+    let (session, p) = app.require_session(id)?;
     if workflow_routes::waiting_for(app, id)?.is_some() {
         return error(stream, 409, "a workflow is running in this session");
     }
@@ -672,9 +643,7 @@ pub(crate) fn serve_events_page(
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(u64::MAX);
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let page = store.events_before(id, before, limit)?;
     let out: Vec<Value> = page
         .into_iter()
@@ -697,9 +666,7 @@ pub(crate) fn serve_run_events(
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(u64::MAX);
     let store = app.store()?;
-    if store.session(id)?.is_none() {
-        return error(stream, 404, "no such session");
-    }
+    require_session(&store, id)?;
     let page = store.workflow_run_before(id, before)?;
     let out: Vec<Value> = page
         .into_iter()

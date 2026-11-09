@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::sync::PoisonError;
 
 use rusqlite::{ToSql, params_from_iter};
 use serde::Serialize;
@@ -176,7 +177,7 @@ impl Ledger {
     /// Every call matching `f`, oldest first, with its `breakdown`, `savings`,
     /// labels and computed `lost_cache_tokens`, for in-memory grouping.
     pub fn rows(&self, f: &Filter) -> Result<Vec<CallRow>, Error> {
-        let conn = self.db.lock().unwrap();
+        let conn = self.db.lock().unwrap_or_else(PoisonError::into_inner);
         let (sql, params) = build_query(f);
 
         let mut stmt = conn.prepare(&sql)?;

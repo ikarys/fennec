@@ -50,4 +50,12 @@ impl EventLog for NotifyingLog<'_> {
     fn events(&self, session_id: &str) -> Result<Vec<Event>, String> {
         self.log.events(session_id)
     }
+
+    fn window(&self, session_id: &str) -> Result<Vec<Event>, String> {
+        self.log.window(session_id)
+    }
+
+    fn events_of(&self, session_id: &str, kinds: &[&str]) -> Result<Vec<Event>, String> {
+        self.log.events_of(session_id, kinds)
+    }
 }

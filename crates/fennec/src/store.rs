@@ -88,6 +88,7 @@ const SCHEMA: &str = "PRAGMA foreign_keys = ON;
        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
      );
      CREATE INDEX IF NOT EXISTS idx_events_session_seq ON events(session_id, seq);
+     CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session_id, event_type, seq);
      CREATE TABLE IF NOT EXISTS settings (
        key TEXT PRIMARY KEY,
        value TEXT NOT NULL,
@@ -101,7 +102,11 @@ impl SqliteStore {
         // NORMAL is durable in WAL mode except across a power loss, where
         // the last events may be lost: one fsync per checkpoint instead of
         // one per event.
-        db.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
+        // journal_size_limit: the WAL is truncated back to 64 MB after a checkpoint instead
+        // of keeping its high-water size.
+        db.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 67108864;",
+        )?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;
         SqliteStore::init(db)
     }
@@ -557,16 +562,57 @@ impl EventLog for SqliteStore {
     }
 
     fn events(&self, session_id: &str) -> std::result::Result<Vec<Event>, String> {
-        let mut out = Vec::new();
-        for (_, payload) in self.events_after(session_id, 0)? {
-            // A payload this version cannot read is skipped, not fatal: the
-            // log may hold event types ported later.
-            if let Ok(event) = serde_json::from_str(&payload) {
-                out.push(event);
-            }
-        }
-        Ok(out)
+        let payloads = self.events_after(session_id, 0)?;
+        Ok(decoded(payloads.into_iter().map(|(_, payload)| payload)))
     }
+
+    fn window(&self, session_id: &str) -> std::result::Result<Vec<Event>, String> {
+        let payloads = self.payloads(
+            "SELECT payload FROM events WHERE session_id = ?1 AND seq >= COALESCE(
+               (SELECT MAX(seq) FROM events WHERE session_id = ?1 AND event_type = 'context.compacted'), 0)
+             ORDER BY seq",
+            [session_id],
+        )?;
+        Ok(decoded(payloads))
+    }
+
+    fn events_of(
+        &self,
+        session_id: &str,
+        kinds: &[&str],
+    ) -> std::result::Result<Vec<Event>, String> {
+        if kinds.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = (2..=kinds.len() + 1)
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT payload FROM events WHERE session_id = ?1 AND event_type IN ({placeholders}) ORDER BY seq"
+        );
+        let params = std::iter::once(session_id).chain(kinds.iter().copied());
+        Ok(decoded(
+            self.payloads(&sql, rusqlite::params_from_iter(params))?,
+        ))
+    }
+}
+
+impl SqliteStore {
+    fn payloads(&self, sql: &str, params: impl rusqlite::Params) -> Result<Vec<String>> {
+        let mut stmt = self.db.prepare_cached(sql)?;
+        let rows = stmt.query_map(params, |row| row.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+}
+
+/// A payload this version cannot read is skipped, not fatal: the log may hold event types
+/// ported later.
+fn decoded(payloads: impl IntoIterator<Item = String>) -> Vec<Event> {
+    payloads
+        .into_iter()
+        .filter_map(|payload| serde_json::from_str(&payload).ok())
+        .collect()
 }
 
 const SESSION_SELECT: &str = "SELECT s.id, s.project_id, COALESCE(s.title, ''), CAST(s.created_at AS INTEGER),
@@ -606,6 +652,80 @@ fn project_row(r: &rusqlite::Row) -> rusqlite::Result<Project> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A store with one session, for the tests that append events.
+    fn store_with_session() -> (SqliteStore, String) {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/tmp/targeted-reads").unwrap();
+        let session = store.create_session(&project, "t").unwrap();
+        (store, session)
+    }
+
+    fn cut() -> Event {
+        Event::ContextCompacted {
+            before_tokens: 0,
+            after_tokens: 0,
+            summary: "s".into(),
+        }
+    }
+
+    #[test]
+    fn window_starts_at_the_last_cut() {
+        let (store, cut_session) = store_with_session();
+        for event in [
+            Event::RunningChanged { is_running: true },
+            cut(),
+            Event::RunningChanged { is_running: false },
+            cut(),
+            Event::QueueCancelled {
+                queue_id: "q".into(),
+            },
+        ] {
+            store.append(&cut_session, &event).unwrap();
+        }
+        assert_eq!(
+            store.window(&cut_session).unwrap(),
+            vec![
+                cut(),
+                Event::QueueCancelled {
+                    queue_id: "q".into()
+                }
+            ]
+        );
+
+        let project = store.project_for("/tmp/targeted-reads-plain").unwrap();
+        let plain = store.create_session(&project, "t").unwrap();
+        store
+            .append(&plain, &Event::RunningChanged { is_running: true })
+            .unwrap();
+        assert_eq!(store.window(&plain).unwrap(), store.events(&plain).unwrap());
+    }
+
+    #[test]
+    fn events_of_keeps_the_kinds_asked() {
+        let (store, session) = store_with_session();
+        for event in [
+            Event::RunningChanged { is_running: true },
+            cut(),
+            Event::QueueCancelled {
+                queue_id: "q".into(),
+            },
+        ] {
+            store.append(&session, &event).unwrap();
+        }
+        assert_eq!(
+            store
+                .events_of(&session, &["running.changed", "queue.cancelled"])
+                .unwrap(),
+            vec![
+                Event::RunningChanged { is_running: true },
+                Event::QueueCancelled {
+                    queue_id: "q".into()
+                }
+            ]
+        );
+        assert!(store.events_of(&session, &[]).unwrap().is_empty());
+    }
     use crate::domain::workflow::run::RunOutcome;
 
     #[test]

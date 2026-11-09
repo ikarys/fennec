@@ -29,7 +29,7 @@ pub(crate) fn start_queue(app: &Arc<App>, project_id: &str, autonomous: bool) {
 /// queue resumes before it starts the next ready idea.
 fn spawn_queue(app: &Arc<App>, project_id: &str, autonomous: bool, resume: Vec<String>) {
     let stop = {
-        let mut queues = app.idea_queues.lock().expect("idea queue lock poisoned");
+        let mut queues = crate::locks::lock(&app.idea_queues);
         if queues.contains_key(project_id) {
             None
         } else {
@@ -45,10 +45,7 @@ fn spawn_queue(app: &Arc<App>, project_id: &str, autonomous: bool, resume: Vec<S
         thread::spawn(move || {
             let result = run_queue(app.as_ref(), &project_id, &stop, autonomous, &resume);
             // Remove the flag even on error so a later start can run again.
-            app.idea_queues
-                .lock()
-                .expect("idea queue lock poisoned")
-                .remove(&project_id);
+            crate::locks::lock(&app.idea_queues).remove(&project_id);
             if let Err(e) = result {
                 eprintln!("fennec: idea queue {project_id}: {e}");
             }
@@ -57,21 +54,13 @@ fn spawn_queue(app: &Arc<App>, project_id: &str, autonomous: bool, resume: Vec<S
 }
 
 pub(crate) fn stop_queue(app: &App, project_id: &str) {
-    if let Some(stop) = app
-        .idea_queues
-        .lock()
-        .expect("idea queue lock poisoned")
-        .get(project_id)
-    {
+    if let Some(stop) = crate::locks::lock(&app.idea_queues).get(project_id) {
         stop.store(true, Ordering::SeqCst);
     }
 }
 
 pub(crate) fn queue_running(app: &App, project_id: &str) -> bool {
-    app.idea_queues
-        .lock()
-        .expect("idea queue lock poisoned")
-        .contains_key(project_id)
+    crate::locks::lock(&app.idea_queues).contains_key(project_id)
 }
 
 pub(crate) fn start_idea(
@@ -113,8 +102,7 @@ pub(crate) fn start_idea(
     let place = app.open_place(store, &session, project, true)?;
     // The idea's pinned files become what the agent consumes: images for the
     // model, text inlined, binaries written into the worktree.
-    let (attachments, addendum) =
-        crate::web::routes::idea_assets::prepare(&idea.attachments, &place.workdir);
+    let (attachments, addendum) = super::idea_assets::prepare(&idea.attachments, &place.workdir);
     let task = if addendum.is_empty() {
         idea.text.clone()
     } else {

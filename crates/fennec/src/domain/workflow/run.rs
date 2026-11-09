@@ -89,6 +89,18 @@ pub enum Next {
 }
 
 impl RunState {
+    /// The via a re-entered node gets when the log recorded none: from the start node.
+    pub fn default_via(&self) -> Via {
+        Via {
+            from: self
+                .workflow
+                .start()
+                .map(|n| n.id.clone())
+                .unwrap_or_default(),
+            port: "next".into(),
+        }
+    }
+
     pub fn new(run_id: String, workflow: Workflow, task: String, step_by_step: bool) -> RunState {
         RunState {
             run_id,
@@ -231,6 +243,34 @@ pub fn current_run_events(events: &[Event]) -> &[Event] {
         .rposition(|event| matches!(event, Event::WorkflowStarted { .. }))
         .unwrap_or(0);
     &events[start..]
+}
+
+/// The node that was open when a finished run ended: from the run's start on,
+/// the last node started with no finish after it, and the via that entered it.
+pub fn open_at_finish(events: &[Event], run_id: &str) -> Option<(String, Option<Via>)> {
+    let start = events
+        .iter()
+        .rposition(|e| matches!(e, Event::WorkflowStarted { run_id: r, .. } if r == run_id))?;
+    let mut open: Option<(String, Option<Via>)> = None;
+    for event in &events[start + 1..] {
+        match event {
+            Event::WorkflowNodeStarted {
+                run_id: r,
+                node_id,
+                via,
+                ..
+            } if r == run_id => {
+                open = Some((node_id.clone(), via.clone()));
+            }
+            Event::WorkflowNodeFinished {
+                run_id: r, node_id, ..
+            } if r == run_id && open.as_ref().is_some_and(|(id, _)| id == node_id) => {
+                open = None;
+            }
+            _ => {}
+        }
+    }
+    open
 }
 
 pub fn current_run(events: &[Event]) -> Option<RunState> {
@@ -1436,5 +1476,65 @@ mod tests {
     #[test]
     fn finish_on_discard_is_none_without_a_run() {
         assert!(finish_on_discard(&[]).is_none());
+    }
+
+    #[test]
+    fn open_at_finish_finds_the_last_unfinished_node() {
+        let events = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow: simple_workflow(),
+                task: "do it".into(),
+                step_by_step: false,
+                started_at: None,
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "start".into(),
+                pass: 1,
+                via: None,
+                child_session_id: None,
+                started_at: None,
+            },
+            Event::WorkflowNodeFinished {
+                run_id: "r".into(),
+                node_id: "start".into(),
+                port: "next".into(),
+                output: "do it".into(),
+                exit_code: None,
+                comment: None,
+                duration_ms: None,
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: Some(Via {
+                    from: "start".into(),
+                    port: "next".into(),
+                }),
+                child_session_id: None,
+                started_at: None,
+            },
+        ];
+
+        let found = open_at_finish(&events, "r").unwrap();
+        assert_eq!(found.0, "a");
+        assert!(found.1.is_some());
+    }
+
+    #[test]
+    fn default_via_points_at_the_start_node() {
+        let events = vec![Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            started_at: None,
+        }];
+        let state = current_run(&events).unwrap();
+        let via = state.default_via();
+        assert_eq!(via.from, "start");
+        assert_eq!(via.port, "next");
     }
 }

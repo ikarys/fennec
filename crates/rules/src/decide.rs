@@ -1,7 +1,7 @@
 //! Decision logic: turn a request into Allow, Ask, or Block.
 
-use crate::command::segments;
 use crate::rule::{Access, Action, Rule, Rules, Scope, Target};
+use crate::shell::segments;
 
 /// A canonicalized path request from the host.
 ///

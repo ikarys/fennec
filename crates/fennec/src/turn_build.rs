@@ -10,9 +10,9 @@ use crate::config::Settings;
 use crate::domain::clock;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::kernel_rules;
-use crate::domain::lang::Lang;
 use crate::domain::mcp;
-use crate::domain::preferences::ModelRef;
+use crate::domain::preferences::{ModelRef, Preferences};
+use crate::domain::project::SessionSummary;
 use crate::domain::test_files;
 use crate::domain::waiver;
 use crate::instructions::all_instructions;
@@ -20,9 +20,10 @@ use crate::llm::OpenAiClient;
 use crate::metering::MeteredLog;
 use crate::notifier::{Notifier, NotifyingLog};
 use crate::protected;
+use crate::sandbox::Sandbox;
 use crate::skills;
 use crate::store::SqliteStore;
-use crate::tools::{CanvasTarget, LocalTools, Sandbox};
+use crate::tools::{CanvasTarget, LocalTools};
 use crate::worktree;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -86,9 +87,6 @@ pub fn with_turn<R>(
             .retain(|tool| !delegate::withheld(tool, can_delegate, options.delegated));
     }
     let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
-    // A session worktree is the agent's own copy: a new dependency's lockfile
-    // may change there, and the integration gate shows it to the human. Outside
-    // a worktree the mount list is empty, so this is a no-op for the CLI.
     // The human's rules live in the `rules` crate's own database. They are
     // loaded per turn so a rule changed in the UI applies from the next turn.
     let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
@@ -96,23 +94,8 @@ pub fn with_turn<R>(
     // The budget is a human decision the kernel enforces before any turn starts:
     // every path that starts a turn (web, CLI, the ideas queue, workflow children)
     // goes through `with_turn`.
-    if let Some(session) = &session
-        && let Err(refusal) = crate::budget::check(settings, store, &session.project_id)
-    {
-        let error = Event::ChatError {
-            error: refusal.clone(),
-            recoverable: false,
-        };
-        log.append(session_id, &error)?;
-        (options.on_event)(&error);
-        let done = Event::ChatDone {
-            message_id: String::new(),
-            reason: DoneReason::Error,
-            duration_ms: None,
-        };
-        log.append(session_id, &done)?;
-        (options.on_event)(&done);
-        return Err(refusal);
+    if let Some(session) = &session {
+        refuse_over_budget(settings, store, log, session, options)?;
     }
     // The kernel's own rules come with them, CLI and workflow shell nodes included.
     let rules = kernel_rules::with_kernel(match &session {
@@ -121,10 +104,73 @@ pub fn with_turn<R>(
             .map_err(|e| e.to_string())?,
         None => rules::Rules::default(),
     });
-    // Only project-relative `Block` path rules that cover writes can be enforced
-    // by the file tools' protection and the sandbox's read-only mounts; the rest
-    // are checked per call by the `rules` crate.
-    let blocked_paths: Vec<String> = rules
+    let events = log.events(session_id)?;
+    let tools = build_tools(
+        settings,
+        store,
+        workdir,
+        session.as_ref(),
+        &prefs,
+        rules,
+        &events,
+    )?;
+    let mut turn = Turn {
+        model: &model,
+        log,
+        tools: &tools,
+        session_id,
+        workdir,
+        instructions: &instructions,
+        skills: &skills,
+        always_on: &prefs.always_on_skills,
+        agents: &agents,
+        max_tokens: params.max_tokens,
+        context_window: params.context_window,
+        compact_at: params.compact_at,
+        reasoning_effort: params.reasoning_effort,
+        autonomous: options.autonomous,
+        lang: prefs.display.language,
+        preflight_sent_back: false,
+        stop,
+        on_event: &mut options.on_event,
+        children: options.children,
+    };
+    body(&mut turn, &tools)
+}
+
+/// Refuses the turn when the project's budget is spent: the refusal is logged as the turn's error.
+fn refuse_over_budget(
+    settings: &Settings,
+    store: &SqliteStore,
+    log: &dyn EventLog,
+    session: &SessionSummary,
+    options: &mut Options,
+) -> Result<(), String> {
+    let Err(refusal) = crate::budget::check(settings, store, &session.project_id) else {
+        return Ok(());
+    };
+    for event in [
+        Event::ChatError {
+            error: refusal.clone(),
+            recoverable: false,
+        },
+        Event::ChatDone {
+            message_id: String::new(),
+            reason: DoneReason::Error,
+            duration_ms: None,
+        },
+    ] {
+        log.append(&session.id, &event)?;
+        (options.on_event)(&event);
+    }
+    Err(refusal)
+}
+
+/// Only project-relative `Block` path rules that cover writes can be enforced
+/// by the file tools' protection and the sandbox's read-only mounts; the rest
+/// are checked per call by the `rules` crate.
+fn blocked_write_paths(rules: &rules::Rules) -> Vec<String> {
+    rules
         .all()
         .iter()
         .filter_map(|rule| {
@@ -140,10 +186,22 @@ pub fn with_turn<R>(
                 _ => None,
             }
         })
-        .collect();
+        .collect()
+}
+
+/// The turn's toolbox: the sandbox, the protected files, the rules, MCP and the canvas.
+fn build_tools(
+    settings: &Settings,
+    store: &SqliteStore,
+    workdir: &Path,
+    session: Option<&SessionSummary>,
+    prefs: &Preferences,
+    rules: rules::Rules,
+    events: &[Event],
+) -> Result<LocalTools, String> {
+    let blocked_paths = blocked_write_paths(&rules);
     // ponytail: a waiver's expiry is checked when a turn starts, not mid-turn.
-    let events = log.events(session_id)?;
-    let waiver_paths = waiver::active(&events, clock::now_ms());
+    let waiver_paths = waiver::active(events, clock::now_ms());
     let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
         protected::load_for_worktree(workdir)
     } else {
@@ -151,12 +209,12 @@ pub fn with_turn<R>(
     })
     .with_patterns(&blocked_paths)
     // Validated at the test gate, protected from the next turn.
-    .with_patterns(&test_files::approved(&events))
+    .with_patterns(&test_files::approved(events))
     .exempting(&waiver_paths);
     let shared_target = worktree::shared_target(&worktree::root(&settings.db_path), workdir);
     // The model may still name the human's checkout after the session moved
     // into its worktree: the file tools redirect those paths.
-    let project_dir = match &session {
+    let project_dir = match session {
         Some(session) => store
             .project(&session.project_id)
             .map_err(|e| e.to_string())?
@@ -185,42 +243,21 @@ pub fn with_turn<R>(
                 .collect(),
         )
         .with_rules(rules)
-        .with_mcp(mcp::active_servers(&events, &prefs))
+        .with_mcp(mcp::active_servers(events, prefs))
         .with_mcp_vault(crate::mcp::oauth::Vault::for_settings(settings));
     let tools = match project_dir {
         Some(dir) => tools.with_project_dir(dir),
         None => tools,
     };
-    let tools = match &session {
+    let tools = match session {
         Some(session) => tools.with_canvas(CanvasTarget {
             db: settings.canvas_path(),
             project_id: session.project_id.clone(),
-            session_id: session_id.to_string(),
+            session_id: session.id.clone(),
         }),
         None => tools,
     };
-    let mut turn = Turn {
-        model: &model,
-        log,
-        tools: &tools,
-        session_id,
-        workdir,
-        instructions: &instructions,
-        skills: &skills,
-        always_on: &prefs.always_on_skills,
-        agents: &agents,
-        max_tokens: params.max_tokens,
-        context_window: params.context_window,
-        compact_at: params.compact_at,
-        reasoning_effort: params.reasoning_effort,
-        autonomous: options.autonomous,
-        lang: Lang::from_code(&prefs.display.language),
-        preflight_sent_back: false,
-        stop,
-        on_event: &mut options.on_event,
-        children: options.children,
-    };
-    body(&mut turn, &tools)
+    Ok(tools)
 }
 
 #[cfg(test)]

@@ -1,20 +1,10 @@
 name: ci
 
 # Actions minutes are a budget: the gate runs once per PR, not again on the
-# push its squash makes (develop gets exactly what the PR tested). Documentation
-# alone builds nothing and changes no test: skip the gate. Not `**.md`: the
-# agents and skills under crates/ are embedded in the binary.
+# push its squash makes (develop gets exactly what the PR tested).
 on:
   pull_request:
     branches: [develop, main]
-    paths-ignore: &docs
-      - README.md
-      - AGENTS.md
-      - CLAUDE.md
-      - THIRD_PARTY.md
-      - CHANGELOG.md
-      - LICENSE
-      - docs/**
 
 permissions:
   contents: read
@@ -24,13 +14,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The conventions: the UI compiles and keeps its primitives, rustfmt, clippy.
-  check:
+  # What every change passes, documentation included.
+  guard:
     runs-on: ubuntu-24.04
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
     steps:
       - uses: actions/checkout@v7
-      # The squash title becomes the commit release-please reads. Checked here,
-      # not in a workflow of its own: each job is billed at least a minute.
+        with:
+          fetch-depth: 0
+      # No secret anywhere in the history, not only in this PR's diff.
+      - name: Secrets
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          PATH="$RUNNER_TEMP:$PATH" gitleaks git --no-banner --redact .
+      # The squash title becomes the commit release-please reads.
       # The title goes through a file, never into the script: no injection.
       - name: PR title
         env:
@@ -38,6 +37,28 @@ jobs:
         run: |
           printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/title"
           .githooks/commit-msg "$RUNNER_TEMP/title"
+      # Documentation alone builds nothing and changes no test: the gate below
+      # is skipped by a job condition, which a required check accepts, where a
+      # workflow-level paths-ignore would leave it pending forever. Not `**.md`:
+      # the agents and skills under crates/ are embedded in the binary.
+      # The checkout is the PR's merge commit, so its first parent is the base.
+      - name: Scope
+        id: scope
+        run: |
+          files="$(git diff --name-only HEAD^1 HEAD)"
+          if grep -qvE '^(README\.md|AGENTS\.md|CLAUDE\.md|THIRD_PARTY\.md|CHANGELOG\.md|LICENSE|docs/.*)$' <<<"$files"; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The conventions: the UI compiles and keeps its primitives, rustfmt, clippy.
+  check:
+    needs: guard
+    if: needs.guard.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -50,8 +71,12 @@ jobs:
       - uses: extractions/setup-just@v4
       - name: Build the UI
         run: just web
-      - name: Lint
-        run: just lint
+      - name: UI rules
+        run: node web/scripts/check-ui.mjs
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
       # A new dependency must come under a licence the AGPL can absorb.
       - name: Licenses
         run: just licenses
@@ -60,6 +85,8 @@ jobs:
 
   # The unit tests, the sandbox's included (they need bwrap).
   tests:
+    needs: guard
+    if: needs.guard.outputs.code == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

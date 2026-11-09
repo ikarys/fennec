@@ -53,6 +53,29 @@ pub trait EventLog {
     /// Appends `event`, returns its sequence number in the session.
     fn append(&self, session_id: &str, event: &Event) -> Result<u64, String>;
     fn events(&self, session_id: &str) -> Result<Vec<Event>, String>;
+
+    /// The model's window: what a round folds. From the last `context.compacted` on, the cut
+    /// included, so `model_view` gives on it what it gives on the whole log.
+    fn window(&self, session_id: &str) -> Result<Vec<Event>, String> {
+        let mut events = self.events(session_id)?;
+        if let Some(i) = events
+            .iter()
+            .rposition(|event| matches!(event, Event::ContextCompacted { .. }))
+        {
+            events.drain(..i);
+        }
+        Ok(events)
+    }
+
+    /// Only the events of `kinds`, in log order: for the folds that read a few kinds over the
+    /// whole session.
+    fn events_of(&self, session_id: &str, kinds: &[&str]) -> Result<Vec<Event>, String> {
+        Ok(self
+            .events(session_id)?
+            .into_iter()
+            .filter(|event| kinds.contains(&event.kind()))
+            .collect())
+    }
 }
 
 /// What the human's rules say about one tool call, and what it was about (the command,
@@ -61,6 +84,18 @@ pub struct RuleCheck<'r> {
     pub decision: rules::Decision<'r>,
     pub subject: String,
     pub proposal: Option<rules::Proposal>,
+}
+
+#[cfg(test)]
+impl RuleCheck<'_> {
+    /// No rule applies: the call runs (the test doubles' answer).
+    pub fn allowed() -> Self {
+        RuleCheck {
+            decision: rules::Decision::Allow(None),
+            subject: String::new(),
+            proposal: None,
+        }
+    }
 }
 
 /// The tools a model can call (adapter: `tools::LocalTools`, on the host).
@@ -89,14 +124,9 @@ pub trait Toolbox {
     ) -> ToolResult {
         self.execute(name, args, access, stop, on_output)
     }
-    /// The human's rules on this call, decided before it runs; the default allows.
-    fn check_rules(&self, _name: &str, _args: &Value) -> RuleCheck<'_> {
-        RuleCheck {
-            decision: rules::Decision::Allow(None),
-            subject: String::new(),
-            proposal: None,
-        }
-    }
+    /// The human's rules on this call, decided before it runs. No default: a
+    /// toolbox that forgot the rules would run every call unchecked.
+    fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_>;
     /// The MCP tool names offered; empty when the toolbox has no MCP servers.
     /// The snapshot re-freezes when this set changes.
     fn mcp_tool_names(&self) -> Vec<String> {

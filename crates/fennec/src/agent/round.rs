@@ -59,7 +59,7 @@ pub fn stream(turn: &mut Turn, message_id: &str, prompt: &RoundPrompt) -> Result
                 error,
                 recoverable: true,
             })?;
-            turn.append_user(CONTINUE_AFTER_STREAM_ERROR_PROMPT, true, None, Vec::new())?;
+            turn.append_system(CONTINUE_AFTER_STREAM_ERROR_PROMPT)?;
             return Ok(Round::Interrupted);
         }
         failures += 1;
@@ -89,7 +89,8 @@ fn stream_once(
     prompt: &RoundPrompt,
     started: &mut bool,
 ) -> Result<Result<(Completion, MessageStats), String>, String> {
-    let events = turn.log.events(turn.session_id)?;
+    // The window, not the whole log: a round costs the window's size, not the session's.
+    let events = turn.log.window(turn.session_id)?;
     let messages = fold_messages(&events);
     let req = Request {
         system_prompt: prompt.system_prompt,
