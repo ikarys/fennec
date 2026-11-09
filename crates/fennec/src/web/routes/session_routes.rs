@@ -286,9 +286,11 @@ pub(crate) fn serve_skills(app: &App, stream: &mut TcpStream, id: &str) -> Resul
 pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let (session, project) = app.require_session(id)?;
-    let events = store.events(id)?;
+    // Targeted reads: the thread is refetched at each tool call, the whole log need not be decoded.
+    let window = store.window(id)?;
+    let session_events = store.events_of(id, thread_view::SESSION_KINDS)?;
     let workdir = app.place(&store, &session, &project)?.workdir;
-    let view = thread_view::thread_view(&events, &workdir.to_string_lossy());
+    let view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
     send_json(
         stream,
         200,

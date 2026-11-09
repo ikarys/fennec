@@ -21,7 +21,7 @@ use serde_json::Value;
 /// description) does not change the prompt's first bytes and void the whole
 /// session's prompt cache.
 pub(super) fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
-    let events = turn.log.events(turn.session_id)?;
+    let events = turn.log.events_of(turn.session_id, &["turn.snapshot"])?;
     let (prompt, tools) = frozen_prompt(&events);
     let current_mcp = turn.tools.mcp_tool_names();
     if let (Some(prompt), Some(tools)) = (prompt, tools) {

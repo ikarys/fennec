@@ -350,7 +350,7 @@ pub(super) fn run_top_level_agent_loop(
         };
         if !compacted_last_round
             && should_compact(
-                context_tokens(&turn.log.events(turn.session_id)?),
+                context_tokens(&turn.log.window(turn.session_id)?),
                 turn.context_window,
                 turn.compact_at,
             )

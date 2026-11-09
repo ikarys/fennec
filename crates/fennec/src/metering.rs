@@ -63,9 +63,7 @@ impl EventLog for MeteredLog<'_> {
             partial: false,
         } = event
         {
-            // ponytail: re-reads and folds the session's log at each call, O(n) like the
-            // turn loop's own fold; pass the round's parts in if it shows.
-            let breakdown = match self.log.events(session_id) {
+            let breakdown = match breakdown_events(self.log, session_id) {
                 Ok(events) => call_breakdown(&events, message_id, stats.prefill_tokens),
                 Err(e) => {
                     eprintln!("fennec: usage ledger: {e}");
@@ -99,6 +97,30 @@ impl EventLog for MeteredLog<'_> {
     fn events(&self, session_id: &str) -> Result<Vec<Event>, String> {
         self.log.events(session_id)
     }
+
+    fn window(&self, session_id: &str) -> Result<Vec<Event>, String> {
+        self.log.window(session_id)
+    }
+
+    fn events_of(&self, session_id: &str, kinds: &[&str]) -> Result<Vec<Event>, String> {
+        self.log.events_of(session_id, kinds)
+    }
+}
+
+/// What a call's breakdown reads: the model's window, preceded by the prompt snapshots from
+/// before it (the frozen prompt may predate the last cut). For the breakdown of the window's
+/// calls, equal to the whole log, without decoding it.
+fn breakdown_events(log: &dyn EventLog, session_id: &str) -> Result<Vec<Event>, String> {
+    let window = log.window(session_id)?;
+    let in_window = window
+        .iter()
+        .filter(|event| matches!(event, Event::TurnSnapshot { .. }))
+        .count();
+    // In log order: the last `in_window` snapshots are the window's own.
+    let mut events = log.events_of(session_id, &["turn.snapshot"])?;
+    events.truncate(events.len().saturating_sub(in_window));
+    events.extend(window);
+    Ok(events)
 }
 
 /// Idempotent thanks to `external_id` (rows stored before labels or breakdowns existed get them);
@@ -268,6 +290,51 @@ mod tests {
         assert_eq!(summary.prompt_tokens, 100);
         assert_eq!(summary.cached_tokens, 20);
         assert_eq!(summary.completion_tokens, 30);
+    }
+
+    #[test]
+    fn breakdown_events_break_down_like_the_whole_log() {
+        let store = SqliteStore::in_memory().expect("store");
+        let project = store.project_for("/tmp/meter-window").expect("project");
+        let session = store.create_session(&project, "t").expect("session");
+        let snapshot = |prompt: &str, tools: serde_json::Value| Event::TurnSnapshot {
+            cached_system_prompt: prompt.into(),
+            cached_tools: Some(tools),
+            mcp_tool_names: Vec::new(),
+        };
+        let message = |id: &str, role: Role, content: &str| Event::MessageStart {
+            message_id: id.into(),
+            role,
+            content: Some(content.into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: vec![],
+        };
+        for event in [
+            snapshot("first prompt", serde_json::json!([{"name": "a"}])),
+            message("u1", Role::User, "before the cut"),
+            Event::ContextCompacted {
+                before_tokens: 10,
+                after_tokens: 2,
+                summary: "s".into(),
+            },
+            snapshot(
+                "first prompt",
+                serde_json::json!([{"name": "a"}, {"name": "b"}]),
+            ),
+            message("u2", Role::User, "after the cut"),
+            message("a2", Role::Assistant, "answer"),
+        ] {
+            store.append(&session, &event).expect("append");
+        }
+
+        let targeted = breakdown_events(&store, &session).expect("read");
+        let whole = store.events(&session).expect("read");
+        assert_eq!(
+            call_breakdown(&targeted, "a2", 100),
+            call_breakdown(&whole, "a2", 100)
+        );
+        assert!(!call_breakdown(&targeted, "a2", 100).is_empty());
     }
 
     #[test]
