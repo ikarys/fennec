@@ -61,6 +61,7 @@ pub mod scanner;
 pub mod security_scan;
 pub mod server;
 pub mod server_config;
+pub mod service;
 pub mod session_name;
 pub mod session_skills;
 pub mod setup;

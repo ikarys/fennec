@@ -90,6 +90,17 @@ fennec --version
 
 `fennec update --check` reports whether a newer release is out. `fennec update` installs the latest release with the install script, which restarts the service (systemd user service on Linux, launchd agent on macOS). The update offered in the UI waits until no turn is running. `fennec --version` (or `-V`) prints the version.
 
+## Run in the background
+
+```bash
+fennec service install
+fennec service start
+fennec service stop
+fennec service restart
+```
+
+`fennec service install` writes a systemd user service on Linux or a launchd agent on macOS, then starts it now and at each login. It runs the binary that ran the command, with the `PATH` of your shell. A service file already there is yours: it is kept as it is.
+
 ## Environment defaults
 
 The command line reads the same environment defaults as the server: `FENNEC_LLM_URL`, `FENNEC_MODEL`, `FENNEC_API_KEY`, `FENNEC_MAX_TOKENS`, `FENNEC_COMPACT_AT`, `FENNEC_MODEL_CONCURRENCY`, and `FENNEC_DB`. The Settings page overrides them. See [configuration](configuration.md).
