@@ -1107,6 +1107,7 @@ export const en = {
   ruleBridgeAdd: 'Add the rules',
   // components/session/Thread.tsx
   thinkingHide: 'Thinking · hide',
+  answerSources: 'Sources',
   thinkingShow: 'Thinking · show',
   assistantProducedByModel: 'Produced by the model',
   threadMode: 'mode',
@@ -2550,6 +2551,7 @@ export const fr: Record<MsgKey, string> = {
   ruleBridgeAdd: 'Ajouter les règles',
   // components/session/Thread.tsx
   thinkingHide: 'Réflexion · masquer',
+  answerSources: 'Sources',
   thinkingShow: 'Réflexion · afficher',
   assistantProducedByModel: 'produit par le modèle',
   threadMode: 'mode',

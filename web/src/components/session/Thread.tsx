@@ -16,6 +16,7 @@ import { ToolCard } from './ToolCard';
 import { NodeDivider } from '../workflow/session/NodeDivider';
 import { RunEndCard } from '../workflow/session/RunEndCard';
 import { markdownComponents } from './markdownComponents';
+import { splitSources } from '../../lib/sources';
 import { attachmentAnchorId } from '../../lib/vision';
 import { usePlanActions } from './PlanActions';
 import { useT } from '../../i18n';
@@ -53,10 +54,12 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 const REMARK_PLUGINS = [remarkGfm];
 
 const TextSegment = memo(function TextSegment({ content, caret, id, preflight }: { content: string; caret: boolean; id?: string; preflight?: PreflightResultView[] }) {
+  const t = useT();
   const actions = usePlanActions();
   // Parsed only when settled: a half-written contract would flicker between the
   // two renderings while the message streams.
   const contract = useMemo(() => (caret ? null : splitContract(content)), [content, caret]);
+  const split = useMemo(() => splitSources(content), [content]);
   const planActions =
     actions && id !== undefined && actions.segmentId === id && contract?.contract.kind === 'plan'
       ? actions
@@ -80,11 +83,21 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
       </>
     );
   }
+  const { body, sources } = split;
   return (
     <Card className={`${ANSWER_WIDTH} px-3.5 py-2.5`}>
       <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
-        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{body}</ReactMarkdown>
         {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
+        {sources !== null && (
+          <details className="group mt-2 border-t border-border pt-2">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1.5 py-1 text-sm text-muted select-none hover:bg-accent-soft hover:text-text [&::-webkit-details-marker]:hidden">
+              <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
+              {t('answerSources')}
+            </summary>
+            <div className="pl-5"><ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{sources}</ReactMarkdown></div>
+          </details>
+        )}
       </div>
     </Card>
   );

@@ -30,10 +30,10 @@ Exactly these headings, in this order, nothing after them:
 
 ```
 ## Answer
-- The direct answer first, short — <path>:<line>
-## Where to look
-- The file or line to open, and why — <path>:<line>
+- The direct answer first, short, in plain sentences
 ## Not settled
-- A question for the human, on a point the code could not settle — <path>:<line>
+- A question for the human, on a point the code could not settle
+## Sources
+- The file or line that backs a claim, and what it shows — <path>:<line>
 ```
-One bullet per claim; if `## Not settled` has nothing, write `- None.`. If the question is not about this project's code, say so in one line under `## Answer` and stop.
+One bullet per claim. Paths and line numbers go under `## Sources` only, never in `## Answer` or `## Not settled`: the human reads the answer first and opens the sources on demand. If `## Not settled` has nothing, write `- None.`. If the question is not about this project's code, say so in one line under `## Answer` and stop.
