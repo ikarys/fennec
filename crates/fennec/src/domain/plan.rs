@@ -102,13 +102,16 @@ pub struct Pending {
 
 /// The last `plan.proposed`, unless a workflow started since or the human wrote after leaving
 /// the plan agent. A later human question in plan mode keeps it pending: the decision stays
-/// offered while they discuss.
+/// offered while they discuss. A plan proposed inside a run belongs to that run: its own nodes
+/// ask the human, and it is never offered once the run ends.
 pub fn pending(events: &[Event]) -> Option<Pending> {
     let mut pending: Option<Pending> = None;
     let mut left_plan = false;
+    let mut in_run = false;
 
     for event in events {
         match event {
+            Event::PlanProposed { .. } if in_run => {}
             Event::PlanProposed {
                 call_id,
                 plan,
@@ -127,7 +130,11 @@ pub fn pending(events: &[Event]) -> Option<Pending> {
                     pending.preflight = results.clone();
                 }
             }
-            Event::WorkflowStarted { .. } => pending = None,
+            Event::WorkflowStarted { .. } => {
+                pending = None;
+                in_run = true;
+            }
+            Event::WorkflowFinished { .. } => in_run = false,
             Event::ModeChanged { mode, .. } => {
                 left_plan = mode.as_str() != "plan";
             }
@@ -312,6 +319,29 @@ mod tests {
             step_by_step: false,
             started_at: None,
         }
+    }
+
+    fn finished() -> Event {
+        Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: crate::domain::workflow::run::RunOutcome::Done,
+            reason: None,
+            stats: None,
+        }
+    }
+
+    #[test]
+    fn a_plan_proposed_inside_a_run_is_never_offered() {
+        assert_eq!(pending_id(&[started(), proposed("p1")]), None);
+        assert_eq!(pending_id(&[started(), proposed("p1"), finished()]), None);
+    }
+
+    #[test]
+    fn a_plan_after_the_run_ended_is_offered() {
+        assert_eq!(
+            pending_id(&[started(), finished(), proposed("p2")]),
+            Some("p2".into())
+        );
     }
 
     #[test]
