@@ -217,7 +217,8 @@ Contributions, done (C17, part 1): a "Contributions" tab on the project page lis
 commits the human's branch lacks; a click adopts one into a new session's worktree (`worktree::adopt`: the branch's tip,
 its base at the merge-base with the human's HEAD), so a colleague's work goes through the same integration gate as an
 agent's (blockers, scanners, review map, comprehension dialogue). Only a listed branch is adopted; nothing merges on its
-own (`git::contributions`, `web/routes/contribution_routes.rs`).
+own. A branch already squashed into HEAD (its whole diff has the patch-id of one of HEAD's last 1000 commits), `main`,
+`master`, `develop` and the release-please branches are left out (`git/contributions.rs`, `web/routes/contribution_routes.rs`).
 
 Update, done: `fennec update [--check]` and the top bar's arrow read the latest GitHub release (`/releases/latest`'s
 redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on the human's click only, run the

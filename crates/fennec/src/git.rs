@@ -5,6 +5,9 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
+mod contributions;
+pub use contributions::contributions;
+
 /// Runs `git -C dir args…`; a non-zero exit is an `Err` with the command and
 /// its trimmed stderr.
 pub(crate) fn run(dir: &Path, args: &[&str], stdin: Option<&[u8]>) -> Result<Vec<u8>, String> {
@@ -260,82 +263,6 @@ pub fn branch_stats(workdir: &Path, session_id: &str) -> Option<BranchStats> {
     Some(BranchStats { commits, files })
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Contribution {
-    pub branch: String,
-    pub ahead: usize,
-    pub subject: String,
-}
-
-/// The branches, local and remote, holding commits the human's HEAD lacks: what
-/// could come in as a contribution.
-pub fn contributions(workdir: &Path) -> Vec<Contribution> {
-    let out = run(
-        workdir,
-        &[
-            "for-each-ref",
-            "--no-merged",
-            "HEAD",
-            "--sort=-committerdate",
-            // lstrip=2, not :short: `refs/remotes/origin/HEAD` stays `origin/HEAD`
-            // (short gives a bare `origin`), so the filter can drop it.
-            "--format=%(refname:lstrip=2)%09%(subject)",
-            "refs/heads",
-            "refs/remotes",
-        ],
-        None,
-    )
-    .ok()
-    .map(|o| String::from_utf8_lossy(&o).into_owned())
-    .unwrap_or_default();
-    let current = current_branch(workdir);
-    let mut contributions = Vec::new();
-    for (branch, subject) in parse_contributions(&out, current.as_deref()) {
-        let range = format!("HEAD..{branch}");
-        let Some(ahead) = run(workdir, &["rev-list", "--count", &range], None)
-            .ok()
-            .and_then(|o| String::from_utf8_lossy(&o).trim().parse::<usize>().ok())
-        else {
-            continue;
-        };
-        contributions.push(Contribution {
-            branch,
-            ahead,
-            subject,
-        });
-        if contributions.len() == 50 {
-            // ponytail: one rev-list per branch, capped at 50; a single
-            // `for-each-ref %(ahead-behind:HEAD)` (git 2.41+) if it ever matters.
-            break;
-        }
-    }
-    contributions
-}
-
-/// Drops the session branches (fennec's own), remote HEADs and the branch the human is on.
-fn parse_contributions(out: &str, current: Option<&str>) -> Vec<(String, String)> {
-    out.lines()
-        .filter_map(|line| {
-            let (branch, subject) = line.split_once('\t')?;
-            let branch = branch.trim();
-            let subject = subject.trim();
-            if branch.is_empty() {
-                return None;
-            }
-            if branch.starts_with("fennec/") || branch.contains("/fennec/") {
-                return None;
-            }
-            if branch.ends_with("/HEAD") {
-                return None;
-            }
-            if current.is_some_and(|c| c == branch) {
-                return None;
-            }
-            Some((branch.to_string(), subject.to_string()))
-        })
-        .collect()
-}
-
 /// Parses `for-each-ref` lines: a session is pending when its branch and base
 /// refs both exist and point to different commits.
 fn unintegrated(refs: &str) -> HashSet<String> {
@@ -360,9 +287,7 @@ fn unintegrated(refs: &str) -> HashSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        dirty_count, parse_contributions, remote_url, session_trailers, unintegrated, web_url,
-    };
+    use super::{dirty_count, remote_url, session_trailers, unintegrated, web_url};
     use std::collections::HashSet;
     use std::process::Command;
 
@@ -370,19 +295,6 @@ mod tests {
     fn session_trailers_lists_each_integrated_session() {
         let ids = session_trailers("s1\n\n\n  s2 \n\n");
         assert_eq!(ids, HashSet::from(["s1".to_string(), "s2".to_string()]));
-    }
-
-    #[test]
-    fn parse_contributions_drops_session_heads_and_current() {
-        let out = "main\tsubject\ncontrib\tcontrib subject\nfennec/s1\tsession\norigin/fennec/s1\tremote session\norigin/HEAD\tremote head\nfeature\tfeature subject\n";
-        let parsed = parse_contributions(out, Some("main"));
-        assert_eq!(
-            parsed,
-            vec![
-                ("contrib".to_string(), "contrib subject".to_string()),
-                ("feature".to_string(), "feature subject".to_string()),
-            ]
-        );
     }
 
     #[test]
