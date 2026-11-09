@@ -138,7 +138,7 @@ function ServerCard({
           </span>
           {server.cachedTools.length > 0 ? (
             <Badge tone="accent" appearance="pill">
-              {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
+              {t('mcpToolCount', { count: server.cachedTools.length })}
             </Badge>
           ) : null}
           <Switch
@@ -233,7 +233,7 @@ function ServerCard({
             </label>
             {server.cachedTools.length > 0 && (
               <span className="text-xs text-muted">
-                {t('mcpToolCount', { count: server.cachedTools.length, s: server.cachedTools.length > 1 ? 's' : '' })}
+                {t('mcpToolCount', { count: server.cachedTools.length })}
               </span>
             )}
           </div>

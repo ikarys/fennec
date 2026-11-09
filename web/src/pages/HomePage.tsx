@@ -2,8 +2,9 @@ import { useState } from 'react';
 import type { Project } from '../lib/api';
 import { DeleteSessionsDialog, type DeletionTarget } from '../components/session/DeleteSessionsDialog';
 import { useT } from '../i18n';
-import { SearchIcon } from '../components/ui/Icons';
+import { FolderIcon, SearchIcon } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { WorktreeAlert } from '../components/project/WorktreeAlert';
 import { SetupChecklist } from '../components/project/SetupChecklist';
 import { TextInput } from '../components/ui/Field';
@@ -83,33 +84,25 @@ export function HomePage({
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto flex max-w-page flex-col gap-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <h1 className="text-2xl font-semibold">{t('paletteProjects')}</h1>
-            <p className="flex items-center gap-2 text-sm text-muted">
+        <PageHeader
+          Icon={FolderIcon}
+          title={t('paletteProjects')}
+          subtitle={
+            <span className="flex items-center gap-2">
               {runningCount > 0 && <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />}
               {runningCount > 0
                 ? t('homeRunningSessions', { count: runningCount })
                 : t('homeNoRunningSessions')}
-            </p>
-            <WorktreeAlert />
-          </div>
-          <Button variant="primary" size="md" onClick={onOpenProjectDialog}>
-            <svg
-              className="h-[15px] w-[15px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-            {t('openProject')}
-          </Button>
-        </div>
+            </span>
+          }
+          actions={
+            <Button variant="primary" size="md" onClick={onOpenProjectDialog}>
+              <FolderIcon className="h-[15px] w-[15px]" />
+              {t('openProject')}
+            </Button>
+          }
+        />
+        <WorktreeAlert />
 
         <div className="flex items-center gap-3">
           <div className="relative min-w-0 grow">

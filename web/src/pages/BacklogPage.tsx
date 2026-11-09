@@ -4,8 +4,9 @@ import { startQueue, stopQueue } from '../lib/ideas';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { MoonIcon, PlayIcon, StopIcon } from '../components/ui/Icons';
+import { BacklogIcon, MoonIcon, PlayIcon, StopIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
+import { PageHeader } from '../components/ui/PageHeader';
 import type { MsgKey } from '../i18n/messages';
 
 function headerSummary(
@@ -191,10 +192,7 @@ export default function BacklogPage() {
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-page">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('tasks')}</h1>
-          {view ? <p className="mt-0.5 text-sm text-muted">{headerSummary(view, t)}</p> : null}
-        </div>
+        <PageHeader Icon={BacklogIcon} title={t('tasks')} subtitle={view ? headerSummary(view, t) : undefined} />
 
         {error ? <p className="mt-4 text-err">{error}</p> : null}
         {!view && !error ? <div className="mt-4 text-muted">{t('loading')}</div> : null}

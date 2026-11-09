@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useT } from '../i18n';
+import { WorkflowsIcon } from '../components/ui/Icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import type { MsgKey } from '../i18n/messages';
 import type { Project } from '../lib/api';
 import { getWorkflow, listWorkflows } from '../lib/api';
@@ -112,9 +114,8 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
 
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
-      <div className="mx-auto max-w-[720px]">
-        <h1 className="text-2xl font-semibold">{t('workflows')}</h1>
-        <p className="mt-0.5 text-muted">{t('workflowsPageDescription')}</p>
+      <div className="mx-auto max-w-page">
+        <PageHeader Icon={WorkflowsIcon} title={t('workflows')} subtitle={t('workflowsPageDescription')} />
 
         <div className="mt-6 flex items-center gap-3">
           <label htmlFor="wf-project" className="text-xs text-muted">

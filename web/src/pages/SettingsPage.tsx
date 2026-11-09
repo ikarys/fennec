@@ -48,6 +48,8 @@ import { VersionSection } from '../components/settings/VersionSection';
 import { WhatsNewSection } from '../components/settings/WhatsNewSection';
 import { AboutBrand } from '../components/settings/AboutBrand';
 import { useT } from '../i18n';
+import { SettingsIcon } from '../components/ui/Icons';
+import { PageHeader } from '../components/ui/PageHeader';
 import type { MsgKey } from '../i18n/messages';
 
 /** The pause after the last edit before the page stores it. */
@@ -383,8 +385,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     return (
       <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
         <div className="mx-auto max-w-page">
-          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
-          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
+          <PageHeader Icon={SettingsIcon} title={t('settingsTitle')} subtitle={t('settingsSubtle')} />
           <div className="mt-6 text-sm text-muted">{t('loading')}</div>
         </div>
       </main>
@@ -395,10 +396,7 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     <main className="grow overflow-y-auto px-4 md:px-6">
       {/* The top padding sits inside the scroller, so the jump bar sticks at its very top. */}
       <div className="mx-auto flex max-w-page flex-col gap-6 pt-6 md:pt-8">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
-          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
-        </div>
+        <PageHeader Icon={SettingsIcon} title={t('settingsTitle')} subtitle={t('settingsSubtle')} />
 
         <Card className="flex flex-col md:flex-row">
           {/* One form across the tabs: an edit on one tab is kept when switching. */}
