@@ -167,6 +167,20 @@ export function TasksSection({
         onSelect={(id) => onSelectSub(id as TasksSub)}
       />
 
+      <div className="flex items-center gap-2">
+        <div className="ml-auto">
+          <Button
+            variant="secondary"
+            size="sm"
+            title={t('addIdeaToBacklog')}
+            onClick={() => setNewIdeaOpen(true)}
+          >
+            <PlusIcon className="h-4 w-4" />
+            {t('newIdea')}
+          </Button>
+        </div>
+      </div>
+
       {actionError ? (
         <div className="flex items-center gap-2">
           <p className="m-0 flex items-center gap-2 text-xs text-err" role="alert">
@@ -217,20 +231,6 @@ export function TasksSection({
       {activeSub === 'ready' || activeSub === 'backlog' ? (
         <div className="flex flex-col gap-4">
           <QueueBar queue={board.queue} projectId={projectId} run={run} />
-
-          <div className="flex items-center gap-2">
-            <div className="ml-auto">
-              <Button
-                variant="secondary"
-                size="sm"
-                title={t('addIdeaToBacklog')}
-                onClick={() => setNewIdeaOpen(true)}
-              >
-                <PlusIcon className="h-4 w-4" />
-                {t('newIdea')}
-              </Button>
-            </div>
-          </div>
 
           {activeSub === 'backlog' && drafts.length === 0 ? (
             <p className="m-0 text-sm text-muted">{t('noDraftsPending')}</p>
@@ -289,6 +289,7 @@ export function TasksSection({
         open={newIdeaOpen}
         run={run}
         onClose={() => setNewIdeaOpen(false)}
+        onCreated={() => onSelectSub('backlog')}
       />
     </section>
   );
