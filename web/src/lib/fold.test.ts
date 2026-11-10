@@ -258,7 +258,7 @@ describe('createThreadFold', () => {
             { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
             { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
           ],
-          doneWhen: ['tests pass — check: `cargo test`', 'docs updated'],
+          doneWhen: [{ text: 'tests pass', check: 'cargo test' }, { text: 'docs updated', check: '' }],
           risks: ['Risk one']
         },
         markdown: '## Plan: Ship'
@@ -318,8 +318,8 @@ describe('createThreadFold', () => {
             { number: 2, checked: false, text: 'Docs', detail: '' }
           ],
           doneWhen: [
-            { checked: true, text: 'tests pass', detail: 'cargo test' },
-            { checked: false, text: 'docs updated', detail: '' }
+            { number: 2, checked: false, text: 'docs updated', detail: '' },
+            { number: 1, checked: true, text: 'tests pass', detail: 'cargo test' }
           ],
           changed: [{ path: 'a.ts', what: 'the code' }],
           test: 'Open the UI',

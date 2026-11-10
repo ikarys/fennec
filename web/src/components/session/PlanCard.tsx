@@ -1,8 +1,8 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Plan, Report } from '../../lib/plan';
+import type { Plan, PlanCriterion, Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { CheckIcon, ChevronRightIcon, CloseIcon } from '../ui/Icons';
+import { CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, PlayIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
@@ -102,19 +102,16 @@ export function PlanBody({ plan, preflight }: { plan: Plan; preflight?: Prefligh
         })}
       </ol>
       {plan.doneWhen.length > 0 && (
-        <Card variant="inset">
-          <SectionLabel>{t('doneWhen')}</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1.5">
-            {plan.doneWhen.map((criterion, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-text">
-                <span aria-hidden="true" className="mt-1 h-3.5 w-3.5 shrink-0 rounded-sm border border-border-strong bg-panel" />
-                <span>
-                  <Inline>{criterion}</Inline>
-                </span>
-              </li>
-            ))}
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <CheckIcon className="h-3.5 w-3.5 text-accent" />
+            <SectionLabel>{t('doneWhen')}</SectionLabel>
+            <Badge tone="neutral">{plan.doneWhen.length}</Badge>
+          </div>
+          <ul className="m-0 flex flex-col divide-y divide-border">
+            {plan.doneWhen.map((criterion, i) => <PlanCriterionRow key={i} id={`C${i + 1}`} criterion={criterion} />)}
           </ul>
-        </Card>
+        </div>
       )}
       {preflight && preflight.length > 0 && <PreflightSection results={preflight} />}
       {plan.risks.length > 0 && (
@@ -133,6 +130,35 @@ export function PlanBody({ plan, preflight }: { plan: Plan; preflight?: Prefligh
         </div>
       )}
     </div>
+  );
+}
+
+function CriterionId({ id }: { id: string }) {
+  return (
+    <span className="mt-px rounded-sm bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-accent">{id}</span>
+  );
+}
+
+function PlanCriterionRow({ id, criterion }: { id: string; criterion: PlanCriterion }) {
+  const t = useT();
+  return (
+    <li className="grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1 px-3 py-2.5">
+      <CriterionId id={id} />
+      <span className="min-w-0 text-sm text-text"><Inline>{criterion.text}</Inline></span>
+      <span className="col-start-2">
+        {criterion.check ? (
+          <Badge tone="info" title={t('criterionCheckTitle', { command: criterion.check })}>
+            <PlayIcon className="h-3 w-3" />
+            {t('criterionCheck')}
+          </Badge>
+        ) : (
+          <Badge tone="attention" title={t('criterionJudgeTitle')}>
+            <EyeIcon className="h-3 w-3" />
+            {t('criterionJudge')}
+          </Badge>
+        )}
+      </span>
+    </li>
   );
 }
 
@@ -168,29 +194,23 @@ export function PlanCard({
   );
 }
 
-function Tally({ done, total }: { done: number; total: number }) {
+function Tally({ done, total, label }: { done: number; total: number; label: 'stepsTally' | 'criteriaTally' }) {
   const t = useT();
   const all = total > 0 && done === total;
-  return <span className={all ? 'text-ok' : 'text-err'}>{t('stepsTally', { done, total })}</span>;
+  return <Badge tone={all ? 'ok' : 'err'}>{t(label, { done, total })}</Badge>;
 }
 
-function CheckRow({ checked, text, detail }: { checked: boolean; text: string; detail: string }) {
+function CheckRow({ checked, label, text, detail }: { checked: boolean; label: string; text: string; detail: string }) {
   return (
-    <li className="flex items-start gap-2 text-sm">
-      {checked ? (
-        <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
-      ) : (
-        <CloseIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-err" />
+    <li className={`grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1 px-3 py-2.5 ${checked ? 'shadow-[inset_2px_0_0_var(--color-ok)]' : 'bg-err/5 shadow-[inset_2px_0_0_var(--color-err)]'}`}>
+      <Badge tone={checked ? 'ok' : 'err'}>
+        {checked ? <CheckIcon className="h-3 w-3" /> : <CloseIcon className="h-3 w-3" />}
+        {label}
+      </Badge>
+      <span className="min-w-0 text-sm text-text"><Inline>{text}</Inline></span>
+      {detail && (
+        <span className="col-start-2 text-xs text-muted"><Inline>{detail}</Inline></span>
       )}
-      <span className="min-w-0 text-text">
-        <Inline>{text}</Inline>
-        {detail && (
-          <span className="text-muted">
-            {' — '}
-            <Inline>{detail}</Inline>
-          </span>
-        )}
-      </span>
     </li>
   );
 }
@@ -198,6 +218,7 @@ function CheckRow({ checked, text, detail }: { checked: boolean; text: string; d
 export function ReportCard({ report }: { report: Report }) {
   const t = useT();
   const done = report.steps.filter((s) => s.checked).length;
+  const met = report.doneWhen.filter((c) => c.checked).length;
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
@@ -205,7 +226,8 @@ export function ReportCard({ report }: { report: Report }) {
         <span className="min-w-0 font-semibold text-text">
           <Inline>{report.title}</Inline>
         </span>
-        {report.steps.length > 0 && <Tally done={done} total={report.steps.length} />}
+        {report.steps.length > 0 && <Tally done={done} total={report.steps.length} label="stepsTally" />}
+        {report.doneWhen.length > 0 && <Tally done={met} total={report.doneWhen.length} label="criteriaTally" />}
         <Badge tone="accent" title={t('reportIndicativeTitle')} className="ml-auto">{t('indicative')}</Badge>
       </div>
       {report.summary && (
@@ -214,21 +236,39 @@ export function ReportCard({ report }: { report: Report }) {
         </p>
       )}
       {report.steps.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>{t('stepsLabel')}</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1.5">
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <CheckIcon className="h-3.5 w-3.5 text-accent" />
+            <SectionLabel>{t('stepsLabel')}</SectionLabel>
+          </div>
+          <ul className="m-0 flex flex-col divide-y divide-border">
             {report.steps.map((step, i) => (
-              <CheckRow key={i} checked={step.checked} text={t('stepRow', { number: step.number, text: step.text })} detail={step.detail} />
+              <CheckRow
+                key={i}
+                checked={step.checked}
+                label={step.checked ? t('stepDone', { number: step.number }) : t('stepNotDone', { number: step.number })}
+                text={step.text}
+                detail={step.detail}
+              />
             ))}
           </ul>
         </div>
       )}
       {report.doneWhen.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>{t('doneWhen')}</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1.5">
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <CheckIcon className="h-3.5 w-3.5 text-accent" />
+            <SectionLabel>{t('doneWhen')}</SectionLabel>
+          </div>
+          <ul className="m-0 flex flex-col divide-y divide-border">
             {report.doneWhen.map((item, i) => (
-              <CheckRow key={i} checked={item.checked} text={item.text} detail={item.detail} />
+              <CheckRow
+                key={i}
+                checked={item.checked}
+                label={item.checked ? t('criterionMet', { id: `C${item.number}` }) : t('criterionUnmet', { id: `C${item.number}` })}
+                text={item.text}
+                detail={item.detail}
+              />
             ))}
           </ul>
         </div>

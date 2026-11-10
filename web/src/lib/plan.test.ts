@@ -67,7 +67,7 @@ describe('splitContract', () => {
     expect(out.contract.steps[1].title).toBe('Update docs');
     expect(out.contract.steps[1].files).toEqual(['docs.md (new)']);
 
-    expect(out.contract.doneWhen).toEqual(['tests pass', 'docs updated']);
+    expect(out.contract.doneWhen).toEqual([{ text: 'tests pass', check: '' }, { text: 'docs updated', check: '' }]);
     expect(out.contract.risks).toEqual([]);
   });
 
@@ -111,8 +111,8 @@ describe('splitContract', () => {
     });
 
     expect(out.contract.doneWhen).toEqual([
-      { checked: true, text: 'tests pass', detail: '' },
-      { checked: false, text: 'docs updated', detail: '' },
+      { number: 2, checked: false, text: 'docs updated', detail: '' },
+      { number: 1, checked: true, text: 'tests pass', detail: '' },
     ]);
     expect(out.contract.changed).toEqual([
       { path: 'a.ts', what: 'added' },
@@ -129,6 +129,13 @@ describe('splitContract', () => {
 
   it('returns null for a plan heading with no steps', () => {
     expect(split('## Plan: X\nGoal: y')).toBeNull();
+  });
+
+  it('keeps a legacy criterion check apart from its text', () => {
+    const out = split('## Plan: P\n### Step 1: Do\n### Done when\n- [ ] tests pass — check: `cargo test`\n- [ ] docs updated');
+    expect(out?.contract.kind).toBe('plan');
+    if (out?.contract.kind !== 'plan') return;
+    expect(out.contract.doneWhen).toEqual([{ text: 'tests pass', check: 'cargo test' }, { text: 'docs updated', check: '' }]);
   });
 
   it('returns null for a report heading with no steps or done when', () => {
@@ -203,7 +210,7 @@ describe('splitContract', () => {
 });
 
 describe('planFromProposal', () => {
-  it('builds the recorded plan, numbering the steps and formatting the checks', () => {
+  it('builds the recorded plan, numbering the steps and keeping each check apart', () => {
     const plan = planFromProposal({
       title: 'Ship',
       goal: 'Goal',
@@ -225,7 +232,7 @@ describe('planFromProposal', () => {
         { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
         { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
       ],
-      doneWhen: ['tests pass — check: `cargo test`', 'docs updated'],
+      doneWhen: [{ text: 'tests pass', check: 'cargo test' }, { text: 'docs updated', check: '' }],
       risks: ['Risk one']
     });
   });
@@ -265,8 +272,8 @@ describe('reportFromSubmission', () => {
         { number: 2, checked: false, text: 'Docs', detail: '' }
       ],
       doneWhen: [
-        { checked: true, text: 'tests pass', detail: 'cargo test' },
-        { checked: false, text: 'docs updated', detail: '' }
+        { number: 2, checked: false, text: 'docs updated', detail: '' },
+        { number: 1, checked: true, text: 'tests pass', detail: 'cargo test' }
       ],
       changed: [{ path: 'a.ts', what: 'the code' }],
       test: 'Open the UI',
