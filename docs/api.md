@@ -351,14 +351,14 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   that file to disk; nothing is committed. `base` must be the blob id the human read; a stale base
   answers 409. Only tracked regular files inside the project are written; never a symlink or `.git`.
 - `GET /api/projects/{id}/changes` → `{files: [{path, status}]}`. `files` is the tracked files that
-  differ from HEAD, staged or not; `status` is `modified`, `added`, or `deleted`. Untracked files are
-  not listed.
+  differ from HEAD and the untracked files git does not ignore; `status` is `modified`, `added`,
+  `deleted`, or `untracked`.
 - `POST /api/projects/{id}/commit` body `{paths, message}` → `{commit}`. One commit of those files only
   (`git commit --only`) on the human's current branch with their git identity; every path must be a
-  changed tracked file, at most 1000.
+  listed changed file, untracked ones are added first, at most 1000.
 - `POST /api/projects/{id}/restore` body `{path}` → `{}`. Puts one changed tracked file back as HEAD has it,
   on disk and in the index; an added file is only unstaged and stays on disk. 400 when the path is not a
-  changed tracked file.
+  changed tracked file; an untracked file is refused (400).
 - `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
   Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
   these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.

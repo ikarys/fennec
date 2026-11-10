@@ -57,6 +57,7 @@ pub enum ChangeKind {
     Modified,
     Added,
     Deleted,
+    Untracked,
 }
 
 #[derive(Debug)]
@@ -210,6 +211,7 @@ pub fn read_image(
     }
 }
 
+/// The tracked files that differ from HEAD and the untracked files git does not ignore.
 pub fn changes(workdir: &Path) -> Result<Vec<ChangedFile>, String> {
     let output = git::run(
         workdir,
@@ -243,6 +245,31 @@ pub fn changes(workdir: &Path) -> Result<Vec<ChangedFile>, String> {
         }
 
         files.push(ChangedFile { path, status: kind });
+    }
+
+    let untracked = git::run(
+        workdir,
+        &[
+            "-c",
+            "core.quotePath=false",
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
+        None,
+    )?;
+
+    // A trailing slash is a nested repository: adding it would record a gitlink.
+    for path in split_nul(&untracked) {
+        if path.ends_with('/') || RelPath::parse(&path).is_err() || !seen.insert(path.clone()) {
+            continue;
+        }
+
+        files.push(ChangedFile {
+            path,
+            status: ChangeKind::Untracked,
+        });
     }
 
     files.sort_by(|a, b| a.path.cmp(&b.path));
@@ -303,10 +330,26 @@ pub fn commit(
     for path in paths {
         if !changed_paths.contains(path.as_str()) {
             return Err(FileError::Invalid(format!(
-                "not a changed tracked file: {}",
+                "not a changed file: {}",
                 path.as_str()
             )));
         }
+    }
+
+    let untracked: Vec<&str> = paths
+        .iter()
+        .filter(|path| {
+            changed
+                .iter()
+                .any(|file| file.path == path.as_str() && file.status == ChangeKind::Untracked)
+        })
+        .map(|path| path.as_str())
+        .collect();
+
+    if !untracked.is_empty() {
+        let mut add_args: Vec<&str> = vec!["--literal-pathspecs", "add", "--"];
+        add_args.extend(untracked.iter());
+        git::run(workdir, &add_args, None).map_err(|e| FileError::Git(e.to_string()))?;
     }
 
     let mut args: Vec<&str> = vec![
@@ -320,7 +363,15 @@ pub fn commit(
     ];
     args.extend(paths.iter().map(|path| path.as_str()));
 
-    git::run(workdir, &args, None).map_err(|e| FileError::Git(e.to_string()))?;
+    let result = git::run(workdir, &args, None);
+    if let Err(error) = result {
+        if !untracked.is_empty() {
+            let mut reset_args: Vec<&str> = vec!["--literal-pathspecs", "reset", "--quiet", "--"];
+            reset_args.extend(untracked.iter());
+            let _ = git::run(workdir, &reset_args, None);
+        }
+        return Err(FileError::Git(error.to_string()));
+    }
 
     let commit = git::stdout(workdir, &["rev-parse", "HEAD"])
         .ok_or_else(|| FileError::Git("the commit was made but HEAD is unknown".into()))?;
@@ -328,7 +379,7 @@ pub fn commit(
 }
 
 /// Put one changed tracked file back as HEAD has it, on disk and in the index; an
-/// added file is only unstaged and stays on disk.
+/// added file is only unstaged and stays on disk; an untracked file is refused.
 pub fn restore(workdir: &Path, path: &RelPath) -> Result<(), FileError> {
     let changed = changes(workdir).map_err(FileError::Git)?;
     let Some(file) = changed.iter().find(|file| file.path == path.as_str()) else {
@@ -368,6 +419,12 @@ pub fn restore(workdir: &Path, path: &RelPath) -> Result<(), FileError> {
                 None,
             )
             .map_err(|e| FileError::Git(e.to_string()))?;
+        }
+        ChangeKind::Untracked => {
+            return Err(FileError::Invalid(format!(
+                "an untracked file has nothing to restore: {}",
+                path.as_str()
+            )));
         }
     }
 
@@ -783,7 +840,7 @@ mod tests {
 
         match error {
             FileError::Invalid(message) => {
-                assert_eq!(message, "not a changed tracked file: a.txt");
+                assert_eq!(message, "not a changed file: a.txt");
             }
             other => panic!("expected Invalid, got {other:?}"),
         }
@@ -792,7 +849,7 @@ mod tests {
     }
 
     #[test]
-    fn changes_lists_modified_added_and_deleted_tracked_files() {
+    fn changes_lists_tracked_changes_and_untracked_files() {
         let dir = fresh_repo();
         commit_file(&dir, "a.txt", "a1");
         commit_file(&dir, "b.txt", "b1");
@@ -809,7 +866,7 @@ mod tests {
 
         let changed = changes(&dir).unwrap();
         let paths: Vec<&str> = changed.iter().map(|file| file.path.as_str()).collect();
-        assert_eq!(paths, vec!["a.txt", "c.txt", "d.txt"]);
+        assert_eq!(paths, vec!["a.txt", "c.txt", "d.txt", "e.txt"]);
 
         let status = |name: &str| {
             changed
@@ -821,7 +878,74 @@ mod tests {
         assert_eq!(status("a.txt"), Some(ChangeKind::Modified));
         assert_eq!(status("c.txt"), Some(ChangeKind::Deleted));
         assert_eq!(status("d.txt"), Some(ChangeKind::Added));
-        assert_eq!(status("e.txt"), None);
+        assert_eq!(status("e.txt"), Some(ChangeKind::Untracked));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn changes_lists_untracked_files_but_not_ignored_ones() {
+        let dir = fresh_repo();
+        commit_file(&dir, ".gitignore", "ignored.txt\n");
+        commit_file(&dir, "a.txt", "a");
+
+        std::fs::write(dir.join("new.txt"), "new").unwrap();
+        std::fs::write(dir.join("ignored.txt"), "ignored").unwrap();
+
+        let changed = changes(&dir).unwrap();
+        let new = changed.iter().find(|file| file.path == "new.txt").unwrap();
+        assert_eq!(new.status, ChangeKind::Untracked);
+        assert!(changed.iter().all(|file| file.path != "ignored.txt"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn committing_a_new_file_makes_a_commit_that_contains_it() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "a");
+
+        std::fs::write(dir.join("new.txt"), "new").unwrap();
+        let path = RelPath::parse("new.txt").unwrap();
+
+        let commit_id = commit(&dir, &[path], &CommitMessage::parse("add new").unwrap()).unwrap();
+        assert!(!commit_id.is_empty());
+
+        let show = git::stdout(
+            &dir,
+            &[
+                "-c",
+                "core.quotePath=false",
+                "show",
+                "--name-only",
+                "--format=",
+                "HEAD",
+            ],
+        )
+        .unwrap();
+        assert_eq!(show.trim(), "new.txt");
+        assert!(changes(&dir).unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restoring_an_untracked_file_is_refused_and_the_file_stays_on_disk() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "a");
+
+        std::fs::write(dir.join("new.txt"), "new").unwrap();
+        let path = RelPath::parse("new.txt").unwrap();
+
+        let error = restore(&dir, &path).unwrap_err();
+
+        match error {
+            FileError::Invalid(message) => {
+                assert_eq!(message, "an untracked file has nothing to restore: new.txt");
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+        assert_eq!(std::fs::read_to_string(dir.join("new.txt")).unwrap(), "new");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -947,7 +1071,10 @@ mod tests {
         restore(&dir, &path).unwrap();
 
         assert_eq!(std::fs::read_to_string(dir.join("new.txt")).unwrap(), "new");
-        assert!(changes(&dir).unwrap().is_empty());
+        let changed = changes(&dir).unwrap();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0].path, "new.txt");
+        assert_eq!(changed[0].status, ChangeKind::Untracked);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
