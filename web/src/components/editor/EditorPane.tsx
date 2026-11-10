@@ -11,6 +11,7 @@ import { markdownComponents } from '../session/markdownComponents';
 import { CodeEditor } from './CodeEditor';
 import {
   getProjectFile,
+  projectFileRawUrl,
   saveProjectFile,
   type ProjectFileView,
 } from '../../lib/api';
@@ -44,6 +45,7 @@ export function EditorPane({
   const [saved, setSaved] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [imageError, setImageError] = useState(false);
   const timerRef = useRef<number | null>(null);
   const savedTimerRef = useRef<number | null>(null);
   const savingRef = useRef(false);
@@ -84,6 +86,7 @@ export function EditorPane({
     setSaving(false);
     setSaved(false);
     setPaused(false);
+    setImageError(false);
 
     getProjectFile(projectId, path, sessionId)
       .then((data) => {
@@ -261,7 +264,21 @@ export function EditorPane({
         <p className="text-err">{error}</p>
       ) : file ? (
         <>
-          {file.binary ? (
+          {file.image && !(editing && file.editable) ? (
+            <div className="flex min-h-0 grow items-center justify-center overflow-auto rounded-md border border-border bg-raised p-4">
+              {imageError ? (
+                <p className="text-sm text-muted">{t('editorImageUnavailable')}</p>
+              ) : (
+                <img
+                  key={file.blob ?? ''}
+                  src={projectFileRawUrl(projectId, path, sessionId)}
+                  alt={name}
+                  className="max-h-full max-w-full object-contain"
+                  onError={() => setImageError(true)}
+                />
+              )}
+            </div>
+          ) : file.binary ? (
             <p className="text-sm text-muted">{t('filesBinary')}</p>
           ) : file.tooLarge ? (
             <p className="text-sm text-muted">{t('filesTooLarge')}</p>

@@ -1,12 +1,15 @@
 //! The project file explorer's routes (contract: `docs/api.md`): the tree, a file,
-//! the changed tracked files, a file saved to disk, and one commit of the ticked
-//! files. `session` in a reply says whether the session's branch was read, or the
-//! working tree once that branch is gone. `project_files.rs` does the work.
+//! an image's raw bytes, the changed tracked files, a file saved to disk, and one
+//! commit of the ticked files. `session` in a reply says whether the session's
+//! branch was read, or the working tree once that branch is gone.
+//! `project_files.rs` does the work.
 
 use crate::domain::project_file::{CommitMessage, MAX_COMMIT_PATHS, RelPath, SessionBranch};
 use crate::project_files::{self, Version};
 use crate::web::App;
-use crate::web::http::{HttpError, Request, error, require_project, require_session, send_json};
+use crate::web::http::{
+    HttpError, Request, error, require_project, require_session, send_json, send_with,
+};
 use serde_json::{Value, json};
 use std::net::TcpStream;
 use std::path::Path;
@@ -40,6 +43,33 @@ pub fn read(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resul
     let mut body = serde_json::to_value(view).map_err(|e| e.to_string())?;
     body["session"] = json!(matches!(version, Version::Session(_)));
     send_json(stream, 200, &body)
+}
+
+/// `GET /api/projects/{id}/raw?path=…[&session=…]`: an image's bytes, for the editor's `<img>`.
+pub fn raw(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
+    let project = require_project(&app.store()?, id)?;
+    let path_raw = req
+        .query_param("path")
+        .ok_or_else(|| HttpError::new(400, "missing path"))?;
+    let path = RelPath::parse(&path_raw).map_err(|e| HttpError::new(400, e))?;
+    let workdir = Path::new(&project.workdir);
+    let version = project_files::resolve(workdir, version(app, req, id)?);
+
+    let (bytes, mime) = match project_files::read_image(workdir, &version, &path) {
+        Ok(result) => result,
+        Err(file_error) => return error(stream, file_error.status(), &file_error.message()),
+    };
+
+    send_with(
+        stream,
+        200,
+        mime,
+        &[(
+            "Content-Security-Policy",
+            "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        )],
+        &bytes,
+    )
 }
 
 /// `POST /api/projects/{id}/file`: the human's save writes the file to disk.

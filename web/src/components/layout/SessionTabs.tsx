@@ -4,7 +4,7 @@ import { useT } from '../../i18n';
 import type { SessionState } from '../../lib/api';
 import type { PageId } from '../../lib/route';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { CloseIcon, FolderIcon, PlusIcon } from '../ui/Icons';
+import { CloseIcon, EditIcon, FolderIcon, PlusIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Menu, MenuItem, MenuLabel } from '../ui/Menu';
@@ -15,7 +15,8 @@ export const CHAT_PROJECT_ID = 'chat';
 
 export type TabInfo =
   | { id: string; title: string; project: string; state: SessionState; kind: 'session' }
-  | { id: string; title: string; kind: 'page'; page: PageId };
+  | { id: string; title: string; kind: 'page'; page: PageId }
+  | { id: string; title: string; kind: 'editor'; project: string };
 
 interface SessionTabsProps {
   tabs: TabInfo[];
@@ -107,8 +108,10 @@ export function SessionTabs({
               {selected ? <span aria-hidden className="absolute inset-x-2 top-0 h-0.5 rounded-b bg-accent" /> : null}
               {tab.kind === 'session' ? (
                 <SessionStateIcon state={tab.state} className={selected ? 'h-3.5 w-3.5 text-accent' : 'h-3.5 w-3.5'} />
-              ) : (
+              ) : tab.kind === 'page' ? (
                 <PageIcon page={tab.page} className={selected ? 'h-3.5 w-3.5 text-accent' : 'h-3.5 w-3.5'} />
+              ) : (
+                <EditIcon className={selected ? 'h-3.5 w-3.5 text-accent' : 'h-3.5 w-3.5'} />
               )}
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium">
                 {tab.title}

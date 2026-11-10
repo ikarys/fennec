@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ACTIVE_TAB_KEY, TABS_KEY, loadActiveTab, loadTabs } from '../lib/route';
+import { ACTIVE_TAB_KEY, TABS_KEY, isRouteTab, loadActiveTab, loadTabs } from '../lib/route';
 
 export function useTabs() {
   const [tabs, setTabs] = useState<string[]>(() => loadTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>(() => loadActiveTab());
 
   useEffect(() => {
-    // Only session tabs are persisted: page tabs are re-created by the
-    // route-sync effect from the URL on load, so a one-time visit to a page
-    // must not leave a permanent tab in the bar.
+    // Only session tabs are persisted: route tabs (pages, editors) are re-created
+    // by the route-sync effect from the URL on load, so a one-time visit to a
+    // page or editor must not leave a permanent tab in the bar.
     try {
-      localStorage.setItem(TABS_KEY, JSON.stringify(tabs.filter((id) => !id.startsWith('page:'))));
+      localStorage.setItem(TABS_KEY, JSON.stringify(tabs.filter((id) => !isRouteTab(id))));
     } catch {
       // Ignore storage errors.
     }
