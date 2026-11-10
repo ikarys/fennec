@@ -15,3 +15,4 @@ web/dist/
 
 # The user guide, built into the site by `just site` and the Pages workflow
 site/docs/
+__pycache__/

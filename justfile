@@ -55,6 +55,11 @@ dev:
     # the server's origin guard does not know (5174+ → "forbidden origin").
     cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT" --strictPort
 
+# Measure fennec on a scripted session workload: `just perf` (fake model) or `just perf real` (the model at FENNEC_LLM_URL, default http://127.0.0.1:8000/v1)
+perf mode="fake":
+    cargo build --release -p fennec
+    python3 scripts/perf/run.py --mode {{mode}}
+
 # Everything CI checks: the conventions (web, lint) and the tests
 check: web lint test test-web licenses
 

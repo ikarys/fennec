@@ -23,7 +23,7 @@ Models used appear in each commit as `Assisted-by: <tool>:<model>` trailers: Cla
 | Dependencies | Human review of the commit body: Rule 5 requires SQLite and no new dependency without a stated reason |
 | Dependency licences | `just licenses` |
 | Commit format | Conventional Commits, enforced by the git hook from `just setup` |
-| Resources | Measured before and after changes that could cost RAM/CPU (no automated benchmark) |
+| Resources | Measured before and after changes that could cost RAM/CPU with `just perf`; results tracked in [`docs/perf/`](docs/perf/latest.md) |
 
 ## Continuous integration
 
@@ -48,3 +48,5 @@ Blind tests will be committed under `docs/blind-tests/`. A blind test gives an a
 Run these commands from the repository root: `just setup`, `just check`, and `just test`. `just setup` installs the git hooks once per clone.
 
 `just check` runs `web` (the UI build), `lint` (`cargo fmt --check`, `cargo clippy -D warnings`, and `web/scripts/check-ui.mjs`), `test` (`cargo test`), `test-web` (Vitest), and `licenses`. `just test` runs all Rust tests, including the sandbox e2e tests, in a private TMPDIR; the sandbox e2e tests need a working bwrap, and on Ubuntu 24.04 AppArmor may block it, with the Settings page showing the command to allow it.
+
+`just perf` builds the release binary and runs a scripted workload against it. The workload creates a project, runs several sessions with real tool calls (read, write, command), a compaction and a workflow, then times the pages. It runs in a temporary data directory and a throwaway git repository, so your own data is never touched. The model is a local fake with a fixed latency, so runs on the same machine compare across commits. `just perf real` runs the same workload against the model at `FENNEC_LLM_URL` (default `http://127.0.0.1:8000/v1`). The terminal table gives the delta against the previous run on the same machine and flags anything more than 20 % worse. Each run is appended to `docs/perf/history.jsonl`, and `docs/perf/latest.md` holds the last one.
