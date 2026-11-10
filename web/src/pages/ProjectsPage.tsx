@@ -5,6 +5,7 @@ import { useT } from '../i18n';
 import { FolderIcon, SearchIcon } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Section } from '../components/ui/Section';
 import { WorktreeAlert } from '../components/project/WorktreeAlert';
 import { TextInput } from '../components/ui/Field';
 import { Segmented } from '../components/ui/Segmented';
@@ -80,37 +81,6 @@ export function ProjectsPage({
         />
         <WorktreeAlert />
 
-        <div className="flex items-center gap-3">
-          <div className="relative min-w-0 grow">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
-            <TextInput
-              className="pl-8"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') setQuery('');
-              }}
-              placeholder={t('homeFilterProjects')}
-              aria-label={t('homeFilterProjects')}
-            />
-          </div>
-          <Segmented<'tiles' | 'rows'>
-            label={t('homeDisplayProjects')}
-            segments={[
-              { value: 'tiles', label: t('homeTiles') },
-              { value: 'rows', label: t('homeList') }
-            ]}
-            value={view}
-            onChange={(value) => {
-              setView(value);
-              // A blocked storage only loses the choice on reload.
-              try {
-                localStorage.setItem('fennec.home.view', value);
-              } catch {}
-            }}
-          />
-        </div>
-
         {selected.size > 0 && (
           <div className="sticky top-0 z-10 flex items-center gap-3 rounded-md border border-border bg-raised px-3 py-2">
             {t('homeSelectedSessions', { count: selected.size })}
@@ -123,43 +93,79 @@ export function ProjectsPage({
           </div>
         )}
 
-        {error && <p className="m-0 text-err">{error}</p>}
-
-        {loading && projects.length === 0 && <div className="text-sm text-muted">{t('loading')}</div>}
-
-        {!loading && !error && regularProjects.length === 0 && (
-          <p className="m-0 py-10 text-center text-muted">
-            {t('homeNoProjects')}
-          </p>
-        )}
-
-        {needle && regularProjects.length > 0 && filteredProjects.length === 0 && (
-          <p className="m-0 py-6 text-center text-sm text-muted">{t('homeNoMatchingProjects', { query })}</p>
-        )}
-
-        {view === 'tiles' ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => (
-              <ProjectTile key={project.id} project={project} onNewSession={onNewSession} onToggleFavorite={onToggleFavorite} />
-            ))}
-          </div>
-        ) : (
-          // The server lists favourites first, then the most recently active: the first one opens unfolded.
-          filteredProjects.map((project, index) => (
-            <ProjectSection
-              key={project.id}
-              project={project}
-              defaultOpen={index === 0}
-              onNewSession={onNewSession}
-              onOpenSession={onOpenSession}
-              onToggleFavorite={onToggleFavorite}
-              selected={selected}
-              selecting={selected.size > 0}
-              onToggle={toggle}
-              onDelete={(id) => remove([id])}
+        <Section
+          Icon={FolderIcon}
+          title={t('homeProjectsTitle')}
+          description={t('homeProjectsCount', { count: regularProjects.length })}
+          actions={
+            <Segmented<'tiles' | 'rows'>
+              label={t('homeDisplayProjects')}
+              segments={[
+                { value: 'tiles', label: t('homeTiles') },
+                { value: 'rows', label: t('homeList') }
+              ]}
+              value={view}
+              onChange={(value) => {
+                setView(value);
+                // A blocked storage only loses the choice on reload.
+                try {
+                  localStorage.setItem('fennec.home.view', value);
+                } catch {}
+              }}
             />
-          ))
-        )}
+          }
+        >
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+            <TextInput
+              className="pl-8"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setQuery('');
+              }}
+              placeholder={t('homeFilterProjects')}
+              aria-label={t('homeFilterProjects')}
+            />
+          </div>
+          {error && <p className="m-0 text-err">{error}</p>}
+
+          {loading && projects.length === 0 && <div className="text-sm text-muted">{t('loading')}</div>}
+
+          {!loading && !error && regularProjects.length === 0 && (
+            <p className="m-0 py-10 text-center text-muted">
+              {t('homeNoProjects')}
+            </p>
+          )}
+
+          {needle && regularProjects.length > 0 && filteredProjects.length === 0 && (
+            <p className="m-0 py-6 text-center text-sm text-muted">{t('homeNoMatchingProjects', { query })}</p>
+          )}
+
+          {view === 'tiles' ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredProjects.map((project) => (
+                <ProjectTile key={project.id} project={project} onNewSession={onNewSession} onToggleFavorite={onToggleFavorite} />
+              ))}
+            </div>
+          ) : (
+            // The server lists favourites first, then the most recently active: the first one opens unfolded.
+            filteredProjects.map((project, index) => (
+              <ProjectSection
+                key={project.id}
+                project={project}
+                defaultOpen={index === 0}
+                onNewSession={onNewSession}
+                onOpenSession={onOpenSession}
+                onToggleFavorite={onToggleFavorite}
+                selected={selected}
+                selecting={selected.size > 0}
+                onToggle={toggle}
+                onDelete={(id) => remove([id])}
+              />
+            ))
+          )}
+        </Section>
       </div>
 
       {dialog}
