@@ -7,6 +7,10 @@
 export type Lang = 'en' | 'fr';
 
 export const en = {
+  offlineTitle: 'fennec lost the trail of its server',
+  offlineBody: 'The connection to the fennec server is down. Your work is safe on the server: this page comes back by itself as soon as it answers again.',
+  offlineRetrying: 'Reconnecting…',
+  offlineReload: 'Reload the page',
   loading: 'Loading…',
   integrateInto: 'Integrate into {branch}',
   displayTitle: 'Display',
@@ -1519,6 +1523,10 @@ export const en = {
 export type MsgKey = keyof typeof en;
 
 export const fr: Record<MsgKey, string> = {
+  offlineTitle: 'fennec a perdu la piste de son serveur',
+  offlineBody: 'La connexion au serveur fennec est coupée. Votre travail est en sécurité côté serveur : cette page revient d\'elle-même dès qu\'il répond à nouveau.',
+  offlineRetrying: 'Reconnexion…',
+  offlineReload: 'Recharger la page',
   canvasMenu: 'Canvas',
   canvasEmpty: 'Aucun artefact canvas',
   canvasPin: 'Épingler au canvas',

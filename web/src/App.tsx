@@ -31,6 +31,7 @@ import { useProjects } from './hooks/useProjects';
 import { useTabs } from './hooks/useTabs';
 import { usePaneTabs } from './hooks/usePaneTabs';
 import { useTurnNotices } from './hooks/useTurnNotices';
+import { OfflineNotice } from './components/layout/OfflineNotice';
 import { PluginsVersionContext } from './hooks/usePluginsVersion';
 import { StatusBar } from './components/layout/StatusBar';
 
@@ -198,7 +199,7 @@ export default function App() {
     },
     [navigate, openTab]
   );
-  const { items: attention, pluginsVersion } = useTurnNotices(openSession);
+  const { items: attention, pluginsVersion, online } = useTurnNotices(openSession);
 
   const closeTab = useCallback(
     (tabId: string) => {
@@ -425,6 +426,7 @@ export default function App() {
       {/* h-full: the html/body/#root chain is 100%, which no page-level
           scaling can push past the window. */}
       <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
+        {!online && <OfflineNotice />}
         <TopBar
           tabs={tabInfos}
           // The highlighted tab follows the route: on home or a project page none is.
