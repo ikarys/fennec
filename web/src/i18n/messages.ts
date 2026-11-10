@@ -429,6 +429,9 @@ export const en = {
   compactionHint: '0 disables automatic compaction.',
   effortLabel: 'Reasoning effort',
   effortAuto: 'Auto (no effort)',
+  effortAutoShort: 'auto',
+  sessionEffort: 'Reasoning effort',
+  sessionEffortTitle: "Reasoning effort for this session, over the agent's and the model's. Changing it can make a local server re-read the whole context.",
   priceHeader: 'Price ($ per million tokens, for the Insight estimate)',
   billedLabel: 'Billed',
   billedHint: 'A billed model counts toward the project budgets. Off by default for a local model: its price is only an estimate, shown everywhere but never blocking a turn.',
@@ -1227,6 +1230,7 @@ export const en = {
   // hooks/useModeAndModel.ts
   modeChangeError: 'Error while changing the mode',
   modelChangeError: 'Error while changing the model',
+  effortChangeError: 'Error while changing the effort',
   // components/workflow/useWorkflowEditor.ts
   workflowSaveError: 'Save failed',
   // components/ui/Section.tsx
@@ -2003,6 +2007,9 @@ export const fr: Record<MsgKey, string> = {
   compactionHint: '0 désactive la compaction automatique.',
   effortLabel: 'Effort de réflexion',
   effortAuto: 'Auto (sans effort)',
+  effortAutoShort: 'auto',
+  sessionEffort: 'Effort de réflexion',
+  sessionEffortTitle: "Effort de réflexion de cette session, prioritaire sur celui de l'agent et du modèle. Le changer peut faire relire tout le contexte à un serveur local.",
   priceHeader: "Prix ($ par million de tokens, pour l'estimation d'Insight)",
   billedLabel: 'Facturé',
   billedHint: "Un modèle facturé compte dans les budgets des projets. Désactivé par défaut pour un modèle local : son prix n'est qu'une estimation, affichée partout mais qui ne bloque jamais un tour.",
@@ -2805,6 +2812,7 @@ export const fr: Record<MsgKey, string> = {
   // hooks/useModeAndModel.ts
   modeChangeError: 'Erreur lors du changement de mode',
   modelChangeError: 'Erreur lors du changement de modèle',
+  effortChangeError: "Erreur lors du changement d'effort",
   // components/workflow/useWorkflowEditor.ts
   workflowSaveError: 'Échec de l’enregistrement',
   // components/ui/Section.tsx

@@ -29,6 +29,7 @@ with camelCase fields.
 | `turn.snapshot` | `{cachedSystemPrompt, cachedTools?}`: the session's system prompt and tool definitions, frozen at its first turn (a session from before `cachedTools` gets a second snapshot that freezes them) |
 | `mode.changed` | `{mode, auto, reason?}`: the human switched the session's agent; it applies from the next turn |
 | `model.changed` | `{model: {provider, model}}`: the human chose the session's model (fennec's own); it applies from the next turn, and a workflow's child sessions inherit it |
+| `effort.changed` | `{effort}`: the human chose the session's reasoning effort (fennec's own), `null` for auto; it applies from the next turn, wins over the agent's and the model's, and is ignored while the session's model does not accept it |
 | `session.rewound` | `{messageId}`: fennec's replay cut; the model's view drops that message and everything after it, the log keeps them |
 | `session.name_generated` | `{name}`: the model-generated session title; the server renames the session and wakes the event stream |
 | `workflow.started` | `{runId, workflow, task, stepByStep}`: `workflow` is the whole definition, frozen for the run |
@@ -693,9 +694,10 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `consumers` (null before any call was broken down) has the shape of `/context`'s `composition`: each call's input
   tokens spread pro rata of its prompt's text over its parts (ledger breakdown keys `<kind>/<label>`), summed over
   the period; indicative.
-- `POST /api/sessions` `{projectId, prompt, mode?, model?, attachments?, mcpDisabled?}` → `{id}`;
+- `POST /api/sessions` `{projectId, prompt, mode?, model?, effort?, attachments?, mcpDisabled?}` → `{id}`;
   `model` is `{provider, model}` (400 if empty or the provider is unknown),
-  recorded as `model.changed` before the first turn; `mcpDisabled` is an array
+  recorded as `model.changed` before the first turn; `effort` is a reasoning effort
+  (400 if unknown), recorded as `effort.changed` before the first turn; `mcpDisabled` is an array
   of MCP server names recorded as `mcp.disabled` before the first turn;
   the turn starts at once; `mode` is optional, validated against the
   project's agents before the session is created (400 if unknown) and applied
@@ -760,6 +762,11 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   session's `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if
   the model is empty or the provider unknown; 409 while a workflow runs;
   appends `model.changed`
+- `POST /api/sessions/{id}/effort` `{effort}` → 200 `{model}` (the session's
+  `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if the effort
+  is unknown; 409 while a workflow runs; appends `effort.changed`; the
+  session's model JSON and the model choices carry `acceptedEfforts`
+  (empty = unknown), and the session's model JSON carries `effort`
 - `GET /api/sessions/{id}/mcp` → `{servers, totalTokens}`: each server with
   `name, visible, disabled, active, tokens, enabledToolTokens, toolCount, tools` (each tool with
   `name, enabled, tokens`); `active` is the session's effective state (the

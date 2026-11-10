@@ -55,6 +55,7 @@ impl<'a> Harness<'a> {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            session_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,

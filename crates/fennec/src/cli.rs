@@ -142,6 +142,7 @@ fn with_turn(
     let mut options = turn_build::Options {
         notifier: None,
         model_choice: None,
+        effort_choice: None,
         autonomous: false,
         delegated: false,
         on_event: &mut on_event,

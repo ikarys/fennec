@@ -68,6 +68,8 @@ pub struct Turn<'a> {
     pub compact_at: f64,
     /// `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// The effort the human chose for the session; wins over the agent's.
+    pub session_effort: Option<ReasoningEffort>,
     /// The human is away (the ideas queue's night mode): `ask_user` and
     /// `propose_criteria` answer themselves instead of pausing the turn.
     pub autonomous: bool,
@@ -222,14 +224,18 @@ pub fn compact_session(turn: &mut Turn) -> Result<DoneReason, String> {
         if !open_calls::open_calls(&events).is_empty() {
             return Err("answer the pending question or send a message first".into());
         }
-        // The summary round runs as the session's agent, so it uses its effort too.
+        // The summary round runs as the session's agent; the session's effort
+        // wins over the agent's.
         let agent_effort = resolve(turn.agents, &events).and_then(|agent| agent.reasoning_effort);
         let (system_prompt, tool_defs) = round_prompt_parts(turn)?;
         let prompt = RoundPrompt {
             system_prompt: &system_prompt,
             tools: &tool_defs,
             max_tokens: turn.max_tokens,
-            reasoning_effort: agent_effort.or(turn.reasoning_effort),
+            reasoning_effort: turn
+                .session_effort
+                .or(agent_effort)
+                .or(turn.reasoning_effort),
         };
         match compaction::compact(turn, &prompt)? {
             Compacted::Done | Compacted::Skipped => {
@@ -346,7 +352,10 @@ pub(super) fn run_top_level_agent_loop(
             system_prompt: &system_prompt,
             tools: &tool_defs,
             max_tokens,
-            reasoning_effort: agent.reasoning_effort.or(turn.reasoning_effort),
+            reasoning_effort: turn
+                .session_effort
+                .or(agent.reasoning_effort)
+                .or(turn.reasoning_effort),
         };
         if !compacted_last_round
             && should_compact(
@@ -570,6 +579,7 @@ mod tests {
                 context_window: 1000,
                 compact_at: 0.0,
                 reasoning_effort: None,
+                session_effort: None,
                 autonomous: false,
                 lang: crate::domain::lang::Lang::Fr,
                 preflight_sent_back: false,
@@ -608,6 +618,7 @@ mod tests {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            session_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
@@ -944,6 +955,7 @@ mod tests {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            session_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
@@ -1910,6 +1922,7 @@ mod tests {
             context_window: 1000,
             compact_at: 0.0,
             reasoning_effort: None,
+            session_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,

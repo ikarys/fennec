@@ -25,6 +25,8 @@ export interface ModelForm {
   contextWindow: string;
   compactionThreshold: string;
   reasoningEffort: string;
+  /** The accepted efforts, comma-joined; '' when never probed. */
+  reasoningEfforts: string;
   priceInput: string;
   priceCached: string;
   priceOutput: string;
@@ -163,6 +165,7 @@ export const emptyModelForm: ModelForm = {
   contextWindow: '',
   compactionThreshold: '',
   reasoningEffort: '',
+  reasoningEfforts: '',
   priceInput: '',
   priceCached: '',
   priceOutput: ''
@@ -250,6 +253,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
         compactionThreshold:
           prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
         reasoningEffort: prefs.reasoningEffort ?? '',
+        reasoningEfforts: (prefs.reasoningEfforts ?? []).join(','),
         priceInput: prefs.price ? String(prefs.price.inputPerM) : '',
         priceCached: prefs.price ? String(prefs.price.cachedPerM) : '',
         priceOutput: prefs.price ? String(prefs.price.outputPerM) : ''
@@ -328,6 +332,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
       if (contextWindow != null) prefs.contextWindow = contextWindow;
       if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
       if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
+      if (entry.reasoningEfforts !== '') prefs.reasoningEfforts = entry.reasoningEfforts.split(',') as ReasoningEffort[];
       if (entry.priceInput !== '' || entry.priceCached !== '' || entry.priceOutput !== '') {
         prefs.price = {
           inputPerM: priceInput ?? 0,

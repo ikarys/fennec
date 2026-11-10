@@ -34,6 +34,7 @@ function listing(provider: string, modelIds: string[]): ProviderListing {
     models: modelIds.map((id) => ({
       id,
       contextWindow: null,
+      acceptedEfforts: [],
       resolved: {
         maxTokens: resolved(0),
         contextWindow: resolved(0),
@@ -246,6 +247,7 @@ describe('to form', () => {
       contextWindow: '',
       compactionThreshold: '50',
       reasoningEffort: '',
+      reasoningEfforts: '',
       priceInput: '1',
       priceCached: '2',
       priceOutput: '3',
@@ -257,6 +259,21 @@ describe('to form', () => {
     const formValue = toForm(preferences(), listings);
 
     expect(formValue.models['p/model']).toEqual(emptyModelForm);
+  });
+
+  it('round-trips probed reasoning efforts as a comma-joined string', () => {
+    const listings = [listing('p', ['model'])];
+    const prefs = preferences({ providers: [provider('p')] });
+    const formValue = form(prefs, listings, {
+      models: { 'p/model': modelForm({ reasoningEfforts: 'low,high' }) },
+    });
+    const built = buildPreferences(formValue, response(prefs, listings));
+    const builtModel = built.providers.find((item) => item.id === 'p')?.models['model'];
+
+    expect(builtModel?.reasoningEfforts).toEqual(['low', 'high']);
+
+    const read = toForm(built, listings);
+    expect(read.models['p/model']?.reasoningEfforts).toBe('low,high');
   });
 
   it('applies defaults for missing optional preferences', () => {

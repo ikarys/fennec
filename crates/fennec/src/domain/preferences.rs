@@ -452,6 +452,7 @@ mod tests {
                     context_window: Some(2048),
                     compaction_threshold: Some(0.5),
                     reasoning_effort: Some(ReasoningEffort::High),
+                    reasoning_efforts: Vec::new(),
                 },
             )],
             ..Default::default()
@@ -500,6 +501,7 @@ mod tests {
             "a".into(),
             ModelPrefs {
                 reasoning_effort: Some(ReasoningEffort::Minimal),
+                reasoning_efforts: Vec::new(),
                 ..Default::default()
             },
         );
@@ -538,6 +540,7 @@ mod tests {
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
                 reasoning_effort: None,
+                reasoning_efforts: Vec::new(),
             },
         ));
 
@@ -596,6 +599,7 @@ mod tests {
                 context_window: Some(4096),
                 compaction_threshold: Some(0.75),
                 reasoning_effort: None,
+                reasoning_efforts: Vec::new(),
             },
         );
         let chosen = ModelRef {
@@ -827,6 +831,7 @@ mod tests {
                 context_window: Some(2048),
                 compaction_threshold: Some(0.25),
                 reasoning_effort: Some(ReasoningEffort::XHigh),
+                reasoning_efforts: Vec::new(),
             },
         );
         let mut p = Preferences {
@@ -956,6 +961,7 @@ mod tests {
             "new".into(),
             ModelPrefs {
                 max_tokens: Some(2),
+                reasoning_efforts: Vec::new(),
                 ..Default::default()
             },
         );
