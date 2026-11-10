@@ -4,6 +4,7 @@ import { useT } from '../../i18n';
 import { getVersion, type AttentionItem } from '../../lib/api';
 import { ChatIcon, SearchIcon, SplitIcon } from '../ui/Icons';
 import { buttonClass } from '../ui/Button';
+import { Divider } from '../ui/Divider';
 import { AttentionBell } from './AttentionBell';
 import { PageNav, type PageId } from './PageNav';
 import { CHAT_PROJECT_ID, SessionTabs, type TabInfo } from './SessionTabs';
@@ -31,7 +32,6 @@ function useVersionLabel(): string | null {
   return build ? `${version} · #${build.split('.')[0]}` : version;
 }
 
-const Divider = () => <span aria-hidden className="mx-1 h-5 w-px bg-border" />;
 
 interface TopBarProps {
   tabs: TabInfo[];
@@ -82,7 +82,7 @@ export function TopBar({
         {versionLabel ? <span className="font-mono text-xs font-normal text-faint">{versionLabel}</span> : null}
       </a>
 
-      <span className="flex items-center"><Divider /></span>
+      <Divider />
 
       <SessionTabs
         tabs={tabs}
