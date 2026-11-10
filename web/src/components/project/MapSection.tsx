@@ -65,6 +65,7 @@ export function MapSection({
 
   return (
     <Section
+      Icon={LayersIcon}
       title={t('moduleMapTitle')}
       description={t('moduleMapDescription')}
       actions={

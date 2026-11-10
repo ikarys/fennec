@@ -6,9 +6,9 @@ import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '../ui/Badge';
-import { Card } from '../ui/Card';
-import { SectionLabel } from '../ui/SectionLabel';
+import { Section } from '../ui/Section';
 import { Select } from '../ui/Field';
+import { DecisionIcon, FileIcon } from '../ui/Icons';
 import { markdownComponents } from '../session/markdownComponents';
 import { getProjectDocs, type Adr, type DocFile } from '../../lib/api';
 import { useT } from '../../i18n';
@@ -99,12 +99,14 @@ export function DocSection({ projectId }: { projectId: string }) {
       ) : error ? (
         <p className="text-err">{error}</p>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           {file ? (
-            <>
-              <div className="flex items-center gap-2">
-                <SectionLabel>{t('documentation')}</SectionLabel>
-                {files.length > 1 ? (
+            <Section
+              Icon={FileIcon}
+              title={t('documentation')}
+              flush
+              actions={
+                files.length > 1 ? (
                   <Select
                     aria-label={t('docFileAria')}
                     value={file.path}
@@ -117,39 +119,41 @@ export function DocSection({ projectId }: { projectId: string }) {
                       </option>
                     ))}
                   </Select>
-                ) : null}
-              </div>
-              <Card className="mt-3">
-                <div className="px-4 py-3 text-sm">
-                  <p className="text-xs text-muted">{file.path}</p>
-                  <div className="mt-2">
-                    <ReactMarkdown
-                      remarkPlugins={REMARK_PLUGINS}
-                      components={markdownComponents}
-                    >
-                      {file.content}
-                    </ReactMarkdown>
-                  </div>
+                ) : null
+              }
+            >
+              <div className="px-4 py-3 text-sm">
+                <p className="text-xs text-muted">{file.path}</p>
+                <div className="mt-2">
+                  <ReactMarkdown
+                    remarkPlugins={REMARK_PLUGINS}
+                    components={markdownComponents}
+                  >
+                    {file.content}
+                  </ReactMarkdown>
                 </div>
-              </Card>
-            </>
+              </div>
+            </Section>
           ) : (
             <p className="text-xs text-muted">{t('noDocFiles')}</p>
           )}
 
-          <div className="mt-6">
-            <SectionLabel>ADR ({adrs.length})</SectionLabel>
+          <Section
+            Icon={DecisionIcon}
+            title={`ADR (${adrs.length})`}
+            flush
+          >
             {adrs.length === 0 ? (
               <p className="mt-3 text-xs text-muted">{t('noAdrs')}</p>
             ) : (
-              <Card className="mt-3">
+              <>
                 {adrs.map((adr, index) => (
                   <AdrRow key={adr.file} adr={adr} first={index === 0} />
                 ))}
-              </Card>
+              </>
             )}
-          </div>
-        </>
+          </Section>
+        </div>
       )}
     </section>
   );

@@ -11,6 +11,7 @@ import {
   DecisionIcon,
   EyeIcon,
   FileIcon,
+  InsightIcon,
   ProjectIcon,
   ReviewIcon,
 } from '../ui/Icons';
@@ -44,6 +45,7 @@ export function IndicatorsSection({ projectId }: { projectId: string }) {
 
   return (
     <Section
+      Icon={InsightIcon}
       title={t('indicatorsTitle')}
       description={t('indicatorsHint')}
       actions={

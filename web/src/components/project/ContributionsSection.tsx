@@ -3,11 +3,9 @@ import { useEffect, useState } from 'react';
 import { adoptContribution, getContributions, type Contribution } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
-import { ReviewIcon } from '../ui/Icons';
+import { CommitIcon, ReviewIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
-import { TableHeader } from '../ui/TableHeader';
 
 export function ContributionsSection({
   projectId,
@@ -61,62 +59,55 @@ export function ContributionsSection({
   };
 
   return (
-    <Section title={t('contributionsTitle')} description={t('contributionsDescription')} flush>
+    <Section Icon={CommitIcon} title={t('contributionsTitle')} description={t('contributionsDescription')} flush>
       {loading ? (
-        <p className='text-muted'>{t('loading')}</p>
+        <p className='px-4 py-3 text-xs text-muted'>{t('loading')}</p>
       ) : error ? (
-        <p className='text-err'>{error}</p>
+        <p className='px-4 py-3 text-xs text-err'>{error}</p>
       ) : contributions.length === 0 ? (
-        <p className='py-3 text-xs text-muted'>{t('contributionsEmpty')}</p>
+        <p className='px-4 py-3 text-xs text-muted'>{t('contributionsEmpty')}</p>
       ) : (
-        <Card className='overflow-hidden'>
-          <TableHeader>
-            <span className='min-w-0 grow'>{t('contributionsBranchCol')}</span>
-            <span className='w-24 shrink-0 text-right'>{t('contributionsAheadCol')}</span>
-            <span className='w-10 shrink-0' />
-          </TableHeader>
-          <ul className='divide-y divide-border'>
-            {contributions.map((c) => (
-              <li
-                key={c.branch}
-                onClick={() => {
-                  if (busyBranch) return;
-                  void review(c.branch);
-                }}
-                className={`group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 ${
-                  busyBranch === c.branch ? 'bg-accent-soft before:opacity-100' : 'before:opacity-0'
-                }`}
-              >
-                <span className='min-w-0 grow'>
-                  <span className='block truncate font-mono text-sm text-text group-hover:text-accent-strong' title={c.branch}>
-                    {c.branch}
-                  </span>
-                  <span className='block truncate text-xs text-muted'>{c.subject}</span>
+        <ul className='divide-y divide-border'>
+          {contributions.map((c) => (
+            <li
+              key={c.branch}
+              onClick={() => {
+                if (busyBranch) return;
+                void review(c.branch);
+              }}
+              className={`group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 ${
+                busyBranch === c.branch ? 'bg-accent-soft before:opacity-100' : 'before:opacity-0'
+              }`}
+            >
+              <span className='min-w-0 grow'>
+                <span className='block truncate font-mono text-sm text-text group-hover:text-accent-strong' title={c.branch}>
+                  {c.branch}
                 </span>
-                <span className='flex w-24 shrink-0 items-center justify-end'>
-                  <Badge tone='info'>{t('contributionsAhead', { count: c.ahead })}</Badge>
-                </span>
-                <span className='flex w-10 shrink-0 items-center justify-end'>
-                  <Button
-                    variant='soft'
-                    size='sm'
-                    iconOnly
-                    title={t('contributionsReview', { branch: c.branch })}
-                    aria-label={t('contributionsReview', { branch: c.branch })}
-                    disabled={busyBranch !== null}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (busyBranch) return;
-                      void review(c.branch);
-                    }}
-                  >
-                    <ReviewIcon className='h-3.5 w-3.5' />
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
+                <span className='block truncate text-xs text-muted'>{c.subject}</span>
+              </span>
+              <span className='flex w-24 shrink-0 items-center justify-end'>
+                <Badge tone='info'>{t('contributionsAhead', { count: c.ahead })}</Badge>
+              </span>
+              <span className='flex w-10 shrink-0 items-center justify-end'>
+                <Button
+                  variant='soft'
+                  size='sm'
+                  iconOnly
+                  title={t('contributionsReview', { branch: c.branch })}
+                  aria-label={t('contributionsReview', { branch: c.branch })}
+                  disabled={busyBranch !== null}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (busyBranch) return;
+                    void review(c.branch);
+                  }}
+                >
+                  <ReviewIcon className='h-3.5 w-3.5' />
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
       {reviewError ? <p className='text-xs text-err'>{reviewError}</p> : null}
     </Section>

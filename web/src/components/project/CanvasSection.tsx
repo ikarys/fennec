@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { TrashIcon } from '../ui/Icons';
+import { Section } from '../ui/Section';
+import { TrashIcon, WandIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { CanvasPane } from '../canvas/CanvasPane';
 import { deleteCanvas, listProjectCanvas, type CanvasArtifact } from '../../lib/api/canvas';
@@ -51,7 +51,7 @@ export function CanvasSection({ projectId }: { projectId: string }) {
 
   return (
     <section>
-      <Card>
+      <Section Icon={WandIcon} title={t('canvasLibraryTab')} flush>
         <div className="flex items-center gap-2 border-b border-border bg-raised px-4 py-2 text-xs text-muted">
           <span className="font-medium text-text">{t('canvasLibraryTitle')}</span>
           <Badge tone="neutral">{artifacts?.length ?? 0}</Badge>
@@ -108,7 +108,7 @@ export function CanvasSection({ projectId }: { projectId: string }) {
           </ul>
         )}
         {deleteError ? <div className="border-t border-border px-4 py-2 text-xs text-err">{deleteError}</div> : null}
-      </Card>
+      </Section>
 
       {openArtifactId != null ? (
         <CanvasPane

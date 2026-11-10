@@ -5,7 +5,6 @@ import type { MsgKey } from '../../i18n/messages';
 import { getProjectRisks, type RiskSignal, type RiskZone } from '../../lib/api/risks';
 import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
@@ -88,6 +87,7 @@ export function RiskSection({
       </div>
       {error ? <div className="px-4 pb-2 text-err text-xs">{error}</div> : null}
       <Section
+        Icon={AlertIcon}
         title={t('riskZones')}
         flush
         description={t('riskZonesDescription')}
@@ -121,7 +121,7 @@ export function RiskSection({
       >
         {data ? (
           data.modules.length > 0 ? (
-            <Card className="overflow-hidden">
+            <>
               <TableHeader>
                 <span className="w-3.5 shrink-0" />
                 <span className="min-w-0 grow">{t('moduleCol')}</span>
@@ -179,7 +179,7 @@ export function RiskSection({
                   ))}
                 </details>
               ))}
-            </Card>
+            </>
           ) : (
             <div className="px-4 py-3 text-sm text-muted">{t('noRiskZones')}</div>
           )
