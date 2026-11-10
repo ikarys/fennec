@@ -1,5 +1,6 @@
 # Layers point inward: adapters -> agent -> domain (see AGENTS.md "Layout").
 # Checked on the lines an integration adds; a violation must be accepted by the human.
+# fennec's own check (architecture.rs) reads production code only: a test may wire an adapter in.
 # The domain may name values (IpAddr, the process id); it never opens a socket, file or process.
 crates/fennec/src/domain/ forbids std::net::Tcp
 crates/fennec/src/domain/ forbids std::net::Udp

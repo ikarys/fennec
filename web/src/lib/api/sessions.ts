@@ -332,6 +332,8 @@ export interface CriteriaTally {
   passed: number;
   failed: number;
   indicative: number;
+  /** 0 to 100, the passes' share: the bar's width. */
+  percent: number;
 }
 
 /** A `plan.proposed` still waiting for the human, with the preflight of its turn. */

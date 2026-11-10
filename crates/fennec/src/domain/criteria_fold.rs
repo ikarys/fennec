@@ -13,6 +13,8 @@ pub struct Tally {
     pub passed: usize,
     pub failed: usize,
     pub indicative: usize,
+    /// The passes' share of the criteria, 0 to 100, the bar's width.
+    pub percent: u8,
 }
 
 pub fn apply(criteria: &mut Vec<CriterionState>, event: &Event) {
@@ -52,7 +54,7 @@ pub fn in_force(events: &[Event]) -> Vec<CriterionState> {
 }
 
 pub fn tally(criteria: &[CriterionState]) -> Tally {
-    criteria.iter().fold(Tally::default(), |mut tally, state| {
+    let mut tally = criteria.iter().fold(Tally::default(), |mut tally, state| {
         tally.total += 1;
         match &state.status {
             CriterionStatus::Pending => {}
@@ -65,7 +67,11 @@ pub fn tally(criteria: &[CriterionState]) -> Tally {
             CriterionStatus::Failed { .. } => tally.failed += 1,
         }
         tally
-    })
+    });
+    tally.percent = (tally.passed * 100)
+        .checked_div(tally.total)
+        .map_or(0, |share| share as u8);
+    tally
 }
 
 #[cfg(test)]
@@ -247,6 +253,7 @@ mod tests {
                 passed: 2,
                 failed: 1,
                 indicative: 1,
+                percent: 50,
             }
         );
     }
