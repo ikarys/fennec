@@ -26,7 +26,7 @@ export function Tabs<T extends string>({
       {tab.label}
       {tab.count != null ? (
         <span
-          className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs tabular-nums ${
+          className={`rounded-full px-1.5 py-0.5 text-xs tabular-nums ${
             tab.id === active ? 'bg-accent-soft text-accent-strong' : 'bg-raised text-muted'
           }`}
         >
@@ -42,7 +42,7 @@ export function Tabs<T extends string>({
         role="tablist"
         aria-label={label}
         aria-orientation="horizontal"
-        className="flex items-center gap-1 border-b border-border"
+        className="flex items-end gap-0.5 border-b border-border"
       >
         {tabs.map((tab) => (
           <button
@@ -51,16 +51,18 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={tab.id === active}
             onClick={() => onSelect(tab.id)}
-            className={`-mb-px border-b-2 px-3 py-1.5 text-sm transition-colors ${
+            className={`relative -mb-px flex h-9 items-center gap-2 whitespace-nowrap rounded-t-lg border border-b-0 px-3 text-sm transition-colors ${
               tab.id === active
-                ? 'border-accent font-medium text-text'
-                : 'border-transparent text-muted hover:text-text'
+                ? 'border-border bg-bg font-medium text-text'
+                : 'border-transparent text-muted hover:bg-raised/50 hover:text-text'
             }`}
           >
+            {tab.id === active ? <span aria-hidden className="absolute inset-x-2 top-0 h-0.5 rounded-b bg-accent" /> : null}
+            {tab.Icon ? <tab.Icon className={`h-3.5 w-3.5 shrink-0 ${tab.id === active ? 'text-accent' : ''}`} /> : null}
             {renderLabel(tab)}
           </button>
         ))}
-        {trailing ? <div className="ml-auto pb-1">{trailing}</div> : null}
+        {trailing ? <div className="ml-auto self-center">{trailing}</div> : null}
       </div>
     );
   }
