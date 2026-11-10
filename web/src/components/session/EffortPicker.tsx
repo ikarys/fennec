@@ -3,18 +3,23 @@ import { CpuIcon } from '../ui/Icons';
 import { REASONING_EFFORTS, type ReasoningEffort } from '../../lib/api';
 import { useT } from '../../i18n';
 
-/** The session's reasoning effort in the composer: auto, then the efforts the model accepts (all when unknown). */
+/** The session's reasoning effort in the composer: the default (the agent's, else the model's setting), then the efforts the model accepts (all when unknown). */
 export function EffortPicker({
   effort,
   accepted,
+  defaultEffort,
   onChange
 }: {
   effort: ReasoningEffort | null;
   accepted: ReasoningEffort[];
+  defaultEffort: ReasoningEffort | null;
   onChange: (effort: ReasoningEffort | null) => void;
 }) {
   const t = useT();
   const offered = accepted.length > 0 ? accepted : REASONING_EFFORTS;
+  const defaultLabel = defaultEffort
+    ? t('effortDefault', { effort: defaultEffort })
+    : t('effortAutoShort');
 
   return (
     <ChoiceMenu
@@ -25,7 +30,7 @@ export function EffortPicker({
       groups={[
         {
           choices: [
-            { value: 'auto', label: t('effortAutoShort') },
+            { value: 'auto', label: defaultLabel },
             ...offered.map((value) => ({ value, label: value }))
           ]
         }
@@ -35,7 +40,7 @@ export function EffortPicker({
       trigger={
         <>
           <CpuIcon className="h-3.5 w-3.5" />
-          {effort ?? t('effortAutoShort')}
+          {effort ?? defaultEffort ?? t('effortAutoShort')}
         </>
       }
     />

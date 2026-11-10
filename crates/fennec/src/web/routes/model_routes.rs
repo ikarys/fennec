@@ -1,7 +1,9 @@
 //! Model choices for sessions: what the composer offers and what a session runs on.
 
 use crate::agent::ports::EventLog;
+use crate::agents;
 use crate::config::Settings;
+use crate::domain::agent::resolve;
 use crate::domain::event::Event;
 use crate::domain::model_choice::{chosen_effort, chosen_model, usable_effort};
 use crate::domain::preferences::{
@@ -14,6 +16,7 @@ use crate::web::http::{Request, error, send_json};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::net::TcpStream;
+use std::path::Path;
 
 /// Where a session's model comes from, shown next to it.
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
@@ -88,12 +91,13 @@ fn provider_name(prefs: &Preferences, provider: &str) -> String {
     }
 }
 
-fn choice_value(prefs: &Preferences, model: &ModelRef) -> Value {
+fn choice_value(settings: &Settings, prefs: &Preferences, model: &ModelRef) -> Value {
     json!({
         "provider": model.provider,
         "model": model.model,
         "providerName": provider_name(prefs, &model.provider),
         "acceptedEfforts": ModelPrefs::accepted_efforts(prefs_of(prefs, model)),
+        "defaultEffort": settings.llm.for_turn(prefs, Some(model)).reasoning_effort,
     })
 }
 
@@ -106,12 +110,12 @@ pub(crate) fn choices(app: &App, stream: &mut TcpStream) -> Result<(), HttpError
     let favorites: Vec<Value> = prefs
         .favorites
         .iter()
-        .map(|m| choice_value(&prefs, m))
+        .map(|m| choice_value(&app.settings, &prefs, m))
         .collect();
     send_json(
         stream,
         200,
-        &json!({ "default": choice_value(&prefs, &default), "favorites": favorites }),
+        &json!({ "default": choice_value(&app.settings, &prefs, &default), "favorites": favorites }),
     )
 }
 
@@ -190,6 +194,7 @@ pub(crate) fn session_model(
     let prefs = store.preferences()?;
     let params = app.settings.llm.for_turn(&prefs, chosen.as_ref());
     let (effort, accepted) = session_effort(&app.settings, store, session_id)?;
+    let default_effort = agent_effort(store, session_id)?.or(params.reasoning_effort);
     Ok(json!({
         "provider": params.provider,
         "model": params.model,
@@ -199,7 +204,22 @@ pub(crate) fn session_model(
         "source": source,
         "effort": effort,
         "acceptedEfforts": accepted,
+        "defaultEffort": default_effort,
     }))
+}
+
+/// The effort of the agent the session runs as, when its definition sets one.
+fn agent_effort(store: &SqliteStore, session_id: &str) -> Result<Option<ReasoningEffort>, String> {
+    let Some(project) = store
+        .session(session_id)?
+        .and_then(|session| store.project(&session.project_id).transpose())
+        .transpose()?
+    else {
+        return Ok(None);
+    };
+    let agents = agents::discover(Path::new(&project.workdir));
+    let events = store.events(session_id)?;
+    Ok(resolve(&agents, &events).and_then(|agent| agent.reasoning_effort))
 }
 
 #[cfg(test)]

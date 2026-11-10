@@ -76,28 +76,24 @@ export function useModeAndModel({
   }, [pendingMode, serverMode]);
 
   const serverModel = detailModel ?? modelChoices?.default ?? null;
+  const pendingChoice = pendingModel
+    ? modelChoices?.favorites.find((favorite) => sameModelRef(favorite, pendingModel)) ??
+      (modelChoices && sameModelRef(modelChoices.default, pendingModel)
+        ? modelChoices.default
+        : undefined)
+    : undefined;
   const currentModel: ModelChoice | null = pendingModel
     ? {
         provider: pendingModel.provider,
         model: pendingModel.model,
-        providerName:
-          modelChoices?.favorites.find((favorite) =>
-            sameModelRef(favorite, pendingModel),
-          )?.providerName ??
-          (modelChoices && sameModelRef(modelChoices.default, pendingModel)
-            ? modelChoices.default.providerName
-            : pendingModel.provider),
-        acceptedEfforts:
-          modelChoices?.favorites.find((favorite) =>
-            sameModelRef(favorite, pendingModel),
-          )?.acceptedEfforts ??
-          (modelChoices && sameModelRef(modelChoices.default, pendingModel)
-            ? modelChoices.default.acceptedEfforts
-            : undefined),
+        providerName: pendingChoice?.providerName ?? pendingModel.provider,
+        acceptedEfforts: pendingChoice?.acceptedEfforts,
+        defaultEffort: pendingChoice?.defaultEffort,
       }
     : serverModel;
 
   const acceptedEfforts: ReasoningEffort[] = currentModel?.acceptedEfforts ?? [];
+  const defaultEffort: ReasoningEffort | null = currentModel?.defaultEffort ?? null;
   const effort: ReasoningEffort | null = pendingEffort
     ? pendingEffort.value
     : detailModel?.effort ?? null;
@@ -209,6 +205,7 @@ export function useModeAndModel({
     pendingEffort,
     effort,
     acceptedEfforts,
+    defaultEffort,
     handleModeChange,
     handleModelChange,
     handleEffortChange,

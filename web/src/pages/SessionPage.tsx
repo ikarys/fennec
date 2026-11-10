@@ -208,6 +208,7 @@ export function SessionPage({
     pendingEffort,
     effort,
     acceptedEfforts,
+    defaultEffort,
     handleModeChange,
     handleModelChange,
     handleEffortChange,
@@ -979,6 +980,7 @@ export function SessionPage({
                         onModelChange={handleModelChange}
                         effort={effort}
                         acceptedEfforts={acceptedEfforts}
+                        defaultEffort={defaultEffort}
                         onEffortChange={(next) => void handleEffortChange(next)}
                         error={sendError}
                         textareaRef={textareaRef}

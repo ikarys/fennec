@@ -45,6 +45,7 @@ interface ComposerProps {
   onModelChange?: (ref: ModelRef) => void;
   effort?: ReasoningEffort | null;
   acceptedEfforts?: ReasoningEffort[];
+  defaultEffort?: ReasoningEffort | null;
   onEffortChange?: (effort: ReasoningEffort | null) => void;
   error: string | null;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -76,6 +77,7 @@ export function Composer({
   onModelChange,
   effort,
   acceptedEfforts,
+  defaultEffort,
   onEffortChange,
   error,
   textareaRef,
@@ -336,6 +338,7 @@ export function Composer({
               <EffortPicker
                 effort={effort ?? null}
                 accepted={acceptedEfforts ?? []}
+                defaultEffort={defaultEffort ?? null}
                 onChange={onEffortChange}
               />
             )}
