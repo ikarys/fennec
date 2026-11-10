@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import type { Project } from '../../lib/api';
 import { useT } from '../../i18n';
-import { PlusIcon } from '../ui/Icons';
-import { Button } from '../ui/Button';
 import { SessionList } from './SessionList';
 
 export function ChatSection({
   project,
-  onNewSession,
   onOpenSession,
   selected,
   selecting,
@@ -15,7 +12,6 @@ export function ChatSection({
   onDelete
 }: {
   project: Project;
-  onNewSession: () => void;
   onOpenSession: (sessionId: string) => void;
   selected: Set<string>;
   selecting: boolean;
@@ -33,19 +29,6 @@ export function ChatSection({
             {t('homeConversationCount', { count: project.sessions.length })}
           </span>
         </span>
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-accent hover:bg-accent-soft hover:text-accent-strong"
-            onClick={onNewSession}
-            title={t('homeNewChatTitle')}
-            aria-label={t('paletteNewChat')}
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-            {t('paletteNewChat')}
-          </Button>
-        </div>
       </div>
 
       <SessionList

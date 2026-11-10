@@ -8,6 +8,7 @@ export * from "./api/mcp";
 export * from "./api/projectServers";
 export * from "./api/projects";
 export * from "./api/worktrees";
+export * from "./api/home";
 export * from "./api/canvas";
 export * from "./api/workflows";
 export * from "./api/insight";

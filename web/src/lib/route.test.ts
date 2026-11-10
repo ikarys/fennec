@@ -348,3 +348,15 @@ describe('loadActiveTab', () => {
     expect(loadActiveTab()).toBeNull();
   });
 });
+
+describe('page routes', () => {
+  it('parses #/projects and maps it to its tab id', () => {
+    expect(parseRoute('#/projects')).toEqual({ name: 'projects' });
+    expect(tabIdForRoute({ name: 'projects' })).toBe('page:projects');
+  });
+
+  it('parses #/chats and maps it to its tab id', () => {
+    expect(parseRoute('#/chats')).toEqual({ name: 'chats' });
+    expect(tabIdForRoute({ name: 'chats' })).toBe('page:chats');
+  });
+});

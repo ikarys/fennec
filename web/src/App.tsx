@@ -11,6 +11,8 @@ import {
   type Route,
 } from './lib/route';
 import { HomePage } from './pages/HomePage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { ChatsPage } from './pages/ChatsPage';
 import { SessionPage } from './pages/SessionPage';
 import { SplitPage } from './pages/SplitPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -61,7 +63,9 @@ export default function App() {
     route.name === 'settings' ||
     route.name === 'insight' ||
     route.name === 'backlog' ||
-    route.name === 'workflows'
+    route.name === 'workflows' ||
+    route.name === 'projects' ||
+    route.name === 'chats'
       ? `page:${route.name}`
       : null;
   useEffect(() => {
@@ -77,7 +81,18 @@ export default function App() {
   // No polling: the list refreshes when the human looks at it (home, project,
   // palette) and when a turn starts or ends; F5 does the rest.
   const projectsVisible =
-    route.name === 'home' || route.name === 'project' || paletteOpen;
+    route.name === 'home' ||
+    route.name === 'project' ||
+    route.name === 'projects' ||
+    route.name === 'chats' ||
+    paletteOpen;
+  const chatProjectId = projects.find((project) => project.chat)?.id ?? null;
+
+  // The home page reloads its dashboard whenever the sessions change.
+  const [homeRefreshKey, setHomeRefreshKey] = useState(0);
+  useEffect(() => {
+    setHomeRefreshKey((key) => key + 1);
+  }, [projects]);
   useEffect(() => {
     if (projectsVisible) refreshProjects();
   }, [projectsVisible, refreshProjects]);
@@ -361,6 +376,16 @@ export default function App() {
         <div className="flex min-h-0 grow">
           {route.name === 'home' ? (
             <HomePage
+              projectCount={projects.filter((project) => !project.chat).length}
+              attention={attention}
+              refreshKey={homeRefreshKey}
+              onOpenProjectDialog={() => setProjectDialogOpen(true)}
+              onNewChat={chatProjectId ? () => startNewSession(chatProjectId) : null}
+              onNewSession={(projectId) => startNewSession(projectId)}
+              onOpenSession={openSession}
+            />
+          ) : route.name === 'projects' ? (
+            <ProjectsPage
               projects={projects}
               loading={projectsLoading}
               error={projectsError}
@@ -369,6 +394,15 @@ export default function App() {
               onOpenSession={openSession}
               onSessionsDeleted={handleSessionsDeleted}
               onToggleFavorite={(projectId, favorite) => void setProjectFavorite(projectId, favorite).then(refreshProjects)}
+            />
+          ) : route.name === 'chats' ? (
+            <ChatsPage
+              projects={projects}
+              loading={projectsLoading}
+              error={projectsError}
+              onNewSession={(projectId) => startNewSession(projectId)}
+              onOpenSession={openSession}
+              onSessionsDeleted={handleSessionsDeleted}
             />
           ) : route.name === 'settings' ? (
             <SettingsPage

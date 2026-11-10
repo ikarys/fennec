@@ -3,7 +3,7 @@
 import type { MsgKey } from '../i18n/messages';
 
 /** The fixed pages a tab can show. */
-export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
+export type PageId = 'projects' | 'chats' | 'settings' | 'insight' | 'workflows' | 'backlog';
 
 export type Route =
   | { name: 'home' }
@@ -13,6 +13,8 @@ export type Route =
   | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
   | { name: 'backlog' }
+  | { name: 'projects' }
+  | { name: 'chats' }
   | { name: 'split'; left: string | null; right: string | null }
   | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
@@ -22,6 +24,8 @@ export const ACTIVE_TAB_KEY = 'fennec.activeTab';
 
 /** The fixed pages that get a tab in the bar, in display order. */
 export const PAGE_TABS: { page: PageId; titleKey: MsgKey; path: string }[] = [
+  { page: 'projects', titleKey: 'paletteProjects', path: '#/projects' },
+  { page: 'chats', titleKey: 'homeChat', path: '#/chats' },
   { page: 'settings', titleKey: 'settings', path: '#/settings' },
   { page: 'insight', titleKey: 'insight', path: '#/insight' },
   { page: 'workflows', titleKey: 'workflows', path: '#/workflows' },
@@ -37,6 +41,12 @@ export function parseRoute(hash: string): Route {
   }
   if (hash === '#/backlog') {
     return { name: 'backlog' };
+  }
+  if (hash === '#/projects') {
+    return { name: 'projects' };
+  }
+  if (hash === '#/chats') {
+    return { name: 'chats' };
   }
   if (hash.startsWith('#/project/')) {
     const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
@@ -112,6 +122,10 @@ export function tabIdForRoute(route: Route): string | null {
       return 'page:backlog';
     case 'workflows':
       return 'page:workflows';
+    case 'projects':
+      return 'page:projects';
+    case 'chats':
+      return 'page:chats';
     default:
       return null;
   }

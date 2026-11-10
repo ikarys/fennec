@@ -295,3 +295,9 @@ Travail shows where the work lands (the human's folder and branch, or the agent'
 a discard), a terminal and the IDE there, the criteria, and the five most changed files served by the fold
 (`domain/modified_files.rs`) with a link to the changes page (`WorkplaceSection.tsx`, `ModifiedFilesSection.tsx`).
 The configurable panel pages are gone.
+
+Home, done: the home page greets the human with what needs them (the attention items, the bell's list shown large),
+the recently updated sessions of every project and chat, the favourite projects with a new-session button, and three
+figures that link to their page (cost over 7 days, ideas ready, worktrees on disk). The server sorts and counts
+(`domain/home.rs`, `web/routes/home_routes.rs`); projects and chats have their own pages in the header's nav
+(`HomePage.tsx`, `ProjectsPage.tsx`, `ChatsPage.tsx`).
