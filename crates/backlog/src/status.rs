@@ -187,6 +187,8 @@ mod tests {
             started_at: None,
             autonomous: false,
             attachments: Vec::new(),
+            sheet: None,
+            model_fields: Default::default(),
         }
     }
 

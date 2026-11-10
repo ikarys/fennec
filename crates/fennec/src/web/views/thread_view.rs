@@ -222,6 +222,8 @@ mod tests {
             started_at: None,
             autonomous: false,
             attachments: vec![],
+            sheet: None,
+            model_fields: Default::default(),
         }
     }
 

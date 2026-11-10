@@ -232,6 +232,8 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         status(
             &Idea {
                 state: IdeaState::Started,
+                sheet: None,
+                model_fields: Default::default(),
                 ..idea.clone()
             },
             progress,
