@@ -68,7 +68,7 @@ checked on the lines an integration adds; a violation is a blocker the human acc
 (`domain/architecture.rs`, `architecture.rs`).
 Bypass detection, done: added lines that silence a lint, a type check or a test, and
 tests or assertions removed on balance, are blockers the human accepts (`domain/bypass.rs`).
-ADRs, done: the project page lists the MADR files of `docs/adr/`, protected
+ADRs, done: the project page's Decisions tab lists the MADR files of `docs/adr/`, protected
 (`domain/adr.rs`, `adr.rs`). Not the agents' recorded decisions: those explain one change,
 an ADR binds the project.
 Project page and map, done: `#/project/<id>` (the "Projet" button of a home card) shows the

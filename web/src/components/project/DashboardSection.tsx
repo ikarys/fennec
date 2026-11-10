@@ -7,7 +7,7 @@ import { Tile } from '../ui/Tile';
 import {
   ClockIcon,
   CoinIcon,
-  FileIcon,
+  DecisionIcon,
   LayersIcon,
   ReviewIcon,
   TokensIcon,
@@ -27,7 +27,7 @@ const ICONS: Record<DashboardIcon, ReactNode> = {
   tokens: <TokensIcon />,
   time: <ClockIcon />,
   cost: <CoinIcon />,
-  doc: <FileIcon />,
+  decisions: <DecisionIcon />,
 };
 
 export function DashboardSection({

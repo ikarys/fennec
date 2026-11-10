@@ -257,15 +257,6 @@ export interface ArchitectureDrift {
 /** The committed `docs/map.md` against the map of the code as it is. */
 export type MapFileState = "missing" | "stale" | "current";
 
-/** A project's documentation file, read from disk (verified). */
-export interface DocFile {
-  path: string;
-  name: string;
-  /** The folder the tab groups it under (`docs/guide`), empty at the root. */
-  dir: string;
-  content: string;
-}
-
 export interface ProjectOverview {
   map: ModuleMap;
   mapFile: MapFileState;
@@ -280,12 +271,10 @@ export function getProjectOverview(
   );
 }
 
-/** The project's documentation: its markdown files and its ADRs (verified). */
-export function getProjectDocs(
-  projectId: string,
-): Promise<{ files: DocFile[]; adrs: Adr[] }> {
-  return request<{ files: DocFile[]; adrs: Adr[] }>(
-    `/api/projects/${encodeURIComponent(projectId)}/docs`,
+/** The project's ADRs (`docs/adr/`), read from disk (verified). */
+export function getProjectAdrs(projectId: string): Promise<{ adrs: Adr[] }> {
+  return request<{ adrs: Adr[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/adrs`,
   );
 }
 
@@ -302,7 +291,7 @@ export function writeMapFile(
 }
 
 // The project dashboard: display-ready tiles and recent sessions.
-export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'doc';
+export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'decisions';
 
 export interface DashboardTile {
   id: string;

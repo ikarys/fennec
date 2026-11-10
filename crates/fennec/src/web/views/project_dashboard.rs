@@ -18,7 +18,7 @@ use crate::web::App;
 use crate::web::http::send_json;
 use crate::web::views::idea_board::Board;
 use crate::web::views::insight::Period;
-use crate::{adr, doc};
+use crate::adr;
 use backlog::Stage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -41,7 +41,7 @@ pub enum TileIcon {
     Tokens,
     Time,
     Cost,
-    Doc,
+    Decisions,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -89,8 +89,8 @@ struct Facts {
     usage: Summary,
     cost_value: String,
     cost_detail: String,
-    doc_count: usize,
     adr_count: usize,
+    adr_accepted: usize,
     lang: Lang,
 }
 
@@ -155,8 +155,11 @@ fn gather(
     let lang = preferences.display.language;
     let pricing = priced(&models, &prices(&preferences));
 
-    let doc_count = doc::load(workdir).len();
-    let adr_count = adr::load(workdir).len();
+    let adrs = adr::load(workdir);
+    let adr_accepted = adrs
+        .iter()
+        .filter(|adr| adr.status.as_deref() == Some("accepted"))
+        .count();
 
     Ok(Facts {
         sessions,
@@ -164,8 +167,8 @@ fn gather(
         usage,
         cost_value: pricing.value(lang.locale()),
         cost_detail: pricing.detail(lang),
-        doc_count,
-        adr_count,
+        adr_count: adrs.len(),
+        adr_accepted,
         lang,
     })
 }
@@ -189,7 +192,7 @@ fn tiles(project_id: &str, facts: &Facts, lang: Lang) -> Vec<TileView> {
             facts.usage.calls > 0,
             lang,
         ),
-        doc_tile(project_id, facts.doc_count, facts.adr_count, lang),
+        decisions_tile(project_id, facts.adr_count, facts.adr_accepted, lang),
     ]
 }
 
@@ -315,16 +318,19 @@ fn cost_tile(value: &str, detail: &str, active: bool, lang: Lang) -> TileView {
     }
 }
 
-fn doc_tile(project_id: &str, doc_count: usize, adr_count: usize, lang: Lang) -> TileView {
+fn decisions_tile(project_id: &str, adr_count: usize, accepted: usize, lang: Lang) -> TileView {
     TileView {
-        id: "doc".into(),
-        icon: TileIcon::Doc,
-        label: lang.pick("Documentation", "Documentation").into(),
-        figure: doc_count.to_string(),
-        detail: format!("{adr_count} ADR"),
+        id: "decisions".into(),
+        icon: TileIcon::Decisions,
+        label: lang.pick("Decisions", "Décisions").into(),
+        figure: adr_count.to_string(),
+        detail: match lang {
+            Lang::Fr => format!("{accepted} acceptée(s)"),
+            Lang::En => format!("{accepted} accepted"),
+        },
         tone: Tone::Neutral,
         active: false,
-        href: Some(format!("#/project/{project_id}/doc")),
+        href: Some(format!("#/project/{project_id}/decisions")),
         title: None,
     }
 }
@@ -408,8 +414,8 @@ mod tests {
             usage: summary(),
             cost_value: "—".into(),
             cost_detail: "aucun modèle n'a de prix : Paramètres, Modèles".into(),
-            doc_count: 0,
             adr_count: 0,
+            adr_accepted: 0,
             lang: Lang::Fr,
         }
     }
@@ -419,7 +425,7 @@ mod tests {
         let view = view("p", &facts(), Lang::Fr);
         let ids: Vec<&str> = view.tiles.iter().map(|tile| tile.id.as_str()).collect();
 
-        assert_eq!(ids, ["sessions", "ideas", "tokens", "time", "cost", "doc"]);
+        assert_eq!(ids, ["sessions", "ideas", "tokens", "time", "cost", "decisions"]);
     }
 
     #[test]

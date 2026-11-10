@@ -668,9 +668,6 @@ export const en = {
   addIdeaBtn: 'Add the idea',
   // Project: doc, question, module map (components/project)
   docVerifiedTitle: 'Read from the file',
-  documentation: 'Documentation',
-  docFileAria: 'Doc file',
-  noDocFiles: 'No doc file (README, docs/).',
   noAdrs: 'No ADR in docs/adr/.',
   askQuestion: 'Ask a question',
   indicativeSourced: 'Answer produced by a model, each point sourced',
@@ -1316,7 +1313,7 @@ export const en = {
   workflowEditorTestTitle: 'Opens a new session with this workflow, step by step.',
   workflowEditorTestSaveTitle: 'Save the workflow before testing it.',
   // pages/ProjectPage.tsx
-  projectPageDoc: 'Doc',
+  projectPageDecisions: 'Decisions',
   projectPageNotFound: 'Project not found.',
   projectPageSectionsLabel: 'Project sections',
   // components/workflow/NodePanel.tsx
@@ -2172,9 +2169,6 @@ export const fr: Record<MsgKey, string> = {
   addIdeaBtn: 'Ajouter l’idée',
   // Project: doc, question, module map (components/project)
   docVerifiedTitle: 'Lu depuis le fichier',
-  documentation: 'Documentation',
-  docFileAria: 'Fichier de doc',
-  noDocFiles: 'Aucun fichier de doc (README, docs/).',
   noAdrs: 'Aucun ADR dans docs/adr/.',
   askQuestion: 'Poser une question',
   indicativeSourced: 'Réponse produite par un modèle, chaque point sourcé',
@@ -2824,7 +2818,7 @@ export const fr: Record<MsgKey, string> = {
   workflowEditorTestTitle: 'Ouvre une nouvelle session avec ce workflow, en pas à pas.',
   workflowEditorTestSaveTitle: 'Enregistre le workflow avant de le tester.',
   // pages/ProjectPage.tsx
-  projectPageDoc: 'Doc',
+  projectPageDecisions: 'Décisions',
   projectPageNotFound: 'Projet introuvable.',
   projectPageSectionsLabel: 'Sections du projet',
   // components/workflow/NodePanel.tsx

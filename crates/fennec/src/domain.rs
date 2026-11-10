@@ -24,7 +24,6 @@ pub mod criteria;
 pub mod criteria_fold;
 pub mod decision;
 pub mod diff;
-pub mod doc;
 pub mod drift;
 pub mod editor;
 pub mod event;

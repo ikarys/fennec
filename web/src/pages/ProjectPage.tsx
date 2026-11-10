@@ -7,7 +7,7 @@ import {
   AlertIcon,
   BulbIcon,
   ExternalIcon,
-  FileIcon,
+  DecisionIcon,
   InsightIcon,
   LayersIcon,
   PlusIcon,
@@ -21,7 +21,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
-import { DocSection } from '../components/project/DocSection';
+import { DecisionsSection } from '../components/project/DecisionsSection';
 import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
@@ -46,7 +46,7 @@ const TABS = [
   { id: 'sessions', label: 'sessionsSectionTitle', Icon: TerminalIcon },
   { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
   { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
-  { id: 'doc', label: 'projectPageDoc', Icon: FileIcon },
+  { id: 'decisions', label: 'projectPageDecisions', Icon: DecisionIcon },
   { id: 'canvas', label: 'canvasLibraryTab', Icon: WandIcon },
   { id: 'analyses', label: 'analysesTitle', Icon: SearchIcon },
 ] as const;
@@ -257,7 +257,7 @@ export default function ProjectPage({
           {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
-          {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'decisions' ? <DecisionsSection projectId={projectId} /> : null}
           {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection
