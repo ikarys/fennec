@@ -45,6 +45,7 @@ pub mod open_calls;
 pub mod password;
 pub mod plan;
 pub mod plan_scope;
+pub mod plan_sheet;
 pub mod plugin;
 pub mod preferences;
 pub mod preflight;

@@ -480,6 +480,10 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     started, dropped or completed
   - `POST /api/projects/{id}/ideas/{ideaId}/turn-into-task` `{}` (`idea.sheet_edited`, by human): a sheet whose
     objective is the idea's text; 409 if it already has one, or once started, dropped or completed
+  - `POST /api/projects/{id}/ideas/{ideaId}/sheet-apply` `{}` (`idea.sheet_edited`, `by: agent`): maps the framing
+    session's pending plan onto the task sheet (goal → objective, done when with their checks, context, constraints,
+    out of scope, deliverable one to one, steps → approach, risks appended to context; an empty plan field keeps the
+    sheet's value); 409 when the idea is not a task, has no session or no plan is pending
   - `POST /api/projects/{id}/ideas/{ideaId}/edit` `{text}` (`idea.edited`; 400 if empty or over 4000 characters): the human rewrites the idea's text; a dropped or completed idea keeps its text
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`): abandons an idea, or removes a done one from the board (menu `remove`)
   - `POST /api/projects/{id}/ideas/{ideaId}/complete` `{}` (`idea.completed`)

@@ -2,6 +2,8 @@
 
 use serde_json::{Map, Value};
 
+use crate::domain::plan::Plan;
+use crate::domain::plan_sheet;
 use backlog::{Author, BacklogEvent, Idea, IdeaState, SheetCriterion, SheetField, TaskSheet};
 
 pub const MAX_CRITERIA: usize = 20;
@@ -35,9 +37,10 @@ pub fn sheet_event(
     action: &str,
     body: &Value,
     max_chars: usize,
+    pending: Option<&Plan>,
 ) -> Option<Result<BacklogEvent, Refusal>> {
     let ready_with_sheet = action == "ready" && idea.sheet.is_some();
-    if !matches!(action, "sheet" | "turn-into-task") && !ready_with_sheet {
+    if !matches!(action, "sheet" | "sheet-apply" | "turn-into-task") && !ready_with_sheet {
         return None;
     }
 
@@ -69,6 +72,15 @@ pub fn sheet_event(
                 })
                 .map_err(|message| refusal(400, &message, Vec::new())),
         ),
+        "sheet-apply" => Some(match (idea.sheet.as_ref(), pending) {
+            (None, _) => Err(refusal(409, "the idea is not a task", Vec::new())),
+            (Some(_), None) => Err(refusal(409, "no plan is waiting to be applied", Vec::new())),
+            (Some(current), Some(plan)) => Ok(BacklogEvent::SheetEdited {
+                idea_id: idea.id.clone(),
+                sheet: plan_sheet::sheet_from_plan(plan, current),
+                by: Author::Agent,
+            }),
+        }),
         "turn-into-task" => Some(if idea.sheet.is_some() {
             Err(refusal(409, "the idea is already a task", Vec::new()))
         } else {
@@ -257,7 +269,7 @@ mod tests {
             ..Default::default()
         };
         let idea = idea(IdeaState::Framing, Some(sheet));
-        let result = sheet_event(&idea, "ready", &json!({}), 4000).unwrap();
+        let result = sheet_event(&idea, "ready", &json!({}), 4000, None).unwrap();
         let Err(refusal) = result else {
             panic!("expected refusal");
         };
@@ -283,7 +295,7 @@ mod tests {
             ..Default::default()
         };
         let idea = idea(IdeaState::Framing, Some(sheet.clone()));
-        let result = sheet_event(&idea, "ready", &json!({}), 4000).unwrap();
+        let result = sheet_event(&idea, "ready", &json!({}), 4000, None).unwrap();
         let Ok(BacklogEvent::Ready { plan, .. }) = result else {
             panic!("expected ready event");
         };
@@ -304,25 +316,25 @@ mod tests {
     #[test]
     fn sheet_on_a_started_idea_is_409() {
         let started = idea(IdeaState::Started, None);
-        let result = sheet_event(&started, "sheet", &json!({ "sheet": {} }), 4000).unwrap();
+        let result = sheet_event(&started, "sheet", &json!({ "sheet": {} }), 4000, None).unwrap();
         assert!(matches!(result, Err(Refusal { status: 409, .. })));
 
         let dropped = idea(IdeaState::Dropped, None);
-        let result = sheet_event(&dropped, "turn-into-task", &json!({}), 4000).unwrap();
+        let result = sheet_event(&dropped, "turn-into-task", &json!({}), 4000, None).unwrap();
         assert!(matches!(result, Err(Refusal { status: 409, .. })));
     }
 
     #[test]
     fn turn_into_task_twice_is_409() {
         let idea = idea(IdeaState::Framing, Some(TaskSheet::default()));
-        let result = sheet_event(&idea, "turn-into-task", &json!({}), 4000).unwrap();
+        let result = sheet_event(&idea, "turn-into-task", &json!({}), 4000, None).unwrap();
         assert!(matches!(result, Err(Refusal { status: 409, .. })));
     }
 
     #[test]
     fn turn_into_task_copies_the_text_as_objective() {
         let idea = idea(IdeaState::Framing, None);
-        let result = sheet_event(&idea, "turn-into-task", &json!({}), 4000).unwrap();
+        let result = sheet_event(&idea, "turn-into-task", &json!({}), 4000, None).unwrap();
         let Ok(BacklogEvent::SheetEdited { sheet, by, .. }) = result else {
             panic!("expected sheet edited event");
         };
@@ -333,14 +345,43 @@ mod tests {
     #[test]
     fn ready_without_a_sheet_is_left_to_the_caller() {
         let idea = idea(IdeaState::Framing, None);
-        assert!(sheet_event(&idea, "ready", &json!({}), 4000).is_none());
+        assert!(sheet_event(&idea, "ready", &json!({}), 4000, None).is_none());
+    }
+
+    #[test]
+    fn apply_without_a_pending_plan_is_409() {
+        let idea = idea(IdeaState::Framing, Some(TaskSheet::default()));
+        let result = sheet_event(&idea, "sheet-apply", &json!({}), 4000, None).unwrap();
+        assert!(matches!(result, Err(Refusal { status: 409, .. })));
+    }
+
+    #[test]
+    fn apply_saves_the_plan_as_an_agent_edit() {
+        let plan = Plan {
+            title: "t".to_string(),
+            goal: "Export costs".to_string(),
+            context: String::new(),
+            constraints: String::new(),
+            out_of_scope: String::new(),
+            deliverable: String::new(),
+            steps: vec![],
+            done_when: vec![],
+            risks: vec![],
+        };
+        let idea = idea(IdeaState::Framing, Some(TaskSheet::default()));
+        let result = sheet_event(&idea, "sheet-apply", &json!({}), 4000, Some(&plan)).unwrap();
+        let Ok(BacklogEvent::SheetEdited { sheet, by, .. }) = result else {
+            panic!("expected sheet edited event");
+        };
+        assert_eq!(sheet.objective, plan.goal);
+        assert_eq!(by, Author::Agent);
     }
 
     #[test]
     fn sheet_by_agent_is_recorded() {
         let idea = idea(IdeaState::Framing, None);
         let body = json!({ "sheet": { "objective": "goal" }, "by": "agent" });
-        let result = sheet_event(&idea, "sheet", &body, 4000).unwrap();
+        let result = sheet_event(&idea, "sheet", &body, 4000, None).unwrap();
         let Ok(BacklogEvent::SheetEdited { by, .. }) = result else {
             panic!("expected sheet edited event");
         };
