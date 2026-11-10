@@ -15,7 +15,6 @@ import {
 } from "../../ui/Icons";
 import { IdeaStatusBadge } from "./IdeaStatusBadge";
 import { IdeaMeta } from "./IdeaMeta";
-import { IdeaAttachments } from "./IdeaAttachments";
 import { IdeaMenu } from "./IdeaMenu";
 import { formatDate } from "../../../lib/format";
 import {
@@ -206,15 +205,6 @@ export function IdeaRow({
         <p className="m-0 truncate text-sm text-text" title={idea.text}>
           {idea.title}
         </p>
-        {idea.description ? (
-          <p
-            className="m-0 truncate text-xs text-faint"
-            title={idea.description}
-          >
-            {idea.description}
-          </p>
-        ) : null}
-        <IdeaAttachments attachments={idea.attachments} />
         {idea.halted ? (
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}

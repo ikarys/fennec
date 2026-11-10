@@ -36,8 +36,6 @@ export interface IdeaView {
   text: string;
   /** A short title: the approved plan's, else the text's first sentence. */
   title: string;
-  /** The text under the title, computed by the server. */
-  description: string;
   attachments: IdeaAttachmentView[];
   status: IdeaStatus;
   stage: Stage;
