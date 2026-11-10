@@ -18,12 +18,16 @@ mod tests {
     use crate::domain::drift;
     use crate::domain::module_map::{self, SourceFile};
 
-    /// fennec's own production sources: test modules and test files cut off,
-    /// since a test may wire an adapter in.
+    /// fennec's own production sources: test modules, `tests.rs` and
+    /// `test_support.rs` cut off, since a test may wire an adapter in.
     fn production_sources(root: &Path) -> Vec<SourceFile> {
         crate::module_map::tracked_files(root)
             .into_iter()
-            .filter(|file| !file.path.ends_with("tests.rs") && !file.path.contains("/tests/"))
+            .filter(|file| {
+                !file.path.ends_with("tests.rs")
+                    && !file.path.ends_with("test_support.rs")
+                    && !file.path.contains("/tests/")
+            })
             .map(|file| SourceFile {
                 content: file
                     .content
