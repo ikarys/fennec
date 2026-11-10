@@ -13,6 +13,7 @@ import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 import type { AttentionItem } from '../lib/api';
 import type { BudgetNotice } from '../lib/api/sessions';
+import { playCue, unlockSounds, type Cue } from '../lib/sounds';
 
 /** True when the current hash shows this session: `#/s/<id>` or a split pane `#/split/<a>/<b>`. */
 function hashShowsSession(hash: string, sessionId: string): boolean {
@@ -41,7 +42,15 @@ function bodyFor(item: AttentionItem, t: (key: MsgKey, vars?: Record<string, str
   }
 }
 
-export function useTurnNotices(onOpen?: (sessionId: string) => void): {
+/** The one sound a snapshot plays for what is new in it, the most urgent first. */
+export function cueFor(kinds: AttentionItem['kind'][], newBudget: boolean): Cue | null {
+  if (newBudget || kinds.some((kind) => kind === 'error' || kind === 'conflict')) return 'problem';
+  if (kinds.some((kind) => kind === 'question' || kind === 'workflowPause')) return 'yourTurn';
+  if (kinds.some((kind) => kind === 'awaitingIntegration')) return 'done';
+  return null;
+}
+
+export function useTurnNotices(onOpen?: (sessionId: string) => void, sounds = true): {
   items: AttentionItem[];
   /** Moves on every accepted plugin block update: the block-fetching components refetch on it. */
   pluginsVersion: number;
@@ -59,6 +68,8 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): {
   // latest `openSession` without re-creating the stream on every render.
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
+  const soundsRef = useRef(sounds);
+  soundsRef.current = sounds;
 
   useEffect(() => {
     let source: EventSource | null = null;
@@ -119,6 +130,17 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): {
         // not notify for what was already waiting before the tab opened.
         const first = baseline.current;
         baseline.current = false;
+        if (!first && soundsRef.current) {
+          const newItems = snapshot.items.filter((item) => !previous.current.has(item.sessionId));
+          const newBudgets = budgets.filter(
+            (budget) => !previousBudgets.current.has(budget.projectId + ':' + budget.status),
+          );
+          const cue = cueFor(
+            newItems.map((item) => item.kind),
+            newBudgets.length > 0,
+          );
+          if (cue) playCue(cue);
+        }
         if (
           !first &&
           'Notification' in window &&
@@ -173,6 +195,16 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): {
       source?.close();
       clearOfflineTimer();
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unlock = () => unlockSounds();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
     };
   }, []);
 

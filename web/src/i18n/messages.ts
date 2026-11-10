@@ -7,6 +7,9 @@
 export type Lang = 'en' | 'fr';
 
 export const en = {
+  displayNoticesTitle: 'Notices',
+  soundsLabel: 'Sounds',
+  soundsHint: 'A short sound when a session needs you: a question, work to integrate, an error.',
   offlineTitle: 'fennec lost the trail of its server',
   offlineBody: 'The connection to the fennec server is down. Your work is safe on the server: this page comes back by itself as soon as it answers again.',
   offlineRetrying: 'Reconnecting…',
@@ -1523,6 +1526,9 @@ export const en = {
 export type MsgKey = keyof typeof en;
 
 export const fr: Record<MsgKey, string> = {
+  displayNoticesTitle: 'Notifications',
+  soundsLabel: 'Sons',
+  soundsHint: "Un son court quand une session a besoin de vous : une question, un travail à intégrer, une erreur.",
   offlineTitle: 'fennec a perdu la piste de son serveur',
   offlineBody: 'La connexion au serveur fennec est coupée. Votre travail est en sécurité côté serveur : cette page revient d\'elle-même dès qu\'il répond à nouveau.',
   offlineRetrying: 'Reconnexion…',

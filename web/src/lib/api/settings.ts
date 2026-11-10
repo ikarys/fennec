@@ -23,6 +23,8 @@ export interface DisplayPrefs {
   language?: 'en' | 'fr';
   /** The IDE the "open in editor" links open (server default "vscode"). */
   editor?: EditorId;
+  /** Short sounds when something new needs attention (server default true). */
+  sounds?: boolean;
 }
 
 export interface SearchPrefs {

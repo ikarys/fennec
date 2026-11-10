@@ -7,7 +7,8 @@ export const defaultDisplayPrefs: DisplayPrefs = {
   reasoningOpen: true,
   toolResultsOpen: false,
   fontSize: 14,
-  language: 'en'
+  language: 'en',
+  sounds: true
 };
 
 const DisplayPrefsContext = createContext<DisplayPrefs>(defaultDisplayPrefs);

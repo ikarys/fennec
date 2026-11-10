@@ -1,4 +1,4 @@
-/** Appearance settings: theme, language/text, and thread defaults. */
+/** Appearance settings: theme, language/text, thread defaults and notice sounds. */
 import type { DisplayPrefs, EditorId } from '../../lib/api';
 import { EDITORS } from '../../lib/editors';
 import { Segmented } from '../ui/Segmented';
@@ -7,7 +7,7 @@ import { Select } from '../ui/Field';
 import { Switch } from '../ui/Switch';
 import { ThemePicker } from '../settings/ThemePicker';
 import { SettingRow } from '../ui/SettingRow';
-import { ChatIcon, EyeIcon, GlobeIcon } from '../ui/Icons';
+import { BellIcon, ChatIcon, EyeIcon, GlobeIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { ThemeId } from '../../lib/theme';
@@ -84,6 +84,16 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
             label={t('toolResultsOpen')}
             checked={value.toolResultsOpen}
             onChange={(toolResultsOpen) => onChange({ ...value, toolResultsOpen })}
+          />
+        </SettingRow>
+      </Section>
+
+      <Section Icon={BellIcon} title={t('displayNoticesTitle')} flush save={save}>
+        <SettingRow label={t('soundsLabel')} hint={t('soundsHint')}>
+          <Switch
+            label={t('soundsLabel')}
+            checked={value.sounds ?? true}
+            onChange={(sounds) => onChange({ ...value, sounds })}
           />
         </SettingRow>
       </Section>

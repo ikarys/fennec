@@ -139,7 +139,8 @@ as the `local` provider's, and written back in the new shape.
   "display": {
     "reasoningOpen": true,
     "toolResultsOpen": false,
-    "fontSize": 14
+    "fontSize": 14,
+    "sounds": true
   },
   "globalInstructions": "string | null",
   "search": {
