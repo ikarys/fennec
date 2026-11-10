@@ -2,7 +2,6 @@
 import { type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import {
@@ -79,6 +78,7 @@ export function DashboardSection({
       <PluginsSection projectId={projectId} />
 
       <Section
+        Icon={ClockIcon}
         title={t('recentSessions')}
         flush
         actions={
@@ -94,9 +94,9 @@ export function DashboardSection({
         }
       >
         {data.recent.length === 0 ? (
-          <Card className="px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</Card>
+          <p className="m-0 px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</p>
         ) : (
-          <Card className="overflow-hidden">
+          <>
             <TableHeader>
               <span className="min-w-0 grow">{t('titleCol')}</span>
               <span className="w-28 shrink-0">{t('statusCol')}</span>
@@ -133,7 +133,7 @@ export function DashboardSection({
                 </li>
               ))}
             </ul>
-          </Card>
+          </>
         )}
       </Section>
 

@@ -1,7 +1,8 @@
+/** Home project section: a project, its badges, and its sessions. */
 import { useState } from 'react';
 import type { Project } from '../../lib/api';
 import { useT } from '../../i18n';
-import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon } from '../ui/Icons';
+import { BulbIcon, ChevronRightIcon, GlobeIcon, PlusIcon, ProjectIcon } from '../ui/Icons';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { FavoriteButton } from './FavoriteButton';
@@ -37,8 +38,12 @@ export function ProjectSection({
   const runningCount = project.sessions.filter((session) => session.state === 'running').length;
 
   return (
-    <section className="overflow-hidden rounded-md border border-border bg-panel">
-      <div className="flex min-h-12 items-center gap-2.5 px-3 py-2">
+    <section className="overflow-hidden rounded-xl border border-border bg-panel">
+      <div
+        className={`flex min-h-12 items-center gap-2.5 bg-linear-to-r from-accent-soft to-transparent to-75% px-3 py-2 ${
+          open ? 'border-b border-border' : ''
+        }`}
+      >
         <button
           type="button"
           aria-expanded={open}
@@ -48,6 +53,9 @@ export function ProjectSection({
           <ChevronRightIcon
             className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
           />
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+            <ProjectIcon className="h-3.5 w-3.5" />
+          </span>
           <span className="shrink-0 text-sm font-semibold">{project.name}</span>
           {runningCount > 0 && (
             <Badge tone="accent" appearance="solid" dot pulse>

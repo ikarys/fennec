@@ -1,7 +1,8 @@
 /** A tab rail: vertical for page sections, horizontal for sub-sections. */
 import type { ReactNode } from 'react';
+import type { PuzzleIcon } from './Icons';
 
-type Tab<T extends string> = { id: T; label: string; count?: number };
+type Tab<T extends string> = { id: T; label: string; count?: number; Icon?: typeof PuzzleIcon };
 
 export function Tabs<T extends string>({
   tabs,
@@ -69,7 +70,7 @@ export function Tabs<T extends string>({
       role="tablist"
       aria-label={label}
       aria-orientation="vertical"
-      className="flex shrink-0 gap-1 overflow-x-auto md:w-44 md:flex-col md:overflow-visible"
+      className="flex shrink-0 gap-px overflow-x-auto md:sticky md:top-6 md:w-56 md:flex-col md:overflow-visible"
     >
       {tabs.map((tab) => (
         <button
@@ -78,12 +79,13 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={tab.id === active}
           onClick={() => onSelect(tab.id)}
-          className={`whitespace-nowrap rounded-r-md border-l-2 px-3 py-2 text-left text-sm transition-colors ${
+          className={`relative flex h-[34px] items-center gap-2.5 whitespace-nowrap rounded-md pl-2 pr-2.5 text-left text-sm transition-colors ${
             tab.id === active
-              ? 'border-accent bg-raised font-medium text-text'
-              : 'border-transparent text-muted hover:bg-raised hover:text-text'
+              ? 'bg-accent-soft font-semibold text-accent before:absolute before:-left-0.5 before:top-[7px] before:bottom-[7px] before:w-[2.5px] before:rounded-sm before:bg-accent'
+              : 'text-muted hover:bg-raised hover:text-text'
           }`}
         >
+          {tab.Icon ? <tab.Icon className="h-4 w-4 shrink-0" /> : null}
           {renderLabel(tab)}
         </button>
       ))}

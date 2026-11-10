@@ -3,7 +3,7 @@
  * its sessions are on that page and in the list view.
  */
 import type { Project } from '../../lib/api';
-import { BulbIcon, PlusIcon } from '../ui/Icons';
+import { BulbIcon, FolderIcon, PlusIcon } from '../ui/Icons';
 import { FavoriteButton } from './FavoriteButton';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
@@ -23,7 +23,10 @@ export function ProjectTile({
 
   return (
     <article className="group relative flex flex-col gap-2 rounded-xl border border-border bg-panel p-4 transition-colors hover:border-accent hover:bg-accent-soft">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="-mx-4 -mt-4 mb-1 flex min-w-0 items-center gap-2.5 rounded-t-xl border-b border-border bg-linear-to-r from-accent-soft to-transparent to-75% px-4 py-2.5">
+        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+          <FolderIcon className="h-3.5 w-3.5" />
+        </span>
         <a
           href={'#/project/' + encodeURIComponent(project.id)}
           title={t('viewProject')}

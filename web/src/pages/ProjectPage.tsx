@@ -1,7 +1,23 @@
+/** Project page: section rail and content for one project. */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
-import { ExternalIcon, PlusIcon, ProjectIcon, TrashIcon } from '../components/ui/Icons';
+import {
+  ActivityIcon,
+  AlertIcon,
+  BulbIcon,
+  CommitIcon,
+  ExternalIcon,
+  FileIcon,
+  InsightIcon,
+  LayersIcon,
+  PlusIcon,
+  ProjectIcon,
+  SearchIcon,
+  TerminalIcon,
+  TrashIcon,
+  WandIcon,
+} from '../components/ui/Icons';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
@@ -26,16 +42,16 @@ import { useT } from '../i18n';
 
 
 const TABS = [
-  { id: 'overview', label: 'tasksTabOverview' },
-  { id: 'indicators', label: 'indicatorsTab' },
-  { id: 'tasks', label: 'tasks' },
-  { id: 'sessions', label: 'sessionsSectionTitle' },
-  { id: 'contributions', label: 'contributionsTitle' },
-  { id: 'map', label: 'moduleMapTitle' },
-  { id: 'risks', label: 'risksLabel' },
-  { id: 'doc', label: 'projectPageDoc' },
-  { id: 'canvas', label: 'canvasLibraryTab' },
-  { id: 'analyses', label: 'analysesTitle' },
+  { id: 'overview', label: 'tasksTabOverview', Icon: ActivityIcon },
+  { id: 'indicators', label: 'indicatorsTab', Icon: InsightIcon },
+  { id: 'tasks', label: 'tasks', Icon: BulbIcon },
+  { id: 'sessions', label: 'sessionsSectionTitle', Icon: TerminalIcon },
+  { id: 'contributions', label: 'contributionsTitle', Icon: CommitIcon },
+  { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
+  { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
+  { id: 'doc', label: 'projectPageDoc', Icon: FileIcon },
+  { id: 'canvas', label: 'canvasLibraryTab', Icon: WandIcon },
+  { id: 'analyses', label: 'analysesTitle', Icon: SearchIcon },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
