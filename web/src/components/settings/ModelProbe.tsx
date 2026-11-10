@@ -31,7 +31,7 @@ function report(lang: Lang, probed: ProbedModel): string {
 }
 
 /**
- * "Auto": probes the model at its stored endpoint and fills the form with
+ * "Auto config": probes the model at its stored endpoint and fills the form with
  * the limits found. Indicative: read from the endpoint's error messages.
  */
 export function ModelProbe({
@@ -67,13 +67,12 @@ export function ModelProbe({
       <Button
         variant="secondary"
         size="sm"
-        iconOnly
         disabled={busy}
-        aria-label="Auto"
         title={busy ? t('probing') : t('probeTitle')}
         onClick={() => void probe()}
       >
         {busy ? <SpinnerIcon className="h-4 w-4" /> : <WandIcon className="h-4 w-4" />}
+        {t('probeButton')}
       </Button>
       {message && (
         <span className={`text-xs ${message.failed ? 'text-err' : 'text-muted'}`}>
