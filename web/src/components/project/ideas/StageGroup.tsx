@@ -5,6 +5,8 @@ import { useState, type ReactNode } from "react";
 import { Card } from "../../ui/Card";
 import { SectionLabel } from "../../ui/SectionLabel";
 import { IdeaRow } from "./IdeaRow";
+import { Pager } from "../../ui/Pager";
+import { usePaged } from "../../../hooks/usePaged";
 import {
   reorderIdeas,
   type IdeaBoard,
@@ -65,6 +67,7 @@ export function StageGroup({
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const t = useT();
+  const paged = usePaged(ideas);
 
   const move = async (from: number, to: number) => {
     if (
@@ -94,7 +97,9 @@ export function StageGroup({
         {stage === "queue" && ideas.length === 0 ? (
           <p className="m-0 px-3 py-2 text-sm text-muted">{t('noReadyTasks')}</p>
         ) : null}
-        {ideas.map((idea, index) => {
+        {paged.visible.map((idea, visibleIndex) => {
+          // Reordering works on the whole queue, not the page.
+          const index = paged.page * paged.size + visibleIndex;
           const reorder =
             stage === "queue" && ideas.length > 1
               ? {
@@ -131,6 +136,7 @@ export function StageGroup({
             />
           );
         })}
+        <Pager paged={paged} />
       </ListFrame>
     </>
   );

@@ -1,7 +1,7 @@
 // Slices an already-loaded list into pages; the page is clamped when the list or the page size changes.
 import { useState } from 'react';
 
-export const PAGE_SIZES = [25, 50] as const;
+export const PAGE_SIZES = [25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 
 export interface Paged<T> {
