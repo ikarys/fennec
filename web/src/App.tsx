@@ -340,7 +340,8 @@ export default function App() {
       <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
         <TopBar
           tabs={tabInfos}
-          activeTabId={activeTabId}
+          // The highlighted tab follows the route: on home or a project page none is.
+          activeTabId={route.name === 'split' ? activeTabId : tabIdForRoute(route)}
           attention={attention}
           onOpenAttention={openSession}
           onPickTab={pickTab}
