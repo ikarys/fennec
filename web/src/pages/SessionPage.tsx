@@ -1,89 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { addPlannedIdea, frameIdea, markIdeaReady } from "../lib/ideas";
-import type {
-  AttachmentInput,
-  Project,
-  SessionDetail,
-  SessionState,
-} from "../lib/api";
-import { lastHumanMessage, pendingPlanOf } from "../lib/plan";
-import {
-  createSession,
-  getSession,
-  sendMessage,
-  startWorkflow,
-} from "../lib/api";
-import { readImages } from "../lib/attachments";
-import { formatDateTime } from "../lib/format";
-import { sessionStatus } from "../lib/sessionStatus";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Project, SessionState } from "../lib/api";
 import { runWaiting } from "../lib/workflowRun";
+import { sessionStatus } from "../lib/sessionStatus";
 import { useLang, useT } from "../i18n";
 import { useSessionThread } from "../hooks/useSessionThread";
+import { useSessionDetail } from "../hooks/useSessionDetail";
+import { useSessionTabSync } from "../hooks/useSessionTabSync";
 import { useProjectOptions } from "../hooks/useProjectOptions";
 import { useModeAndModel } from "../hooks/useModeAndModel";
-import { AGENT_SHORTCUT_EVENT } from "../lib/shortcuts";
+import { useAgentChoice } from "../hooks/useAgentChoice";
 import { useScrollFollow } from "../hooks/useScrollFollow";
 import { useSessionActions } from "../hooks/useSessionActions";
 import { useWorkflowActions } from "../hooks/useWorkflowActions";
 import { useSessionMcp } from "../hooks/useSessionMcp";
+import { useComposerDraft } from "../hooks/useComposerDraft";
 import { useComposerPrefill } from "../hooks/useComposerPrefill";
+import { useSessionSend } from "../hooks/useSessionSend";
+import { useSessionPlan } from "../hooks/useSessionPlan";
+import { useSessionDecisions } from "../hooks/useSessionDecisions";
+import { useJumpToNode } from "../hooks/useJumpToNode";
 import { Composer } from "../components/session/Composer";
-import { ChatLinkPicker } from "../components/session/ChatLinkPicker";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
-import { Badge } from "../components/ui/Badge";
-import { AuditDecision } from "../components/session/AuditDecision";
-import { ProposedTasksDecision } from "../components/session/ProposedTasksDecision";
-import { AgentsMdDecision } from "../components/session/AgentsMdDecision";
-import { RuleProposalDecision } from "../components/session/RuleProposalDecision";
-import { AgentSuggestionDecision } from "../components/session/AgentSuggestionDecision";
-import { IntegrationDecision } from "../components/session/IntegrationDecision";
 import { ContextPanel } from "../components/session/ContextPanel";
-import { ContextGauge } from "../components/session/ContextGauge";
-import { QuestionDecision } from "../components/session/QuestionDecision";
-import { ApprovalDecision } from "../components/session/ApprovalDecision";
-import { WaiverDecision } from "../components/session/WaiverDecision";
 import { QueuedMessages } from "../components/session/QueuedMessages";
-import { RetryDecision } from "../components/session/RetryDecision";
-import { ThreadItemView } from "../components/session/Thread";
-import { PendingPlanContext, planAnchorId } from "../components/session/PendingPlan";
-import { DecisionBar } from "../components/session/DecisionBar";
 import { HandedPlanNote } from "../components/session/HandedPlanNote";
-import { PlanDecision, type PlanDecisionActions } from "../components/session/PlanDecision";
-import {
-  CallUsageContext,
-  WorkflowUsageContext,
-} from "../components/session/CallUsage";
-import {
-  IntegrationInviteContext,
-  type IntegrationInvite,
-} from "../components/session/IntegrationInvite";
-import { IntegrationDialog } from "../components/session/IntegrationDialog";
-import { TryDialog } from "../components/session/TryDialog";
-import { PlayIcon, CloseIcon } from "../components/ui/Icons";
-import {
-  PreviewContext,
-  PreviewWorkdirContext,
-  type PreviewTarget,
-} from "../components/preview/PreviewContext";
-import { PreviewPane } from "../components/preview/PreviewPane";
-import { CanvasPane } from "../components/canvas/CanvasPane";
-import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
-import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
-import { FileLinkContext } from "../components/session/FileLinkContext";
-import { changesPath, editorPath } from "../lib/route";
+import { SessionDecisionBar } from "../components/session/SessionDecisionBar";
+import { SessionHeader } from "../components/session/SessionHeader";
+import { SessionOverlays } from "../components/session/SessionOverlays";
+import { SessionProviders } from "../components/session/SessionProviders";
+import { SessionThreadPane } from "../components/session/SessionThreadPane";
+import { WorkflowNodeNotice } from "../components/session/WorkflowNodeNotice";
+import type { PreviewTarget } from "../components/preview/PreviewContext";
 import { RunRail } from "../components/workflow/session/RunRail";
-import { useJumpToNode } from "../hooks/useJumpToNode";
-import { RunDecision } from "../components/workflow/session/RunDecision";
-import { Button, buttonClass } from "../components/ui/Button";
-import {
-  DEFAULT_WORKFLOW_ID,
-  defaultWorkflowSelection,
-} from "../components/workflow/session/WorkflowPicker";
-
-// One unsent draft per session, kept while the app lives: switching tabs must
-// never carry a draft to another agent, and coming back must find it again.
-const drafts = new Map<string, string>();
 
 interface SessionPageProps {
   sessionId: string | null;
@@ -118,36 +67,8 @@ export function SessionPage({
   onRenamed,
   onClose,
 }: SessionPageProps) {
-  const [detail, setDetail] = useState<SessionDetail | null>(null);
-  const [text, setText] = useState("");
-  const draftKey = sessionId ?? `new:${projectId ?? ""}`;
-  const textRef = useRef(text);
-  textRef.current = text;
-  useEffect(() => {
-    setText(drafts.get(draftKey) ?? "");
-    // Saved when the key changes: the cleanup still sees the old key.
-    return () => {
-      drafts.set(draftKey, textRef.current);
-    };
-  }, [draftKey]);
-  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
-  const [sendError, setSendError] = useState<string | null>(null);
-  // A session framing a backlog idea only talks: its messages must not start
-  // the default build workflow (a "go on" there once ran a whole build).
-  const framingIdea = detail?.idea?.state === "framing";
-  const [planBuildInFlight, setPlanBuildInFlight] = useState(false);
-  // The decision bar opens one row at a time; the id is the decision's (a plan's call id).
-  const [openDecision, setOpenDecision] = useState<string | null>(null);
-  const [preview, setPreview] = useState<PreviewTarget | null>(null);
-  const [contextRevealKey, setContextRevealKey] = useState(0);
-  const [canvasId, setCanvasId] = useState<number | null>(null);
-  const [runComment, setRunComment] = useState("");
-  const [detailVersion, setDetailVersion] = useState(0);
-  // The plan last put in the backlog: its button says so until a new plan comes.
-  const [backlogSegment, setBacklogSegment] = useState<string | null>(null);
-  const [integrationOpen, setIntegrationOpen] = useState(false);
-  const [tryOpen, setTryOpen] = useState(false);
-  const [integrationVersion, setIntegrationVersion] = useState(0);
+  const lang = useLang();
+  const t = useT();
   const {
     view,
     hasMore,
@@ -162,44 +83,41 @@ export function SessionPage({
     served,
     refreshThread,
   } = useSessionThread(sessionId);
-  const lang = useLang();
-  const t = useT();
   const running = view.running;
-  const pendingCallId =
-    served.pendingApproval?.callId ?? served.pendingWaiver?.callId;
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
+  const { detail, detailVersion, reloadDetail } = useSessionDetail(sessionId, running);
+  useSessionTabSync(running, view.name, onRunningChanged, onRenamed);
+
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [contextRevealKey, setContextRevealKey] = useState(0);
+  const [canvasId, setCanvasId] = useState<number | null>(null);
+  const [runComment, setRunComment] = useState("");
+  const [integrationOpen, setIntegrationOpen] = useState(false);
+  const [tryOpen, setTryOpen] = useState(false);
+  const [integrationVersion, setIntegrationVersion] = useState(0);
+  const openIntegration = useCallback(() => setIntegrationOpen(true), []);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // The detail is fetched once; the event stream says how a turn ended.
   const state: SessionState = running
     ? "running"
     : ((view.lastDone as SessionState | undefined) ?? detail?.state ?? "idle");
   const status = sessionStatus(lang, state, run, waiting);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const previousRunning = useRef(running);
-  const {
-    commands,
-    agents,
-    workflows,
-    workflowSelection,
-    setWorkflowSelection,
-  } = useProjectOptions({
-    projectId: detail?.project.id ?? projectId,
-    testWorkflowId,
-    frameIdeaId,
-    framingIdea,
-  });
+  // A session framing a backlog idea only talks: its messages must not start
+  // the default build workflow (a "go on" there once ran a whole build).
+  const framingIdea = detail?.idea?.state === "framing";
+  const { commands, agents, workflows, workflowSelection, setWorkflowSelection } =
+    useProjectOptions({
+      projectId: detail?.project.id ?? projectId,
+      testWorkflowId,
+      frameIdeaId,
+      framingIdea,
+    });
   // A chat has no folder: it starts in `builder` (talk, act on request), not
   // in the project's framing agent, and the header shows "Chat".
   const isChat = detail?.project.chat ?? projectId === "chat";
-  const linkProjectId = detail?.project.id ?? projectId;
-  const fileLink = useMemo(
-    () =>
-      sessionId && linkProjectId && !isChat
-        ? (path: string) =>
-            detail?.worktree?.commits ? changesPath(sessionId, path) : editorPath(linkProjectId, path)
-        : null,
-    [sessionId, linkProjectId, isChat, detail?.worktree?.commits],
-  );
   const {
     modelChoices,
     mode,
@@ -221,114 +139,30 @@ export function SessionPage({
       : (agents[0]?.id ?? null),
     detailModel: detail?.model ?? null,
     onError: setSendError,
-    onModelApplied: () => setDetailVersion((version) => version + 1),
+    onModelApplied: reloadDetail,
   });
-  // Picking an agent means talking to it: the composer's default workflow
-  // would otherwise take the message and start with its planner instead —
-  // unless the agent carries its own default, kept only while the project
-  // offers that workflow.
-  function chooseAgent(agent: string) {
-    const workflow = agents.find((a) => a.id === agent)?.workflow ?? null;
-    setWorkflowSelection((selection) => ({
-      ...selection,
-      workflowId: workflow && workflows.some((w) => w.id === workflow) ? workflow : null,
-      stepByStep: false,
-    }));
-    return handleModeChange(agent);
-  }
-
-  // A keyboard shortcut switches the agent like the composer's picker; a chat has no picker.
-  const chooseAgentRef = useRef(chooseAgent);
-  chooseAgentRef.current = chooseAgent;
-  useEffect(() => {
-    if (isChat) return;
-    const onAgent = (event: Event) => {
-      const agent = (event as CustomEvent<string>).detail;
-      if (agents.some((candidate) => candidate.id === agent)) void chooseAgentRef.current(agent);
-    };
-    window.addEventListener(AGENT_SHORTCUT_EVENT, onAgent);
-    return () => window.removeEventListener(AGENT_SHORTCUT_EVENT, onAgent);
-  }, [isChat, agents]);
-  const {
-    scrollRef,
-    contentRef,
-    awayFromBottom,
-    setFollow,
-    onScroll,
-    handleLoadOlder,
-  } = useScrollFollow({ sessionId, view, detail, loadOlder });
+  const chooseAgent = useAgentChoice({
+    isChat,
+    agents,
+    workflows,
+    setWorkflowSelection,
+    handleModeChange,
+  });
+  const { scrollRef, contentRef, awayFromBottom, setFollow, onScroll, handleLoadOlder } =
+    useScrollFollow({ sessionId, view, detail, loadOlder });
   const jumpToNode = useJumpToNode({ view, hasMore, loadOlder, setFollow });
-  const {
-    compactError,
-    handleStop,
-    handleCompact,
-    handleReplay,
-    handleApproval,
-    handleCancelQueued,
-    handleWaiver,
-    handleRetry,
-  } = useSessionActions({
+  const actions = useSessionActions({
     sessionId,
     pendingApproval: served.pendingApproval,
     pendingWaiver: served.pendingWaiver,
     onError: setSendError,
   });
-  const {
-    handleStopWorkflow,
-    handlePauseWorkflow,
-    handleAnswerWorkflow,
-    handleContinueWorkflow,
-    handleResumeWorkflow,
-  } = useWorkflowActions({ sessionId, run });
-
-  useEffect(() => {
-    onRunningChanged();
-  }, [running, onRunningChanged]);
-
-  const previousName = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (view.name && view.name !== previousName.current) {
-      onRenamed();
-    }
-    previousName.current = view.name;
-  }, [view.name, onRenamed]);
-
-  useEffect(() => {
-    if (!sessionId) {
-      setDetail(null);
-      return;
-    }
-    let active = true;
-    getSession(sessionId)
-      .then((data) => {
-        if (active) setDetail(data);
-      })
-      .catch(() => {
-        // The event stream is the source of truth for the thread.
-      });
-    return () => {
-      active = false;
-    };
-  }, [sessionId, detailVersion]);
-
+  const workflowActions = useWorkflowActions({ sessionId, run });
   const { mcpView, draftMcpDisabled, toggleMcp } = useSessionMcp(sessionId, detailVersion);
 
-  useEffect(() => {
-    // A workflow's first turn creates the worktree: re-read the detail when
-    // a turn ends, not only on a reload.
-    if (previousRunning.current && !running) {
-      setDetailVersion((version) => version + 1);
-    }
-    previousRunning.current = running;
-  }, [running]);
-
-  useEffect(() => {
-    if (!sessionId) {
-      window.setTimeout(() => textareaRef.current?.focus(), 0);
-    }
-  }, [sessionId]);
-
+  const { text, setText, attachments, setAttachments } = useComposerDraft(
+    sessionId ?? `new:${projectId ?? ""}`,
+  );
   useComposerPrefill({
     sessionId,
     projectId,
@@ -338,6 +172,61 @@ export function SessionPage({
     setText,
     setAttachments,
   });
+  const { handleSend, handleAttach, handleRemoveAttachment } = useSessionSend({
+    sessionId,
+    projectId,
+    frameIdeaId,
+    pseudoTabId,
+    isChat,
+    running,
+    run,
+    hasPendingQuestion: Boolean(view.pendingQuestion),
+    mode,
+    pendingModel,
+    pendingEffort,
+    draftMcpDisabled,
+    workflows,
+    workflowSelection,
+    setWorkflowSelection,
+    text,
+    setText,
+    attachments,
+    setAttachments,
+    setSendError,
+    onSessionCreated,
+  });
+  const { pendingPlan, planActions, handleTakeBackPlan } = useSessionPlan({
+    sessionId,
+    detail,
+    view,
+    served,
+    isChat,
+    running,
+    workflows,
+    setWorkflowSelection,
+    textareaRef,
+    handleModeChange,
+    setSendError,
+    reloadDetail,
+    refreshThread,
+  });
+  const decisions = useSessionDecisions({
+    sessionId,
+    detail,
+    view,
+    served,
+    running,
+    waiting,
+    pendingPlan,
+    planActions,
+    openIntegration,
+  });
+
+  useEffect(() => {
+    if (!sessionId) {
+      window.setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     if (view.pendingQuestion && !running) {
@@ -354,722 +243,179 @@ export function SessionPage({
 
   const title =
     view.name ?? detail?.title ?? (sessionId ? t('session') : isChat ? t('paletteNewChat') : t('newSession'));
-
-  // The server serves the plan that waits whole: the thread holds only the log's tail, an
-  // older plan would be missing from it. A question after the plan keeps it offered.
-  const pendingPlan = useMemo(() => pendingPlanOf(served.pendingPlan), [served.pendingPlan]);
-  const planSource = pendingPlan ? { id: pendingPlan.id, content: pendingPlan.markdown } : null;
-  const planActions: PlanDecisionActions | null =
-    pendingPlan && !view.pendingQuestion && (!run || run.finished)
-      ? {
-          onBuild: handlePlanBuild,
-          onBuildAlone: handlePlanBuildAlone,
-          onRevise: handlePlanRevise,
-          onShowInThread: () =>
-            document.getElementById(planAnchorId(pendingPlan.id))?.scrollIntoView({ behavior: "smooth", block: "start" }),
-          // Without the default workflow, Launch falls back to the builder alone, in the folder.
-          worktreeAvailable: !isChat && workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID),
-          ideaReady: detail
-            ? {
-                onMark: () => void handleIdeaReady(),
-                idea:
-                  backlogSegment === pendingPlan.id
-                    ? "saved"
-                    : detail.idea?.state === "ready"
-                      ? "ready"
-                      : detail.idea
-                        ? "framing"
-                        : "none",
-              }
-            : undefined,
-          disabled: running || planBuildInFlight,
-        }
-      : null;
-  // What blocks the agent until the human answers; a node's session is answered in its parent.
-  const answerable = !running && !waiting && !detail?.parentId;
-  const blocking = {
-    approval: answerable ? served.pendingApproval : null,
-    waiver: answerable ? served.pendingWaiver : null,
-    question: answerable ? view.pendingQuestion : null,
-    run: waiting && !detail?.parentId ? waiting : null,
-    retry: answerable && view.lastDone === "error" && !view.pendingQuestion,
-  };
-  const runDecisionId = blocking.run
-    ? `run-${blocking.run.kind === "human" ? blocking.run.nodeId : blocking.run.kind}`
-    : null;
-  // The last run ended done and its work is not integrated yet: the bar invites to review it.
-  const runWorkReady = useMemo(() => {
-    for (let i = view.items.length - 1; i >= 0; i -= 1) {
-      const item = view.items[i];
-      if (item?.id.startsWith("integration-applied-")) return false;
-      if (item && item.kind === "workflow-end") return item.outcome === "done";
-    }
-    return false;
-  }, [view.items]);
-  const integrationInvite = useMemo<IntegrationInvite | null>(() => {
-    // No commit on the agent's branch: nothing to review, no invitation.
-    if (!sessionId || !detail?.worktree?.commits) return null;
-    return { open: () => setIntegrationOpen(true) };
-  }, [sessionId, detail?.worktree?.commits]);
-  // The agent's proposals wait in the bar until taken; none of them blocks the agent.
-  const offered = detail && sessionId && !running ? detail : null;
-  const proposals = {
-    audit: offered?.audit && offered.audit.findings.some((finding) => !offered.audit!.taken.includes(finding.number)) ? offered.audit : null,
-    tasks: offered?.proposedTasks.some((task) => task.ideaId === null) ? offered.proposedTasks : null,
-    agentsMd: offered?.agentsMdDraft && !offered.agentsMdDraft.written ? offered.agentsMdDraft : null,
-    rules: offered?.ruleProposal && !offered.ruleProposal.added && offered.ruleProposal.lines.length > 0 ? offered.ruleProposal : null,
-    suggestion: offered?.agentSuggestion && offered.project.id ? offered.agentSuggestion : null,
-    integration: !running && runWorkReady ? integrationInvite : null,
-  };
-  const decisionCount =
-    [blocking.approval, blocking.waiver, blocking.question, blocking.run, blocking.retry].filter(Boolean).length +
-    (!detail?.parentId && pendingPlan && planActions ? 1 : 0) +
-    Object.values(proposals).filter(Boolean).length;
-  const blockingId =
-    blocking.approval?.callId ??
-    blocking.waiver?.callId ??
-    blocking.question?.callId ??
-    runDecisionId ??
-    (blocking.retry ? "retry" : null);
-  // A blocking decision opens on arrival: the agent waits on it.
-  useEffect(() => {
-    if (blockingId) setOpenDecision(blockingId);
-  }, [blockingId]);
-  const toggleDecision = (id: string) => setOpenDecision((open) => (open === id ? null : id));
   const projectName =
     detail?.project.name ??
     projects.find((project) => project.id === projectId)?.name ??
     projectId ??
     "—";
-
-  // A send in flight: a second Enter or click before the server answers would
-  // create a second session (or send the message twice).
-  const sending = useRef(false);
-
-  async function handleSend(content?: string) {
-    if (sending.current) return;
-    sending.current = true;
-    try {
-      await send(content);
-    } finally {
-      sending.current = false;
-    }
-  }
-
-  async function send(content?: string) {
-    // Attachments belong to the composer; a quick answer (`content`) sends none.
-    const fromComposer = content === undefined;
-    const value = (content ?? text).trim();
-    const images = fromComposer ? attachments : [];
-    if (!value && images.length === 0) return;
-    setSendError(null);
-
-    // Ask for notification permission in the user gesture that starts a turn.
-    if ('Notification' in window && Notification.permission === 'default') {
-      void Notification.requestPermission();
-    }
-
-    // A quick answer or a message to a running/waiting run is an ordinary
-    // message, not a workflow start.
-    const workflowId =
-      fromComposer &&
-      !isChat &&
-      workflowSelection.workflowId &&
-      !running &&
-      (!run || run.finished) &&
-      !view.pendingQuestion
-        ? workflowSelection.workflowId
-        : null;
-
-    try {
-      if (workflowId) {
-        if (sessionId) {
-          await startWorkflow(
-            sessionId,
-            workflowId,
-            value,
-            workflowSelection.stepByStep,
-            workflowSelection.worktree,
-            images,
-          );
-        } else if (projectId) {
-          const created = await createSession(
-            projectId,
-            value,
-            mode ?? undefined,
-            images,
-            {
-              workflowId,
-              stepByStep: workflowSelection.stepByStep,
-              worktree: workflowSelection.worktree,
-            },
-            pendingModel ?? undefined,
-            draftMcpDisabled ?? undefined,
-            pendingEffort?.value ?? undefined,
-          );
-          onSessionCreated(created.id, pseudoTabId);
-        }
-        // The next message gets the default workflow again.
-        setWorkflowSelection(defaultWorkflowSelection(workflows));
-      } else if (sessionId) {
-        await sendMessage(sessionId, value, images);
-      } else if (projectId) {
-        // A mode chosen before creation is applied to the first turn.
-        const created = await createSession(
-          projectId,
-          value,
-          frameIdeaId ? "plan" : (mode ?? undefined),
-          images,
-          undefined,
-          pendingModel ?? undefined,
-          draftMcpDisabled ?? undefined,
-          pendingEffort?.value ?? undefined,
-        );
-        if (frameIdeaId) {
-          await frameIdea(projectId, frameIdeaId, created.id);
-        }
-        onSessionCreated(created.id, pseudoTabId);
-      }
-      if (fromComposer) {
-        setText("");
-        setAttachments([]);
-      }
-    } catch (error) {
-      setSendError(
-        error instanceof Error ? error.message : t('sessionPageSendError'),
-      );
-    }
-  }
-
-  async function handleAttach(files: File[]) {
-    const { attachments: read, error } = await readImages(
-      lang,
-      files,
-      attachments.length,
-    );
-    setAttachments((current) => [...current, ...read]);
-    setSendError(error);
-  }
-
-  function handleRemoveAttachment(index: number) {
-    setAttachments((current) => current.filter((_, i) => i !== index));
-  }
-
-  async function runPlanBuildAlone() {
-    const modeChanged = await handleModeChange("builder");
-    // Sent directly, not through handleSend: a workflow picked in the
-    // composer would otherwise take this message as its task.
-    if (modeChanged && sessionId) {
-      await sendMessage(sessionId, t('sessionPageExecutePlanAbove'));
-    }
-  }
-
-  async function handlePlanBuild(worktree: boolean) {
-    if (planBuildInFlight) return;
-    setPlanBuildInFlight(true);
-    setSendError(null);
-    try {
-      if (
-        sessionId &&
-        workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID) &&
-        planSource
-      ) {
-        const task = lastHumanMessage(view.items) ?? t('sessionPageExecuteApprovedPlan');
-        await startWorkflow(
-          sessionId,
-          DEFAULT_WORKFLOW_ID,
-          task,
-          false,
-          worktree,
-          [],
-          planSource.content,
-        );
-        // The next message gets the default workflow again.
-        setWorkflowSelection(defaultWorkflowSelection(workflows));
-      } else {
-        await runPlanBuildAlone();
-      }
-    } catch (err) {
-      setSendError(
-        err instanceof Error ? err.message : t('sessionPageSendMessageError'),
-      );
-    } finally {
-      setPlanBuildInFlight(false);
-    }
-  }
-
-  async function handleIdeaReady() {
-    if (!detail || !planSource) return;
-    setSendError(null);
-    try {
-      if (detail.idea) {
-        await markIdeaReady(detail.project.id, detail.idea.id, planSource.content);
-      } else {
-        await addPlannedIdea(detail.project.id, detail.title, detail.id, planSource.content);
-      }
-      setBacklogSegment(planSource.id);
-      setDetailVersion((version) => version + 1);
-      // A backlog event is not in the session's log: the bar learns of it by asking again.
-      refreshThread();
-    } catch (err) {
-      setSendError(err instanceof Error ? err.message : t('unknownError'));
-    }
-  }
-
-  async function handlePlanBuildAlone() {
-    if (planBuildInFlight) return;
-    setPlanBuildInFlight(true);
-    setSendError(null);
-    try {
-      await runPlanBuildAlone();
-    } catch (err) {
-      setSendError(
-        err instanceof Error ? err.message : t('sessionPageSendMessageError'),
-      );
-    } finally {
-      setPlanBuildInFlight(false);
-    }
-  }
-
-  async function handleTakeBackPlan(ideaId: string) {
-    if (!detail) return;
-    setSendError(null);
-    try {
-      await frameIdea(detail.project.id, ideaId, detail.id);
-      setDetailVersion((version) => version + 1);
-      refreshThread();
-    } catch (err) {
-      setSendError(err instanceof Error ? err.message : t('unknownError'));
-    }
-  }
-
-  function handlePlanRevise() {
-    // The revision is an ordinary message to the planner, not a workflow start.
-    setWorkflowSelection((selection) => ({ ...selection, workflowId: null }));
-    textareaRef.current?.focus();
-  }
+  const pendingCallId =
+    served.pendingApproval?.callId ?? served.pendingWaiver?.callId;
 
   return (
-    <PreviewContext.Provider value={setPreview}>
-     <CanvasOpenerContext.Provider value={setCanvasId}>
-      <CanvasSessionContext.Provider value={sessionId ?? undefined}>
-      <FileLinkContext.Provider value={fileLink}>
-      {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
-      <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
-        <PendingPlanContext.Provider value={served.pendingPlan?.callId ?? null}>
-          <IntegrationInviteContext.Provider value={integrationInvite}>
-            <CallUsageContext.Provider value={calls}>
-              <WorkflowUsageContext.Provider value={workflowUsage}>
-                <div className="flex min-h-0 min-w-0 grow">
-                  {run && <RunRail run={run} onJump={jumpToNode} />}
-                  <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
-                    {/* A shadow under the title: the thread fades under it instead of meeting a hard edge. */}
-                    <div className="relative z-10 flex items-center gap-2 px-4 md:px-6 py-2.5 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-linear-to-b after:from-black/45 after:to-transparent">
-                      <div className="mx-auto flex w-full max-w-page items-center gap-2">
-                        {/* Title and state first; project and date on a quieter line below: the header stays light. */}
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <h1
-                              className="min-w-0 truncate text-base font-semibold"
-                              title={title}
-                            >
-                              {title}
-                            </h1>
-                            <Badge
-                              tone={status.tone}
-                              appearance="pill"
-                              dot={status.live}
-                              pulse={status.live}
-                            >
-                              {status.label}
-                            </Badge>
-                          </div>
-                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
-                            <span
-                              className="truncate"
-                              title={isChat ? undefined : detail?.project.workdir}
-                            >
-                              {isChat ? t('sessionPageChat') : projectName}
-                            </span>
-                            {detail && (
-                              <>
-                                <span aria-hidden>·</span>
-                                <span
-                                  className="shrink-0 tabular-nums"
-                                  title={t('sessionPageCreatedTitle')}
-                                >
-                                  {formatDateTime(lang, detail.createdAt)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-auto flex shrink-0 items-center gap-1">
-                          {sessionId && !isChat && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              title={t('tryChange')}
-                              onClick={() => setTryOpen(true)}
-                            >
-                              <PlayIcon className="h-3.5 w-3.5" />{t('tryChangeShort')}
-                            </Button>
-                          )}
-                          {sessionId && isChat && detail && (
-                            <ChatLinkPicker
-                              sessionId={sessionId}
-                              linkedProjectId={detail.linkedProjectId}
-                              projects={projects}
-                              onLinked={onRenamed}
-                            />
-                          )}
-                          {sessionId && (
-                            <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />
-                          )}
-                        </div>
-                        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-border" />
-                        <ContextGauge
-                          context={context}
-                          compactDisabled={
-                            !sessionId ||
-                            state === "running" ||
-                            state === "waiting_for_user"
-                          }
-                          onCompact={handleCompact}
-                          compactError={compactError}
-                          onOpen={() => setContextRevealKey((key) => key + 1)}
-                        />
-                        {onClose && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            iconOnly
-                            className="ml-1"
-                            title={t('splitClosePane')}
-                            aria-label={t('splitClosePane')}
-                            onClick={onClose}
-                          >
-                            <CloseIcon className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+    <SessionProviders
+      sessionId={sessionId}
+      linkProjectId={detail?.project.id ?? projectId}
+      detail={detail}
+      isChat={isChat}
+      onPreview={setPreview}
+      onOpenCanvas={setCanvasId}
+      pendingPlanCallId={served.pendingPlan?.callId ?? null}
+      integrationInvite={decisions.integrationInvite}
+      calls={calls}
+      workflowUsage={workflowUsage}
+    >
+      <div className="flex min-h-0 min-w-0 grow">
+        {run && <RunRail run={run} onJump={jumpToNode} />}
+        <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
+          <SessionHeader
+            title={title}
+            status={status}
+            sessionId={sessionId}
+            isChat={isChat}
+            projectName={projectName}
+            detail={detail}
+            projects={projects}
+            view={view}
+            context={context}
+            compactDisabled={!sessionId || state === "running" || state === "waiting_for_user"}
+            onCompact={actions.handleCompact}
+            compactError={actions.compactError}
+            onTry={() => setTryOpen(true)}
+            onOpenCanvas={setCanvasId}
+            onOpenContext={() => setContextRevealKey((key) => key + 1)}
+            onRenamed={onRenamed}
+            onClose={onClose}
+          />
+          <SessionThreadPane
+            scrollRef={scrollRef}
+            contentRef={contentRef}
+            onScroll={onScroll}
+            sessionId={sessionId}
+            view={view}
+            hasMore={hasMore}
+            loadingOlder={loadingOlder}
+            onLoadOlder={handleLoadOlder}
+            pendingCallId={pendingCallId}
+            model={currentModel ? modelShortName(currentModel.model) : t('sessionPageModelFallback')}
+            running={running}
+            replayable={served.replayable}
+            onReplay={actions.handleReplay}
+          />
+          {/* A node's session is driven by its workflow: the human answers in the parent. */}
+          {detail?.parentId && <WorkflowNodeNotice parentId={detail.parentId} running={running} />}
+          <RunningStrip
+            running={running}
+            run={run}
+            following={!awayFromBottom}
+            onFollowChange={setFollow}
+          />
+          {!detail?.parentId && (
+            <QueuedMessages queued={served.queued} onCancel={actions.handleCancelQueued} />
+          )}
+          {decisions.decisionCount > 0 && (
+            <SessionDecisionBar
+              decisions={decisions}
+              sessionId={sessionId}
+              detail={detail}
+              running={running}
+              pendingPlan={pendingPlan}
+              planActions={planActions}
+              actions={actions}
+              workflowActions={workflowActions}
+              runComment={runComment}
+              onRunCommentChange={setRunComment}
+              onAnswer={(answer) => void handleSend(answer)}
+              onDetailChanged={reloadDetail}
+            />
+          )}
+          {!detail?.parentId && detail && served.handedPlan && (
+            <HandedPlanNote
+              projectId={detail.project.id}
+              onUndo={served.handedPlan.undoable ? () => void handleTakeBackPlan(served.handedPlan!.ideaId) : undefined}
+            />
+          )}
+          {!detail?.parentId && (
+            <Composer
+              text={text}
+              onTextChange={setText}
+              onSend={() => handleSend()}
+              onStop={actions.handleStop}
+              onPause={run && !run.finished && !run.paused ? workflowActions.handlePauseWorkflow : undefined}
+              pauseRequested={run?.pauseRequested}
+              running={running}
+              currentModel={currentModel}
+              modelChoices={modelChoices}
+              onModelChange={handleModelChange}
+              effort={effort}
+              acceptedEfforts={acceptedEfforts}
+              defaultEffort={defaultEffort}
+              onEffortChange={(next) => void handleEffortChange(next)}
+              error={sendError}
+              textareaRef={textareaRef}
+              placeholder={
+                workflowSelection.workflowId && !isChat
+                  ? t('sessionPageWorkflowTaskPlaceholder')
+                  : view.pendingQuestion && !running
+                    ? t('sessionPageAnswerPlaceholder')
+                    : undefined
+              }
+              commands={commands}
+              // A chat talks to builder only: no agent nor workflow to pick.
+              agents={isChat ? undefined : agents}
+              mode={mode}
+              onModeChange={chooseAgent}
+              attachments={attachments}
+              onAttach={handleAttach}
+              onRemoveAttachment={handleRemoveAttachment}
+              workflows={isChat ? undefined : workflows}
+              workflowSelection={workflowSelection}
+              onWorkflowSelectionChange={setWorkflowSelection}
+              mcpView={mcpView}
+              onMcpToggle={toggleMcp}
+            />
+          )}
+        </main>
 
-                    {/* The thread scrolls in its column, so the scrollbar sits beside it;
-                        a wheel over the margins still scrolls the thread. */}
-                    <div
-                      className="relative min-h-0 grow"
-                      onWheel={(event) => {
-                        if (event.target === event.currentTarget) scrollRef.current?.scrollBy({ top: event.deltaY });
-                      }}
-                    >
-                      <div
-                        ref={scrollRef}
-                        onScroll={onScroll}
-                        className="mx-auto h-full max-w-[calc(var(--container-page)+3rem)] overflow-y-auto p-4 md:p-6"
-                      >
-                        <div
-                          ref={contentRef}
-                          className="mx-auto flex max-w-page flex-col gap-4.5"
-                        >
-                          {sessionId && hasMore && (
-                            <Button
-                              className="mx-auto"
-                              onClick={handleLoadOlder}
-                              disabled={loadingOlder}
-                            >
-                              {loadingOlder
-                                ? t('loading')
-                                : t('sessionPageLoadOlderMessages')}
-                            </Button>
-                          )}
-                          {view.items.length === 0 && !sessionId && (
-                            <div className="py-10 text-center text-sm text-muted">
-                              {t('sessionPageNewSessionHint')}
-                            </div>
-                          )}
-                          {view.items.map((item, index) => (
-                            <ThreadItemView
-                              key={item.id}
-                              item={item}
-                              pendingCallId={pendingCallId}
-                              model={
-                                currentModel
-                                  ? modelShortName(currentModel.model)
-                                  : t('sessionPageModelFallback')
-                              }
-                              running={running}
-                              showHeader={
-                                view.items[index - 1]?.kind !== "assistant"
-                              }
-                              onReplay={sessionId && served.replayable.includes(item.id) ? handleReplay : undefined}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* A node's session is driven by its workflow: the human answers in the parent. */}
-                    {detail?.parentId && (
-                      <div className="mx-auto flex max-w-page items-center gap-3 border-t border-border px-1 py-2">
-                        <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${running ? "bg-accent" : "bg-ok"}`}
-                        />
-                        <div className="min-w-0 grow">
-                          <div className="text-sm font-medium text-text">
-                            {running
-                              ? t('sessionPageWorkflowNodeRunning')
-                              : t('sessionPageWorkflowNodeFinished')}
-                          </div>
-                          <div className="text-xs text-muted">
-                            {t('sessionPageWorkflowDrivenSessionHint')}
-                          </div>
-                        </div>
-                        <a
-                          href={`#/s/${detail.parentId}`}
-                          className={buttonClass(
-                            { variant: "primary", size: "sm" },
-                            "shrink-0",
-                          )}
-                        >
-                          {t('sessionPageBackToWorkflow')}
-                        </a>
-                      </div>
-                    )}
-                    <RunningStrip
-                      running={running}
-                      run={run}
-                      following={!awayFromBottom}
-                      onFollowChange={setFollow}
-                    />
-                    {!detail?.parentId && (
-                      <QueuedMessages queued={served.queued} onCancel={handleCancelQueued} />
-                    )}
-                    {decisionCount > 0 && (
-                      <DecisionBar count={decisionCount} onEscape={() => setOpenDecision(null)}>
-                        {blocking.approval && (
-                          <ApprovalDecision
-                            approval={blocking.approval}
-                            onAnswer={handleApproval}
-                            disabled={running}
-                            open={openDecision === blocking.approval.callId}
-                            onToggle={() => toggleDecision(blocking.approval!.callId)}
-                          />
-                        )}
-                        {blocking.waiver && (
-                          <WaiverDecision
-                            waiver={blocking.waiver}
-                            onAnswer={handleWaiver}
-                            disabled={running}
-                            open={openDecision === blocking.waiver.callId}
-                            onToggle={() => toggleDecision(blocking.waiver!.callId)}
-                          />
-                        )}
-                        {blocking.question && (
-                          <QuestionDecision
-                            question={blocking.question}
-                            onAnswer={(answer) => handleSend(answer)}
-                            disabled={running}
-                            open={openDecision === blocking.question.callId}
-                            onToggle={() => toggleDecision(blocking.question!.callId)}
-                          />
-                        )}
-                        {blocking.run && runDecisionId && (
-                          <RunDecision
-                            waiting={blocking.run}
-                            onAnswer={handleAnswerWorkflow}
-                            onContinue={handleContinueWorkflow}
-                            onResume={handleResumeWorkflow}
-                            onStop={handleStopWorkflow}
-                            disabled={running}
-                            comment={runComment}
-                            onCommentChange={setRunComment}
-                            open={openDecision === runDecisionId}
-                            onToggle={() => toggleDecision(runDecisionId)}
-                          />
-                        )}
-                        {blocking.retry && (
-                          <RetryDecision
-                            onRetry={handleRetry}
-                            disabled={running}
-                            open={openDecision === "retry"}
-                            onToggle={() => toggleDecision("retry")}
-                          />
-                        )}
-                        {!detail?.parentId && pendingPlan && planActions && (
-                          <PlanDecision
-                            plan={pendingPlan.plan}
-                            preflight={pendingPlan.preflight}
-                            actions={planActions}
-                            open={openDecision === pendingPlan.id}
-                            onToggle={() => toggleDecision(pendingPlan.id)}
-                          />
-                        )}
-                        {proposals.integration && (
-                          <IntegrationDecision
-                            onOpen={proposals.integration.open}
-                            open={openDecision === "integration"}
-                            onToggle={() => toggleDecision("integration")}
-                          />
-                        )}
-                        {proposals.audit && sessionId && (
-                          <AuditDecision
-                            audit={proposals.audit}
-                            sessionId={sessionId}
-                            projectId={detail?.project.id ?? null}
-                            onCreated={() => setDetailVersion((version) => version + 1)}
-                            open={openDecision === "audit"}
-                            onToggle={() => toggleDecision("audit")}
-                          />
-                        )}
-                        {proposals.tasks && sessionId && (
-                          <ProposedTasksDecision
-                            tasks={proposals.tasks}
-                            sessionId={sessionId}
-                            onAccepted={() => setDetailVersion((version) => version + 1)}
-                            open={openDecision === "tasks"}
-                            onToggle={() => toggleDecision("tasks")}
-                          />
-                        )}
-                        {proposals.agentsMd && sessionId && (
-                          <AgentsMdDecision
-                            draft={proposals.agentsMd}
-                            sessionId={sessionId}
-                            onWritten={() => setDetailVersion((version) => version + 1)}
-                            open={openDecision === "agents-md"}
-                            onToggle={() => toggleDecision("agents-md")}
-                          />
-                        )}
-                        {proposals.rules && sessionId && (
-                          <RuleProposalDecision
-                            proposal={proposals.rules}
-                            sessionId={sessionId}
-                            onAdded={() => setDetailVersion((version) => version + 1)}
-                            open={openDecision === "rules"}
-                            onToggle={() => toggleDecision("rules")}
-                          />
-                        )}
-                        {proposals.suggestion && sessionId && detail?.project.id && (
-                          <AgentSuggestionDecision
-                            suggestion={proposals.suggestion}
-                            sessionId={sessionId}
-                            projectId={detail.project.id}
-                            open={openDecision === "suggestion"}
-                            onToggle={() => toggleDecision("suggestion")}
-                          />
-                        )}
-                      </DecisionBar>
-                    )}
-                    {!detail?.parentId && detail && served.handedPlan && (
-                      <HandedPlanNote
-                        projectId={detail.project.id}
-                        onUndo={served.handedPlan.undoable ? () => void handleTakeBackPlan(served.handedPlan!.ideaId) : undefined}
-                      />
-                    )}
-                    {!detail?.parentId && (
-                      <Composer
-                        text={text}
-                        onTextChange={setText}
-                        onSend={() => handleSend()}
-                        onStop={handleStop}
-                        onPause={run && !run.finished && !run.paused ? handlePauseWorkflow : undefined}
-                        pauseRequested={run?.pauseRequested}
-                        running={running}
-                        currentModel={currentModel}
-                        modelChoices={modelChoices}
-                        onModelChange={handleModelChange}
-                        effort={effort}
-                        acceptedEfforts={acceptedEfforts}
-                        defaultEffort={defaultEffort}
-                        onEffortChange={(next) => void handleEffortChange(next)}
-                        error={sendError}
-                        textareaRef={textareaRef}
-                        placeholder={
-                          workflowSelection.workflowId && !isChat
-                            ? t('sessionPageWorkflowTaskPlaceholder')
-                            : view.pendingQuestion && !running
-                              ? t('sessionPageAnswerPlaceholder')
-                              : undefined
-                        }
-                        commands={commands}
-                        // A chat talks to builder only: no agent nor workflow to pick.
-                        agents={isChat ? undefined : agents}
-                        mode={mode}
-                        onModeChange={chooseAgent}
-                        attachments={attachments}
-                        onAttach={handleAttach}
-                        onRemoveAttachment={handleRemoveAttachment}
-                        workflows={isChat ? undefined : workflows}
-                        workflowSelection={workflowSelection}
-                        onWorkflowSelectionChange={setWorkflowSelection}
-                        mcpView={mcpView}
-                        onMcpToggle={toggleMcp}
-                      />
-                    )}
-                  </main>
-
-                  <ContextPanel
-                    key={sessionId ?? ''}
-                    view={view}
-                    skills={skills}
-                    usage={usage}
-                    context={context}
-                    contextRevealKey={contextRevealKey}
-                    hasSession={sessionId !== null}
-                    worktree={detail?.worktree ?? null}
-                    editorUrl={detail?.editorUrl ?? null}
-                    sessionId={sessionId}
-                    onWorktreeChanged={() =>
-                      setDetailVersion((version) => version + 1)
-                    }
-                    integrationVersion={integrationVersion}
-                    vision={vision}
-                    served={served}
-                  />
-                  {sessionId && integrationOpen && (
-                    <IntegrationDialog
-                      sessionId={sessionId}
-                      projectId={detail?.project.id ?? projectId}
-                      open
-                      onClose={() => {
-                        setIntegrationOpen(false);
-                        setIntegrationVersion((version) => version + 1);
-                      }}
-                    />
-                  )}
-                  {sessionId && tryOpen && (
-                    <TryDialog sessionId={sessionId} open onClose={() => setTryOpen(false)} />
-                  )}
-                  {preview && sessionId && (
-                    <PreviewPane
-                      sessionId={sessionId}
-                      target={preview}
-                      onClose={() => setPreview(null)}
-                    />
-                  )}
-                  {canvasId != null && (
-                    <CanvasPane
-                      artifactId={canvasId}
-                      refreshKey={view}
-                      onClose={() => setCanvasId(null)}
-                      onAnnotate={(message) => {
-                        // The run waiting on a choice or a pause refuses the composer: the note goes to its comment.
-                        const append = (current: string) =>
-                          current.trim() ? `${current}\n\n${message}` : message;
-                        if (waiting?.kind === "human" || waiting?.kind === "pause") setRunComment(append);
-                        else setText(append);
-                      }}
-                    />
-                  )}
-                </div>
-              </WorkflowUsageContext.Provider>
-            </CallUsageContext.Provider>
-          </IntegrationInviteContext.Provider>
-        </PendingPlanContext.Provider>
-      </PreviewWorkdirContext.Provider>
-      </FileLinkContext.Provider>
-      </CanvasSessionContext.Provider>
-     </CanvasOpenerContext.Provider>
-    </PreviewContext.Provider>
+        <ContextPanel
+          key={sessionId ?? ''}
+          view={view}
+          skills={skills}
+          usage={usage}
+          context={context}
+          contextRevealKey={contextRevealKey}
+          hasSession={sessionId !== null}
+          worktree={detail?.worktree ?? null}
+          editorUrl={detail?.editorUrl ?? null}
+          sessionId={sessionId}
+          onWorktreeChanged={reloadDetail}
+          integrationVersion={integrationVersion}
+          vision={vision}
+          served={served}
+        />
+        <SessionOverlays
+          sessionId={sessionId}
+          projectId={detail?.project.id ?? projectId}
+          view={view}
+          integrationOpen={integrationOpen}
+          onCloseIntegration={() => {
+            setIntegrationOpen(false);
+            setIntegrationVersion((version) => version + 1);
+          }}
+          tryOpen={tryOpen}
+          onCloseTry={() => setTryOpen(false)}
+          preview={preview}
+          onClosePreview={() => setPreview(null)}
+          canvasId={canvasId}
+          onCloseCanvas={() => setCanvasId(null)}
+          onAnnotate={(message) => {
+            // The run waiting on a choice or a pause refuses the composer: the note goes to its comment.
+            const append = (current: string) =>
+              current.trim() ? `${current}\n\n${message}` : message;
+            if (waiting?.kind === "human" || waiting?.kind === "pause") setRunComment(append);
+            else setText(append);
+          }}
+        />
+      </div>
+    </SessionProviders>
   );
 }
