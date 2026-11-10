@@ -416,14 +416,15 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - `groups` `[{stage, ideas: [idea]}]`, all five groups always sent, in this order: `yours` (waits for the human: review, question,
     halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
     queue, the most recently changed first.
-  - `idea` `{id, text, attachments, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
+  - `idea` `{id, text, attachments, status, stage, action, menu, edit, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
     durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
     review | halted | failed | integrated | completed` (from the idea and its session's state; a started idea whose
     session is gone is `failed`); `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the
     idea (a base64 data URL in `data`; handed to the agent on framing and build: images as vision, text inlined,
     binaries in the worktree); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
-    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop | remove | editText | editPlan`
-    (`editText` posts `edit`, `editPlan` posts `ready`; empty for running); `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
+    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop | remove | editPlan`
+    (`editPlan` posts `ready`; empty for running); `edit` the edit shown as its own button, `editText` (posts `edit`) on a
+    draft, else `null`; `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
     new plan or start; `position` its 1-based place in the queue; `durationMs` from its start to now (running) or its
     session's last change; `tokens` uncached prompt plus completion of the project's calls in that window (exact while
     one idea runs at a time); `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its

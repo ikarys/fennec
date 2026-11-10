@@ -27,7 +27,7 @@ export function IdeaMenu({
 }) {
   // Both drop and remove end in `idea.dropped`; only the wording differs.
   const [pendingDrop, setPendingDrop] = useState<'drop' | 'remove' | null>(null);
-  const [editing, setEditing] = useState<'text' | 'plan' | null>(null);
+  const [editing, setEditing] = useState<'plan' | null>(null);
   const t = useT();
   if (idea.menu.length === 0) {
     return null;
@@ -47,12 +47,6 @@ export function IdeaMenu({
       <Menu label={t('menuActions')}>
         {idea.menu.map((action) => {
           switch (action) {
-            case 'editText':
-              return (
-                <MenuItem key={action} onSelect={() => setEditing('text')}>
-                  {t('menuEditText')}
-                </MenuItem>
-              );
             case 'editPlan':
               return (
                 <MenuItem key={action} onSelect={() => setEditing('plan')}>
@@ -110,7 +104,7 @@ export function IdeaMenu({
         <EditIdeaDialog
           idea={idea}
           projectId={projectId}
-          field={editing}
+          field="plan"
           run={run}
           onClose={() => setEditing(null)}
         />

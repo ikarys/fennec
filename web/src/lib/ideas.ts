@@ -21,7 +21,7 @@ export type IdeaStatus =
 
 export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
 
-export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editText' | 'editPlan';
+export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editPlan';
 
 /** A file or image pinned to an idea, kept as a data URL. */
 export interface IdeaAttachmentView {
@@ -41,6 +41,8 @@ export interface IdeaView {
   stage: Stage;
   action: IdeaAction | null;
   menu: IdeaMenuAction[];
+  /** The edit shown as its own button: a draft's text. */
+  edit: 'editText' | null;
   sessionId: string | null;
   plan: string | null;
   halted: string | null;

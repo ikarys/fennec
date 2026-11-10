@@ -325,6 +325,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "stage": stage,
         "action": action,
         "menu": status.menu(),
+        "edit": status.edit(),
         "sessionId": idea.session_id,
         "plan": idea.plan,
         "halted": idea.halted,

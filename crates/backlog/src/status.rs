@@ -135,6 +135,14 @@ impl Status {
         }
     }
 
+    /// The edit shown as its own button beside the primary action: a draft's text.
+    pub fn edit(self) -> Option<MenuAction> {
+        match self {
+            Status::Inbox => Some(MenuAction::EditText),
+            _ => None,
+        }
+    }
+
     /// The secondary actions offered in an idea's menu.
     ///
     /// `Reframe` is only offered where the fold accepts a `Framing` event for
@@ -142,11 +150,7 @@ impl Status {
     /// the server would ignore.
     pub fn menu(self) -> &'static [MenuAction] {
         match self {
-            Status::Inbox => &[
-                MenuAction::EditText,
-                MenuAction::StartUnframed,
-                MenuAction::Drop,
-            ],
+            Status::Inbox => &[MenuAction::StartUnframed, MenuAction::Drop],
             // A failed idea is retried by framing it again.
             Status::Framing => &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop],
             Status::Queued => &[MenuAction::EditPlan, MenuAction::Reframe, MenuAction::Drop],
@@ -279,12 +283,10 @@ mod tests {
     fn menu_lists_match_the_states() {
         assert_eq!(
             Status::Inbox.menu(),
-            &[
-                MenuAction::EditText,
-                MenuAction::StartUnframed,
-                MenuAction::Drop
-            ]
+            &[MenuAction::StartUnframed, MenuAction::Drop]
         );
+        assert_eq!(Status::Inbox.edit(), Some(MenuAction::EditText));
+        assert_eq!(Status::Queued.edit(), None);
         assert_eq!(
             Status::Framing.menu(),
             &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop]
