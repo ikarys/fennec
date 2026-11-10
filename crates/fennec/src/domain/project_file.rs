@@ -5,6 +5,8 @@ pub const MAX_FILE_BYTES: u64 = 1024 * 1024;
 pub const MAX_LISTED: usize = 20_000;
 /// The most files one commit from the file explorer may name.
 pub const MAX_COMMIT_PATHS: usize = 1000;
+/// The largest image served raw to the editor.
+pub const MAX_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelPath(String);
@@ -39,6 +41,26 @@ impl RelPath {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// The image type of a path, by its extension; None for anything else (never served raw).
+pub fn image_mime(path: &RelPath) -> Option<&'static str> {
+    let extension = path
+        .as_str()
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())?;
+
+    match extension.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "avif" => Some("image/avif"),
+        "bmp" => Some("image/bmp"),
+        "ico" => Some("image/x-icon"),
+        "svg" => Some("image/svg+xml"),
+        _ => None,
     }
 }
 
@@ -135,5 +157,20 @@ mod tests {
         assert!(CommitMessage::parse("   ").is_err());
         let message = CommitMessage::parse("  save file \n").unwrap();
         assert_eq!(message.as_str(), "save file");
+    }
+
+    #[test]
+    fn image_types_come_from_the_extension_and_others_are_none() {
+        let png = RelPath::parse("A.PNG").unwrap();
+        assert_eq!(image_mime(&png), Some("image/png"));
+
+        let svg = RelPath::parse("a.svg").unwrap();
+        assert_eq!(image_mime(&svg), Some("image/svg+xml"));
+
+        let html = RelPath::parse("a.html").unwrap();
+        assert_eq!(image_mime(&html), None);
+
+        let makefile = RelPath::parse("Makefile").unwrap();
+        assert_eq!(image_mime(&makefile), None);
     }
 }

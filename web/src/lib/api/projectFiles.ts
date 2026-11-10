@@ -20,6 +20,7 @@ export interface ProjectFileView {
   tooLarge: boolean;
   blob: string | null;
   editable: boolean;
+  image: boolean;
   session: boolean;
 }
 
@@ -58,6 +59,20 @@ export function getProjectFile(
   return request<ProjectFileView>(
     `/api/projects/${encodeURIComponent(projectId)}/file?${params.toString()}`,
   );
+}
+
+/** The URL of an image's bytes, for an `<img>`; responses are never cached, so a saved image reloads. */
+export function projectFileRawUrl(
+  projectId: string,
+  path: string,
+  sessionId: string | null,
+): string {
+  const params = new URLSearchParams({ path });
+  if (sessionId !== null) {
+    params.set("session", sessionId);
+  }
+
+  return `/api/projects/${encodeURIComponent(projectId)}/raw?${params.toString()}`;
 }
 
 export function saveProjectFile(

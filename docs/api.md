@@ -334,10 +334,14 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `truncated` is true past 20,000 files. The `session` query reads the session's branch `fennec/<id>`
   through git, read-only; once that branch is gone (integrated, discarded) the working tree is read
   instead, and the reply's `session` says which one was read.
-- `GET /api/projects/{id}/file?path=…[&session=…]` → `{path, content, binary, tooLarge, blob, editable, session}`,
+- `GET /api/projects/{id}/file?path=…[&session=…]` → `{path, content, binary, tooLarge, blob, editable, image, session}`,
   one file from the working tree or from a session's branch. `content` is null for binary files and for
   files over 1 MiB; `blob` is the git blob id of the bytes; `editable` is true only for a tracked
-  working-tree file that is shown.
+  working-tree file that is shown; `image` is true for the image extensions listed below.
+- `GET /api/projects/{id}/raw?path=…[&session=…]` → the file's bytes, image types only, by extension
+  (`png`, `jpg`, `jpeg`, `gif`, `webp`, `avif`, `bmp`, `ico`, `svg`). At most 8 MiB; served with a
+  sandbox `Content-Security-Policy` and `X-Content-Type-Options: nosniff`, so an SVG opened directly runs
+  nothing. 400 for any other file, a missing path, or an image over 8 MiB.
 - `POST /api/projects/{id}/file` body `{path, content, base}` → `{blob}`. The human's save writes only
   that file to disk; nothing is committed. `base` must be the blob id the human read; a stale base
   answers 409. Only tracked regular files inside the project are written; never a symlink or `.git`.

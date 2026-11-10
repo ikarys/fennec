@@ -299,7 +299,9 @@ figures that link to their page (cost over 7 days, ideas ready, worktrees on dis
 File editor, done: the editor page (`#/edit/<project>`, linked from the project page's header) lists the
 project's files as git sees them (tracked and new, never ignored ones) in a collapsible tree and opens a file in a
 code editor with syntax highlighting and line numbers (CodeMirror, loaded with the page only), read-only and
-rendered for markdown until the human switches to edit mode. While editing, a tracked file is saved to disk shortly
+rendered for markdown until the human switches to edit mode; an image is shown as one (served raw only for
+image types, an SVG's source opening in edit mode). Each project's editor gets its tab in the header, returning to
+the last file opened. While editing, a tracked file is saved to disk shortly
 after the last keystroke, refused when it changed since it was read (autosave then stops until a reload); nothing
 is committed then. The Changes panel lists the tracked files that differ from HEAD, the ones saved from the page
 ticked: one message makes one commit of the ticked files on the human's current branch, leaving the rest of their

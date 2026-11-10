@@ -4,7 +4,8 @@
 //! branch. The checks live in `domain/project_file.rs`.
 
 use crate::domain::project_file::{
-    CommitMessage, MAX_COMMIT_PATHS, MAX_FILE_BYTES, MAX_LISTED, RelPath, SessionBranch,
+    CommitMessage, MAX_COMMIT_PATHS, MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_LISTED, RelPath,
+    SessionBranch, image_mime,
 };
 use crate::git;
 use serde::Serialize;
@@ -40,6 +41,7 @@ pub struct FileView {
     pub too_large: bool,
     pub blob: Option<String>,
     pub editable: bool,
+    pub image: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -172,9 +174,39 @@ pub fn read(workdir: &Path, version: &Version, path: &RelPath) -> Result<FileVie
                 too_large: parts.too_large,
                 blob: parts.blob,
                 editable: !parts.too_large && !parts.binary && parts.tracked,
+                image: image_mime(path).is_some(),
             })
         }
         Version::Session(branch) => session_view(workdir, branch, path),
+    }
+}
+
+/// An image's bytes and type, from the tree or a session's branch; refused for any other file.
+pub fn read_image(
+    workdir: &Path,
+    version: &Version,
+    path: &RelPath,
+) -> Result<(Vec<u8>, &'static str), FileError> {
+    let mime = image_mime(path).ok_or_else(|| FileError::Invalid("not an image".into()))?;
+
+    match version {
+        Version::Tree => {
+            let (full, metadata) = checked_file(workdir, path)?;
+            if metadata.len() > MAX_IMAGE_BYTES {
+                return Err(FileError::Invalid("image too large".into()));
+            }
+            let bytes = std::fs::read(&full).map_err(|e| FileError::Git(e.to_string()))?;
+            Ok((bytes, mime))
+        }
+        Version::Session(branch) => {
+            let (blob, size) = session_blob(workdir, branch, path)?;
+            if size > MAX_IMAGE_BYTES {
+                return Err(FileError::Invalid("image too large".into()));
+            }
+            let bytes = git::run(workdir, &["cat-file", "blob", &blob], None)
+                .map_err(|e| FileError::Git(e.to_string()))?;
+            Ok((bytes, mime))
+        }
     }
 }
 
@@ -342,7 +374,7 @@ pub fn restore(workdir: &Path, path: &RelPath) -> Result<(), FileError> {
     Ok(())
 }
 
-fn tree_parts(workdir: &Path, path: &RelPath) -> Result<TreeParts, FileError> {
+fn checked_file(workdir: &Path, path: &RelPath) -> Result<(PathBuf, std::fs::Metadata), FileError> {
     let full = workdir.join(path.as_str());
     let metadata = std::fs::symlink_metadata(&full).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -362,6 +394,12 @@ fn tree_parts(workdir: &Path, path: &RelPath) -> Result<TreeParts, FileError> {
     if !canonical_file.starts_with(&canonical_workdir) {
         return Err(FileError::Invalid("outside the project".into()));
     }
+
+    Ok((full, metadata))
+}
+
+fn tree_parts(workdir: &Path, path: &RelPath) -> Result<TreeParts, FileError> {
+    let (full, metadata) = checked_file(workdir, path)?;
 
     if metadata.len() > MAX_FILE_BYTES {
         return Ok(TreeParts {
@@ -405,11 +443,11 @@ fn tree_parts(workdir: &Path, path: &RelPath) -> Result<TreeParts, FileError> {
     })
 }
 
-fn session_view(
+fn session_blob(
     workdir: &Path,
     branch: &SessionBranch,
     path: &RelPath,
-) -> Result<FileView, FileError> {
+) -> Result<(String, u64), FileError> {
     let ref_name = format!("{}:./{}", branch.as_str(), path.as_str());
     let blob = git::stdout(
         workdir,
@@ -439,6 +477,16 @@ fn session_view(
         .parse()
         .map_err(|e| FileError::Git(format!("git cat-file -s did not return a size: {e}")))?;
 
+    Ok((blob, size))
+}
+
+fn session_view(
+    workdir: &Path,
+    branch: &SessionBranch,
+    path: &RelPath,
+) -> Result<FileView, FileError> {
+    let (blob, size) = session_blob(workdir, branch, path)?;
+
     if size > MAX_FILE_BYTES {
         return Ok(FileView {
             path: path.as_str().to_string(),
@@ -447,6 +495,7 @@ fn session_view(
             too_large: true,
             blob: Some(blob),
             editable: false,
+            image: image_mime(path).is_some(),
         });
     }
 
@@ -466,6 +515,7 @@ fn session_view(
         too_large: false,
         blob: Some(blob),
         editable: false,
+        image: image_mime(path).is_some(),
     })
 }
 
@@ -918,5 +968,56 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_image_is_read_with_its_type() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.svg", "<svg></svg>");
+
+        let (bytes, mime) =
+            read_image(&dir, &Version::Tree, &RelPath::parse("a.svg").unwrap()).unwrap();
+
+        assert_eq!(bytes, b"<svg></svg>".to_vec());
+        assert_eq!(mime, "image/svg+xml");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_that_is_not_an_image_is_not_read_raw() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.html", "<html></html>");
+
+        let error =
+            read_image(&dir, &Version::Tree, &RelPath::parse("a.html").unwrap()).unwrap_err();
+
+        assert!(matches!(error, FileError::Invalid(_)));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_image_pointing_outside_is_refused() {
+        let dir = fresh_repo();
+        let outside = std::env::temp_dir().join(format!(
+            "fennec-project-files-outside-{}",
+            crate::domain::id::new_id()
+        ));
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("x.png"), "png").unwrap();
+        std::os::unix::fs::symlink(outside.join("x.png"), dir.join("x.png")).unwrap();
+
+        let path = RelPath::parse("x.png").unwrap();
+        match read_image(&dir, &Version::Tree, &path) {
+            Err(FileError::Invalid(message)) => {
+                assert!(message.contains("regular") || message.contains("outside"));
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
     }
 }
