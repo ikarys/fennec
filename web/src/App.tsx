@@ -171,6 +171,11 @@ export default function App() {
     (tabId: string) => {
       const next = tabs.filter((id) => id !== tabId);
       setTabs(next);
+      // In split view a closed tab empties the pane that shows it.
+      if (route.name === 'split' && (route.left === tabId || route.right === tabId)) {
+        navigate(splitPath(route.left === tabId ? null : route.left, route.right === tabId ? null : route.right));
+        return;
+      }
       // Only the tab that is on screen (per the route) triggers a navigation.
       // activeTabId can be stale when a session was opened by URL/bookmark, so
       // it is not a reliable "is this tab showing" signal.
@@ -311,8 +316,6 @@ export default function App() {
     [activeTabId, route, navigate, refreshProjects]
   );
 
-  const [splitFocus, setSplitFocus] = useState<'left' | 'right'>('left');
-
   const toggleSplit = useCallback(() => {
     if (route.name === 'split') {
       // Exit to a single session view: the left pane, else the active tab.
@@ -329,7 +332,6 @@ export default function App() {
     (side: 'left' | 'right') => {
       if (route.name !== 'split') return;
       const other = side === 'left' ? route.right : route.left;
-      setSplitFocus('left');
       navigate(other ? tabPath(other) : '#/');
     },
     [route, navigate]
@@ -348,21 +350,34 @@ export default function App() {
   const pickTab = useCallback(
     (id: string) => {
       setActiveTabId(id);
-      // In split view a session tab opens in the focused pane; a page tab leaves the split.
-      if (route.name === 'split' && !id.startsWith('page:')) {
-        if (route.left === id) setSplitFocus('left');
-        else if (route.right === id) setSplitFocus('right');
-        else navigate(splitPath(splitFocus === 'left' ? id : route.left, splitFocus === 'right' ? id : route.right));
-        return;
-      }
       const target = tabPath(id);
       if (!id.startsWith('page:') || basePathOf(window.location.hash) !== target) {
         navigate(target);
       }
     },
-    [route, splitFocus, navigate]
+    [navigate]
   );
 
+  const pickTabInPane = useCallback(
+    (side: 'left' | 'right', id: string) => {
+      if (route.name !== 'split' || id.startsWith('page:')) {
+        pickTab(id);
+        return;
+      }
+      setActiveTabId(id);
+      navigate(splitPath(side === 'left' ? id : route.left, side === 'right' ? id : route.right));
+    },
+    [route, pickTab, navigate]
+  );
+
+  const newSessionProjects = useMemo(
+    () =>
+      projects
+        .filter((project) => !project.sessionWorktree)
+        .sort((a, b) => a.recentRank - b.recentRank)
+        .map((project) => ({ id: project.id, name: project.name })),
+    [projects]
+  );
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
 
   return (
@@ -375,17 +390,14 @@ export default function App() {
         <TopBar
           tabs={tabInfos}
           // The highlighted tab follows the route: on home or a project page none is.
-          activeTabId={route.name === 'split' ? (splitFocus === 'left' ? route.left : route.right) : tabIdForRoute(route)}
+          activeTabId={route.name === 'split' ? null : tabIdForRoute(route)}
           attention={attention}
           onOpenAttention={openSession}
           onPickTab={pickTab}
           onCloseTab={closeTab}
           onOpenPalette={() => setPaletteOpen(true)}
           currentProject={currentProject}
-          projects={projects
-            .filter((project) => !project.sessionWorktree)
-            .sort((a, b) => a.recentRank - b.recentRank)
-            .map((project) => ({ id: project.id, name: project.name }))}
+          projects={newSessionProjects}
           onNewSession={(projectId) => startNewSession(projectId)}
           onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           splitActive={route.name === 'split'}
@@ -456,9 +468,11 @@ export default function App() {
             <SplitPage
               left={route.left}
               right={route.right}
-              focused={splitFocus}
-              onFocusPane={setSplitFocus}
               onClosePane={closePane}
+              tabs={tabInfos}
+              newSessionProjects={newSessionProjects}
+              onPickTabInPane={pickTabInPane}
+              onCloseTab={closeTab}
               projects={projects}
               onChooseSession={openSessionInPane}
               onNewSessionInPane={newSessionInPane}

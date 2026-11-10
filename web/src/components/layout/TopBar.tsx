@@ -84,15 +84,20 @@ export function TopBar({
 
       <Divider />
 
-      <SessionTabs
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onPickTab={onPickTab}
-        onCloseTab={onCloseTab}
-        currentProject={currentProject}
-        projects={projects}
-        onNewSession={onNewSession}
-      />
+      {/* In split view each pane carries the tab strip. */}
+      {splitActive ? (
+        <div className="flex-1" />
+      ) : (
+        <SessionTabs
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onPickTab={onPickTab}
+          onCloseTab={onCloseTab}
+          currentProject={currentProject}
+          projects={projects}
+          onNewSession={onNewSession}
+        />
+      )}
 
       <div className="flex items-center gap-1.5 py-1.5">
         <button

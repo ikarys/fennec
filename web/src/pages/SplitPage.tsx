@@ -6,6 +6,7 @@ import { Palette } from '../components/layout/Palette';
 import type { PageId } from '../components/layout/TopBar';
 import { Button } from '../components/ui/Button';
 import { PlusIcon, CloseIcon } from '../components/ui/Icons';
+import { SessionTabs, type TabInfo } from '../components/layout/SessionTabs';
 
 const RATIO_KEY = 'fennec.split.ratio';
 const MIN_PCT = 25;
@@ -37,9 +38,13 @@ interface SplitPageProps {
   left: string | null;
   right: string | null;
   projects: Project[];
-  /** The pane the top bar highlights: the last one clicked or focused. */
-  focused: 'left' | 'right';
-  onFocusPane: (side: 'left' | 'right') => void;
+  /** The app's open tabs: each pane's strip lists them all and highlights its own. */
+  tabs: TabInfo[];
+  /** The projects the strips' "+" menu offers, most recently used first. */
+  newSessionProjects: { id: string; name: string }[];
+  /** A tab picked in a pane's strip: a session opens in that pane, a page leaves the split. */
+  onPickTabInPane: (side: 'left' | 'right', id: string) => void;
+  onCloseTab: (id: string) => void;
   /** Closes a pane: the other one stays, alone. */
   onClosePane: (side: 'left' | 'right') => void;
   onChooseSession: (side: 'left' | 'right', sessionId: string) => void;
@@ -56,14 +61,17 @@ interface SplitPageProps {
 /**
  * Two sessions side by side, like two browser windows in one page. Each pane is
  * a full, independent SessionPage (its own thread, composer and SSE stream); the
- * panes' ids live in the URL, so the split survives a refresh.
+ * panes' ids live in the URL, so the split survives a refresh. Each pane has its
+ * own tab strip over the same open tabs.
  */
 export function SplitPage({
   left,
   right,
   projects,
-  focused,
-  onFocusPane,
+  tabs,
+  newSessionProjects,
+  onPickTabInPane,
+  onCloseTab,
   onClosePane,
   onChooseSession,
   onNewSessionInPane,
@@ -156,16 +164,29 @@ export function SplitPage({
     );
   };
 
+  const renderColumn = (side: 'left' | 'right', value: string | null) => (
+    <div
+      className={side === 'left' ? 'flex min-h-0 min-w-0 flex-col' : 'flex min-h-0 min-w-0 grow flex-col'}
+      style={side === 'left' ? { width: `${leftPct}%` } : undefined}
+    >
+      <div className="flex h-11 shrink-0 border-b border-border bg-panel px-2">
+        <SessionTabs
+          tabs={tabs}
+          activeTabId={value}
+          onPickTab={(id) => onPickTabInPane(side, id)}
+          onCloseTab={onCloseTab}
+          currentProject={null}
+          projects={newSessionProjects}
+          onNewSession={(projectId) => onNewSessionInPane(side, projectId)}
+        />
+      </div>
+      <div className="flex min-h-0 min-w-0 grow">{renderPane(side, value)}</div>
+    </div>
+  );
+
   return (
     <div ref={containerRef} className="flex min-h-0 min-w-0 grow">
-      <div
-        className={`flex min-h-0 min-w-0 border-t-2 ${focused === 'left' ? 'border-accent' : 'border-transparent'}`}
-        style={{ width: `${leftPct}%` }}
-        onPointerDownCapture={() => onFocusPane('left')}
-        onFocusCapture={() => onFocusPane('left')}
-      >
-        {renderPane('left', left)}
-      </div>
+      {renderColumn('left', left)}
 
       <div
         role="separator"
@@ -187,13 +208,7 @@ export function SplitPage({
         className="z-10 w-1 shrink-0 cursor-col-resize touch-none bg-border hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
       />
 
-      <div
-        className={`flex min-h-0 min-w-0 grow border-t-2 ${focused === 'right' ? 'border-accent' : 'border-transparent'}`}
-        onPointerDownCapture={() => onFocusPane('right')}
-        onFocusCapture={() => onFocusPane('right')}
-      >
-        {renderPane('right', right)}
-      </div>
+      {renderColumn('right', right)}
 
       <Palette
         open={paletteFor !== null}
