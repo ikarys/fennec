@@ -82,6 +82,8 @@ export function TopBar({
         {versionLabel ? <span className="font-mono text-xs font-normal text-faint">{versionLabel}</span> : null}
       </a>
 
+      <span className="flex items-center"><Divider /></span>
+
       <SessionTabs
         tabs={tabs}
         activeTabId={activeTabId}
