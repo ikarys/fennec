@@ -1,16 +1,30 @@
+/** Project page: section rail and content for one project. */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
-import { ExternalIcon, PlusIcon, ProjectIcon, TrashIcon } from '../components/ui/Icons';
+import {
+  ActivityIcon,
+  AlertIcon,
+  BulbIcon,
+  ExternalIcon,
+  DecisionIcon,
+  InsightIcon,
+  LayersIcon,
+  PlusIcon,
+  ProjectIcon,
+  SearchIcon,
+  TerminalIcon,
+  TrashIcon,
+  WandIcon,
+} from '../components/ui/Icons';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
-import { DocSection } from '../components/project/DocSection';
+import { DecisionsSection } from '../components/project/DecisionsSection';
 import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
-import { ContributionsSection } from '../components/project/ContributionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
 import { IndicatorsSection } from '../components/project/IndicatorsSection';
 import { CanvasSection } from '../components/project/CanvasSection';
@@ -26,16 +40,15 @@ import { useT } from '../i18n';
 
 
 const TABS = [
-  { id: 'overview', label: 'tasksTabOverview' },
-  { id: 'indicators', label: 'indicatorsTab' },
-  { id: 'tasks', label: 'tasks' },
-  { id: 'sessions', label: 'sessionsSectionTitle' },
-  { id: 'contributions', label: 'contributionsTitle' },
-  { id: 'map', label: 'moduleMapTitle' },
-  { id: 'risks', label: 'risksLabel' },
-  { id: 'doc', label: 'projectPageDoc' },
-  { id: 'canvas', label: 'canvasLibraryTab' },
-  { id: 'analyses', label: 'analysesTitle' },
+  { id: 'overview', label: 'tasksTabOverview', Icon: ActivityIcon },
+  { id: 'indicators', label: 'indicatorsTab', Icon: InsightIcon },
+  { id: 'tasks', label: 'tasks', Icon: BulbIcon },
+  { id: 'sessions', label: 'sessionsSectionTitle', Icon: TerminalIcon },
+  { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
+  { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
+  { id: 'decisions', label: 'projectPageDecisions', Icon: DecisionIcon },
+  { id: 'canvas', label: 'canvasLibraryTab', Icon: WandIcon },
+  { id: 'analyses', label: 'analysesTitle', Icon: SearchIcon },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -242,10 +255,9 @@ export default function ProjectPage({
             />
           ) : null}
           {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
-          {activeTab === 'contributions' ? <ContributionsSection projectId={projectId} onOpenSession={onOpenSession} /> : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
-          {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'decisions' ? <DecisionsSection projectId={projectId} /> : null}
           {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection

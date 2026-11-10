@@ -1,9 +1,9 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { TextArea } from '../ui/Field';
 import { BulbIcon, ReplyIcon, SendIcon } from '../ui/Icons';
+import { Section } from '../ui/Section';
 import { useT } from '../../i18n';
 
 export function QuestionForm({
@@ -42,17 +42,16 @@ export function QuestionForm({
   };
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-border bg-raised px-4 py-2 text-xs uppercase tracking-wide text-faint">
-        <ReplyIcon className="h-3.5 w-3.5 text-accent" />
-        <span>{t('askQuestion')}</span>
-        <span className="ml-auto">
-          <Badge tone="info" appearance="pill" title={t('indicativeSourced')}>
-            {t('indicative')}
-          </Badge>
-        </span>
-      </div>
-
+    <Section
+      Icon={ReplyIcon}
+      title={t('askQuestion')}
+      actions={
+        <Badge tone="info" appearance="pill" title={t('indicativeSourced')}>
+          {t('indicative')}
+        </Badge>
+      }
+      flush
+    >
       <form onSubmit={onSubmit} className="flex flex-col gap-3 p-4">
         <TextArea
           id="project-question"
@@ -92,6 +91,6 @@ export function QuestionForm({
           </div>
         </div>
       </form>
-    </Card>
+    </Section>
   );
 }

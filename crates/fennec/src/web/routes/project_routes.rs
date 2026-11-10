@@ -11,7 +11,7 @@ use serde_json::json;
 use crate::domain::drift;
 use crate::web::App;
 use crate::web::http::send_json;
-use crate::{adr, architecture, doc, module_map, risk};
+use crate::{adr, architecture, module_map, risk};
 
 /// `GET /api/projects/{id}/overview`.
 pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
@@ -32,16 +32,11 @@ pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), H
     send_json(stream, 200, &body)
 }
 
-/// `GET /api/projects/{id}/docs`: the project's documentation, read from disk
-/// (verified) — its markdown files (`AGENTS.md`, `README.md`, `docs/`) and its
-/// ADRs, for the project page's Doc tab.
-pub fn get_docs(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
+/// `GET /api/projects/{id}/adrs`: the project's ADRs, read from disk
+/// (verified), for the project page's Decisions tab.
+pub fn get_adrs(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let project = require_project(&app.store()?, id)?;
-    let workdir = Path::new(&project.workdir);
-    let body = json!({
-        "files": doc::load(workdir),
-        "adrs": adr::load(workdir),
-    });
+    let body = json!({ "adrs": adr::load(Path::new(&project.workdir)) });
     send_json(stream, 200, &body)
 }
 

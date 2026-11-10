@@ -675,6 +675,16 @@ export function CpuIcon({ className }: IconProps) {
   );
 }
 
+export function BotIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="4" y="8" width="16" height="12" rx="3" />
+      <path d="M12 4v4M9 13v1M15 13v1M2 13v2M22 13v2" />
+      <circle cx="12" cy="3" r="1" />
+    </Svg>
+  );
+}
+
 export function KeyIcon({ className }: IconProps) {
   return (
     <Svg className={className}>

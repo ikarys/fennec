@@ -34,7 +34,7 @@ See [plans](plans.md) and [the review gate](review-gate.md) for the details.
 
 The home page shows your projects, recent sessions, and a **Getting started** checklist. Use **New chat** to talk without a project.
 
-The project page holds **Tasks**, the module map, documentation, sessions, analyses, risk zones, contributions, disk space, and indicators.
+The project page holds **Tasks**, the module map, documentation, sessions, analyses, risk zones, disk space, and indicators.
 
 A session page has the thread, composer, agent and model pickers, workflow picker, context panel, changes, servers, and preview surfaces. The top bar shows open tabs, search, update notices, and a **To review** counter.
 

@@ -11,6 +11,8 @@ import {
   type Route,
 } from './lib/route';
 import { HomePage } from './pages/HomePage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { ChatsPage } from './pages/ChatsPage';
 import { SessionPage } from './pages/SessionPage';
 import { SplitPage } from './pages/SplitPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -24,6 +26,7 @@ import type { Lang } from './i18n/messages';
 import { useSettings } from './hooks/useSettings';
 import { useProjects } from './hooks/useProjects';
 import { useTabs } from './hooks/useTabs';
+import { usePaneTabs } from './hooks/usePaneTabs';
 import { useTurnNotices } from './hooks/useTurnNotices';
 import { PluginsVersionContext } from './hooks/usePluginsVersion';
 import { StatusBar } from './components/layout/StatusBar';
@@ -61,7 +64,9 @@ export default function App() {
     route.name === 'settings' ||
     route.name === 'insight' ||
     route.name === 'backlog' ||
-    route.name === 'workflows'
+    route.name === 'workflows' ||
+    route.name === 'projects' ||
+    route.name === 'chats'
       ? `page:${route.name}`
       : null;
   useEffect(() => {
@@ -77,7 +82,18 @@ export default function App() {
   // No polling: the list refreshes when the human looks at it (home, project,
   // palette) and when a turn starts or ends; F5 does the rest.
   const projectsVisible =
-    route.name === 'home' || route.name === 'project' || paletteOpen;
+    route.name === 'home' ||
+    route.name === 'project' ||
+    route.name === 'projects' ||
+    route.name === 'chats' ||
+    paletteOpen;
+  const chatProjectId = projects.find((project) => project.chat)?.id ?? null;
+
+  // The home page reloads its dashboard whenever the sessions change.
+  const [homeRefreshKey, setHomeRefreshKey] = useState(0);
+  useEffect(() => {
+    setHomeRefreshKey((key) => key + 1);
+  }, [projects]);
   useEffect(() => {
     if (projectsVisible) refreshProjects();
   }, [projectsVisible, refreshProjects]);
@@ -115,33 +131,39 @@ export default function App() {
     }
   }, []);
 
-  const tabInfos = useMemo<TabInfo[]>(() => {
-    const infos: TabInfo[] = tabs.map((id) => {
-      if (id.startsWith('page:')) {
-        const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
-        return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
+  const tabInfo = useCallback((id: string): TabInfo => {
+    if (id.startsWith('page:')) {
+      const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
+      return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
+    }
+    if (id.startsWith('new:')) {
+      const projectId = id.slice(4);
+      const project = projects.find((candidate) => candidate.id === projectId);
+      return {
+        id,
+        title: t(language, project?.chat ? 'paletteNewChat' : 'newSession'),
+        project: project?.name ?? projectId,
+        state: 'idle' as const,
+        kind: 'session' as const
+      };
+    }
+    for (const project of projects) {
+      const session = project.sessions.find((candidate) => candidate.id === id);
+      if (session) {
+        return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
       }
-      if (id.startsWith('new:')) {
-        const projectId = id.slice(4);
-        const project = projects.find((candidate) => candidate.id === projectId);
-        return {
-          id,
-          title: t(language, project?.chat ? 'paletteNewChat' : 'newSession'),
-          project: project?.name ?? projectId,
-          state: 'idle' as const,
-          kind: 'session' as const
-        };
-      }
-      for (const project of projects) {
-        const session = project.sessions.find((candidate) => candidate.id === id);
-        if (session) {
-          return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
-        }
-      }
-      return { id, title: t(language, 'session'), project: '—', state: 'idle' as const, kind: 'session' as const };
-    });
-    return infos;
-  }, [tabs, projects, language]);
+    }
+    return { id, title: t(language, 'session'), project: '—', state: 'idle' as const, kind: 'session' as const };
+  }, [projects, language]);
+  const tabInfos = useMemo(() => tabs.map(tabInfo), [tabs, tabInfo]);
+  const { paneTabs, closeTab: closePaneTabIn, replaceTab: replacePaneTab } = usePaneTabs(
+    route.name === 'split' ? { left: route.left, right: route.right } : null,
+    tabs
+  );
+  const paneTabInfos = useMemo(
+    () => ({ left: (paneTabs?.left ?? []).map(tabInfo), right: (paneTabs?.right ?? []).map(tabInfo) }),
+    [paneTabs, tabInfo]
+  );
 
   const openSession = useCallback(
     (sessionId: string) => {
@@ -199,7 +221,7 @@ export default function App() {
         .catch(() => true)
         .then((ready) => {
           if (!ready) {
-            navigate('#/settings/models');
+            navigate('#/settings/providers');
             return;
           }
           openTab(`new:${targetProjectId}`);
@@ -284,6 +306,7 @@ export default function App() {
 
   const sessionCreatedInPane = useCallback(
     (side: 'left' | 'right', newId: string, pseudoId: string | null) => {
+      if (pseudoId) replacePaneTab(pseudoId, newId);
       setTabs((previous) => {
         const replaced = pseudoId ? previous.map((id) => (id === pseudoId ? newId : id)) : previous;
         return replaced.includes(newId) ? replaced : [...replaced, newId];
@@ -293,7 +316,7 @@ export default function App() {
       navigate(splitPath(side === 'left' ? newId : left, side === 'right' ? newId : right));
       refreshProjects();
     },
-    [activeTabId, route, navigate, refreshProjects]
+    [activeTabId, route, navigate, refreshProjects, replacePaneTab]
   );
 
   const toggleSplit = useCallback(() => {
@@ -307,6 +330,15 @@ export default function App() {
       route.name === 'session' ? route.id : route.name === 'new' ? `new:${route.id}` : activeTabId;
     navigate(splitPath(current, null));
   }, [route, activeTabId, navigate]);
+
+  const closePane = useCallback(
+    (side: 'left' | 'right') => {
+      if (route.name !== 'split') return;
+      const other = side === 'left' ? route.right : route.left;
+      navigate(other ? tabPath(other) : '#/');
+    },
+    [route, navigate]
+  );
 
   useEffect(() => {
     toggleSplitRef.current = toggleSplit;
@@ -329,6 +361,35 @@ export default function App() {
     [navigate]
   );
 
+  const pickTabInPane = useCallback(
+    (side: 'left' | 'right', id: string) => {
+      if (route.name !== 'split' || id.startsWith('page:')) {
+        pickTab(id);
+        return;
+      }
+      setActiveTabId(id);
+      navigate(splitPath(side === 'left' ? id : route.left, side === 'right' ? id : route.right));
+    },
+    [route, pickTab, navigate]
+  );
+
+  const closeTabInPane = useCallback(
+    (side: 'left' | 'right', id: string) => {
+      const fallback = closePaneTabIn(side, id);
+      if (route.name !== 'split' || route[side] !== id) return;
+      navigate(splitPath(side === 'left' ? fallback : route.left, side === 'right' ? fallback : route.right));
+    },
+    [closePaneTabIn, route, navigate]
+  );
+
+  const newSessionProjects = useMemo(
+    () =>
+      projects
+        .filter((project) => !project.sessionWorktree)
+        .sort((a, b) => a.recentRank - b.recentRank)
+        .map((project) => ({ id: project.id, name: project.name })),
+    [projects]
+  );
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
 
   return (
@@ -340,17 +401,15 @@ export default function App() {
       <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
         <TopBar
           tabs={tabInfos}
-          activeTabId={activeTabId}
+          // The highlighted tab follows the route: on home or a project page none is.
+          activeTabId={route.name === 'split' ? null : tabIdForRoute(route)}
           attention={attention}
           onOpenAttention={openSession}
           onPickTab={pickTab}
           onCloseTab={closeTab}
           onOpenPalette={() => setPaletteOpen(true)}
           currentProject={currentProject}
-          projects={projects
-            .filter((project) => !project.sessionWorktree)
-            .sort((a, b) => a.recentRank - b.recentRank)
-            .map((project) => ({ id: project.id, name: project.name }))}
+          projects={newSessionProjects}
           onNewSession={(projectId) => startNewSession(projectId)}
           onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
           splitActive={route.name === 'split'}
@@ -360,6 +419,16 @@ export default function App() {
         <div className="flex min-h-0 grow">
           {route.name === 'home' ? (
             <HomePage
+              projectCount={projects.filter((project) => !project.chat).length}
+              attention={attention}
+              refreshKey={homeRefreshKey}
+              onOpenProjectDialog={() => setProjectDialogOpen(true)}
+              onNewChat={chatProjectId ? () => startNewSession(chatProjectId) : null}
+              onNewSession={(projectId) => startNewSession(projectId)}
+              onOpenSession={openSession}
+            />
+          ) : route.name === 'projects' ? (
+            <ProjectsPage
               projects={projects}
               loading={projectsLoading}
               error={projectsError}
@@ -369,10 +438,18 @@ export default function App() {
               onSessionsDeleted={handleSessionsDeleted}
               onToggleFavorite={(projectId, favorite) => void setProjectFavorite(projectId, favorite).then(refreshProjects)}
             />
+          ) : route.name === 'chats' ? (
+            <ChatsPage
+              projects={projects}
+              loading={projectsLoading}
+              error={projectsError}
+              onNewSession={(projectId) => startNewSession(projectId)}
+              onOpenSession={openSession}
+              onSessionsDeleted={handleSessionsDeleted}
+            />
           ) : route.name === 'settings' ? (
             <SettingsPage
-              key={route.tab ?? ''}
-              initialTab={route.tab}
+              page={route.tab}
               settings={settings}
               theme={theme}
               onThemeChange={setTheme}
@@ -402,6 +479,11 @@ export default function App() {
             <SplitPage
               left={route.left}
               right={route.right}
+              onClosePane={closePane}
+              paneTabs={paneTabInfos}
+              newSessionProjects={newSessionProjects}
+              onPickTabInPane={pickTabInPane}
+              onCloseTabInPane={closeTabInPane}
               projects={projects}
               onChooseSession={openSessionInPane}
               onNewSessionInPane={newSessionInPane}

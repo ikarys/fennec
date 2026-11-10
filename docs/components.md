@@ -68,7 +68,7 @@ checked on the lines an integration adds; a violation is a blocker the human acc
 (`domain/architecture.rs`, `architecture.rs`).
 Bypass detection, done: added lines that silence a lint, a type check or a test, and
 tests or assertions removed on balance, are blockers the human accepts (`domain/bypass.rs`).
-ADRs, done: the project page lists the MADR files of `docs/adr/`, protected
+ADRs, done: the project page's Decisions tab lists the MADR files of `docs/adr/`, protected
 (`domain/adr.rs`, `adr.rs`). Not the agents' recorded decisions: those explain one change,
 an ADR binds the project.
 Project page and map, done: `#/project/<id>` (the "Projet" button of a home card) shows the
@@ -130,7 +130,7 @@ Rules, done: the human's rules, global, per project or granted to a session, own
 crate (model, matching, decision, its own SQLite file `rules.db`) and enforced by fennec's code, never the model: a
 command matched on parsed tokens (through `sudo`, `sh -c`, `&&`, `find -exec`), a tool name, or a path read or written
 (project-relative, absolute or `~/…`). A block refuses the call before it runs (`rule.blocked`, a "règle" badge on the
-tool card, verified); workflow shell nodes too. Settings' Security tab (`#/settings/security`) shows, adds and deletes them
+tool card, verified); workflow shell nodes too. Settings' Rules page (`#/settings/rules`) shows, adds and deletes them
 all; the project page shows its own read-only. An "ask" rule, or a file tool reaching outside the workdir, pauses
 the turn with the call open (`rule.approval_requested`); the human answers on a card: once, for the session (a grant
 on the path and its subdirectories, the command, the tool), always or never (a project rule). fennec then runs the
@@ -213,12 +213,6 @@ Test gate, done (C4): the default workflow writes the tests before the code: onc
 from the "Done when" criteria, and a human node asks to validate them. "Validate" records `tests.approved` with the test files
 written so far (the kernel's choice, at the human's click); from the next turn on they are protected for the rest of the session
 like `.agents/protected` (`domain/test_files.rs`, `turn_build.rs`), so the builder makes them pass without weakening them.
-Contributions, done (C17, part 1): a "Contributions" tab on the project page lists the branches, local or remote, with
-commits the human's branch lacks; a click adopts one into a new session's worktree (`worktree::adopt`: the branch's tip,
-its base at the merge-base with the human's HEAD), so a colleague's work goes through the same integration gate as an
-agent's (blockers, scanners, review map, comprehension dialogue). Only a listed branch is adopted; nothing merges on its
-own. A branch already squashed into HEAD (its whole diff has the patch-id of one of HEAD's last 1000 commits), `main`,
-`master`, `develop` and the release-please branches are left out (`git/contributions.rs`, `web/routes/contribution_routes.rs`).
 
 Update, done: `fennec update [--check]` and the top bar's arrow read the latest GitHub release (`/releases/latest`'s
 redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on the human's click only, run the
@@ -295,3 +289,9 @@ Travail shows where the work lands (the human's folder and branch, or the agent'
 a discard), a terminal and the IDE there, the criteria, and the five most changed files served by the fold
 (`domain/modified_files.rs`) with a link to the changes page (`WorkplaceSection.tsx`, `ModifiedFilesSection.tsx`).
 The configurable panel pages are gone.
+
+Home, done: the home page greets the human with what needs them (the attention items, the bell's list shown large),
+the recently updated sessions of every project and chat, the favourite projects with a new-session button, and three
+figures that link to their page (cost over 7 days, ideas ready, worktrees on disk). The server sorts and counts
+(`domain/home.rs`, `web/routes/home_routes.rs`); projects and chats have their own pages in the header's nav
+(`HomePage.tsx`, `ProjectsPage.tsx`, `ChatsPage.tsx`).

@@ -11,15 +11,14 @@ use serde_json::to_value;
 use token_usage::display::{duration, percent, tokens};
 use token_usage::{Filter, GroupBy, Ledger, Summary};
 
+use crate::adr;
 use crate::domain::clock::now_ms;
 use crate::domain::lang::Lang;
-use crate::domain::map_doc::MapFileState;
 use crate::domain::pricing::{priced, prices};
 use crate::web::App;
 use crate::web::http::send_json;
 use crate::web::views::idea_board::Board;
 use crate::web::views::insight::Period;
-use crate::{adr, doc, module_map};
 use backlog::Stage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -42,8 +41,7 @@ pub enum TileIcon {
     Tokens,
     Time,
     Cost,
-    Map,
-    Doc,
+    Decisions,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -91,10 +89,8 @@ struct Facts {
     usage: Summary,
     cost_value: String,
     cost_detail: String,
-    map_state: MapFileState,
-    module_count: usize,
-    doc_count: usize,
     adr_count: usize,
+    adr_accepted: usize,
     lang: Lang,
 }
 
@@ -159,12 +155,11 @@ fn gather(
     let lang = preferences.display.language;
     let pricing = priced(&models, &prices(&preferences));
 
-    let map = module_map::load(workdir);
-    let map_state = module_map::map_file_state(workdir, &map);
-    let module_count = map.modules.len();
-
-    let doc_count = doc::load(workdir).len();
-    let adr_count = adr::load(workdir).len();
+    let adrs = adr::load(workdir);
+    let adr_accepted = adrs
+        .iter()
+        .filter(|adr| adr.status.as_deref() == Some("accepted"))
+        .count();
 
     Ok(Facts {
         sessions,
@@ -172,10 +167,8 @@ fn gather(
         usage,
         cost_value: pricing.value(lang.locale()),
         cost_detail: pricing.detail(lang),
-        map_state,
-        module_count,
-        doc_count,
-        adr_count,
+        adr_count: adrs.len(),
+        adr_accepted,
         lang,
     })
 }
@@ -199,8 +192,7 @@ fn tiles(project_id: &str, facts: &Facts, lang: Lang) -> Vec<TileView> {
             facts.usage.calls > 0,
             lang,
         ),
-        map_tile(project_id, &facts.map_state, facts.module_count, lang),
-        doc_tile(project_id, facts.doc_count, facts.adr_count, lang),
+        decisions_tile(project_id, facts.adr_count, facts.adr_accepted, lang),
     ]
 }
 
@@ -326,51 +318,19 @@ fn cost_tile(value: &str, detail: &str, active: bool, lang: Lang) -> TileView {
     }
 }
 
-fn map_tile(project_id: &str, state: &MapFileState, module_count: usize, lang: Lang) -> TileView {
-    let (detail, tone, active) = match state {
-        MapFileState::Current => (
-            lang.pick("docs/map.md up to date", "docs/map.md à jour")
-                .to_string(),
-            Tone::Ok,
-            false,
-        ),
-        MapFileState::Stale => (
-            lang.pick("docs/map.md stale", "docs/map.md périmé")
-                .to_string(),
-            Tone::Accent,
-            true,
-        ),
-        MapFileState::Missing => (
-            lang.pick("no docs/map.md", "pas de docs/map.md")
-                .to_string(),
-            Tone::Accent,
-            true,
-        ),
-    };
-
+fn decisions_tile(project_id: &str, adr_count: usize, accepted: usize, lang: Lang) -> TileView {
     TileView {
-        id: "map".into(),
-        icon: TileIcon::Map,
-        label: lang.pick("Module map", "Carte des modules").into(),
-        figure: module_count.to_string(),
-        detail,
-        tone,
-        active,
-        href: Some(format!("#/project/{project_id}/map")),
-        title: None,
-    }
-}
-
-fn doc_tile(project_id: &str, doc_count: usize, adr_count: usize, lang: Lang) -> TileView {
-    TileView {
-        id: "doc".into(),
-        icon: TileIcon::Doc,
-        label: lang.pick("Documentation", "Documentation").into(),
-        figure: doc_count.to_string(),
-        detail: format!("{adr_count} ADR"),
+        id: "decisions".into(),
+        icon: TileIcon::Decisions,
+        label: lang.pick("Decisions", "Décisions").into(),
+        figure: adr_count.to_string(),
+        detail: match lang {
+            Lang::Fr => format!("{accepted} acceptée(s)"),
+            Lang::En => format!("{accepted} accepted"),
+        },
         tone: Tone::Neutral,
         active: false,
-        href: Some(format!("#/project/{project_id}/doc")),
+        href: Some(format!("#/project/{project_id}/decisions")),
         title: None,
     }
 }
@@ -454,10 +414,8 @@ mod tests {
             usage: summary(),
             cost_value: "—".into(),
             cost_detail: "aucun modèle n'a de prix : Paramètres, Modèles".into(),
-            map_state: MapFileState::Missing,
-            module_count: 0,
-            doc_count: 0,
             adr_count: 0,
+            adr_accepted: 0,
             lang: Lang::Fr,
         }
     }
@@ -469,7 +427,7 @@ mod tests {
 
         assert_eq!(
             ids,
-            ["sessions", "ideas", "tokens", "time", "cost", "map", "doc"]
+            ["sessions", "ideas", "tokens", "time", "cost", "decisions"]
         );
     }
 
@@ -481,26 +439,6 @@ mod tests {
 
         facts.idea_stages = vec![Stage::Yours];
         assert!(view("p", &facts, Lang::Fr).tiles[1].active);
-    }
-
-    #[test]
-    fn map_tile_tone_follows_map_file_state() {
-        let mut facts = facts();
-
-        facts.map_state = MapFileState::Current;
-        let map = &view("p", &facts, Lang::Fr).tiles[5];
-        assert_eq!(map.tone, Tone::Ok);
-        assert!(!map.active);
-
-        facts.map_state = MapFileState::Stale;
-        let map = &view("p", &facts, Lang::Fr).tiles[5];
-        assert_eq!(map.tone, Tone::Accent);
-        assert!(map.active);
-
-        facts.map_state = MapFileState::Missing;
-        let map = &view("p", &facts, Lang::Fr).tiles[5];
-        assert_eq!(map.tone, Tone::Accent);
-        assert!(map.active);
     }
 
     #[test]

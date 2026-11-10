@@ -2,13 +2,15 @@
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { PageId } from '../../lib/route';
-import { BacklogIcon, InsightIcon, SettingsIcon, WorkflowsIcon } from '../ui/Icons';
+import { BacklogIcon, ChatIcon, FolderIcon, InsightIcon, SettingsIcon, WorkflowsIcon } from '../ui/Icons';
 import { buttonClass } from '../ui/Button';
 
 export type { PageId };
 
 /** The fixed pages, in the bar's order; `PageIcon` draws each. */
 const PAGES: { page: PageId; title: MsgKey }[] = [
+  { page: 'projects', title: 'paletteProjects' },
+  { page: 'chats', title: 'homeChat' },
   { page: 'backlog', title: 'tasks' },
   { page: 'workflows', title: 'workflows' },
   { page: 'insight', title: 'insight' },
@@ -17,6 +19,10 @@ const PAGES: { page: PageId; title: MsgKey }[] = [
 
 export function PageIcon({ page, className }: { page: PageId; className?: string }) {
   switch (page) {
+    case 'projects':
+      return <FolderIcon className={className} />;
+    case 'chats':
+      return <ChatIcon className={className} />;
     case 'settings':
       return <SettingsIcon className={className} />;
     case 'insight':

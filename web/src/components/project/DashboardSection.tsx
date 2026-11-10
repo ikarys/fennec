@@ -2,15 +2,13 @@
 import { type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import {
   ClockIcon,
   CoinIcon,
-  FileIcon,
+  DecisionIcon,
   LayersIcon,
-  ProjectIcon,
   ReviewIcon,
   TokensIcon,
 } from '../ui/Icons';
@@ -21,7 +19,6 @@ import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
 import { PluginsSection } from './PluginsSection';
 import { useT, useLang } from '../../i18n';
-import { TableHeader } from '../ui/TableHeader';
 import { useLoaded } from '../../hooks/useLoaded';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
@@ -30,8 +27,7 @@ const ICONS: Record<DashboardIcon, ReactNode> = {
   tokens: <TokensIcon />,
   time: <ClockIcon />,
   cost: <CoinIcon />,
-  map: <ProjectIcon />,
-  doc: <FileIcon />,
+  decisions: <DecisionIcon />,
 };
 
 export function DashboardSection({
@@ -79,6 +75,7 @@ export function DashboardSection({
       <PluginsSection projectId={projectId} />
 
       <Section
+        Icon={ClockIcon}
         title={t('recentSessions')}
         flush
         actions={
@@ -94,46 +91,39 @@ export function DashboardSection({
         }
       >
         {data.recent.length === 0 ? (
-          <Card className="px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</Card>
+          <p className="m-0 px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</p>
         ) : (
-          <Card className="overflow-hidden">
-            <TableHeader>
-              <span className="min-w-0 grow">{t('titleCol')}</span>
-              <span className="w-28 shrink-0">{t('statusCol')}</span>
-              <span className="w-24 shrink-0 text-right">{t('modifiedCol')}</span>
-            </TableHeader>
-            <ul className="divide-y divide-border">
-              {data.recent.map((session) => (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    className="w-full text-left group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0"
-                    onClick={() => onOpenSession(session.id)}
+          <ul className="divide-y divide-border">
+            {data.recent.map((session) => (
+              <li key={session.id}>
+                <button
+                  type="button"
+                  className="w-full text-left group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0"
+                  onClick={() => onOpenSession(session.id)}
+                >
+                  <span
+                    className="min-w-0 grow truncate text-sm text-text group-hover:text-accent-strong"
+                    title={session.title}
                   >
-                    <span
-                      className="min-w-0 grow truncate text-sm text-text group-hover:text-accent-strong"
-                      title={session.title}
-                    >
-                      {session.title}
-                    </span>
-                    <span className="w-28 shrink-0">
-                      {session.running ? (
-                        <Badge tone="accent" dot pulse>{t('running')}</Badge>
-                      ) : session.awaiting ? (
-                        <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>
-                      ) : null}
-                    </span>
-                    <span
-                      className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
-                      title={formatDateTime(lang, session.updatedAt)}
-                    >
-                      {formatRelative(lang, session.updatedAt)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
+                    {session.title}
+                  </span>
+                  <span className="w-28 shrink-0">
+                    {session.running ? (
+                      <Badge tone="accent" dot pulse>{t('running')}</Badge>
+                    ) : session.awaiting ? (
+                      <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>
+                    ) : null}
+                  </span>
+                  <span
+                    className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
+                    title={formatDateTime(lang, session.updatedAt)}
+                  >
+                    {formatRelative(lang, session.updatedAt)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </Section>
 

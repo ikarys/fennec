@@ -47,7 +47,7 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
   return <Badge tone={badge.tone} title={badge.title}>{badge.label}</Badge>;
 }
 
-export function CriteriaSection({ criteria, tally }: { criteria: CriterionView[]; tally: CriteriaTally }) {
+export function CriteriaSection({ criteria, tally, planAwaitingBuild }: { criteria: CriterionView[]; tally: CriteriaTally; planAwaitingBuild: boolean }) {
   const t = useT();
   const { total, passed, failed, indicative } = tally;
   // The header's icon reports the block's state: red when a check failed, green when all pass.
@@ -71,7 +71,7 @@ export function CriteriaSection({ criteria, tally }: { criteria: CriterionView[]
       }
     >
       {criteria.length === 0 ? (
-        <div className="text-xs text-muted">{t('noCriteriaHint')}</div>
+        <div className="text-xs text-muted">{t(planAwaitingBuild ? 'criteriaAwaitBuild' : 'noCriteriaHint')}</div>
       ) : (
         <div className="flex flex-col">
           <div className="h-1 w-full overflow-hidden rounded-full bg-raised">

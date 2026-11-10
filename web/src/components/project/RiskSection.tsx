@@ -5,13 +5,14 @@ import type { MsgKey } from '../../i18n/messages';
 import { getProjectRisks, type RiskSignal, type RiskZone } from '../../lib/api/risks';
 import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
+import { Pager } from '../ui/Pager';
 import { Tile } from '../ui/Tile';
 import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../ui/Icons';
 import { TableHeader } from '../ui/TableHeader';
 import { useLoaded } from '../../hooks/useLoaded';
+import { usePaged } from '../../hooks/usePaged';
 
 type T = (key: MsgKey, vars?: Record<string, string | number>) => string;
 
@@ -52,6 +53,7 @@ export function RiskSection({
   const { data, error, loading: measuring } = useLoaded(() => getProjectRisks(projectId), [projectId, reloadKey]);
   // The brief to remediate, global or one module's; null when no confirmation is open.
   const [confirming, setConfirming] = useState<string | null>(null);
+  const paged = usePaged(data?.modules ?? []);
 
   const refresh = () => {
     setReloadKey((key) => key + 1);
@@ -88,6 +90,7 @@ export function RiskSection({
       </div>
       {error ? <div className="px-4 pb-2 text-err text-xs">{error}</div> : null}
       <Section
+        Icon={AlertIcon}
         title={t('riskZones')}
         flush
         description={t('riskZonesDescription')}
@@ -121,7 +124,7 @@ export function RiskSection({
       >
         {data ? (
           data.modules.length > 0 ? (
-            <Card className="overflow-hidden">
+            <>
               <TableHeader>
                 <span className="w-3.5 shrink-0" />
                 <span className="min-w-0 grow">{t('moduleCol')}</span>
@@ -131,7 +134,7 @@ export function RiskSection({
                 <span className="w-20 shrink-0 text-right">{t('filesCol')}</span>
                 <span className="w-7 shrink-0" />
               </TableHeader>
-              {data.modules.map((module, index) => (
+              {paged.visible.map((module, index) => (
                 <details key={module.path} className={`group ${index > 0 ? 'border-t border-border' : ''}`}>
                   {/* An open module keeps the accent edge, so its files read as its own. */}
                   <summary className="group/row relative flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:opacity-0 hover:bg-accent-soft hover:before:opacity-100 group-open:bg-accent-soft group-open:before:opacity-100 [&::-webkit-details-marker]:hidden">
@@ -179,7 +182,8 @@ export function RiskSection({
                   ))}
                 </details>
               ))}
-            </Card>
+              <Pager paged={paged} />
+            </>
           ) : (
             <div className="px-4 py-3 text-sm text-muted">{t('noRiskZones')}</div>
           )

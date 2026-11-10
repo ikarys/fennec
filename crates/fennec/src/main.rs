@@ -9,7 +9,6 @@ mod budget;
 mod chat;
 mod cli;
 mod config;
-mod doc;
 mod domain;
 mod folders;
 mod git;

@@ -11,12 +11,17 @@ export interface PlanStep {
   verify: string;
 }
 
+export interface PlanCriterion {
+  text: string;
+  check: string;
+}
+
 export interface Plan {
   kind: 'plan';
   title: string;
   goal: string;
   steps: PlanStep[];
-  doneWhen: string[];
+  doneWhen: PlanCriterion[];
   risks: string[];
 }
 
@@ -48,7 +53,7 @@ export interface ReportProposal {
 
 /**
  * The plan a plan agent recorded with `propose_plan`, as the thread shows it:
- * the steps numbered in order, each criterion one line (the check in backticks).
+ * the steps numbered in order, each criterion with its check command apart.
  */
 export function planFromProposal(proposal: PlanProposal): Plan {
   const steps = (proposal.steps ?? []).map((step, i) => ({
@@ -58,9 +63,7 @@ export function planFromProposal(proposal: PlanProposal): Plan {
     change: step.change ?? '',
     verify: ''
   }));
-  const doneWhen = (proposal.doneWhen ?? []).map((criterion) =>
-    criterion.check ? `${criterion.text} — check: \`${criterion.check}\`` : criterion.text
-  );
+  const doneWhen = (proposal.doneWhen ?? []).map((criterion) => ({ text: criterion.text, check: criterion.check ?? '' }));
   return {
     kind: 'plan',
     title: proposal.title ?? '',
@@ -71,19 +74,24 @@ export function planFromProposal(proposal: PlanProposal): Plan {
   };
 }
 
-export interface ReportStep extends Checked {
+export interface NumberedCheck extends Checked {
   number: number;
+}
+
+// The unmet criteria first: what needs the human's eye opens the list.
+function unmetFirst(items: NumberedCheck[]): NumberedCheck[] {
+  return [...items.filter((item) => !item.checked), ...items.filter((item) => item.checked)];
 }
 
 export interface Report {
   kind: 'report';
   title: string;
   summary: string;
-  steps: ReportStep[];
-  doneWhen: Checked[];
+  steps: NumberedCheck[];
+  doneWhen: NumberedCheck[];
   changed: { path: string; what: string }[];
-  test: string;
-  todo: string;
+  test: string[];
+  todo: string[];
 }
 
 /**
@@ -98,11 +106,14 @@ export function reportFromSubmission(proposal: ReportProposal): Report {
     text: step.title,
     detail: step.note ?? ''
   }));
-  const doneWhen = (proposal.doneWhen ?? []).map((criterion) => ({
-    checked: criterion.met ?? false,
-    text: criterion.text,
-    detail: criterion.how ?? ''
-  }));
+  const doneWhen = unmetFirst(
+    (proposal.doneWhen ?? []).map((criterion, i) => ({
+      number: i + 1,
+      checked: criterion.met ?? false,
+      text: criterion.text,
+      detail: criterion.how ?? ''
+    }))
+  );
   return {
     kind: 'report',
     title: proposal.title ?? '',
@@ -110,8 +121,8 @@ export function reportFromSubmission(proposal: ReportProposal): Report {
     steps,
     doneWhen,
     changed: proposal.changed ?? [],
-    test: proposal.test ?? '',
-    todo: proposal.todo ?? ''
+    test: itemsOf(proposal.test ?? ''),
+    todo: itemsOf(proposal.todo ?? '')
   };
 }
 
@@ -155,6 +166,12 @@ function splitDetail(text: string): { text: string; detail: string } {
   return { text: text.trim(), detail: '' };
 }
 
+// A legacy criterion line: the text, and the trailing check command when present.
+function criterionOf(text: string): PlanCriterion {
+  const m = text.match(/^(.*?)\s+[—–-]\s*check:\s*`([^`]+)`\s*\.?$/i);
+  return m ? { text: m[1].trim(), check: m[2].trim() } : { text: text.trim(), check: '' };
+}
+
 // The backticked items of a Files line; fall back to comma-splitting, keeping (new).
 function filesOf(text: string): string[] {
   const backticked = text.match(/`([^`]+)`/g);
@@ -167,6 +184,27 @@ function filesOf(text: string): string[] {
 
 function nothingOf(text: string): string {
   return /^(nothing|rien)\.?$/i.test(text.trim()) ? '' : text.trim();
+}
+
+// A free-text field as list items: its lines (bullets stripped) or, on one line, its sentences.
+function itemsOf(text: string): string[] {
+  const kept = nothingOf(text);
+  if (kept === '') return [];
+  const lines = kept
+    .split('\n')
+    .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s+/, '').trim())
+    .filter((line) => line.length > 0);
+  if (lines.length > 1) return lines;
+  return kept
+    .split(/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ«"`])/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+}
+
+/** A path as its folder (with the trailing slash, '' at the root) and its file name. */
+export function pathParts(path: string): { dir: string; name: string } {
+  const cut = path.lastIndexOf('/') + 1;
+  return { dir: path.slice(0, cut), name: path.slice(cut) };
 }
 
 function sectionOf(text: string): string {
@@ -208,7 +246,7 @@ function parsePlan(title: string, lines: string[]): Plan | null {
   let section = '';
   let current: PlanStep | null = null;
   const steps: PlanStep[] = [];
-  const doneWhen: string[] = [];
+  const doneWhen: PlanCriterion[] = [];
   const risks: string[] = [];
 
   for (const token of tokens) {
@@ -245,7 +283,7 @@ function parsePlan(title: string, lines: string[]): Plan | null {
     }
     if (section === 'done-when') {
       const cb = checkboxOf(token.text);
-      doneWhen.push(cb ? cb.rest : token.text);
+      doneWhen.push(criterionOf(cb ? cb.rest : token.text));
       continue;
     }
     if (section === 'risks') {
@@ -268,10 +306,10 @@ function parseReport(title: string, lines: string[]): Report | null {
   const tokens = tokenize(lines);
   let summary = '';
   let section = '';
-  let test = '';
-  let todo = '';
-  const steps: ReportStep[] = [];
-  const doneWhen: Checked[] = [];
+  let test: string[] = [];
+  let todo: string[] = [];
+  const steps: NumberedCheck[] = [];
+  const doneWhen: NumberedCheck[] = [];
   const changed: { path: string; what: string }[] = [];
 
   for (const token of tokens) {
@@ -297,7 +335,7 @@ function parseReport(title: string, lines: string[]): Report | null {
       const cb = checkboxOf(token.text);
       const rest = cb ? cb.rest : token.text;
       const { text, detail } = splitDetail(rest);
-      doneWhen.push({ checked: cb ? cb.checked : false, text, detail });
+      doneWhen.push({ number: doneWhen.length + 1, checked: cb ? cb.checked : false, text, detail });
       continue;
     }
     if (section === 'changed') {
@@ -313,16 +351,16 @@ function parseReport(title: string, lines: string[]): Report | null {
     if (section === 'next') {
       const t = labelOf(token.text, 'Test');
       if (t !== null) {
-        test = nothingOf(t);
+        test = itemsOf(t);
         continue;
       }
       const d = labelOf(token.text, 'To do');
-      if (d !== null) todo = nothingOf(d);
+      if (d !== null) todo = itemsOf(d);
     }
   }
 
   if (steps.length === 0 && doneWhen.length === 0) return null;
-  return { kind: 'report', title, summary, steps, doneWhen, changed, test, todo };
+  return { kind: 'report', title, summary, steps, doneWhen: unmetFirst(doneWhen), changed, test, todo };
 }
 
 /** The text before the contract and the contract itself; null when the text holds none. */

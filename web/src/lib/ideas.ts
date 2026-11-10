@@ -21,7 +21,7 @@ export type IdeaStatus =
 
 export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
 
-export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove';
+export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editPlan';
 
 /** A file or image pinned to an idea, kept as a data URL. */
 export interface IdeaAttachmentView {
@@ -36,13 +36,13 @@ export interface IdeaView {
   text: string;
   /** A short title: the approved plan's, else the text's first sentence. */
   title: string;
-  /** The text under the title, computed by the server. */
-  description: string;
   attachments: IdeaAttachmentView[];
   status: IdeaStatus;
   stage: Stage;
   action: IdeaAction | null;
   menu: IdeaMenuAction[];
+  /** The edit shown as its own button: a draft's text. */
+  edit: 'editText' | null;
   sessionId: string | null;
   plan: string | null;
   halted: string | null;
@@ -197,6 +197,13 @@ export async function markIdeaReady(
   return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/ready`, {
     method: 'POST',
     body: JSON.stringify({ plan }),
+  });
+}
+
+export async function editIdea(projectId: string, ideaId: string, text: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/edit`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
   });
 }
 

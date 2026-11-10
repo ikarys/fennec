@@ -281,15 +281,14 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
-- `GET /api/projects` → `[{id, name, workdir, favorite, recentRank, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt}]}]`
-  (favourites first, then most recently active, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `favorite` is `true` when the project is pinned; `recentRank` is the project's place by recent activity alone, favourites ignored (0 = most recent), the order the top bar's "+" menu uses; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in the IDE of `display.editor`, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused))
+- `GET /api/projects` → `[{id, name, workdir, favorite, recentRank, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt, linkedProjectId}], chatGroups?, linkedChats?}]`
+  (favourites first, then most recently active, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `favorite` is `true` when the project is pinned; `recentRank` is the project's place by recent activity alone, favourites ignored (0 = most recent), the order the top bar's "+" menu uses; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in the IDE of `display.editor`, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused); `linkedProjectId` is the project a chat is linked to, `null` for an unlinked chat or a project session; the chat project adds `chatGroups` (`[{projectId, projectName, sessionIds}]`, linked groups by project name then unlinked last) and every other project adds `linkedChats`, the number of chat sessions linked to it)
+- `GET /api/home` → `{running, recent, favorites}`: the home page's cross-project view; `running` counts running top-level sessions across all projects; `recent` is at most 8 top-level sessions across all projects (chat included), most recently updated first, ties broken by created time, each a session summary plus `projectId`, `projectName` and `chat` (`chat` is true only for the built-in chat project); `favorites` is the favourite projects in `GET /api/projects` order, chat excluded, each `{id, name, workdir, sessions, running}` (`sessions`/`running` count that project's top-level sessions); `createdAt`/`updatedAt` are Unix milliseconds
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory, or inside fennec's store)
 - `POST /api/projects/{id}/delete` `{deleteFolder?}` → `{deleted: true, folderDeleted, folderError}`: deletes the project with every top-level session as `POST /api/sessions/delete` does (logs, children, worktrees, branches, session rules), then its project rules, its ideas backlog and the project. With `deleteFolder: true` the source folder is removed from disk afterwards; a failure there comes back as `folderError` (the project is already gone). 404 for an unknown project; 409 `{error}` while its queue runs, `{error, running}` while one of its sessions runs a turn, `{error, sessionId}` when a worktree cannot be removed (the project and the sessions not yet removed stay); 400 when the folder is the filesystem root, the home directory or an ancestor of it, or holds fennec's store (nothing is deleted then). The usage ledger keeps the calls.
 - `POST /api/projects/{id}/favorite` `{favorite}` → `{ok: true}`: pins or unpins the project (400 if `favorite` is missing or not a boolean; 404 for an unknown project)
 - `GET /api/projects/{id}/budget` → `{limitUsd, label, figure, detail, tone, active}`: the project's monthly budget and what it spent this month, display-ready; 404 if no project. `limitUsd` is null when none is set; `tone` is `ok`, `attention`, `err` or `neutral`; `active` is true when a budget is set
 - `POST /api/projects/{id}/budget` `{limitUsd: number | null}` → the same as `GET`; 400 when `limitUsd` is not a finite number > 0 (null removes the budget); 404 if no project
-- `GET /api/projects/{id}/contributions` → `[{branch, ahead, subject}]`: the local and remote branches holding commits the human's HEAD lacks (fennec's own session branches left out), newest first, at most 50; `ahead` is that commit count, `subject` the tip's subject; `[]` outside a git repository; 404 if no project
-- `POST /api/projects/{id}/contributions` `{branch}` → `{id}`: a new session titled `Contribution: <branch>` whose worktree branch `fennec/<id>` starts at the branch's tip, its base ref at `merge-base HEAD <branch>`, so the integration gate reviews exactly the contribution's commits; nothing is merged. 400 when `branch` is missing or not in the `GET` list; 404 if no project
 - `GET /api/projects/{id}/indicators` → `{indicators: [{id, label, figure, detail, tone}]}`: the project's indicators, display-ready and verified (computed from the session logs, git and the usage ledger, never from a model); 404 if no project. `id` is one of `integrity`, `sensitiveReview`, `understanding`, `architecture`, `security`, `cost`, `transmission`, `traceability`, `reviewLoad`; `tone` as the dashboard tiles'
 - `GET /api/backlog` → `{total, projects}`: the cross-project Backlog page, one row per project (the idea lists
   live in each project's Tasks tab):
@@ -323,15 +322,13 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     compares the dependencies with those of the committed `docs/map.md` (sorted; null when the file is absent).
 - `GET /api/projects/{id}/dashboard` → `{tiles, recent}`, the project page's overview tab (404 if no project):
   - `tiles` `[{id, icon, label, figure, detail, tone, active, href, title}]`, in display order (`sessions`,
-    `ideas`, `tokens`, `time`, `cost`, `disk`, `map`, `doc`); every string is final display text. Usage over
+    `ideas`, `tokens`, `time`, `cost`, `disk`, `map`, `decisions`); every string is final display text. Usage over
     the last 30 days from the ledger; `disk` only reads the cached worktree scan (`—` until one ran), never scans.
   - `recent` `[{id, title, updatedAt, running}]`: the 5 top-level sessions updated last, newest first.
-- `GET /api/projects/{id}/docs` → `{files, adrs}`, the project's documentation, read from disk (verified):
-  - `files` `[{path, name, content}]`: the project's markdown (`AGENTS.md`, `README.md` and `docs/`, its
-    ADRs excluded), sorted by path; `path` forward slashes, `name` the file name.
-  - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
-    sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
-    first `# ` heading).
+- `GET /api/projects/{id}/adrs` → `{adrs}`, the project's ADRs, read from disk (verified):
+  `[{number, file, title, status, date, body}]`, the MADR files of `docs/adr/` (`NNNN-slug.md`,
+  sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
+  first `# ` heading).
 - `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
   Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
   these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.
@@ -374,7 +371,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - Rules load once per turn: a change applies from the next turn. They are checked before every agent tool call and
     every workflow `shell`/`criteria` command.
 - `GET /api/projects/{id}/rules` → `{rules, global}`, the project's rules and the global ones that apply to it too
-  (read-only: the Settings page's Security tab, `#/settings/security`, edits them).
+  (read-only: the Settings Rules page, `#/settings/rules`, edits them).
 - `GET /api/projects/{id}/risks` → `{files, commits, aiCommits, unreviewedPercent, untested, churning, unreviewed, churnDays, modules, remedyPrompt}`, the
   project's risk report, read from git (verified; 404 if no project). `files` counts the tracked source files, tests
   excluded; `commits` and `aiCommits` report the commits in history and those declaring an AI co-author; the
@@ -415,14 +412,15 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - `groups` `[{stage, ideas: [idea]}]`, all five groups always sent, in this order: `yours` (waits for the human: review, question,
     halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
     queue, the most recently changed first.
-  - `idea` `{id, text, attachments, status, stage, action, menu, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
+  - `idea` `{id, text, attachments, status, stage, action, menu, edit, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
     durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
     review | halted | failed | integrated | completed` (from the idea and its session's state; a started idea whose
     session is gone is `failed`); `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the
     idea (a base64 data URL in `data`; handed to the agent on framing and build: images as vision, text inlined,
     binaries in the worktree); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
-    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop` (empty for running, integrated
-    and completed); `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
+    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop | remove | editPlan`
+    (`editPlan` posts `ready`; empty for running); `edit` the edit shown as its own button, `editText` (posts `edit`) on a
+    draft, else `null`; `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
     new plan or start; `position` its 1-based place in the queue; `durationMs` from its start to now (running) or its
     session's last change; `tokens` uncached prompt plus completion of the project's calls in that window (exact while
     one idea runs at a time); `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its
@@ -721,6 +719,13 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
   400 with `unknown mode: <mode>` if the id is not a top-level agent; appends
   `mode.changed` when the mode changes; allowed while a turn runs
+- `POST /api/sessions/{id}/link` `{projectId: string | null}` → `{linkedProjectId}`:
+  links a chat to a project, or unlinks it with `null`. The link is a reference
+  for grouping chats only; the chat keeps no file. 404 if no session or for an
+  unknown `projectId`; 400 with `projectId must be a string or null` when the
+  body is not a string or null, `only a chat can be linked to a
+  project` for a project session, and `a chat cannot be linked to the chat` when
+  the target is the chat's own scratch project
 - `POST /api/sessions/{id}/model` `{provider, model}` → 200 `{model}` (the
   session's `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if
   the model is empty or the provider unknown; 409 while a workflow runs;

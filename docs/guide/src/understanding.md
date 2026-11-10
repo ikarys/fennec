@@ -4,7 +4,7 @@ Use the project page to see a verified map of the code, its documentation, risk 
 
 ## Project page
 
-Open a project from the home page. The project page gives you **Doc**, **Module map**, **Risk zones**, **Analyses**, sessions, tasks, and the integration review in a session. Map, risk, and module-rule data are computed from git and imports; agent reports are marked **indicative**.
+Open a project from the home page. The project page gives you **Decisions**, **Module map**, **Risk zones**, **Analyses**, sessions, tasks, and the integration review in a session. Map, risk, and module-rule data are computed from git and imports; agent reports are marked **indicative**.
 
 ## Module map and docs/map.md
 
@@ -27,11 +27,9 @@ The **Module rules** tile shows **none in .agents/architecture**, **all respecte
 
 When rules are violated, the **Drift since docs/map.md** section lists **Forbidden dependency** rows with **Files** and **Rule**. If there are no module rules, it shows **No module rules in .agents/architecture (A never imports B): nothing to compare.**
 
-## Documentation and ADRs
+## Decisions (ADRs)
 
-The **Doc** tab lists project documentation: `AGENTS.md`, `README`, and files under `docs/`. If none exist, it shows **No doc file (AGENTS.md, README, docs/).**
-
-MADR files in `docs/adr/` are listed as project documentation and are protected from agent writes. If none exist, it shows **No ADR in docs/adr/.** ADRs bind the project; they are not the same as decisions an agent records in a session.
+The **Decisions** tab lists the project's ADRs, the MADR files in `docs/adr/`, in a navigation on the left (number, title, status); the selected one renders on the right. If none exist, it shows **No ADR in docs/adr/.** ADRs are protected from agent writes. They bind the project; they are not the same as decisions an agent records in a session.
 
 ## Risk zones
 

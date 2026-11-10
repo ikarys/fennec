@@ -1,5 +1,9 @@
+// Search settings: SearXNG URL, API key, and web fetch toggle.
 import { Section, type SectionSave } from '../ui/Section';
-import { FieldRow, TextInput } from '../ui/Field';
+import { GlobeIcon } from '../ui/Icons';
+import { SettingRow } from '../ui/SettingRow';
+import { TextInput } from '../ui/Field';
+import { Switch } from '../ui/Switch';
 import { useT } from '../../i18n';
 
 export interface SearchForm {
@@ -20,36 +24,33 @@ export function SearchSection({
 }) {
   const t = useT();
   return (
-    <Section title={t('webSearchTitle')} save={save}>
-      <FieldRow label={t('searxngUrlLabel')}>
+    <Section Icon={GlobeIcon} flush title={t('webSearchTitle')} save={save}>
+      <SettingRow label={t('searxngUrlLabel')}>
         <TextInput
           type="url"
           value={value.url}
           onChange={(event) => onChange({ ...value, url: event.target.value })}
           placeholder="http://127.0.0.1:8080"
-          className="w-full"
+          className="w-72 max-w-full"
+          aria-label={t('searxngUrlLabel')}
         />
-      </FieldRow>
-      <FieldRow label={t('searchApiKeyLabel')} hint={t('searchApiKeyHint')}>
+      </SettingRow>
+      <SettingRow label={t('searchApiKeyLabel')} hint={t('searchApiKeyHint')}>
         <TextInput
           type="password"
           value={value.apiKey}
           onChange={(event) => onChange({ ...value, apiKey: event.target.value })}
-          className="w-full"
+          className="w-72 max-w-full"
+          aria-label={t('searchApiKeyLabel')}
         />
-      </FieldRow>
-      <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2 text-sm text-text">
-          <input
-            type="checkbox"
-            checked={value.webFetch}
-            onChange={(event) => onChange({ ...value, webFetch: event.target.checked })}
-            className="h-4 w-4"
-          />
-          {t('allowWebFetch')}
-        </label>
-        <p className="text-xs text-muted">{t('webFetchHint')}</p>
-      </div>
+      </SettingRow>
+      <SettingRow label={t('allowWebFetch')} hint={t('webFetchHint')}>
+        <Switch
+          checked={value.webFetch}
+          onChange={(webFetch) => onChange({ ...value, webFetch })}
+          label={t('allowWebFetch')}
+        />
+      </SettingRow>
     </Section>
   );
 }

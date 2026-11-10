@@ -10,9 +10,10 @@ pub(super) mod backlog_routes;
 pub(super) mod budget_routes;
 pub(super) mod canvas_routes;
 pub(super) mod changelog_routes;
-pub(super) mod contribution_routes;
+pub(super) mod chat_link_routes;
 pub(super) mod diff_routes;
 pub(super) mod folder_routes;
+pub(super) mod home_routes;
 pub(super) mod idea_routes;
 pub(super) mod indicator_routes;
 pub(super) mod integration;
@@ -96,6 +97,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "folders"]) => folder_routes::list_folders(app, req, stream),
         ("POST", ["api", "folders", "create"]) => folder_routes::create_folder(req, stream),
         ("GET", ["api", "projects"]) => project_list_routes::list_projects(app, stream),
+        ("GET", ["api", "home"]) => home_routes::serve(app, stream),
         ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),
         ("POST", ["api", "projects"]) => project_list_routes::open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => {
@@ -108,7 +110,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             project_routes::get_overview(app, stream, id)
         }
         ("GET", ["api", "projects", id, "dashboard"]) => project_dashboard::serve(app, stream, id),
-        ("GET", ["api", "projects", id, "docs"]) => project_routes::get_docs(app, stream, id),
+        ("GET", ["api", "projects", id, "adrs"]) => project_routes::get_adrs(app, stream, id),
         ("GET", ["api", "projects", id, "risks"]) => project_routes::get_risks(app, stream, id),
         ("GET", ["api", "projects", id, "worktrees"]) => {
             worktree_routes::list(app, req, stream, id)
@@ -164,12 +166,6 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "projects", id, "budget"]) => budget_routes::get(app, stream, id),
         ("POST", ["api", "projects", id, "budget"]) => budget_routes::set(app, req, stream, id),
         ("GET", ["api", "projects", id, "indicators"]) => indicator_routes::serve(app, stream, id),
-        ("GET", ["api", "projects", id, "contributions"]) => {
-            contribution_routes::list(app, stream, id)
-        }
-        ("POST", ["api", "projects", id, "contributions"]) => {
-            contribution_routes::adopt(app, req, stream, id)
-        }
         ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
         ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
         ("GET", ["api", "plugins", "status-bar"]) => plugin_routes::status_bar(app, req, stream),
@@ -243,6 +239,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "mode"]) => {
             session_routes::set_session_mode(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "link"]) => chat_link_routes::link(app, req, stream, id),
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
         ("GET", ["api", "sessions", id, "mcp"]) => mcp_routes::session_mcp(app, stream, id),
         ("POST", ["api", "sessions", id, "mcp"]) => {

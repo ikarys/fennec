@@ -7,7 +7,7 @@ import { BellIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { buttonClass } from '../ui/Button';
 
-function kindLabel(kind: AttentionItem['kind'], t: (key: MsgKey, vars?: Record<string, string | number>) => string): string {
+export function attentionKindLabel(kind: AttentionItem['kind'], t: (key: MsgKey, vars?: Record<string, string | number>) => string): string {
   switch (kind) {
     case 'question':
       return t('questionHeader');
@@ -79,7 +79,7 @@ export function AttentionBell({ attention, onOpen }: { attention: AttentionItem[
               >
                 <div className="flex items-center gap-1.5">
                   <Badge tone={item.kind === 'error' ? 'err' : 'attention'} dot>
-                    {kindLabel(item.kind, t)}
+                    {attentionKindLabel(item.kind, t)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-xs font-medium text-text">{item.title}</span>
                 </div>

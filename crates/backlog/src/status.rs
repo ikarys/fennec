@@ -61,6 +61,10 @@ pub enum MenuAction {
     Drop,
     /// A done task taken off the board (`idea.dropped`); its session stays.
     Remove,
+    /// A draft's text rewritten by the human (`idea.edited`).
+    EditText,
+    /// The plan that will be built rewritten by the human (`idea.ready`).
+    EditPlan,
 }
 
 /// Display order for stages. `Yours` first because it waits for the human.
@@ -131,6 +135,14 @@ impl Status {
         }
     }
 
+    /// The edit shown as its own button beside the primary action: a draft's text.
+    pub fn edit(self) -> Option<MenuAction> {
+        match self {
+            Status::Inbox => Some(MenuAction::EditText),
+            _ => None,
+        }
+    }
+
     /// The secondary actions offered in an idea's menu.
     ///
     /// `Reframe` is only offered where the fold accepts a `Framing` event for
@@ -141,11 +153,12 @@ impl Status {
             Status::Inbox => &[MenuAction::StartUnframed, MenuAction::Drop],
             // A failed idea is retried by framing it again.
             Status::Framing => &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop],
-            Status::Queued => &[MenuAction::Reframe, MenuAction::Drop],
+            Status::Queued => &[MenuAction::EditPlan, MenuAction::Reframe, MenuAction::Drop],
             // A halted or failed idea can be relaunched from its plan before it
             // is framed again.
             Status::Halted | Status::Failed => &[
                 MenuAction::Restart,
+                MenuAction::EditPlan,
                 MenuAction::Reframe,
                 MenuAction::Complete,
                 MenuAction::Drop,
@@ -272,18 +285,21 @@ mod tests {
             Status::Inbox.menu(),
             &[MenuAction::StartUnframed, MenuAction::Drop]
         );
+        assert_eq!(Status::Inbox.edit(), Some(MenuAction::EditText));
+        assert_eq!(Status::Queued.edit(), None);
         assert_eq!(
             Status::Framing.menu(),
             &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop]
         );
         assert_eq!(
             Status::Queued.menu(),
-            &[MenuAction::Reframe, MenuAction::Drop]
+            &[MenuAction::EditPlan, MenuAction::Reframe, MenuAction::Drop]
         );
         assert_eq!(
             Status::Halted.menu(),
             &[
                 MenuAction::Restart,
+                MenuAction::EditPlan,
                 MenuAction::Reframe,
                 MenuAction::Complete,
                 MenuAction::Drop,
@@ -293,6 +309,7 @@ mod tests {
             Status::Failed.menu(),
             &[
                 MenuAction::Restart,
+                MenuAction::EditPlan,
                 MenuAction::Reframe,
                 MenuAction::Complete,
                 MenuAction::Drop,

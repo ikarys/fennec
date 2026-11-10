@@ -10,7 +10,7 @@ import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { NewIdeaDialog } from './NewIdeaDialog';
 import { Button } from '../../ui/Button';
-import { CloseIcon, PlusIcon } from '../../ui/Icons';
+import { ActivityIcon, BulbIcon, CheckIcon, CloseIcon, EditIcon, PlusIcon, ReviewIcon, type PuzzleIcon } from '../../ui/Icons';
 import {
   listIdeas,
   markReportRead,
@@ -22,12 +22,12 @@ import { useT } from '../../../i18n';
 
 export type TasksSub = 'overview' | 'yours' | 'backlog' | 'ready' | 'done';
 
-const TOP_TABS: readonly { id: TasksSub; labelKey: MsgKey }[] = [
-  { id: 'overview', labelKey: 'tasksTabOverview' },
-  { id: 'yours', labelKey: 'tasksTabYours' },
-  { id: 'ready', labelKey: 'tasksTabReady' },
-  { id: 'backlog', labelKey: 'tasksTabBacklog' },
-  { id: 'done', labelKey: 'tasksTabDone' },
+const TOP_TABS: readonly { id: TasksSub; labelKey: MsgKey; Icon: typeof PuzzleIcon }[] = [
+  { id: 'overview', labelKey: 'tasksTabOverview', Icon: ActivityIcon },
+  { id: 'yours', labelKey: 'tasksTabYours', Icon: ReviewIcon },
+  { id: 'ready', labelKey: 'tasksTabReady', Icon: BulbIcon },
+  { id: 'backlog', labelKey: 'tasksTabBacklog', Icon: EditIcon },
+  { id: 'done', labelKey: 'tasksTabDone', Icon: CheckIcon },
 ];
 
 function normalizeSub(sub: string | null): TasksSub {
@@ -152,6 +152,7 @@ export function TasksSection({
         tabs={TOP_TABS.map((tab) => ({
           id: tab.id,
           label: t(tab.labelKey),
+          Icon: tab.Icon,
           count:
             tab.id === 'yours'
               ? yours.length
@@ -165,21 +166,13 @@ export function TasksSection({
         }))}
         active={activeSub}
         onSelect={(id) => onSelectSub(id as TasksSub)}
-      />
-
-      <div className="flex items-center gap-2">
-        <div className="ml-auto">
-          <Button
-            variant="secondary"
-            size="sm"
-            title={t('addIdeaToBacklog')}
-            onClick={() => setNewIdeaOpen(true)}
-          >
+        trailing={
+          <Button variant="secondary" size="sm" title={t('addIdeaToBacklog')} onClick={() => setNewIdeaOpen(true)}>
             <PlusIcon className="h-4 w-4" />
             {t('newIdea')}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {actionError ? (
         <div className="flex items-center gap-2">

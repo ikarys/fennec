@@ -4,6 +4,7 @@
 use crate::agents;
 use crate::chat;
 use crate::domain::agent::resolve_mode as agent_resolve_mode;
+use crate::domain::chat_link;
 use crate::domain::project::Project;
 use crate::domain::slash::commands;
 use crate::web::App;
@@ -14,6 +15,7 @@ use crate::web::routes::folder_routes::store_dir;
 use crate::web::routes::session_routes::session_json;
 use crate::{folders, git, skills};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -22,14 +24,23 @@ pub(crate) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Htt
     let favorites = store.favorite_projects()?;
     let recent = store.recent_project_ids()?;
     let ide = store.preferences()?.display.editor;
+    let projects: Vec<Project> = store.projects()?;
+    // Chats linked to a project, counted once for the project list.
+    let chat_sessions = store.sessions(Some(chat::ID))?;
+    let mut linked_chats = HashMap::new();
+    for session in &chat_sessions {
+        if let Some(project_id) = &session.linked_project_id {
+            *linked_chats.entry(project_id.clone()).or_default() += 1;
+        }
+    }
     let mut out = Vec::new();
-    for p in store.projects()? {
+    for p in &projects {
         // The log says a workflow ended; git says whether its work still waits.
         let pending = git::sessions_with_unintegrated_work(Path::new(&p.workdir));
         // Each session's agent, so the project page can tell an analysis apart.
         let list = agents::discover(Path::new(&p.workdir));
-        let sessions: Vec<Value> = store
-            .sessions(Some(&p.id))?
+        let session_summaries = store.sessions(Some(&p.id))?;
+        let sessions: Vec<Value> = session_summaries
             .iter()
             .map(|s| {
                 let mut v = session_json(app, s);
@@ -41,7 +52,7 @@ pub(crate) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Htt
                 v
             })
             .collect();
-        let mut v = project_json(&p, store_dir(app));
+        let mut v = project_json(p, store_dir(app));
         v["favorite"] = json!(favorites.contains(&p.id));
         v["recentRank"] = json!(recent.iter().position(|id| *id == p.id));
         v["branch"] = json!(git::current_branch(Path::new(&p.workdir)));
@@ -56,6 +67,22 @@ pub(crate) fn list_projects(app: &App, stream: &mut TcpStream) -> Result<(), Htt
             std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
         ));
         v["sessions"] = Value::Array(sessions);
+        if chat::is_chat(p) {
+            let groups = chat_link::group(&session_summaries, &projects);
+            let chat_groups: Vec<Value> = groups
+                .iter()
+                .map(|g| {
+                    json!({
+                        "projectId": g.project.as_ref().map(|p| p.id.clone()),
+                        "projectName": g.project.as_ref().map(|p| p.name.clone()),
+                        "sessionIds": &g.session_ids,
+                    })
+                })
+                .collect();
+            v["chatGroups"] = Value::Array(chat_groups);
+        } else {
+            v["linkedChats"] = json!(linked_chats.get(&p.id).copied().unwrap_or(0));
+        }
         out.push(v);
     }
     send_json(stream, 200, &Value::Array(out))
@@ -214,6 +241,58 @@ mod tests {
             .and_then(|s| s.iter().find(|s| s["id"] == session))
             .and_then(|s| s["mode"].as_str());
         assert_eq!(mode, Some("analyze"));
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn list_projects_reports_chat_links() {
+        let db_path = std::env::temp_dir().join(format!("fennec-routes-test-{}.db", new_id()));
+        let app = app(db_path.clone());
+        let store = app.store().unwrap();
+        let project = store.project_for("/tmp/analyze-links").unwrap();
+        let chat = store.chat_project("/tmp/scratch-x").unwrap();
+        let chat_session = store.create_session(&chat, "chat").unwrap();
+        assert!(
+            store
+                .link_session(&chat_session, Some(&project.id))
+                .unwrap()
+        );
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client = TcpStream::connect(addr).unwrap();
+        let mut server = listener.accept().unwrap().0;
+        {
+            let mut client = client;
+            list_projects(&app, &mut client).unwrap();
+        }
+        let mut body = String::new();
+        server.read_to_string(&mut body).unwrap();
+        let json = body
+            .rsplit("\r\n\r\n")
+            .next()
+            .expect("a response body after the headers");
+        let projects: Value = serde_json::from_str(json).unwrap();
+        let target = projects
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == project.id)
+            .unwrap();
+        assert_eq!(target["linkedChats"], 1);
+        let chat_project = projects
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == chat.id)
+            .unwrap();
+        let groups = chat_project["chatGroups"].as_array().unwrap();
+        let group = groups
+            .iter()
+            .find(|g| g["projectName"] == project.name)
+            .unwrap();
+        assert_eq!(group["projectId"], project.id);
+        assert_eq!(group["sessionIds"], serde_json::json!([chat_session]));
         let _ = std::fs::remove_file(&db_path);
     }
 }

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Button } from "../../ui/Button";
 import {
+  ChatIcon,
   EditIcon,
   ReviewIcon,
   EyeIcon,
@@ -15,8 +16,8 @@ import {
 } from "../../ui/Icons";
 import { IdeaStatusBadge } from "./IdeaStatusBadge";
 import { IdeaMeta } from "./IdeaMeta";
-import { IdeaAttachments } from "./IdeaAttachments";
 import { IdeaMenu } from "./IdeaMenu";
+import { EditIdeaDialog } from "./EditIdeaDialog";
 import { formatDate } from "../../../lib/format";
 import {
   startIdea,
@@ -36,9 +37,9 @@ const ACTION_LABELS: Record<IdeaAction, MsgKey> = {
   review: "actionReview",
 };
 
-const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
-  frame: EditIcon,
-  resumeFraming: EditIcon,
+const ACTION_ICONS: Record<IdeaAction, typeof ChatIcon> = {
+  frame: ChatIcon,
+  resumeFraming: ChatIcon,
   start: PlayIcon,
   open: EyeIcon,
   answer: ReplyIcon,
@@ -75,6 +76,7 @@ export function IdeaRow({
   reorder: RowReorder | null;
 }) {
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
   const t = useT();
 
   const showMeta =
@@ -206,15 +208,6 @@ export function IdeaRow({
         <p className="m-0 truncate text-sm text-text" title={idea.text}>
           {idea.title}
         </p>
-        {idea.description ? (
-          <p
-            className="m-0 truncate text-xs text-faint"
-            title={idea.description}
-          >
-            {idea.description}
-          </p>
-        ) : null}
-        <IdeaAttachments attachments={idea.attachments} />
         {idea.halted ? (
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}
@@ -241,6 +234,18 @@ export function IdeaRow({
             <EyeIcon className="h-4 w-4" />
           </Button>
         ) : null}
+        {idea.edit === "editText" ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            title={t("menuEditText")}
+            aria-label={t("menuEditText")}
+            onClick={() => setEditing(true)}
+          >
+            <EditIcon className="h-4 w-4" />
+          </Button>
+        ) : null}
         {renderAction()}
         <IdeaMenu
           idea={idea}
@@ -249,6 +254,15 @@ export function IdeaRow({
           run={run}
         />
       </div>
+      {editing ? (
+        <EditIdeaDialog
+          idea={idea}
+          projectId={projectId}
+          field="text"
+          run={run}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </div>
   );
 }

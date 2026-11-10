@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPreferences,
   emptyModelForm,
+  modelSpecs,
   percentFromFraction,
   providerFormToApiKey,
   providerToForm,
@@ -19,7 +20,7 @@ import type {
   SettingsResponse,
 } from './api';
 import type { ProviderForm } from '../components/settings/ProvidersSection';
-import type { ModelForm } from '../components/settings/ModelPrefsSection';
+import type { ModelForm } from './settingsForm';
 
 function resolved<T>(value: T): ResolvedValue<T> {
   return { value, source: 'default', wire: false };
@@ -410,5 +411,95 @@ describe('round trip', () => {
 
     expect(rebuilt.billing).toEqual({ 'p/listed': false, 'local/m': true });
     expect(toForm(rebuilt, listings).billing).toEqual(initial.billing);
+  });
+});
+
+describe('modelSpecs', () => {
+
+  const listed = {
+    id: 'm',
+    resolved: {
+      maxTokens: resolved(500),
+      contextWindow: resolved(1000),
+      compactAt: resolved(0.8),
+      reasoningEffort: resolved('high')
+    }
+  } as ProviderListing['models'][number];
+
+  const listedWithoutEffort = {
+    id: 'm',
+    resolved: {
+      maxTokens: resolved(500),
+      contextWindow: resolved(1000),
+      compactAt: resolved(0.8),
+      reasoningEffort: resolved(null)
+    }
+  } as ProviderListing['models'][number];
+
+  it('uses listed-model overrides when present', () => {
+    const value = {
+      ...emptyModelForm,
+      contextWindow: '1234',
+      maxTokens: '567',
+      reasoningEffort: 'low'
+    };
+
+    expect(modelSpecs(value, listed, 'auto effort')).toEqual([
+      'ctx 1.2k',
+      'max 567',
+      'effort low'
+    ]);
+  });
+
+  it('falls back to resolved values for a listed model', () => {
+    expect(modelSpecs(emptyModelForm, listed, 'auto effort')).toEqual([
+      'ctx 1k',
+      'max 500',
+      'effort high'
+    ]);
+  });
+
+  it('falls back to the auto effort for a listed model without resolved effort', () => {
+    expect(modelSpecs(emptyModelForm, listedWithoutEffort, 'auto effort')).toEqual([
+      'ctx 1k',
+      'max 500',
+      'effort auto effort'
+    ]);
+  });
+
+  it('returns only context for a hand-added model when set', () => {
+    const value = { ...emptyModelForm, contextWindow: '4321' };
+
+    expect(modelSpecs(value, null, 'auto effort')).toEqual(['ctx 4.3k']);
+  });
+
+  it('returns no specs for a hand-added model without context', () => {
+    expect(modelSpecs(emptyModelForm, null, 'auto effort')).toEqual([]);
+  });
+
+  it('appends prices when either price is set', () => {
+    const value = {
+      ...emptyModelForm,
+      priceInput: '0.3',
+      priceOutput: '0.6'
+    };
+
+    expect(modelSpecs(value, listed, 'auto effort')).toEqual([
+      'ctx 1k',
+      'max 500',
+      'effort high',
+      '$0.3/$0.6'
+    ]);
+
+    const handAdded = {
+      ...emptyModelForm,
+      contextWindow: '4321',
+      priceInput: '0.3'
+    };
+
+    expect(modelSpecs(handAdded, null, 'auto effort')).toEqual([
+      'ctx 4.3k',
+      '$0.3/$0'
+    ]);
   });
 });

@@ -1,19 +1,20 @@
+// Settings' MCP tab: framed server cards with connection form, toggles, and cached tools.
 import { useState } from 'react';
 import { Section, type SectionSave } from '../ui/Section';
-import { TextInput, Select } from '../ui/Field';
+import { FieldRow, Select, TextInput } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Card } from '../ui/Card';
 import { ListCard } from '../ui/ListCard';
 import { Switch } from '../ui/Switch';
 import { Tabs } from '../ui/Tabs';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
 import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
-import { ChevronRightIcon, KeyIcon } from '../ui/Icons';
+import { EditIcon, KeyIcon, RefreshIcon, ServerIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
+import { InfoBar } from '../ui/InfoBar';
 import { useLang, useT } from '../../i18n';
 import { formatTokens } from '../../lib/format';
 
-function emptyServer(): McpServer {
+export function emptyServer(): McpServer {
   return {
     name: '',
     transport: 'stdio',
@@ -54,6 +55,7 @@ function ServerCard({
   server,
   connecting,
   views,
+  save,
   onPatch,
   onRemove,
   onConnect,
@@ -63,6 +65,7 @@ function ServerCard({
   server: McpServer;
   connecting: boolean;
   views: McpToolSummary[];
+  save?: SectionSave;
   onPatch: (patch: Partial<McpServer>) => void;
   onRemove: () => void;
   onConnect: () => void;
@@ -78,6 +81,7 @@ function ServerCard({
   const t = useT();
   const lang = useLang();
   const [tab, setTab] = useState<ToolAccess | null>(null);
+  const [editing, setEditing] = useState(false);
 
   // The backend view is the source for access and token cost; a missing entry
   // means the tool was not listed by the settings route, so it is undeclared.
@@ -123,19 +127,23 @@ function ServerCard({
       onPatch({ disabledTools: server.disabledTools.filter((name) => !names.includes(name)) });
     }
   }
+
   return (
-    <Card variant="inset">
-      {/* Folded by default: a list of servers stays one line each; a new one opens to be filled. */}
-      <details className="group" open={server.name === '' ? true : undefined}>
-        <summary className="flex cursor-pointer list-none select-none items-center gap-2 hover:text-accent [&::-webkit-details-marker]:hidden">
-          <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
-          <span className="shrink-0 font-mono text-sm text-text">{server.name || t('newServer')}</span>
+    <Section
+      Icon={ServerIcon}
+      flush
+      title={<span className="font-mono">{server.name || t('newServer')}</span>}
+      description={
+        <span className="font-mono">
+          {server.transport === 'http' ? server.url : [server.command, ...server.args].join(' ')}
+        </span>
+      }
+      save={save}
+      actions={
+        <>
           <Badge tone="neutral" appearance="pill">
             {server.transport}
           </Badge>
-          <span className="min-w-0 flex-1 truncate text-xs text-faint">
-            {server.transport === 'http' ? server.url : [server.command, ...server.args].join(' ')}
-          </span>
           {server.cachedTools.length > 0 ? (
             <Badge tone="accent" appearance="pill">
               {t('mcpToolCount', { count: server.cachedTools.length })}
@@ -146,195 +154,226 @@ function ServerCard({
             onChange={(on) => onPatch({ disabled: !on })}
             label={t('mcpActive')}
           />
-        </summary>
-        <div className="mt-3 flex flex-col gap-2">
-          <div className="flex items-center gap-2">
+          <Switch
+            checked={server.visible}
+            onChange={(on) => onPatch({ visible: on })}
+            label={t('mcpShown')}
+          />
+          {server.transport === 'http' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={onAuthorize}
+              disabled={connecting || server.name === ''}
+              title={t('mcpAuthorize')}
+              aria-label={t('mcpAuthorize')}
+            >
+              <KeyIcon className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={onConnect}
+            disabled={connecting || server.name === ''}
+            aria-label={connecting ? t('mcpConnecting') : t('mcpConnect')}
+            title={connecting ? t('mcpConnecting') : t('mcpConnect')}
+          >
+            {connecting ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-pressed={editing}
+            aria-label={t('mcpEdit')}
+            title={t('mcpEdit')}
+            onClick={() => setEditing((current) => !current)}
+          >
+            <EditIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label={t('mcpRemove')}
+            title={t('mcpRemove')}
+            onClick={onRemove}
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </Button>
+        </>
+      }
+    >
+      {(editing || server.name === '') && (
+        <div className="grid gap-3 p-4 sm:grid-cols-2 border-b border-border">
+          <FieldRow label={t('mcpNameLabel')}>
             <TextInput
               value={server.name}
               onChange={(event) => onPatch({ name: event.target.value })}
               placeholder={t('mcpNamePlaceholder')}
-              className="w-40"
+              className="w-full"
               aria-label={t('mcpNameLabel')}
             />
+          </FieldRow>
+
+          <FieldRow label={t('mcpTransportLabel')}>
             <Select
               value={server.transport}
               onChange={(event) => onPatch({ transport: event.target.value as McpServer['transport'] })}
-              className="w-28"
+              className="w-full"
               aria-label={t('mcpTransportLabel')}
             >
               <option value="stdio">stdio</option>
               <option value="http">http</option>
             </Select>
-            {server.transport === 'stdio' ? (
-              <>
+          </FieldRow>
+
+          {server.transport === 'stdio' ? (
+            <>
+              <FieldRow label={t('mcpCommandLabel')}>
                 <TextInput
                   value={server.command ?? ''}
                   onChange={(event) => onPatch({ command: event.target.value })}
                   placeholder={t('mcpCommandPlaceholder')}
-                  className="w-40"
+                  className="w-full"
                   aria-label={t('mcpCommandLabel')}
                 />
+              </FieldRow>
+
+              <FieldRow label={t('mcpArgsLabel')}>
                 <TextInput
                   value={server.args.join(' ')}
                   onChange={(event) =>
                     onPatch({ args: event.target.value.split(/\s+/).filter((part) => part !== '') })
                   }
                   placeholder={t('mcpArgsPlaceholder')}
-                  className="w-40"
+                  className="w-full"
                   aria-label={t('mcpArgsLabel')}
                 />
-              </>
-            ) : (
-              <TextInput
-                value={server.url ?? ''}
-                onChange={(event) => onPatch({ url: event.target.value })}
-                placeholder={t('mcpUrlPlaceholder')}
-                className="w-64"
-                aria-label={t('mcpUrlLabel')}
-              />
-            )}
-            <div className="ml-auto flex items-center gap-2">
-              {server.transport === 'http' ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={onAuthorize}
-                  disabled={connecting || server.name === ''}
-                  title={t('mcpAuthorize')}
-                  aria-label={t('mcpAuthorize')}
-                >
-                  <KeyIcon className="h-4 w-4" />
-                </Button>
-              ) : null}
-              <Button
-                variant="soft"
-                size="sm"
-                onClick={onConnect}
-                disabled={connecting || server.name === ''}
-              >
-                {connecting ? t('mcpConnecting') : t('mcpConnect')}
-              </Button>
-              <Button variant="ghost" size="sm" iconOnly onClick={onRemove} aria-label={t('mcpRemove')}>
-                ×
-              </Button>
+              </FieldRow>
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <FieldRow label={t('mcpUrlLabel')}>
+                <TextInput
+                  value={server.url ?? ''}
+                  onChange={(event) => onPatch({ url: event.target.value })}
+                  placeholder={t('mcpUrlPlaceholder')}
+                  className="w-full"
+                  aria-label={t('mcpUrlLabel')}
+                />
+              </FieldRow>
             </div>
-          </div>
+          )}
 
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input
-                type="checkbox"
-                checked={server.visible}
-                onChange={(event) => onPatch({ visible: event.target.checked })}
-                className="h-4 w-4"
-              />
-              {t('mcpShown')}
-            </label>
-            {server.cachedTools.length > 0 && (
-              <span className="text-xs text-muted">
-                {t('mcpToolCount', { count: server.cachedTools.length })}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-text" htmlFor={`mcp-auth-${index}`}>
-              {t('mcpAuthTokenLabel')}
-            </label>
-            <TextInput
-              id={`mcp-auth-${index}`}
-              type="password"
-              value={server.authToken ?? ''}
-              onChange={(event) => onPatch({ authToken: event.target.value || null })}
-              placeholder={t('mcpAuthTokenPlaceholder')}
-              className="w-64"
-              aria-label={t('mcpAuthTokenLabel')}
-            />
-            <span className="text-xs text-muted">
-              {server.transport === 'http' ? t('mcpAuthTokenBearer') : t('mcpAuthTokenEnv')}
-            </span>
-          </div>
-
-          {server.cachedTools.length > 0 && (
-            <ListCard
-              folded
-              title={t('mcpTools')}
-              count={`${enabled}/${server.cachedTools.length} · ${t('mcpTokens', { count: formatTokens(lang, enabledTokens) })}`}
+          <div className="sm:col-span-2">
+            <FieldRow
+              label={t('mcpAuthTokenLabel')}
+              hint={server.transport === 'http' ? t('mcpAuthTokenBearer') : t('mcpAuthTokenEnv')}
+              htmlFor={`mcp-auth-${index}`}
             >
-              {activeTab ? (
-                <div
-                  className="border-b border-border px-3 pt-1"
-                  title={t('mcpAccessDeclared')}
-                >
-                  <Tabs
-                    label={t('mcpToolsByAccess')}
-                    orientation="horizontal"
-                    tabs={present.map((access) => ({
-                      id: access,
-                      label: t(LABEL[access]),
-                      count: toolsOf(access).length
-                    }))}
-                    active={activeTab}
-                    onSelect={setTab}
-                    trailing={
-                      <label className="flex items-center gap-2 text-xs text-muted">
-                        <input
-                          type="checkbox"
-                          checked={allTabEnabled}
-                          onChange={() => toggleTab(activeTab)}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
-                          }}
-                          className="h-4 w-4"
-                          aria-label={t('mcpToggleTab')}
-                        />
-                        <span className="tabular-nums">{t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}</span>
-                      </label>
-                    }
-                  />
-                </div>
-              ) : null}
-              {activeTools.map((entry, toolIndex) => {
-                const disabled = server.disabledTools.includes(entry.tool.name);
-                return (
-                  <details key={entry.tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
-                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
+              <TextInput
+                id={`mcp-auth-${index}`}
+                type="password"
+                value={server.authToken ?? ''}
+                onChange={(event) => onPatch({ authToken: event.target.value || null })}
+                placeholder={t('mcpAuthTokenPlaceholder')}
+                className="w-full"
+                aria-label={t('mcpAuthTokenLabel')}
+              />
+            </FieldRow>
+          </div>
+        </div>
+      )}
+
+      {server.cachedTools.length > 0 && (
+        <div className="p-4">
+          <ListCard
+            folded
+            title={t('mcpTools')}
+            count={`${enabled}/${server.cachedTools.length} · ${t('mcpTokens', { count: formatTokens(lang, enabledTokens) })}`}
+          >
+            {activeTab ? (
+              <div
+                className="border-b border-border px-3 pt-1"
+                title={t('mcpAccessDeclared')}
+              >
+                <Tabs
+                  label={t('mcpToolsByAccess')}
+                  orientation="horizontal"
+                  tabs={present.map((access) => ({
+                    id: access,
+                    label: t(LABEL[access]),
+                    count: toolsOf(access).length
+                  }))}
+                  active={activeTab}
+                  onSelect={setTab}
+                  trailing={
+                    <label className="flex items-center gap-2 text-xs text-muted">
                       <input
                         type="checkbox"
-                        checked={!disabled}
-                        onChange={() => toggleTool(entry.tool.name)}
-                        onClick={(event) => event.stopPropagation()}
+                        checked={allTabEnabled}
+                        onChange={() => toggleTab(activeTab)}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
+                        }}
                         className="h-4 w-4"
-                        aria-label={entry.tool.name}
+                        aria-label={t('mcpToggleTab')}
                       />
-                      <span
-                        className={
-                          disabled
-                            ? 'shrink-0 font-mono text-xs text-faint line-through'
-                            : 'shrink-0 font-mono text-xs text-text'
-                        }
-                      >
-                        {entry.tool.name}
+                      <span className="tabular-nums">
+                        {t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}
                       </span>
-                      {entry.tool.description ? (
-                        <span className="min-w-0 flex-1 truncate text-xs text-faint">
-                          {firstSentence(entry.tool.description)}
-                        </span>
-                      ) : null}
-                      <span className="shrink-0 text-xs tabular-nums text-faint">~{formatTokens(lang, entry.tokens)}</span>
-                    </summary>
+                    </label>
+                  }
+                />
+              </div>
+            ) : null}
+            {activeTools.map((entry, toolIndex) => {
+              const disabled = server.disabledTools.includes(entry.tool.name);
+              return (
+                <details key={entry.tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
+                  <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
+                    <input
+                      type="checkbox"
+                      checked={!disabled}
+                      onChange={() => toggleTool(entry.tool.name)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="h-4 w-4"
+                      aria-label={entry.tool.name}
+                    />
+                    <span
+                      className={
+                        disabled
+                          ? 'shrink-0 font-mono text-xs text-faint line-through'
+                          : 'shrink-0 font-mono text-xs text-text'
+                      }
+                    >
+                      {entry.tool.name}
+                    </span>
                     {entry.tool.description ? (
-                      <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">{entry.tool.description}</p>
+                      <span className="min-w-0 flex-1 truncate text-xs text-faint">
+                        {firstSentence(entry.tool.description)}
+                      </span>
                     ) : null}
-                  </details>
-                );
-              })}
-            </ListCard>
-          )}
+                    <span className="shrink-0 text-xs tabular-nums text-faint">
+                      ~{formatTokens(lang, entry.tokens)}
+                    </span>
+                  </summary>
+                  {entry.tool.description ? (
+                    <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">
+                      {entry.tool.description}
+                    </p>
+                  ) : null}
+                </details>
+              );
+            })}
+          </ListCard>
         </div>
-      </details>
-    </Card>
+      )}
+    </Section>
   );
 }
 
@@ -403,19 +442,13 @@ export function McpSection({
   }
 
   return (
-    <Section
-      title={t('mcpTitle')}
-      description={t('mcpHint')}
-      actions={
-        <Button variant="primary" onClick={() => onChange([...value, emptyServer()])}>
-          {t('newServer')}
-        </Button>
-      }
-      save={save}
-    >
-      {error ? <p className="text-xs text-err">{error}</p> : null}
+    <div className="flex flex-col gap-6">
+      <InfoBar>{t('mcpHint')}</InfoBar>
+      {error ? <p className="m-0 text-xs text-err">{error}</p> : null}
       {value.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">{t('noMcpServers')}</p>
+        <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">
+          {t('noMcpServers')}
+        </p>
       ) : (
         value.map((server, index) => (
           <ServerCard
@@ -424,6 +457,7 @@ export function McpSection({
             server={server}
             connecting={connecting === index}
             views={toolViews[server.name] ?? []}
+            save={save}
             onPatch={(p) => patch(index, p)}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}
@@ -431,6 +465,6 @@ export function McpSection({
           />
         ))
       )}
-    </Section>
+    </div>
   );
 }

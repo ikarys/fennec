@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import { getProjectPluginBlocks, type ServedPluginBlock } from '../../lib/api';
 import { usePluginsVersion } from '../../hooks/usePluginsVersion';
 import { Section } from '../ui/Section';
+import { PuzzleIcon } from '../ui/Icons';
 import { PluginBlockCard } from '../plugins/PluginBlockCard';
 
 export function PluginsSection({ projectId }: { projectId: string }) {
@@ -30,7 +31,7 @@ export function PluginsSection({ projectId }: { projectId: string }) {
   if (blocks.length === 0) return null;
 
   return (
-    <Section title={t('panelPlugins')} flush>
+    <Section Icon={PuzzleIcon} title={t('panelPlugins')} flush>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {blocks.map((block) => (
           <PluginBlockCard key={`${block.plugin}:${block.title}`} block={block} />

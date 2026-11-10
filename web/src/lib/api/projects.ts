@@ -1,6 +1,12 @@
 import { request } from "./request";
 import type { SessionSummary } from "./sessions";
 
+export interface ChatGroup {
+  projectId: string | null;
+  projectName: string | null;
+  sessionIds: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -18,6 +24,10 @@ export interface Project {
   /** Opens the project in VS Code (through the WSL remote under WSL). */
   editorUrl: string;
   sessions: SessionSummary[];
+  /** The chat's groups, on the chat project only. */
+  chatGroups?: ChatGroup[];
+  /** Chats linked to this project. */
+  linkedChats?: number;
 }
 
 export interface SlashCommand {
@@ -247,13 +257,6 @@ export interface ArchitectureDrift {
 /** The committed `docs/map.md` against the map of the code as it is. */
 export type MapFileState = "missing" | "stale" | "current";
 
-/** A project's documentation file, read from disk (verified). */
-export interface DocFile {
-  path: string;
-  name: string;
-  content: string;
-}
-
 export interface ProjectOverview {
   map: ModuleMap;
   mapFile: MapFileState;
@@ -268,12 +271,10 @@ export function getProjectOverview(
   );
 }
 
-/** The project's documentation: its markdown files and its ADRs (verified). */
-export function getProjectDocs(
-  projectId: string,
-): Promise<{ files: DocFile[]; adrs: Adr[] }> {
-  return request<{ files: DocFile[]; adrs: Adr[] }>(
-    `/api/projects/${encodeURIComponent(projectId)}/docs`,
+/** The project's ADRs (`docs/adr/`), read from disk (verified). */
+export function getProjectAdrs(projectId: string): Promise<{ adrs: Adr[] }> {
+  return request<{ adrs: Adr[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/adrs`,
   );
 }
 
@@ -290,7 +291,7 @@ export function writeMapFile(
 }
 
 // The project dashboard: display-ready tiles and recent sessions.
-export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'map' | 'doc';
+export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'decisions';
 
 export interface DashboardTile {
   id: string;
@@ -351,32 +352,6 @@ export function setProjectBudget(
     {
       method: "POST",
       body: JSON.stringify({ limitUsd }),
-    },
-  );
-}
-
-export interface Contribution {
-  branch: string;
-  ahead: number;
-  subject: string;
-}
-
-export function getContributions(projectId: string): Promise<Contribution[]> {
-  return request<Contribution[]>(
-    `/api/projects/${encodeURIComponent(projectId)}/contributions`,
-  );
-}
-
-/** Adopt a contribution branch into a new session. */
-export function adoptContribution(
-  projectId: string,
-  branch: string,
-): Promise<{ id: string }> {
-  return request<{ id: string }>(
-    `/api/projects/${encodeURIComponent(projectId)}/contributions`,
-    {
-      method: "POST",
-      body: JSON.stringify({ branch }),
     },
   );
 }
