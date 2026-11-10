@@ -326,7 +326,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "status": status,
         "stage": stage,
         "action": action,
-        "menu": status.menu(),
+        "menu": if idea.sheet.is_some() { status.sheet_menu() } else { status.menu().to_vec() },
         "edit": status.edit(),
         "sessionId": idea.session_id,
         "plan": idea.plan,
