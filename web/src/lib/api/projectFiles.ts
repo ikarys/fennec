@@ -91,3 +91,13 @@ export function commitProjectFiles(
     },
   );
 }
+
+export function restoreProjectFile(projectId: string, path: string): Promise<Record<string, never>> {
+  return request<Record<string, never>>(
+    `/api/projects/${encodeURIComponent(projectId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    },
+  );
+}

@@ -1,18 +1,26 @@
 // A session's changes: its branch's files in review order, the selected one's diff.
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { getFileDiff, getIntegration, type FileDiff, type IntegrationPreview, type ReviewSignal } from '../lib/api/integration';
-import { tabPath } from '../lib/route';
+import { editorPath, tabPath } from '../lib/route';
 import { useOpenInEditorLabel } from '../lib/editors';
 import { useT } from '../i18n';
 
 import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
+import { Button, buttonClass } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ListCard } from '../components/ui/ListCard';
-import { BranchIcon, ChevronsLeftIcon, ExternalIcon, FileIcon } from '../components/ui/Icons';
+import { BranchIcon, ChevronsLeftIcon, EditIcon, ExternalIcon, FileIcon } from '../components/ui/Icons';
 import { SIGNAL_KEYS } from '../components/session/IntegrationReview';
 
-export default function ChangesPage({ sessionId }: { sessionId: string }) {
+export default function ChangesPage({
+  sessionId,
+  initialPath,
+  projectId,
+}: {
+  sessionId: string;
+  initialPath: string | null;
+  projectId: string | null;
+}) {
   const t = useT();
   const openInEditor = useOpenInEditorLabel('openInEditor');
   const [integration, setIntegration] = useState<IntegrationPreview | null>(null);
@@ -35,7 +43,11 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
       .then((data) => {
         if (cancelled) return;
         setIntegration(data);
-        if (data.files.length > 0) setSelectedPath(data.files[0].path);
+        if (data.files.length > 0) {
+          const initial =
+            initialPath !== null ? data.files.find((file) => file.path === initialPath)?.path : null;
+          setSelectedPath(initial ?? data.files[0].path);
+        }
       })
       .catch((error) => {
         if (!cancelled) setIntegrationError(error instanceof Error ? error.message : String(error));
@@ -43,7 +55,7 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, initialPath]);
 
   useEffect(() => {
     if (!selectedPath) return;
@@ -171,16 +183,28 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
                     <span className="text-xs text-err tabular-nums">−{selectedFile.removed}</span>
                   </>
                 ) : null}
-                {diff ? (
-                  <a
-                    href={diff.editorUrl}
-                    className="ml-auto rounded-md p-1 text-muted hover:bg-accent-soft hover:text-accent"
-                    title={openInEditor}
-                    aria-label={openInEditor}
-                  >
-                    <ExternalIcon className="h-3.5 w-3.5" />
-                  </a>
-                ) : null}
+                <span className="ml-auto flex items-center gap-1">
+                  {projectId && selectedPath ? (
+                    <a
+                      href={editorPath(projectId, selectedPath, sessionId)}
+                      className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+                      title={t('changesOpenFile')}
+                      aria-label={t('changesOpenFile')}
+                    >
+                      <EditIcon className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
+                  {diff ? (
+                    <a
+                      href={diff.editorUrl}
+                      className="rounded-md p-1 text-muted hover:bg-accent-soft hover:text-accent"
+                      title={openInEditor}
+                      aria-label={openInEditor}
+                    >
+                      <ExternalIcon className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
+                </span>
               </div>
               <div className="grow overflow-auto">
                 {diffLoading ? (

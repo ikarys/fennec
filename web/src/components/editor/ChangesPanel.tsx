@@ -4,11 +4,13 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { CheckIcon } from '../ui/Icons';
+import { CheckIcon, ReplayIcon } from '../ui/Icons';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { SectionLabel } from '../ui/SectionLabel';
 import { TextInput } from '../ui/Field';
 import {
   commitProjectFiles,
+  restoreProjectFile,
   type ProjectChange,
 } from '../../lib/api';
 import { defaultCommitMessage } from '../../lib/fileTree';
@@ -20,12 +22,14 @@ export function ChangesPanel({
   edited,
   onOpen,
   onCommitted,
+  onRestored,
 }: {
   projectId: string;
   changes: ProjectChange[];
   edited: Set<string>;
   onOpen: (path: string) => void;
   onCommitted: () => void;
+  onRestored: (path: string) => void;
 }) {
   const t = useT();
   const [ticked, setTicked] = useState<Set<string>>(() => new Set());
@@ -34,6 +38,9 @@ export function ChangesPanel({
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [committed, setCommitted] = useState<string | null>(null);
+  const [restorePath, setRestorePath] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   useEffect(() => {
     setTicked((prev) => {
@@ -86,6 +93,23 @@ export function ChangesPanel({
       setCommitError(err instanceof Error ? err.message : t('unknownError'));
     } finally {
       setCommitting(false);
+    }
+  };
+
+  const restore = async () => {
+    if (!restorePath || restoring) return;
+
+    setRestoring(true);
+    setRestoreError(null);
+
+    try {
+      await restoreProjectFile(projectId, restorePath);
+      onRestored(restorePath);
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : t('unknownError'));
+    } finally {
+      setRestoring(false);
+      setRestorePath(null);
     }
   };
 
@@ -145,9 +169,23 @@ export function ChangesPanel({
                     {change.path}
                   </span>
                 )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  className="ml-auto"
+                  title={t('editorRestore')}
+                  aria-label={t('editorRestore')}
+                  onClick={() => setRestorePath(change.path)}
+                >
+                  <ReplayIcon className="h-3.5 w-3.5" />
+                </Button>
               </div>
             ))}
           </div>
+
+          {restoreError ? <p className="px-3 py-2 text-xs text-err">{restoreError}</p> : null}
 
           <div className="flex shrink-0 flex-col gap-2 border-t border-border p-3">
             <TextInput
@@ -177,6 +215,16 @@ export function ChangesPanel({
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={restorePath !== null}
+        title={t('editorRestoreTitle')}
+        body={t('editorRestoreBody')}
+        confirmLabel={t('editorRestoreConfirm')}
+        variant="danger"
+        onConfirm={() => void restore()}
+        onCancel={() => setRestorePath(null)}
+      />
     </aside>
   );
 }

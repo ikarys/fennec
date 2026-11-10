@@ -8,7 +8,7 @@ export type PageId = 'projects' | 'chats' | 'settings' | 'insight' | 'workflows'
 export type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
-  | { name: 'changes'; id: string }
+  | { name: 'changes'; id: string; path: string | null }
   | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
   | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
@@ -82,9 +82,9 @@ export function parseRoute(hash: string): Route {
     return { name: 'split', left: parsePaneToken(parts[0] ?? null), right: parsePaneToken(parts[1] ?? null) };
   }
   if (hash.startsWith('#/s/')) {
-    const [rawId, sub] = hash.slice('#/s/'.length).split('/');
+    const [rawId, sub, rawPath] = hash.slice('#/s/'.length).split('/');
     if (sub === 'changes') {
-      return { name: 'changes', id: decodeURIComponent(rawId) };
+      return { name: 'changes', id: decodeURIComponent(rawId), path: rawPath ? decodeURIComponent(rawPath) : null };
     }
     const id = decodeURIComponent(rawId);
     if (id.startsWith('new:')) {
@@ -113,9 +113,9 @@ export function tabPath(tabId: string): string {
   return `#/s/${encodeURIComponent(tabId)}`;
 }
 
-/** The changes page of a session. */
-export function changesPath(sessionId: string): string {
-  return `#/s/${encodeURIComponent(sessionId)}/changes`;
+/** The changes page of a session, optionally focused on one file. */
+export function changesPath(sessionId: string, path: string | null = null): string {
+  return `#/s/${encodeURIComponent(sessionId)}/changes` + (path ? `/${encodeURIComponent(path)}` : '');
 }
 
 /** The editor page for a project's files; optional file path and session id. */
