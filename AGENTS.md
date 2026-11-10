@@ -29,9 +29,12 @@ lands, add its paragraph to `docs/components.md`.
 - A reusable, fennec-free concern gets its own crate (`crates/backlog`, `rules`, `canvas`,
   `token-usage`, and llm-providers-connector on crates.io for talking to models).
 - One responsibility per file. No god file, no catch-all module (`utils`, `misc`, `common`,
-  `helpers`), no file loose at a source root (Rust or web).
-- The UI holds no logic: the server folds and computes, the UI renders. It uses the primitives of
-  `web/src/components/ui` and is never dull (`docs/ui.md`).
+  `helpers`). A Rust root file is an adapter or a composition root; `web/src` holds only
+  `main.tsx` and `App.tsx` at its root.
+- The UI holds no logic: the server folds and computes, the UI renders. One exception: the UI
+  folds the live event stream into the thread's messages (`web/src/lib/fold.ts`) so a streamed
+  token needs no round trip; pending decisions, numbers and provenance still come folded from the
+  server. It uses the primitives of `web/src/components/ui` and is never dull (`docs/ui.md`).
 
 ## Non-negotiable rules
 
