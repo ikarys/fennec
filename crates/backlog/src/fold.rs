@@ -1,6 +1,8 @@
 use crate::event::BacklogEvent;
+use crate::sheet::{Author, SheetField, TaskSheet};
 use serde::Serialize;
 use std::cmp::Reverse;
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +29,10 @@ pub struct Idea {
     pub started_at: Option<u64>,
     pub autonomous: bool,
     pub attachments: Vec<crate::attachment::IdeaAttachment>,
+    /// The task sheet, once the idea was turned into a task.
+    pub sheet: Option<TaskSheet>,
+    /// The sheet fields whose last change came from a model: shown as indicative.
+    pub model_fields: BTreeSet<SheetField>,
 }
 
 /// One launch of the queue.
@@ -118,6 +124,8 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
                     started_at: None,
                     autonomous: false,
                     attachments: attachments.clone(),
+                    sheet: None,
+                    model_fields: BTreeSet::new(),
                 });
             }
             continue;
@@ -146,6 +154,30 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
                 idea.state = IdeaState::Ready;
                 // A new plan puts a halted idea back in the queue.
                 idea.halted = None;
+            }
+            BacklogEvent::SheetEdited { sheet, by, .. } => {
+                let previous = idea.sheet.take().unwrap_or_default();
+                for field in SheetField::ALL {
+                    if !previous.field_eq(sheet, field) {
+                        match by {
+                            Author::Agent => {
+                                idea.model_fields.insert(field);
+                            }
+                            Author::Human => {
+                                idea.model_fields.remove(&field);
+                            }
+                        }
+                    }
+                }
+                idea.sheet = Some(sheet.clone());
+                // A changed sheet never leaves a stale plan queued: the human marks it ready again.
+                if idea.state == IdeaState::Ready {
+                    idea.state = if idea.session_id.is_some() {
+                        IdeaState::Framing
+                    } else {
+                        IdeaState::Inbox
+                    };
+                }
             }
             BacklogEvent::Started { autonomous, .. } => {
                 idea.state = IdeaState::Started;
@@ -229,6 +261,14 @@ mod tests {
         BacklogEvent::Ready {
             idea_id: id.into(),
             plan: plan.into(),
+        }
+    }
+
+    fn sheet_edited(id: &str, sheet: TaskSheet, by: Author) -> BacklogEvent {
+        BacklogEvent::SheetEdited {
+            idea_id: id.into(),
+            sheet,
+            by,
         }
     }
 
@@ -646,5 +686,89 @@ mod tests {
             Some("i1")
         );
         assert_eq!(idea_for_session(&backlog.ideas, "s2"), None);
+    }
+
+    #[test]
+    fn a_sheet_save_sets_the_sheet() {
+        let sheet = TaskSheet {
+            objective: "o".into(),
+            ..Default::default()
+        };
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, sheet_edited("i1", sheet.clone(), Author::Human)),
+        ];
+
+        let backlog = fold(&events);
+
+        let idea = &backlog.ideas[0];
+        assert_eq!(idea.sheet, Some(sheet));
+        assert!(idea.model_fields.is_empty());
+        assert_eq!(idea.updated_at, 2);
+    }
+
+    #[test]
+    fn an_agent_save_marks_the_fields_it_changed() {
+        let sheet = TaskSheet {
+            objective: "o".into(),
+            context: "c".into(),
+            ..Default::default()
+        };
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, sheet_edited("i1", sheet, Author::Agent)),
+        ];
+
+        let backlog = fold(&events);
+
+        assert_eq!(
+            backlog.ideas[0].model_fields,
+            BTreeSet::from([SheetField::Objective, SheetField::Context,])
+        );
+    }
+
+    #[test]
+    fn a_human_change_clears_the_mark_and_an_unchanged_resend_keeps_it() {
+        let agent_sheet = TaskSheet {
+            objective: "o".into(),
+            context: "c".into(),
+            ..Default::default()
+        };
+        let human_sheet = TaskSheet {
+            objective: "new".into(),
+            context: "c".into(),
+            ..Default::default()
+        };
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, sheet_edited("i1", agent_sheet, Author::Agent)),
+            ev(3, sheet_edited("i1", human_sheet, Author::Human)),
+        ];
+
+        let backlog = fold(&events);
+
+        assert_eq!(
+            backlog.ideas[0].model_fields,
+            BTreeSet::from([SheetField::Context])
+        );
+    }
+
+    #[test]
+    fn a_sheet_save_on_a_ready_idea_unreadies_it() {
+        let sheet = TaskSheet::default();
+        let with_session = vec![
+            ev(1, added("i1", "t")),
+            ev(2, framing("i1", "s1")),
+            ev(3, ready("i1", "p")),
+            ev(4, sheet_edited("i1", sheet.clone(), Author::Human)),
+        ];
+        let without_session = vec![
+            ev(1, added("i1", "t")),
+            ev(2, ready("i1", "p")),
+            ev(3, sheet_edited("i1", sheet, Author::Human)),
+        ];
+
+        assert_eq!(fold(&with_session).ideas[0].state, IdeaState::Framing);
+        assert_eq!(fold(&without_session).ideas[0].state, IdeaState::Inbox);
     }
 }

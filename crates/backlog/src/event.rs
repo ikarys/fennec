@@ -18,6 +18,12 @@ pub enum BacklogEvent {
     Framing { idea_id: String, session_id: String },
     #[serde(rename = "idea.ready", rename_all = "camelCase")]
     Ready { idea_id: String, plan: String },
+    #[serde(rename = "idea.sheet_edited", rename_all = "camelCase")]
+    SheetEdited {
+        idea_id: String,
+        sheet: crate::sheet::TaskSheet,
+        by: crate::sheet::Author,
+    },
     #[serde(rename = "idea.started", rename_all = "camelCase")]
     Started {
         idea_id: String,
@@ -48,6 +54,7 @@ impl BacklogEvent {
             Self::Edited { .. } => "idea.edited",
             Self::Framing { .. } => "idea.framing",
             Self::Ready { .. } => "idea.ready",
+            Self::SheetEdited { .. } => "idea.sheet_edited",
             Self::Started { .. } => "idea.started",
             Self::Dropped { .. } => "idea.dropped",
             Self::Completed { .. } => "idea.completed",
@@ -66,6 +73,7 @@ impl BacklogEvent {
             | Self::Edited { idea_id, .. }
             | Self::Framing { idea_id, .. }
             | Self::Ready { idea_id, .. }
+            | Self::SheetEdited { idea_id, .. }
             | Self::Started { idea_id, .. }
             | Self::Dropped { idea_id }
             | Self::Completed { idea_id }
@@ -81,6 +89,7 @@ impl BacklogEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sheet::{Author, TaskSheet};
 
     fn added(id: &str, text: &str) -> BacklogEvent {
         BacklogEvent::Added {
@@ -108,6 +117,14 @@ mod tests {
         BacklogEvent::Ready {
             idea_id: id.into(),
             plan: plan.into(),
+        }
+    }
+
+    fn sheet_edited(id: &str) -> BacklogEvent {
+        BacklogEvent::SheetEdited {
+            idea_id: id.into(),
+            sheet: TaskSheet::default(),
+            by: Author::Human,
         }
     }
 
@@ -158,6 +175,7 @@ mod tests {
         assert_eq!(added("i1", "t").kind(), "idea.added");
         assert_eq!(framing("i1", "s1").kind(), "idea.framing");
         assert_eq!(ready("i1", "p").kind(), "idea.ready");
+        assert_eq!(sheet_edited("i1").kind(), "idea.sheet_edited");
         assert_eq!(started("i1", false).kind(), "idea.started");
         assert_eq!(dropped("i1").kind(), "idea.dropped");
         assert_eq!(completed("i1").kind(), "idea.completed");
@@ -173,6 +191,7 @@ mod tests {
         assert_eq!(added("i1", "t").idea_id(), Some("i1"));
         assert_eq!(framing("i1", "s1").idea_id(), Some("i1"));
         assert_eq!(ready("i1", "p").idea_id(), Some("i1"));
+        assert_eq!(sheet_edited("i1").idea_id(), Some("i1"));
         assert_eq!(started("i1", false).idea_id(), Some("i1"));
         assert_eq!(dropped("i1").idea_id(), Some("i1"));
         assert_eq!(completed("i1").idea_id(), Some("i1"));
@@ -195,6 +214,28 @@ mod tests {
 
         let decoded: BacklogEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, event);
+    }
+
+    #[test]
+    fn sheet_edited_round_trips_on_the_wire() {
+        let json = r#"{"type":"idea.sheet_edited","data":{"ideaId":"i1","sheet":{"objective":"o"},"by":"agent"}}"#;
+
+        let decoded: BacklogEvent = serde_json::from_str(json).unwrap();
+
+        match decoded {
+            BacklogEvent::SheetEdited { idea_id, sheet, by } => {
+                assert_eq!(idea_id, "i1");
+                assert_eq!(
+                    sheet,
+                    TaskSheet {
+                        objective: "o".into(),
+                        ..Default::default()
+                    }
+                );
+                assert_eq!(by, Author::Agent);
+            }
+            other => panic!("expected SheetEdited, got {other:?}"),
+        }
     }
 
     #[test]
