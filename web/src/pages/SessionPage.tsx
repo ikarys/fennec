@@ -59,7 +59,7 @@ import {
 } from "../components/session/IntegrationInvite";
 import { IntegrationDialog } from "../components/session/IntegrationDialog";
 import { TryDialog } from "../components/session/TryDialog";
-import { PlayIcon } from "../components/ui/Icons";
+import { PlayIcon, CloseIcon } from "../components/ui/Icons";
 import {
   PreviewContext,
   PreviewWorkdirContext,
@@ -98,6 +98,8 @@ interface SessionPageProps {
   onRunningChanged: () => void;
   /** The session's name or chat link changed; the tabs and the chats page read them from projects. */
   onRenamed: () => void;
+  /** Set in split view: closes this pane, the other one stays. */
+  onClose?: () => void;
 }
 
 export function SessionPage({
@@ -111,6 +113,7 @@ export function SessionPage({
   onSessionCreated,
   onRunningChanged,
   onRenamed,
+  onClose,
 }: SessionPageProps) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [text, setText] = useState("");
@@ -705,6 +708,19 @@ export function SessionPage({
                             onOpen={() => setContextRevealKey((key) => key + 1)}
                           />
                         </div>
+                        {onClose && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            className="ml-1"
+                            title={t('splitClosePane')}
+                            aria-label={t('splitClosePane')}
+                            onClick={onClose}
+                          >
+                            <CloseIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 

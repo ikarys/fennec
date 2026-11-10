@@ -5,7 +5,7 @@ import { SessionPage } from './SessionPage';
 import { Palette } from '../components/layout/Palette';
 import type { PageId } from '../components/layout/TopBar';
 import { Button } from '../components/ui/Button';
-import { PlusIcon } from '../components/ui/Icons';
+import { PlusIcon, CloseIcon } from '../components/ui/Icons';
 
 const RATIO_KEY = 'fennec.split.ratio';
 const MIN_PCT = 25;
@@ -37,6 +37,11 @@ interface SplitPageProps {
   left: string | null;
   right: string | null;
   projects: Project[];
+  /** The pane the top bar highlights: the last one clicked or focused. */
+  focused: 'left' | 'right';
+  onFocusPane: (side: 'left' | 'right') => void;
+  /** Closes a pane: the other one stays, alone. */
+  onClosePane: (side: 'left' | 'right') => void;
   onChooseSession: (side: 'left' | 'right', sessionId: string) => void;
   onNewSessionInPane: (side: 'left' | 'right', projectId: string) => void;
   onSessionCreated: (side: 'left' | 'right', newId: string, pseudoId: string | null) => void;
@@ -57,6 +62,9 @@ export function SplitPage({
   left,
   right,
   projects,
+  focused,
+  onFocusPane,
+  onClosePane,
   onChooseSession,
   onNewSessionInPane,
   onSessionCreated,
@@ -110,7 +118,18 @@ export function SplitPage({
   const renderPane = (side: 'left' | 'right', value: string | null) => {
     if (value === null) {
       return (
-        <div className="flex min-h-0 min-w-0 grow flex-col items-center justify-center gap-3 p-6 text-center">
+        <div className="relative flex min-h-0 min-w-0 grow flex-col items-center justify-center gap-3 p-6 text-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            className="absolute right-2 top-2"
+            title={t('splitClosePane')}
+            aria-label={t('splitClosePane')}
+            onClick={() => onClosePane(side)}
+          >
+            <CloseIcon className="h-3.5 w-3.5" />
+          </Button>
           <p className="text-sm text-muted">{t('splitEmptyPane')}</p>
           <Button onClick={() => setPaletteFor(side)}>
             <PlusIcon className="h-4 w-4" />
@@ -132,13 +151,19 @@ export function SplitPage({
         onSessionCreated={(newId, pseudoId) => onSessionCreated(side, newId, pseudoId)}
         onRunningChanged={onRunningChanged}
         onRenamed={onRenamed}
+        onClose={() => onClosePane(side)}
       />
     );
   };
 
   return (
     <div ref={containerRef} className="flex min-h-0 min-w-0 grow">
-      <div className="flex min-h-0 min-w-0" style={{ width: `${leftPct}%` }}>
+      <div
+        className={`flex min-h-0 min-w-0 border-t-2 ${focused === 'left' ? 'border-accent' : 'border-transparent'}`}
+        style={{ width: `${leftPct}%` }}
+        onPointerDownCapture={() => onFocusPane('left')}
+        onFocusCapture={() => onFocusPane('left')}
+      >
         {renderPane('left', left)}
       </div>
 
@@ -162,7 +187,11 @@ export function SplitPage({
         className="z-10 w-1 shrink-0 cursor-col-resize touch-none bg-border hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
       />
 
-      <div className="flex min-h-0 min-w-0 grow">
+      <div
+        className={`flex min-h-0 min-w-0 grow border-t-2 ${focused === 'right' ? 'border-accent' : 'border-transparent'}`}
+        onPointerDownCapture={() => onFocusPane('right')}
+        onFocusCapture={() => onFocusPane('right')}
+      >
         {renderPane('right', right)}
       </div>
 

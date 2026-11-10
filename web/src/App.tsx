@@ -311,6 +311,8 @@ export default function App() {
     [activeTabId, route, navigate, refreshProjects]
   );
 
+  const [splitFocus, setSplitFocus] = useState<'left' | 'right'>('left');
+
   const toggleSplit = useCallback(() => {
     if (route.name === 'split') {
       // Exit to a single session view: the left pane, else the active tab.
@@ -322,6 +324,16 @@ export default function App() {
       route.name === 'session' ? route.id : route.name === 'new' ? `new:${route.id}` : activeTabId;
     navigate(splitPath(current, null));
   }, [route, activeTabId, navigate]);
+
+  const closePane = useCallback(
+    (side: 'left' | 'right') => {
+      if (route.name !== 'split') return;
+      const other = side === 'left' ? route.right : route.left;
+      setSplitFocus('left');
+      navigate(other ? tabPath(other) : '#/');
+    },
+    [route, navigate]
+  );
 
   useEffect(() => {
     toggleSplitRef.current = toggleSplit;
@@ -356,7 +368,7 @@ export default function App() {
         <TopBar
           tabs={tabInfos}
           // The highlighted tab follows the route: on home or a project page none is.
-          activeTabId={route.name === 'split' ? activeTabId : tabIdForRoute(route)}
+          activeTabId={route.name === 'split' ? (splitFocus === 'left' ? route.left : route.right) : tabIdForRoute(route)}
           attention={attention}
           onOpenAttention={openSession}
           onPickTab={pickTab}
@@ -437,6 +449,9 @@ export default function App() {
             <SplitPage
               left={route.left}
               right={route.right}
+              focused={splitFocus}
+              onFocusPane={setSplitFocus}
+              onClosePane={closePane}
               projects={projects}
               onChooseSession={openSessionInPane}
               onNewSessionInPane={newSessionInPane}

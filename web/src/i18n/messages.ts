@@ -1354,6 +1354,7 @@ export const en = {
   // pages/SplitPage.tsx
   splitEmptyPane: 'Select a session for this pane',
   splitChooseSession: 'Choose a session',
+  splitClosePane: 'Close this pane',
   splitDividerAria: 'Left pane width',
   splitDividerTitle: 'Drag to resize · double-click: 50/50',
   // pages/BacklogPage.tsx
@@ -2829,6 +2830,7 @@ export const fr: Record<MsgKey, string> = {
   // pages/SplitPage.tsx
   splitEmptyPane: 'Sélectionne une session pour ce volet',
   splitChooseSession: 'Choisir une session',
+  splitClosePane: 'Fermer ce panneau',
   splitDividerAria: 'Largeur du volet de gauche',
   splitDividerTitle: 'Glisser pour redimensionner · double-clic : 50/50',
   // pages/BacklogPage.tsx
