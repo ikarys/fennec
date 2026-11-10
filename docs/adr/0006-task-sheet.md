@@ -37,6 +37,8 @@ One new event, existing ones untouched (ADR 0005):
   keeps the last one.
 - Provenance per field, deterministic: a field is marked as model-written when its last change
   came from an `agent` save; a human save that changes it clears the mark.
+- A save on a ready task returns it to framing (or inbox without a session): the queued plan never
+  goes stale silently; the human marks it ready again.
 
 "Ready" validates the required fields (400 otherwise), renders the sheet as the plan's canonical
 markdown (`## Plan: <title>`, `Goal: <objective>`, sections Context, Constraints, Out of scope,
@@ -74,8 +76,9 @@ is shown as today; no migration.
   header with title, state badge, the counts "required n/2 · suggested n/4" (approach not counted) and one text button,
   **Ready**, disabled with a tooltip naming what is missing. Completeness, provenance marks and
   badges come from the server.
-- Tab **Framing**: the framing session's thread with the existing session components, or a single
-  "Frame with the agent" button when there is none.
+- Tab **Framing**: "Frame with the agent" when the idea has no session, else a link that opens the
+  framing session. The thread is not embedded: it needs the whole session page's state; the
+  discussion and **Apply to the sheet** stay on the session page.
 - A raw idea's drawer offers **Run** and **Turn into a task**.
 
 ## Consequences
