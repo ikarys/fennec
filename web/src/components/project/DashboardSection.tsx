@@ -20,7 +20,6 @@ import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
 import { PluginsSection } from './PluginsSection';
 import { useT, useLang } from '../../i18n';
-import { TableHeader } from '../ui/TableHeader';
 import { useLoaded } from '../../hooks/useLoaded';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
@@ -96,44 +95,37 @@ export function DashboardSection({
         {data.recent.length === 0 ? (
           <p className="m-0 px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</p>
         ) : (
-          <>
-            <TableHeader>
-              <span className="min-w-0 grow">{t('titleCol')}</span>
-              <span className="w-28 shrink-0">{t('statusCol')}</span>
-              <span className="w-24 shrink-0 text-right">{t('modifiedCol')}</span>
-            </TableHeader>
-            <ul className="divide-y divide-border">
-              {data.recent.map((session) => (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    className="w-full text-left group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0"
-                    onClick={() => onOpenSession(session.id)}
+          <ul className="divide-y divide-border">
+            {data.recent.map((session) => (
+              <li key={session.id}>
+                <button
+                  type="button"
+                  className="w-full text-left group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0"
+                  onClick={() => onOpenSession(session.id)}
+                >
+                  <span
+                    className="min-w-0 grow truncate text-sm text-text group-hover:text-accent-strong"
+                    title={session.title}
                   >
-                    <span
-                      className="min-w-0 grow truncate text-sm text-text group-hover:text-accent-strong"
-                      title={session.title}
-                    >
-                      {session.title}
-                    </span>
-                    <span className="w-28 shrink-0">
-                      {session.running ? (
-                        <Badge tone="accent" dot pulse>{t('running')}</Badge>
-                      ) : session.awaiting ? (
-                        <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>
-                      ) : null}
-                    </span>
-                    <span
-                      className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
-                      title={formatDateTime(lang, session.updatedAt)}
-                    >
-                      {formatRelative(lang, session.updatedAt)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
+                    {session.title}
+                  </span>
+                  <span className="w-28 shrink-0">
+                    {session.running ? (
+                      <Badge tone="accent" dot pulse>{t('running')}</Badge>
+                    ) : session.awaiting ? (
+                      <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>
+                    ) : null}
+                  </span>
+                  <span
+                    className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
+                    title={formatDateTime(lang, session.updatedAt)}
+                  >
+                    {formatRelative(lang, session.updatedAt)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </Section>
 

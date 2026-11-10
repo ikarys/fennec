@@ -40,9 +40,7 @@ export function ProjectSection({
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-panel">
       <div
-        className={`flex min-h-12 items-center gap-2.5 bg-linear-to-r from-accent-soft to-transparent to-75% px-3 py-2 ${
-          open ? 'border-b border-border' : ''
-        }`}
+        className={`flex min-h-12 items-center gap-2.5 bg-linear-to-r from-accent-soft to-transparent to-75% px-3 py-2`}
       >
         <button
           type="button"
