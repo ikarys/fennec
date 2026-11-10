@@ -90,7 +90,7 @@ Seatbelt gives the same world with three differences: commands get their own `TM
 - A command can create a new file matching a protected pattern where none existed.
 - A protected file below the top of the folder (`docs/adr/…`, `src/auth/**`) can be replaced by renaming its parent folder (`mv docs docs2`, then a new `docs/adr`). The read-only mount only holds at the top level (`.agents`, `.github`, a root lockfile). Either way, the review gate blocks the integration on any change to a protected path, so you see and decide.
 - Command rules match parsed tokens, so `eval` or a script can slip past them. The sandbox is the wall; rules are guard rails.
-- With the network on, a command can reach the internet, and fennec's own server on `127.0.0.1:7777` too: it could drive fennec (answer an approval, start a turn). Turn the network on for the step that needs it, then off again.
+- With the network on, a command can reach the internet. Turn the network on for the step that needs it, then off again. fennec's own server refuses it (Linux: the server checks which process opened the connection; macOS: the profile denies the port), except through Vite's dev proxy on `:5173` while you run `just dev`.
 - The servers the play button starts run outside the sandbox, as you, with your environment: they run the project's code, so start them on a branch you have read.
 - `~/.cargo/registry`, `~/.cargo/git`, `~/.cache` and `~/.npm` stay writable so builds and installs work; a command could leave a tampered file there that a later build on your machine reuses.
 - The rest of your home stays readable to commands, except the secrets fennec hides (`~/.ssh`, cloud and token files, its own store and `~/.config/fennec`).

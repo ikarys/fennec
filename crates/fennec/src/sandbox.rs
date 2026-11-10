@@ -7,8 +7,21 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 // Each renderer is compiled everywhere so its pure tests run on any machine; only one is used.
+pub mod peer;
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod seatbelt;
+
+/// The port fennec's own server listens on, so a Seatbelt profile can deny it to commands.
+static SERVER_PORT: std::sync::OnceLock<u16> = std::sync::OnceLock::new();
+
+/// Record the server's port once it is bound; a second call is ignored.
+pub fn set_server_port(port: u16) {
+    let _ = SERVER_PORT.set(port);
+}
+
+fn server_port() -> Option<u16> {
+    SERVER_PORT.get().copied()
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sandbox {

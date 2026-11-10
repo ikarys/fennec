@@ -228,6 +228,7 @@ pub fn serve(
     }
     let listener = TcpListener::bind((listen, port))
         .map_err(|e| format!("{}: {e}", std::net::SocketAddr::new(listen, port)))?;
+    crate::sandbox::set_server_port(port);
     let notifier = Arc::new(Notifier::default());
     // The agents home (`<home>/.agents`), resolved the way skills and agents
     // resolve it: the plugins live only there, never in a project.
@@ -342,9 +343,13 @@ pub fn serve(
 fn handle(app: &Arc<App>, stream: &mut TcpStream) -> Result<(), HttpError> {
     // A request that cannot be read is the client's fault, not the server's.
     let req = http::read_request(stream).map_err(|e| HttpError::new(400, e))?;
-    let peer_is_loopback = stream
-        .peer_addr()
-        .is_ok_and(|address| address.ip().is_loopback());
+    // A sandboxed command shares the loopback when its network is on: it is never the human.
+    let peer_is_loopback = match (stream.peer_addr(), stream.local_addr()) {
+        (Ok(peer), Ok(server)) => {
+            peer.ip().is_loopback() && !crate::sandbox::peer::is_sandboxed(peer, server)
+        }
+        _ => false,
+    };
     let caller = match guard::check(&req, app.port, peer_is_loopback, app.logins.enabled()) {
         Ok(caller) => caller,
         Err(refusal) => return http::error(stream, refusal.status, refusal.message),
