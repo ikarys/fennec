@@ -1,18 +1,19 @@
 /**
  * Full-window overlay shown when the fennec backend stream is offline.
- * It tells the user the connection is down and offers a reload.
+ * It tells the user the connection is down and offers a reload. It stays mounted,
+ * hidden while online, so its image is loaded before the server that serves it goes away.
  */
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 
-export function OfflineNotice() {
+export function OfflineNotice({ visible }: { visible: boolean }) {
   const t = useT();
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/85 backdrop-blur-sm"
+      className={`fixed inset-0 z-50 ${visible ? 'flex' : 'hidden'} items-center justify-center bg-bg/85 backdrop-blur-sm`}
       role="alertdialog"
       aria-live="assertive"
       aria-labelledby="offline-notice-title"
