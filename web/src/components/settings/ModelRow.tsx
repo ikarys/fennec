@@ -21,6 +21,13 @@ type ListedModel = ProviderListing['models'][number];
 // The README section a billed flag's info icon opens.
 const BILLING_DOC_URL = 'https://github.com/ikarys/fennec#budgets-and-billed-models';
 
+/** The price fields of a billed model, in display order. */
+const PRICE_FIELDS: { field: 'priceInput' | 'priceCached' | 'priceOutput'; label: MsgKey }[] = [
+  { field: 'priceInput', label: 'inputLabel' },
+  { field: 'priceCached', label: 'cacheLabel' },
+  { field: 'priceOutput', label: 'outputLabel' }
+];
+
 /** The efforts the row's effort select offers: probed, accepted, plus the stored one. */
 function offeredEfforts(value: ModelForm, model: ListedModel | null): ReasoningEffort[] {
   const probed = value.reasoningEfforts ? (value.reasoningEfforts.split(',') as ReasoningEffort[]) : [];
@@ -239,39 +246,19 @@ export function ModelRow({
             <p className="m-0 text-xs font-medium text-muted sm:col-span-2 xl:col-span-4">
               {t('priceHeader')}
             </p>
-            <FieldRow label={t('inputLabel')}>
-              <TextInput
-                type="number"
-                min={0}
-                step="any"
-                value={value.priceInput}
-                placeholder="—"
-                onChange={(event) => onChangeModel(key, 'priceInput', event.target.value)}
-                className="w-full"
-              />
-            </FieldRow>
-            <FieldRow label={t('cacheLabel')}>
-              <TextInput
-                type="number"
-                min={0}
-                step="any"
-                value={value.priceCached}
-                placeholder="—"
-                onChange={(event) => onChangeModel(key, 'priceCached', event.target.value)}
-                className="w-full"
-              />
-            </FieldRow>
-            <FieldRow label={t('outputLabel')}>
-              <TextInput
-                type="number"
-                min={0}
-                step="any"
-                value={value.priceOutput}
-                placeholder="—"
-                onChange={(event) => onChangeModel(key, 'priceOutput', event.target.value)}
-                className="w-full"
-              />
-            </FieldRow>
+            {PRICE_FIELDS.map(({ field, label }) => (
+              <FieldRow key={field} label={t(label)}>
+                <TextInput
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={value[field]}
+                  placeholder="—"
+                  onChange={(event) => onChangeModel(key, field, event.target.value)}
+                  className="w-full"
+                />
+              </FieldRow>
+            ))}
 
             <div className="sm:col-span-2 xl:col-span-4 flex items-center gap-1.5 text-sm">
               <label className="flex items-center gap-2">
