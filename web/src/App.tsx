@@ -1,104 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
-import { createProject, hasModel, setProjectFavorite } from './lib/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { hasModel } from './lib/api';
 import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
-import { TopBar, type TabInfo } from './components/layout/TopBar';
-import {
-  PAGE_TABS,
-  editorTabId,
-  isRouteTab,
-  parseRoute,
-  rememberEditorHash,
-  splitPath,
-  tabIdForRoute,
-  tabPath,
-  type Route,
-} from './lib/route';
-import { HomePage } from './pages/HomePage';
-import { ProjectsPage } from './pages/ProjectsPage';
-import { ChatsPage } from './pages/ChatsPage';
-import { SessionPage } from './pages/SessionPage';
-import { AGENT_SHORTCUT_EVENT, comboLabel, comboOf, shortcutIndex, type ShortcutAction } from './lib/shortcuts';
-import { SplitPage } from './pages/SplitPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { InsightPage } from './pages/InsightPage';
+import { TopBar } from './components/layout/TopBar';
+import { PAGE_TABS, tabIdForRoute, type PageId } from './lib/route';
 import { Palette } from './components/layout/Palette';
 import { ProjectDialog } from './components/project/ProjectDialog';
 import { DisplayPrefsProvider, defaultDisplayPrefs } from './lib/display';
 import { I18nProvider } from './i18n';
-import { t } from './i18n/messages';
 import type { Lang } from './i18n/messages';
 import { useSettings } from './hooks/useSettings';
 import { useProjects } from './hooks/useProjects';
+import { useProjectDialog } from './hooks/useProjectDialog';
 import { useTabs } from './hooks/useTabs';
-import { usePaneTabs } from './hooks/usePaneTabs';
+import { useRoute } from './hooks/useRoute';
+import { useTabNavigation } from './hooks/useTabNavigation';
+import { useSplitView } from './hooks/useSplitView';
+import { useShortcuts } from './hooks/useShortcuts';
 import { useTurnNotices } from './hooks/useTurnNotices';
 import { OfflineNotice } from './components/layout/OfflineNotice';
+import { RouteView } from './components/layout/RouteView';
 import { PluginsVersionContext } from './hooks/usePluginsVersion';
 import { StatusBar } from './components/layout/StatusBar';
 
-const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
-const ProjectPage = lazy(() => import('./pages/ProjectPage'));
-const BacklogPage = lazy(() => import('./pages/BacklogPage'));
-const ChangesPage = lazy(() => import('./pages/ChangesPage'));
-const EditorPage = lazy(() => import('./pages/EditorPage'));
-
-/** The page each page shortcut opens. */
-const SHORTCUT_PAGES = {
-  goProjects: 'projects',
-  goChats: 'chats',
-  goTasks: 'backlog',
-  goWorkflows: 'workflows',
-  goInsight: 'insight',
-  goSettings: 'settings'
-} as const;
-
 export default function App() {
-  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const { settings, handleSettingsSaved, handleListing } = useSettings();
-  const { tabs, setTabs, activeTabId, setActiveTabId, openTab } = useTabs();
+  const tabState = useTabs();
+  const { tabs, openTab } = tabState;
+  const { route, navigate } = useRoute(openTab);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
-  const [projectSubmitting, setProjectSubmitting] = useState(false);
-  const [projectError, setProjectError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId>(() => getStoredTheme());
-  // The ⌘\ handler is attached once; it always calls the latest toggle.
-  const toggleSplitRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    const onHashChange = () => setRoute(parseRoute(window.location.hash));
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-
-  // A route-derived tab (page, project editor) gets its tab in the bar the
-  // moment it is on screen, so the active route is never unlisted.
-  const pageTabIdForRoute =
-    route.name === 'editor'
-      ? editorTabId(route.projectId)
-      : route.name === 'settings' ||
-          route.name === 'insight' ||
-          route.name === 'backlog' ||
-          route.name === 'workflows' ||
-          route.name === 'projects' ||
-          route.name === 'chats'
-        ? `page:${route.name}`
-        : null;
-  useEffect(() => {
-    if (!pageTabIdForRoute) return;
-    openTab(pageTabIdForRoute);
-  }, [pageTabIdForRoute, openTab]);
-
-  // The editor's last file/session location is remembered per project, so the
-  // editor tab can return there when picked again.
-  useEffect(() => {
-    if (route.name === 'editor') {
-      rememberEditorHash(route.projectId, window.location.hash);
-    }
-  }, [route]);
 
   const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
   // The UI's language: the stored choice, else English (the default).
@@ -148,52 +82,17 @@ export default function App() {
     document.documentElement.style.fontSize = `${(16 * displayPrefs.fontSize) / defaultDisplayPrefs.fontSize}px`;
   }, [displayPrefs.fontSize]);
 
-  const navigate = useCallback((path: string) => {
-    if (window.location.hash !== path) {
-      window.location.hash = path;
-    } else {
-      setRoute(parseRoute(window.location.hash));
-    }
-  }, []);
-
-  const tabInfo = useCallback((id: string): TabInfo => {
-    if (id.startsWith('edit:')) {
-      const projectId = id.slice(5);
-      const name = projects.find((candidate) => candidate.id === projectId)?.name ?? projectId;
-      return { id, title: t(language, 'editorTabTitle', { project: name }), kind: 'editor' as const, project: name };
-    }
-    if (id.startsWith('page:')) {
-      const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
-      return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
-    }
-    if (id.startsWith('new:')) {
-      const projectId = id.slice(4);
-      const project = projects.find((candidate) => candidate.id === projectId);
-      return {
-        id,
-        title: t(language, project?.chat ? 'paletteNewChat' : 'newSession'),
-        project: project?.name ?? projectId,
-        state: 'idle' as const,
-        kind: 'session' as const
-      };
-    }
-    for (const project of projects) {
-      const session = project.sessions.find((candidate) => candidate.id === id);
-      if (session) {
-        return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
-      }
-    }
-    return { id, title: t(language, 'session'), project: '—', state: 'idle' as const, kind: 'session' as const };
-  }, [projects, language]);
-  const tabInfos = useMemo(() => tabs.map(tabInfo), [tabs, tabInfo]);
-  const { paneTabs, closeTab: closePaneTabIn, replaceTab: replacePaneTab } = usePaneTabs(
-    route.name === 'split' ? { left: route.left, right: route.right } : null,
-    tabs
+  const projectDialog = useProjectDialog(language, refreshProjects);
+  const { openProjectDialog } = projectDialog;
+  const { tabInfos, tabInfo, closeTab, pickTab, handleSessionsDeleted, adoptSession } = useTabNavigation(
+    tabState,
+    route,
+    navigate,
+    projects,
+    language,
+    refreshProjects
   );
-  const paneTabInfos = useMemo(
-    () => ({ left: (paneTabs?.left ?? []).map(tabInfo), right: (paneTabs?.right ?? []).map(tabInfo) }),
-    [paneTabs, tabInfo]
-  );
+  const split = useSplitView(route, navigate, tabState, tabInfo, pickTab, adoptSession, refreshProjects);
 
   const openSession = useCallback(
     (sessionId: string) => {
@@ -204,46 +103,11 @@ export default function App() {
   );
   const { items: attention, pluginsVersion, online } = useTurnNotices(openSession, displayPrefs.sounds ?? true);
 
-  const closeTab = useCallback(
-    (tabId: string) => {
-      const next = tabs.filter((id) => id !== tabId);
-      setTabs(next);
-      // Only the tab that is on screen (per the route) triggers a navigation.
-      // activeTabId can be stale when a session was opened by URL/bookmark, so
-      // it is not a reliable "is this tab showing" signal.
-      if (tabIdForRoute(route) !== tabId) return;
-      // A route tab closing while active returns home; a session tab falls back
-      // to the last remaining session tab, or home when none are left. Route
-      // tabs are re-derived from the route, so they are not a close target.
-      if (isRouteTab(tabId)) {
-        setActiveTabId(null);
-        navigate('#/');
-        return;
-      }
-      const fallback = next.filter((id) => !isRouteTab(id)).pop() ?? null;
-      setActiveTabId(fallback);
-      navigate(fallback ? tabPath(fallback) : '#/');
-    },
-    [tabs, route, navigate]
-  );
-
-  const handleSessionsDeleted = useCallback(
-    (ids: string[]) => {
-      const deleted = new Set(ids);
-      setTabs((previous) => previous.filter((id) => !deleted.has(id)));
-      if (activeTabId !== null && deleted.has(activeTabId)) {
-        setActiveTabId(null);
-      }
-      refreshProjects();
-    },
-    [activeTabId, refreshProjects]
-  );
-
   const startNewSession = useCallback(
     (projectId?: string) => {
       const targetProjectId = projectId ?? projects[0]?.id;
       if (!targetProjectId) {
-        setProjectDialogOpen(true);
+        openProjectDialog();
         return;
       }
       // No model yet: the setup comes first. A failed check lets the server refuse instead.
@@ -258,7 +122,7 @@ export default function App() {
           navigate(`#/new/${encodeURIComponent(targetProjectId)}`);
         });
     },
-    [navigate, projects, openTab]
+    [navigate, projects, openTab, openProjectDialog]
   );
 
   // The `+` of the bar: the project of the session on screen, else the most recent one.
@@ -285,237 +149,35 @@ export default function App() {
 
   const handleSessionCreated = useCallback(
     (newId: string, pseudoId: string | null) => {
-      setTabs((previous) => {
-        const replaced = pseudoId ? previous.map((id) => (id === pseudoId ? newId : id)) : previous;
-        return replaced.includes(newId) ? replaced : [...replaced, newId];
-      });
-      if (activeTabId === pseudoId) {
-        setActiveTabId(newId);
-      }
+      adoptSession(newId, pseudoId);
       navigate(`#/s/${encodeURIComponent(newId)}`);
       refreshProjects();
     },
-    [activeTabId, navigate, refreshProjects]
+    [adoptSession, navigate, refreshProjects]
   );
 
-  const handleCreateProject = useCallback(
-    async (workdir: string) => {
-      setProjectSubmitting(true);
-      setProjectError(null);
-      try {
-        await createProject(workdir);
-        setProjectDialogOpen(false);
-        await refreshProjects();
-      } catch (error) {
-        setProjectError(error instanceof Error ? error.message : t(language, 'projectOpenError'));
-      } finally {
-        setProjectSubmitting(false);
-      }
-    },
-    [refreshProjects, language]
-  );
+  const shortcutLabels = useShortcuts({
+    bindings: settings?.shortcuts,
+    route,
+    projects,
+    tabs,
+    chatProjectId,
+    navigate,
+    pickTab,
+    closeTab,
+    startNewSession,
+    togglePalette: () => setPaletteOpen((open) => !open),
+    toggleSplit: split.toggleSplit
+  });
 
-  // Split view: the two panes' ids live in the URL; each pane is an independent
-  // SessionPage. Choosing a session or creating one rewrites that pane's token.
-  const openSessionInPane = useCallback(
-    (side: 'left' | 'right', sessionId: string) => {
-      setTabs((previous) => (previous.includes(sessionId) ? previous : [...previous, sessionId]));
-      const { left, right } = route.name === 'split' ? route : { left: null, right: null };
-      navigate(splitPath(side === 'left' ? sessionId : left, side === 'right' ? sessionId : right));
-    },
-    [route, navigate]
-  );
-
-  const newSessionInPane = useCallback(
-    (side: 'left' | 'right', projectId: string) => {
-      const { left, right } = route.name === 'split' ? route : { left: null, right: null };
-      navigate(splitPath(side === 'left' ? `new:${projectId}` : left, side === 'right' ? `new:${projectId}` : right));
-    },
-    [route, navigate]
-  );
-
-  const sessionCreatedInPane = useCallback(
-    (side: 'left' | 'right', newId: string, pseudoId: string | null) => {
-      if (pseudoId) replacePaneTab(pseudoId, newId);
-      setTabs((previous) => {
-        const replaced = pseudoId ? previous.map((id) => (id === pseudoId ? newId : id)) : previous;
-        return replaced.includes(newId) ? replaced : [...replaced, newId];
-      });
-      if (activeTabId === pseudoId) setActiveTabId(newId);
-      const { left, right } = route.name === 'split' ? route : { left: null, right: null };
-      navigate(splitPath(side === 'left' ? newId : left, side === 'right' ? newId : right));
-      refreshProjects();
-    },
-    [activeTabId, route, navigate, refreshProjects, replacePaneTab]
-  );
-
-  const toggleSplit = useCallback(() => {
-    if (route.name === 'split') {
-      // Exit to a single session view: the left pane, else the active tab.
-      const target = route.left ?? activeTabId;
-      navigate(target ? tabPath(target) : '#/');
-      return;
-    }
-    const current =
-      route.name === 'session' ? route.id : route.name === 'new' ? `new:${route.id}` : activeTabId;
-    navigate(splitPath(current, null));
-  }, [route, activeTabId, navigate]);
-
-  const closePane = useCallback(
-    (side: 'left' | 'right') => {
-      if (route.name !== 'split') return;
-      const other = side === 'left' ? route.right : route.left;
-      navigate(other ? tabPath(other) : '#/');
-    },
-    [route, navigate]
-  );
-
-  useEffect(() => {
-    toggleSplitRef.current = toggleSplit;
-  }, [toggleSplit]);
-
-  // Re-clicking the tab of the page already on screen keeps its sub-tab
-  // (settings tab, project id, …) instead of resetting to the page's root.
-  const basePathOf = (hash: string): string => {
-    const segments = hash.slice(1).split('/').filter((segment) => segment.length > 0);
-    return `#/${segments.slice(0, 2).join('/')}`;
-  };
-  const pickTab = useCallback(
-    (id: string) => {
-      setActiveTabId(id);
-      const target = tabPath(id);
-      if (!isRouteTab(id) || basePathOf(window.location.hash) !== target) {
-        navigate(target);
-      }
-    },
+  const goHome = useCallback(() => navigate('#/'), [navigate]);
+  const openPage = useCallback(
+    (page: PageId) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/'),
     [navigate]
   );
-
-  // The keyboard shortcuts: the server resolves the bindings, a key press only looks its combo up.
-  const shortcuts = useMemo(() => shortcutIndex(settings?.shortcuts ?? []), [settings?.shortcuts]);
-  const shortcutLabels = useMemo(
-    () =>
-      Object.fromEntries(
-        (settings?.shortcuts ?? [])
-          .filter((binding) => binding.combo)
-          .map((binding) => [binding.action, comboLabel(binding.combo)])
-      ) as Partial<Record<ShortcutAction, string>>,
-    [settings?.shortcuts]
-  );
-  const runShortcut = useCallback(
-    (action: ShortcutAction) => {
-      switch (action) {
-        case 'newChat':
-          if (chatProjectId) startNewSession(chatProjectId);
-          break;
-        case 'agentPlan':
-          window.dispatchEvent(new CustomEvent(AGENT_SHORTCUT_EVENT, { detail: 'plan' }));
-          break;
-        case 'agentBuilder':
-          window.dispatchEvent(new CustomEvent(AGENT_SHORTCUT_EVENT, { detail: 'builder' }));
-          break;
-        case 'agentAsk':
-          window.dispatchEvent(new CustomEvent(AGENT_SHORTCUT_EVENT, { detail: 'ask' }));
-          break;
-        case 'newSession': {
-          let projectId: string | undefined;
-          if (route.name === 'new') {
-            projectId = route.id;
-          } else if (route.name === 'session') {
-            const project = projects.find((candidate) => candidate.sessions.some((session) => session.id === route.id));
-            projectId = project?.id;
-          } else if (route.name === 'project') {
-            projectId = route.projectId;
-          }
-          startNewSession(projectId);
-          break;
-        }
-        case 'goHome':
-          navigate('#/');
-          break;
-        case 'goProjects':
-        case 'goChats':
-        case 'goTasks':
-        case 'goWorkflows':
-        case 'goInsight':
-        case 'goSettings':
-          navigate(PAGE_TABS.find((tab) => tab.page === SHORTCUT_PAGES[action])?.path ?? '#/');
-          break;
-        case 'nextTab':
-        case 'prevTab': {
-          if (tabs.length === 0) break;
-          const step = action === 'nextTab' ? 1 : -1;
-          const index = tabs.indexOf(tabIdForRoute(route) ?? '');
-          const target =
-            index === -1
-              ? step > 0
-                ? tabs[0]
-                : tabs[tabs.length - 1]
-              : tabs[(index + step + tabs.length) % tabs.length];
-          if (target) pickTab(target);
-          break;
-        }
-        case 'closeTab': {
-          const id = tabIdForRoute(route);
-          if (id) closeTab(id);
-          break;
-        }
-        case 'palette':
-          setPaletteOpen((open) => !open);
-          break;
-        case 'split':
-          toggleSplit();
-          break;
-      }
-    },
-    [
-      chatProjectId,
-      closeTab,
-      navigate,
-      pickTab,
-      projects,
-      route,
-      startNewSession,
-      tabs,
-      toggleSplit
-    ]
-  );
-  const runShortcutRef = useRef(runShortcut);
-  useEffect(() => {
-    runShortcutRef.current = runShortcut;
-  }, [runShortcut]);
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) return;
-      const combo = comboOf(event);
-      const action = combo ? shortcuts.get(combo) : undefined;
-      if (!action) return;
-      event.preventDefault();
-      runShortcutRef.current(action);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [shortcuts]);
-
-  const pickTabInPane = useCallback(
-    (side: 'left' | 'right', id: string) => {
-      if (route.name !== 'split' || isRouteTab(id)) {
-        pickTab(id);
-        return;
-      }
-      setActiveTabId(id);
-      navigate(splitPath(side === 'left' ? id : route.left, side === 'right' ? id : route.right));
-    },
-    [route, pickTab, navigate]
-  );
-
-  const closeTabInPane = useCallback(
-    (side: 'left' | 'right', id: string) => {
-      const fallback = closePaneTabIn(side, id);
-      if (route.name !== 'split' || route[side] !== id) return;
-      navigate(splitPath(side === 'left' ? fallback : route.left, side === 'right' ? fallback : route.right));
-    },
-    [closePaneTabIn, route, navigate]
+  const openProject = useCallback(
+    (projectId: string) => navigate(`#/project/${encodeURIComponent(projectId)}`),
+    [navigate]
   );
 
   const newSessionProjects = useMemo(
@@ -526,7 +188,6 @@ export default function App() {
         .map((project) => ({ id: project.id, name: project.name })),
     [projects]
   );
-  const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
 
   return (
     <I18nProvider lang={language}>
@@ -548,112 +209,39 @@ export default function App() {
           currentProject={currentProject}
           projects={newSessionProjects}
           onNewSession={(projectId) => startNewSession(projectId)}
-          onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
+          onOpenPage={openPage}
           splitActive={route.name === 'split'}
-          onToggleSplit={toggleSplit}
+          onToggleSplit={split.toggleSplit}
         />
 
         <div className="flex min-h-0 grow">
-          {route.name === 'home' ? (
-            <HomePage
-              projectCount={projects.filter((project) => !project.chat).length}
-              attention={attention}
-              refreshKey={homeRefreshKey}
-              onOpenProjectDialog={() => setProjectDialogOpen(true)}
-              onNewChat={chatProjectId ? () => startNewSession(chatProjectId) : null}
-              onNewSession={(projectId) => startNewSession(projectId)}
-              onOpenSession={openSession}
-            />
-          ) : route.name === 'projects' ? (
-            <ProjectsPage
-              projects={projects}
-              loading={projectsLoading}
-              error={projectsError}
-              onOpenProjectDialog={() => setProjectDialogOpen(true)}
-              onNewSession={(projectId) => startNewSession(projectId)}
-              onOpenSession={openSession}
-              onSessionsDeleted={handleSessionsDeleted}
-              onToggleFavorite={(projectId, favorite) => void setProjectFavorite(projectId, favorite).then(refreshProjects)}
-            />
-          ) : route.name === 'chats' ? (
-            <ChatsPage
-              projects={projects}
-              loading={projectsLoading}
-              error={projectsError}
-              onNewSession={(projectId) => startNewSession(projectId)}
-              onOpenSession={openSession}
-              onSessionsDeleted={handleSessionsDeleted}
-            />
-          ) : route.name === 'settings' ? (
-            <SettingsPage
-              page={route.tab}
-              settings={settings}
-              theme={theme}
-              onThemeChange={setTheme}
-              onSaved={handleSettingsSaved}
-              onListing={handleListing}
-            />
-          ) : route.name === 'workflows' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <WorkflowsPage
-                projects={projects}
-                projectId={route.projectId}
-                workflowId={route.workflowId}
-                isNew={route.isNew}
-              />
-            </Suspense>
-          ) : route.name === 'project' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
-            </Suspense>
-          ) : route.name === 'editor' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <EditorPage projects={projects} projectId={route.projectId} path={route.path} sessionId={route.session} />
-            </Suspense>
-          ) : route.name === 'insight' ? (
-            <InsightPage />
-          ) : route.name === 'backlog' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <BacklogPage />
-            </Suspense>
-          ) : route.name === 'split' ? (
-            <SplitPage
-              left={route.left}
-              right={route.right}
-              onClosePane={closePane}
-              paneTabs={paneTabInfos}
-              newSessionProjects={newSessionProjects}
-              onPickTabInPane={pickTabInPane}
-              onCloseTabInPane={closeTabInPane}
-              projects={projects}
-              onChooseSession={openSessionInPane}
-              onNewSessionInPane={newSessionInPane}
-              onSessionCreated={sessionCreatedInPane}
-              onRunningChanged={refreshProjects}
-              onRenamed={refreshProjects}
-              onOpenProjectDialog={() => setProjectDialogOpen(true)}
-              onHome={() => navigate('#/')}
-              onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
-              onOpenProject={(projectId) => navigate(`#/project/${encodeURIComponent(projectId)}`)}
-            />
-          ) : route.name === 'changes' ? (
-            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <ChangesPage sessionId={route.id} initialPath={route.path} projectId={currentProjectId ?? null} />
-            </Suspense>
-          ) : (
-            <SessionPage
-              sessionId={route.name === 'session' ? route.id : null}
-              projectId={route.name === 'new' ? route.id : null}
-              testWorkflowId={route.name === 'new' ? route.testWorkflowId : null}
-              frameIdeaId={route.name === 'new' ? route.frameIdeaId : null}
-              fromSessionId={route.name === 'new' ? route.fromSessionId : null}
-              pseudoTabId={pseudoTabId}
-              projects={projects}
-              onSessionCreated={handleSessionCreated}
-              onRunningChanged={refreshProjects}
-              onRenamed={refreshProjects}
-            />
-          )}
+          <RouteView
+            route={route}
+            projects={projects}
+            projectsLoading={projectsLoading}
+            projectsError={projectsError}
+            settings={settings}
+            theme={theme}
+            attention={attention}
+            homeRefreshKey={homeRefreshKey}
+            chatProjectId={chatProjectId}
+            currentProjectId={currentProjectId}
+            pseudoTabId={route.name === 'new' ? `new:${route.id}` : null}
+            newSessionProjects={newSessionProjects}
+            split={split}
+            onThemeChange={setTheme}
+            onSettingsSaved={handleSettingsSaved}
+            onListing={handleListing}
+            onOpenProjectDialog={openProjectDialog}
+            onNewSession={startNewSession}
+            onOpenSession={openSession}
+            onSessionsDeleted={handleSessionsDeleted}
+            onSessionCreated={handleSessionCreated}
+            onRefreshProjects={refreshProjects}
+            onHome={goHome}
+            onOpenPage={openPage}
+            onOpenProject={openProject}
+          />
         </div>
 
         <StatusBar
@@ -667,20 +255,14 @@ export default function App() {
           shortcuts={shortcutLabels}
           onClose={() => setPaletteOpen(false)}
           onOpenSession={openSession}
-          onNewSession={(projectId) => startNewSession(projectId)}
-          onOpenProjectDialog={() => setProjectDialogOpen(true)}
-          onHome={() => navigate('#/')}
-          onOpenPage={(page) => navigate(PAGE_TABS.find((candidate) => candidate.page === page)?.path ?? '#/')}
-          onOpenProject={(projectId) => navigate(`#/project/${encodeURIComponent(projectId)}`)}
+          onNewSession={startNewSession}
+          onOpenProjectDialog={openProjectDialog}
+          onHome={goHome}
+          onOpenPage={openPage}
+          onOpenProject={openProject}
         />
 
-        <ProjectDialog
-          open={projectDialogOpen}
-          submitting={projectSubmitting}
-          error={projectError}
-          onClose={() => setProjectDialogOpen(false)}
-          onSubmit={handleCreateProject}
-        />
+        <ProjectDialog {...projectDialog.dialogProps} />
       </div>
       </PluginsVersionContext.Provider>
     </DisplayPrefsProvider>
