@@ -444,9 +444,9 @@ checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
 
 [[package]]
 name = "llm-providers-connector"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4763ede4444023cb4760af9b9f580ab6302e14570738a18fdae8e977a2096b4f"
+checksum = "f152aa7c0df85e510c5cb25ac60dc08e4c5d6f7bb3c992e27b9739b26730a9e8"
 dependencies = [
  "chacha20poly1305",
  "serde",

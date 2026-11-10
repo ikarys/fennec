@@ -203,7 +203,7 @@ export interface SettingsModel {
   id: string;
   contextWindow: number | null;
   resolved: ResolvedParams;
-  /** The efforts the model accepts (probed, else catalog); empty when unknown. */
+  /** The efforts the model accepts (as probed); empty when never probed. */
   acceptedEfforts: ReasoningEffort[];
   /** Added by hand: stored with no listing (the endpoint has no /models route). */
   manual?: boolean;
@@ -311,17 +311,12 @@ export function listProvider(body: {
   });
 }
 
-/** Where a probed limit comes from: the endpoint's own words, or the model family's catalog entry. */
-export type LimitSource = "endpoint" | "catalog";
-
 /** What a probe of one model learned (indicative); null where nothing said it. */
 export interface ProbedModel {
   contextWindow: number | null;
-  contextSource: LimitSource | null;
   maxTokens: number | null;
-  /** The distinct efforts accepted; empty when neither the endpoint nor the catalog says. */
+  /** The distinct efforts accepted; empty when the endpoint refused every probe. */
   reasoningEfforts: ReasoningEffort[];
-  effortsSource: LimitSource | null;
   defaultReasoningEffort: ReasoningEffort | null;
 }
 
