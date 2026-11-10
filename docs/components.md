@@ -296,9 +296,12 @@ figures that link to their page (cost over 7 days, ideas ready, worktrees on dis
 (`domain/home.rs`, `web/routes/home_routes.rs`); projects and chats have their own pages in the header's nav
 (`HomePage.tsx`, `ProjectsPage.tsx`, `ChatsPage.tsx`).
 
-File explorer, done: the project page's Files tab lists the project's files as git sees them (tracked and new,
-never ignored ones) in a collapsible tree; a file opens rendered (markdown) or as text, and a tracked one can be
-edited and saved as a commit of that file alone on the human's current branch, with a message they type, refused
-when the file changed since it was read (`project_files.rs`, `domain/project_file.rs`, `web/routes/file_routes.rs`,
-`web/src/components/project/files/`). The changed files of a report card and of the right panel link to the file
-as the session's branch has it, read-only, or to the working tree once the session is integrated.
+File editor, done: the editor page (`#/edit/<project>`, linked from the project page's header) lists the
+project's files as git sees them (tracked and new, never ignored ones) in a collapsible tree and opens a file in a
+code editor with syntax highlighting and line numbers (CodeMirror, loaded with the page only), or rendered for
+markdown. Ctrl+S writes a tracked file to disk, refused when it changed since it was read; nothing is committed
+then. The Changes panel lists the tracked files that differ from HEAD, the ones saved from the page ticked: one
+message makes one commit of the ticked files on the human's current branch, leaving the rest of their staged work
+out (`project_files.rs`, `domain/project_file.rs`, `web/routes/file_routes.rs`, `web/src/components/editor/`,
+`web/src/pages/EditorPage.tsx`). The changed files of a report card and of the right panel open the file as the
+session's branch has it, read-only, or the working tree once the session is integrated.

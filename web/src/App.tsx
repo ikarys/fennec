@@ -35,6 +35,7 @@ const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const BacklogPage = lazy(() => import('./pages/BacklogPage'));
 const ChangesPage = lazy(() => import('./pages/ChangesPage'));
+const EditorPage = lazy(() => import('./pages/EditorPage'));
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
@@ -84,6 +85,7 @@ export default function App() {
   const projectsVisible =
     route.name === 'home' ||
     route.name === 'project' ||
+    route.name === 'editor' ||
     route.name === 'projects' ||
     route.name === 'chats' ||
     paletteOpen;
@@ -467,7 +469,11 @@ export default function App() {
             </Suspense>
           ) : route.name === 'project' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} session={route.session} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
+              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
+            </Suspense>
+          ) : route.name === 'editor' ? (
+            <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
+              <EditorPage projects={projects} projectId={route.projectId} path={route.path} sessionId={route.session} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />

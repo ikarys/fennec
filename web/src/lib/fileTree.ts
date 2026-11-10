@@ -82,7 +82,16 @@ export function isMarkdown(path: string): boolean {
   return name.endsWith('.md') || name.endsWith('.markdown')
 }
 
-export function defaultCommitMessage(path: string): string {
-  const name = path.slice(path.lastIndexOf('/') + 1)
-  return isMarkdown(path) ? `docs: update ${name}` : `chore: update ${name}`
+export function defaultCommitMessage(paths: string[]): string {
+  if (paths.length === 0) return ''
+
+  if (paths.length === 1) {
+    const name = paths[0].slice(paths[0].lastIndexOf('/') + 1)
+    return isMarkdown(paths[0]) ? `docs: update ${name}` : `chore: update ${name}`
+  }
+
+  const allMarkdown = paths.every(isMarkdown)
+  return allMarkdown
+    ? `docs: update ${paths.length} files`
+    : `chore: update ${paths.length} files`
 }

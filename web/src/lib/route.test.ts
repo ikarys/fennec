@@ -96,7 +96,6 @@ describe('parseRoute', () => {
       projectId: 'a/b',
       tab: 'risks',
       sub: null,
-      session: null,
     });
   });
 
@@ -106,24 +105,37 @@ describe('parseRoute', () => {
       projectId: 'x',
       tab: 'map',
       sub: 'foo',
-      session: null,
     });
   });
 
-  it('round-trips a project file path with a session', async () => {
-    const { projectFilePath } = await import('./route');
-    expect(parseRoute(projectFilePath('p', 'docs/a b.md', 's-1'))).toEqual({
-      name: 'project',
+  it('round-trips an editor file path with a session', async () => {
+    const { editorPath } = await import('./route');
+    expect(parseRoute(editorPath('p', 'docs/a b.md', 's-1'))).toEqual({
+      name: 'editor',
       projectId: 'p',
-      tab: 'files',
-      sub: 'docs/a b.md',
+      path: 'docs/a b.md',
       session: 's-1',
     });
   });
 
-  it('builds a project files path without a file', async () => {
-    const { projectFilePath } = await import('./route');
-    expect(projectFilePath('p', null)).toBe('#/project/p/files');
+  it('parses an editor route without a file', () => {
+    expect(parseRoute('#/edit/p')).toEqual({
+      name: 'editor',
+      projectId: 'p',
+      path: null,
+      session: null,
+    });
+  });
+
+  it('returns null for editor route', () => {
+    expect(
+      tabIdForRoute({
+        name: 'editor',
+        projectId: 'p',
+        path: null,
+        session: null,
+      }),
+    ).toBeNull();
   });
 
   it('parses workflows route without ids', () => {
@@ -280,7 +292,6 @@ describe('tabIdForRoute', () => {
         projectId: 'p1',
         tab: null,
         sub: null,
-        session: null,
       }),
     ).toBeNull();
   });
