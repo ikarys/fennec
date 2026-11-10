@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Button } from "../../ui/Button";
 import {
+  BacklogIcon,
   ChatIcon,
   EditIcon,
   ReviewIcon,
@@ -22,6 +23,7 @@ import { formatDate } from "../../../lib/format";
 import { withTask } from "../../../lib/route";
 import {
   startIdea,
+  turnIntoTask,
   type IdeaAction,
   type IdeaBoard,
   type IdeaView,
@@ -104,6 +106,23 @@ export function IdeaRow({
       setBusy(false);
     }
   };
+
+  const openTask = () => {
+    window.location.hash = withTask(window.location.hash, idea.id);
+  };
+
+  // A draft becomes a task with an empty sheet, opened at once to fill it.
+  const handleTurnIntoTask = async () => {
+    setBusy(true);
+    try {
+      if (await run(() => turnIntoTask(projectId, idea.id))) openTask();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const canTurnIntoTask =
+    !idea.sheet && (idea.status === "inbox" || idea.status === "framing");
 
   // The one primary action the server chose for this idea.
   const renderAction = () => {
@@ -210,9 +229,7 @@ export function IdeaRow({
           type="button"
           className="m-0 block w-full truncate text-left text-sm text-text hover:text-accent"
           title={t("openTask")}
-          onClick={() => {
-            window.location.hash = withTask(window.location.hash, idea.id);
-          }}
+          onClick={openTask}
         >
           {idea.title}
         </button>
@@ -252,6 +269,19 @@ export function IdeaRow({
             onClick={() => setEditing(true)}
           >
             <EditIcon className="h-4 w-4" />
+          </Button>
+        ) : null}
+        {canTurnIntoTask || idea.sheet ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            disabled={busy}
+            title={t(idea.sheet ? "openTask" : "turnIntoTask")}
+            aria-label={t(idea.sheet ? "openTask" : "turnIntoTask")}
+            onClick={idea.sheet ? openTask : () => void handleTurnIntoTask()}
+          >
+            <BacklogIcon className="h-4 w-4" />
           </Button>
         ) : null}
         {renderAction()}
