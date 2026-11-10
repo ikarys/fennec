@@ -205,6 +205,14 @@ export async function markIdeaReady(
   });
 }
 
+/** Saves the framing session's pending plan onto the task's sheet, as the agent's edit. */
+export async function applySheet(projectId: string, ideaId: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/sheet-apply`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
 export async function editIdea(projectId: string, ideaId: string, text: string): Promise<IdeaBoard> {
   return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/edit`, {
     method: 'POST',

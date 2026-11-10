@@ -4,7 +4,7 @@ import { sendMessage, startWorkflow } from '../lib/api';
 import type { SessionDetail } from '../lib/api';
 import type { ThreadView } from '../lib/fold';
 import type { ServedThread } from '../lib/api';
-import { addPlannedIdea, frameIdea, markIdeaReady } from '../lib/ideas';
+import { addPlannedIdea, applySheet, frameIdea, markIdeaReady } from '../lib/ideas';
 import { lastHumanMessage, pendingPlanOf } from '../lib/plan';
 import { useT } from '../i18n';
 import { planAnchorId } from '../components/session/PendingPlan';
@@ -122,7 +122,9 @@ export function useSessionPlan({
     if (!detail || !planSource) return;
     setSendError(null);
     try {
-      if (detail.idea) {
+      if (detail.idea?.hasSheet) {
+        await applySheet(detail.project.id, detail.idea.id);
+      } else if (detail.idea) {
         await markIdeaReady(detail.project.id, detail.idea.id, planSource.content);
       } else {
         await addPlannedIdea(detail.project.id, detail.title, detail.id, planSource.content);
@@ -167,8 +169,11 @@ export function useSessionPlan({
           ideaReady: detail
             ? {
                 onMark: () => void handleIdeaReady(),
-                idea:
-                  backlogSegment === pendingPlan.id
+                idea: detail.idea?.hasSheet
+                  ? backlogSegment === pendingPlan.id
+                    ? "applied"
+                    : "sheet"
+                  : backlogSegment === pendingPlan.id
                     ? "saved"
                     : detail.idea?.state === "ready"
                       ? "ready"
