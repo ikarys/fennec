@@ -103,7 +103,7 @@ export function HomePage({
           actions={
             <>
               {onNewChat ? (
-                <Button variant="secondary" size="md" onClick={onNewChat}>
+                <Button variant="soft" size="md" onClick={onNewChat}>
                   <PlusIcon className="h-[15px] w-[15px]" />
                   {t('paletteNewChat')}
                 </Button>
