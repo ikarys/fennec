@@ -36,6 +36,8 @@ the prompt, the tools or a log. Plugins are global, never read from a project.
 | `global` | `settings` (default) | Settings' Plugins tab |
 | `global` | `status_bar` | the status bar, everywhere |
 
+The status bar shows itself while at least one block is placed there and stays hidden otherwise.
+
 Then enable it on Settings → Plugins. Editing the definition or any file in its directory
 deactivates it until the human enables it again (SHA-256 of the command, arguments, environment
 and code; the blocks and the icon only choose where data shows).

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
 import { getVersion, type AttentionItem } from '../../lib/api';
-import { ChatIcon, FooterIcon, SearchIcon, SplitIcon } from '../ui/Icons';
+import { ChatIcon, SearchIcon, SplitIcon } from '../ui/Icons';
 import { buttonClass } from '../ui/Button';
 import { AttentionBell } from './AttentionBell';
 import { PageNav, type PageId } from './PageNav';
@@ -49,9 +49,6 @@ interface TopBarProps {
   onOpenPage: (page: PageId) => void;
   splitActive: boolean;
   onToggleSplit: () => void;
-  /** Whether the footer (status bar) is shown. */
-  footerShown: boolean;
-  onToggleFooter: () => void;
 }
 
 export function TopBar({
@@ -67,9 +64,7 @@ export function TopBar({
   onNewSession,
   onOpenPage,
   splitActive,
-  onToggleSplit,
-  footerShown,
-  onToggleFooter
+  onToggleSplit
 }: TopBarProps) {
   const t = useT();
   const versionLabel = useVersionLabel();
@@ -84,6 +79,7 @@ export function TopBar({
       >
         <img src="/logo.png" alt="" className="h-6 w-6" />
         <span>fennec</span>
+        {versionLabel ? <span className="font-mono text-xs font-normal text-faint">{versionLabel}</span> : null}
       </a>
 
       <SessionTabs
@@ -143,17 +139,6 @@ export function TopBar({
             className={buttonClass({ variant: 'ghost', size: 'sm' }, splitActive ? 'bg-accent-soft text-accent' : undefined)}
           >
             <SplitIcon className="h-4 w-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleFooter}
-            aria-label={t('statusBarLabel')}
-            aria-pressed={footerShown}
-            title={t(footerShown ? 'statusBarHide' : 'statusBarShow')}
-            className={buttonClass({ variant: 'ghost', size: 'sm' }, footerShown ? 'bg-accent-soft text-accent' : undefined)}
-          >
-            <FooterIcon className="h-4 w-4" />
           </button>
         </div>
       </div>

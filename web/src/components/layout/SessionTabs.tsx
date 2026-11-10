@@ -4,9 +4,10 @@ import { useT } from '../../i18n';
 import type { SessionState } from '../../lib/api';
 import type { PageId } from '../../lib/route';
 import { SessionStateIcon } from '../session/SessionStateIcon';
-import { CloseIcon, PlusIcon } from '../ui/Icons';
+import { CloseIcon, FolderIcon, PlusIcon } from '../ui/Icons';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Menu, MenuItem } from '../ui/Menu';
+import { Menu, MenuItem, MenuLabel } from '../ui/Menu';
 import { PageIcon } from './PageNav';
 
 /** The chat's project id, fixed by the server (`chat::ID`). */
@@ -133,16 +134,27 @@ export function SessionTabs({
       {/* The "+" never guesses a project: the open session's comes first, then the others by recent use (the chat has its own button). */}
       <div className="self-center ml-1 shrink-0">
         <Menu label={t('topBarNewSessionMenuLabel')} icon={<PlusIcon className="h-4 w-4" />}>
+          <MenuLabel>{t('topBarNewSessionMenuLabel')}</MenuLabel>
           {currentProject && currentProject.id !== CHAT_PROJECT_ID ? (
-            <MenuItem onSelect={() => onNewSession(currentProject.id)}>
-              {t('paletteNewSessionIn', { name: currentProject.name })}
+            <MenuItem
+              onSelect={() => onNewSession(currentProject.id)}
+              icon={<FolderIcon className="h-3.5 w-3.5 text-faint" />}
+            >
+              <span className="truncate">{currentProject.name}</span>
+              <Badge tone="accent" appearance="pill" className="ml-auto">
+                {t('topBarCurrentProject')}
+              </Badge>
             </MenuItem>
           ) : null}
           {projects
             .filter((project) => project.id !== CHAT_PROJECT_ID && project.id !== currentProject?.id)
             .map((project) => (
-              <MenuItem key={project.id} onSelect={() => onNewSession(project.id)}>
-                {project.name}
+              <MenuItem
+                key={project.id}
+                onSelect={() => onNewSession(project.id)}
+                icon={<FolderIcon className="h-3.5 w-3.5 text-faint" />}
+              >
+                <span className="truncate">{project.name}</span>
               </MenuItem>
             ))}
         </Menu>
