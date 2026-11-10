@@ -348,12 +348,19 @@ export default function App() {
   const pickTab = useCallback(
     (id: string) => {
       setActiveTabId(id);
+      // In split view a session tab opens in the focused pane; a page tab leaves the split.
+      if (route.name === 'split' && !id.startsWith('page:')) {
+        if (route.left === id) setSplitFocus('left');
+        else if (route.right === id) setSplitFocus('right');
+        else navigate(splitPath(splitFocus === 'left' ? id : route.left, splitFocus === 'right' ? id : route.right));
+        return;
+      }
       const target = tabPath(id);
       if (!id.startsWith('page:') || basePathOf(window.location.hash) !== target) {
         navigate(target);
       }
     },
-    [navigate]
+    [route, splitFocus, navigate]
   );
 
   const pseudoTabId = route.name === 'new' ? `new:${route.id}` : null;
