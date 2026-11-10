@@ -199,7 +199,7 @@ export default function App() {
     },
     [navigate, openTab]
   );
-  const { items: attention, pluginsVersion, online } = useTurnNotices(openSession);
+  const { items: attention, pluginsVersion, online } = useTurnNotices(openSession, displayPrefs.sounds ?? true);
 
   const closeTab = useCallback(
     (tabId: string) => {

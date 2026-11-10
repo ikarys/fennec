@@ -169,6 +169,8 @@ pub struct Display {
     pub language: Lang,
     /// The IDE the "open in editor" links open.
     pub editor: Editor,
+    /// Short sounds when something new needs the human's attention.
+    pub sounds: bool,
 }
 
 impl Default for Display {
@@ -179,6 +181,7 @@ impl Default for Display {
             font_size: DEFAULT_FONT_SIZE,
             language: Lang::En,
             editor: Editor::default(),
+            sounds: true,
         }
     }
 }
@@ -853,6 +856,7 @@ mod tests {
         p.migrate();
         assert_eq!(p.display.font_size, DEFAULT_FONT_SIZE);
         assert_eq!(p.display.language, Lang::En);
+        assert!(p.display.sounds);
         assert_eq!(
             p.provider(LOCAL_PROVIDER)
                 .unwrap()
