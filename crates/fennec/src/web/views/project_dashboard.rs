@@ -11,6 +11,7 @@ use serde_json::to_value;
 use token_usage::display::{duration, percent, tokens};
 use token_usage::{Filter, GroupBy, Ledger, Summary};
 
+use crate::adr;
 use crate::domain::clock::now_ms;
 use crate::domain::lang::Lang;
 use crate::domain::pricing::{priced, prices};
@@ -18,7 +19,6 @@ use crate::web::App;
 use crate::web::http::send_json;
 use crate::web::views::idea_board::Board;
 use crate::web::views::insight::Period;
-use crate::adr;
 use backlog::Stage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -425,7 +425,10 @@ mod tests {
         let view = view("p", &facts(), Lang::Fr);
         let ids: Vec<&str> = view.tiles.iter().map(|tile| tile.id.as_str()).collect();
 
-        assert_eq!(ids, ["sessions", "ideas", "tokens", "time", "cost", "decisions"]);
+        assert_eq!(
+            ids,
+            ["sessions", "ideas", "tokens", "time", "cost", "decisions"]
+        );
     }
 
     #[test]
