@@ -19,6 +19,8 @@ import {
   changesPath,
   TABS_KEY,
   ACTIVE_TAB_KEY,
+  isRouteTab,
+  rememberEditorHash,
 } from './route';
 
 describe('changes', () => {
@@ -131,7 +133,7 @@ describe('parseRoute', () => {
     });
   });
 
-  it('returns null for editor route', () => {
+  it('returns editor tab id for editor route', () => {
     expect(
       tabIdForRoute({
         name: 'editor',
@@ -139,7 +141,7 @@ describe('parseRoute', () => {
         path: null,
         session: null,
       }),
-    ).toBeNull();
+    ).toBe('edit:p');
   });
 
   it('parses workflows route without ids', () => {
@@ -228,6 +230,15 @@ describe('tabPath', () => {
     expect(tabPath('abc')).toBe('#/s/abc');
   });
 
+  it('builds editor path before a hash is remembered', () => {
+    expect(tabPath('edit:p')).toBe('#/edit/p');
+  });
+
+  it('builds the remembered editor path', () => {
+    rememberEditorHash('p', '#/edit/p/a.ts');
+    expect(tabPath('edit:p')).toBe('#/edit/p/a.ts');
+  });
+
   it('builds new path', () => {
     expect(tabPath('new:p1')).toBe('#/new/p1');
   });
@@ -308,6 +319,20 @@ describe('tabIdForRoute', () => {
         right: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe('isRouteTab', () => {
+  it('is true for page tabs', () => {
+    expect(isRouteTab('page:settings')).toBe(true);
+  });
+
+  it('is true for editor tabs', () => {
+    expect(isRouteTab('edit:p')).toBe(true);
+  });
+
+  it('is false for session ids', () => {
+    expect(isRouteTab('abc')).toBe(false);
   });
 });
 

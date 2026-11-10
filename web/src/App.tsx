@@ -4,7 +4,10 @@ import { applyTheme, getStoredTheme, type ThemeId } from './lib/theme';
 import { TopBar, type TabInfo } from './components/layout/TopBar';
 import {
   PAGE_TABS,
+  editorTabId,
+  isRouteTab,
   parseRoute,
+  rememberEditorHash,
   splitPath,
   tabIdForRoute,
   tabPath,
@@ -59,21 +62,31 @@ export default function App() {
     applyTheme(theme);
   }, [theme]);
 
-  // A page route (settings, insight, workflows, backlog) gets its tab in the
-  // bar the moment it is on screen, so the active page is never unlisted.
+  // A route-derived tab (page, project editor) gets its tab in the bar the
+  // moment it is on screen, so the active route is never unlisted.
   const pageTabIdForRoute =
-    route.name === 'settings' ||
-    route.name === 'insight' ||
-    route.name === 'backlog' ||
-    route.name === 'workflows' ||
-    route.name === 'projects' ||
-    route.name === 'chats'
-      ? `page:${route.name}`
-      : null;
+    route.name === 'editor'
+      ? editorTabId(route.projectId)
+      : route.name === 'settings' ||
+          route.name === 'insight' ||
+          route.name === 'backlog' ||
+          route.name === 'workflows' ||
+          route.name === 'projects' ||
+          route.name === 'chats'
+        ? `page:${route.name}`
+        : null;
   useEffect(() => {
     if (!pageTabIdForRoute) return;
     openTab(pageTabIdForRoute);
   }, [pageTabIdForRoute, openTab]);
+
+  // The editor's last file/session location is remembered per project, so the
+  // editor tab can return there when picked again.
+  useEffect(() => {
+    if (route.name === 'editor') {
+      rememberEditorHash(route.projectId, window.location.hash);
+    }
+  }, [route]);
 
   const displayPrefs = settings?.preferences.display ?? defaultDisplayPrefs;
   // The UI's language: the stored choice, else English (the default).
@@ -134,6 +147,11 @@ export default function App() {
   }, []);
 
   const tabInfo = useCallback((id: string): TabInfo => {
+    if (id.startsWith('edit:')) {
+      const projectId = id.slice(5);
+      const name = projects.find((candidate) => candidate.id === projectId)?.name ?? projectId;
+      return { id, title: t(language, 'editorTabTitle', { project: name }), kind: 'editor' as const, project: name };
+    }
     if (id.startsWith('page:')) {
       const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
       return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
@@ -184,15 +202,15 @@ export default function App() {
       // activeTabId can be stale when a session was opened by URL/bookmark, so
       // it is not a reliable "is this tab showing" signal.
       if (tabIdForRoute(route) !== tabId) return;
-      // A page tab closing while active returns home; a session tab falls back
-      // to the last remaining session tab, or home when none are left. Page
+      // A route tab closing while active returns home; a session tab falls back
+      // to the last remaining session tab, or home when none are left. Route
       // tabs are re-derived from the route, so they are not a close target.
-      if (tabId.startsWith('page:')) {
+      if (isRouteTab(tabId)) {
         setActiveTabId(null);
         navigate('#/');
         return;
       }
-      const fallback = next.filter((id) => !id.startsWith('page:')).pop() ?? null;
+      const fallback = next.filter((id) => !isRouteTab(id)).pop() ?? null;
       setActiveTabId(fallback);
       navigate(fallback ? tabPath(fallback) : '#/');
     },
@@ -356,7 +374,7 @@ export default function App() {
     (id: string) => {
       setActiveTabId(id);
       const target = tabPath(id);
-      if (!id.startsWith('page:') || basePathOf(window.location.hash) !== target) {
+      if (!isRouteTab(id) || basePathOf(window.location.hash) !== target) {
         navigate(target);
       }
     },
@@ -365,7 +383,7 @@ export default function App() {
 
   const pickTabInPane = useCallback(
     (side: 'left' | 'right', id: string) => {
-      if (route.name !== 'split' || id.startsWith('page:')) {
+      if (route.name !== 'split' || isRouteTab(id)) {
         pickTab(id);
         return;
       }

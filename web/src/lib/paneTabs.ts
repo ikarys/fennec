@@ -1,4 +1,6 @@
 // Pure helpers for the split view's per-pane tab lists.
+import { isRouteTab } from './route';
+
 export type PaneSide = 'left' | 'right';
 
 export interface PaneTabs {
@@ -8,7 +10,7 @@ export interface PaneTabs {
 
 /** The pane lists after the split's panes changed: seeded on entry, each pane's shown tab appended if missing. Returns `previous` itself when nothing changed. */
 export function syncPaneTabs(previous: PaneTabs | null, left: string | null, right: string | null, seed: string[]): PaneTabs {
-  const base = previous ?? { left: seed.filter((id) => !id.startsWith('page:')), right: [] };
+  const base = previous ?? { left: seed.filter((id) => !isRouteTab(id)), right: [] };
   const withTab = (list: string[], id: string | null): string[] => (id && !list.includes(id) ? [...list, id] : list);
   const nextLeft = withTab(base.left, left);
   const nextRight = withTab(base.right, right);

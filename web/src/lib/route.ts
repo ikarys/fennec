@@ -102,13 +102,33 @@ export function parseRoute(hash: string): Route {
   return { name: 'home' };
 }
 
-/** The route of a tab: a pseudo `new:` tab opens the new-session page, a page tab its page. */
+/** A tab derived from the route (a page, a project's editor), never persisted nor split. */
+export function isRouteTab(id: string): boolean {
+  return id.startsWith('page:') || id.startsWith('edit:');
+}
+
+/** The tab of a project's editor. */
+export function editorTabId(projectId: string): string {
+  return `edit:${projectId}`;
+}
+
+const lastEditorHash = new Map<string, string>();
+
+/** Remembers where a project's editor is, so its tab returns there. */
+export function rememberEditorHash(projectId: string, hash: string): void {
+  lastEditorHash.set(projectId, hash);
+}
+
+/** The route of a tab: a pseudo `new:` tab opens the new-session page, a page tab its page, an editor tab its last file. */
 export function tabPath(tabId: string): string {
   if (tabId.startsWith('new:')) {
     return `#/new/${encodeURIComponent(tabId.slice(4))}`;
   }
   if (tabId.startsWith('page:')) {
     return PAGE_TABS.find((page) => page.page === tabId.slice(5))?.path ?? '#/';
+  }
+  if (tabId.startsWith('edit:')) {
+    return lastEditorHash.get(tabId.slice(5)) ?? editorPath(tabId.slice(5), null);
   }
   return `#/s/${encodeURIComponent(tabId)}`;
 }
@@ -148,7 +168,7 @@ export function tabIdForRoute(route: Route): string | null {
     case 'chats':
       return 'page:chats';
     case 'editor':
-      return null;
+      return editorTabId(route.projectId);
     default:
       return null;
   }
@@ -174,7 +194,7 @@ export function loadTabs(): string[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === 'string' && !value.startsWith('page:'))
+      ? parsed.filter((value): value is string => typeof value === 'string' && !isRouteTab(value))
       : [];
   } catch {
     return [];
@@ -184,8 +204,8 @@ export function loadTabs(): string[] {
 export function loadActiveTab(): string | null {
   try {
     const id = localStorage.getItem(ACTIVE_TAB_KEY);
-    // A page tab persisted by an older build is not a real session.
-    return id && !id.startsWith('page:') ? id : null;
+    // A route tab persisted by an older build is not a real session.
+    return id && !isRouteTab(id) ? id : null;
   } catch {
     return null;
   }
