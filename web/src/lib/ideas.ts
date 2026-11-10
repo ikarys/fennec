@@ -23,6 +23,26 @@ export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer'
 
 export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editPlan';
 
+export type SheetField = 'objective' | 'context' | 'constraints' | 'outOfScope' | 'deliverable' | 'approach' | 'doneWhen';
+
+export interface SheetCriterion {
+  text: string;
+  check?: string;
+}
+
+export interface TaskSheet {
+  objective: string;
+  context: string;
+  constraints: string;
+  outOfScope: string;
+  deliverable: string;
+  approach: string;
+  doneWhen: SheetCriterion[];
+}
+
+/** A model's proposal for one field: text, or criteria for doneWhen. */
+export type SheetSuggestion = { text: string } | { criteria: string[] };
+
 /** A file or image pinned to an idea, kept as a data URL. */
 export interface IdeaAttachmentView {
   filename: string;
@@ -47,6 +67,14 @@ export interface IdeaView {
   plan: string | null;
   /** The task sheet rendered as the plan's markdown; null for an idea without a sheet. */
   sheetMarkdown: string | null;
+  /** The structured task sheet; null for an idea without one. */
+  sheet: TaskSheet | null;
+  /** The sheet fields still to fill before the task can be ready. */
+  missing: SheetField[];
+  /** How many required and suggested fields are filled; null without a sheet. */
+  completeness: { required: number; suggested: number } | null;
+  /** The sheet fields a model wrote last: indicative, to review. */
+  modelFields: SheetField[];
   halted: string | null;
   autonomous: boolean;
   position: number | null;
@@ -211,6 +239,47 @@ export async function applySheet(projectId: string, ideaId: string): Promise<Ide
     method: 'POST',
     body: '{}',
   });
+}
+
+/** Saves the whole sheet; `by` says who wrote it, a human or the agent. */
+export async function saveSheet(
+  projectId: string,
+  ideaId: string,
+  sheet: TaskSheet,
+  by: 'human' | 'agent' = 'human',
+): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/sheet`, {
+    method: 'POST',
+    body: JSON.stringify({ sheet, by }),
+  });
+}
+
+/** Queues the task with its sheet as the plan; the server refuses an incomplete sheet. */
+export async function markSheetReady(projectId: string, ideaId: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/ready`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+/** Gives a raw idea an empty task sheet to fill. */
+export async function turnIntoTask(projectId: string, ideaId: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/turn-into-task`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+/** Asks the model for one field; the answer is a proposal, not a board. */
+export async function suggestSheetField(
+  projectId: string,
+  ideaId: string,
+  field: SheetField,
+): Promise<SheetSuggestion> {
+  return request<SheetSuggestion>(
+    `/api/projects/${encodeURIComponent(projectId)}/ideas/${encodeURIComponent(ideaId)}/sheet/suggest`,
+    { method: 'POST', body: JSON.stringify({ field }) },
+  );
 }
 
 export async function editIdea(projectId: string, ideaId: string, text: string): Promise<IdeaBoard> {

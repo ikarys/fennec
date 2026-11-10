@@ -17,6 +17,7 @@ import {
   TrashIcon,
   WandIcon,
 } from '../components/ui/Icons';
+import { withTask } from '../lib/route';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { ProjectOpenActions } from '../components/project/ProjectOpenActions';
@@ -109,6 +110,7 @@ export default function ProjectPage({
   projectId,
   tab,
   sub,
+  task,
   onOpenSession,
   onNewSession,
   onDeleted,
@@ -118,6 +120,7 @@ export default function ProjectPage({
   projectId: string;
   tab: string | null;
   sub: string | null;
+  task: string | null;
   onOpenSession: (sessionId: string) => void;
   onNewSession: (projectId: string) => void;
   /** Home and project pages both show the list, so going home does not refresh it. */
@@ -248,6 +251,10 @@ export default function ProjectPage({
             <TasksSection
               projectId={projectId}
               sub={sub}
+              task={task}
+              onOpenTask={(ideaId) => {
+                window.location.hash = withTask(window.location.hash, ideaId);
+              }}
               onFrame={handleFrame}
               onOpenSession={onOpenSession}
               onSelectSub={(s) => {

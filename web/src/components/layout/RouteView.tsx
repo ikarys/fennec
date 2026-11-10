@@ -124,6 +124,7 @@ export function RouteView(props: RouteViewProps) {
             projectId={route.projectId}
             tab={route.tab}
             sub={route.sub}
+            task={route.task}
             onOpenSession={onOpenSession}
             onNewSession={onNewSession}
             onDeleted={onRefreshProjects}

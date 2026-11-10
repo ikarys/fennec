@@ -19,6 +19,7 @@ import { IdeaMeta } from "./IdeaMeta";
 import { IdeaMenu } from "./IdeaMenu";
 import { EditIdeaDialog } from "./EditIdeaDialog";
 import { formatDate } from "../../../lib/format";
+import { withTask } from "../../../lib/route";
 import {
   startIdea,
   type IdeaAction,
@@ -205,9 +206,16 @@ export function IdeaRow({
       ) : null}
 
       <div className="min-w-0 grow">
-        <p className="m-0 truncate text-sm text-text" title={idea.text}>
+        <button
+          type="button"
+          className="m-0 block w-full truncate text-left text-sm text-text hover:text-accent"
+          title={t("openTask")}
+          onClick={() => {
+            window.location.hash = withTask(window.location.hash, idea.id);
+          }}
+        >
           {idea.title}
-        </p>
+        </button>
         {idea.halted ? (
           <p className="mt-0.5 text-xs text-muted">{idea.halted}</p>
         ) : null}

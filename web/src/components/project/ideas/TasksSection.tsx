@@ -9,6 +9,7 @@ import { TasksOverview } from './TasksOverview';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { NewIdeaDialog } from './NewIdeaDialog';
+import { TaskDrawer } from './TaskDrawer';
 import { Button } from '../../ui/Button';
 import { ActivityIcon, BulbIcon, CheckIcon, CloseIcon, EditIcon, PlusIcon, ReviewIcon, type PuzzleIcon } from '../../ui/Icons';
 import {
@@ -46,12 +47,16 @@ function normalizeSub(sub: string | null): TasksSub {
 export function TasksSection({
   projectId,
   sub,
+  task,
+  onOpenTask,
   onFrame,
   onOpenSession,
   onSelectSub,
 }: {
   projectId: string;
   sub: string | null;
+  task: string | null;
+  onOpenTask: (ideaId: string | null) => void;
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   onSelectSub: (sub: TasksSub) => void;
@@ -143,6 +148,7 @@ export function TasksSection({
   const done = board.groups.find((g) => g.stage === 'done')?.ideas ?? [];
 
   const activeSub = normalizeSub(sub);
+  const openIdea = task ? board.groups.flatMap((g) => g.ideas).find((i) => i.id === task) : undefined;
 
   return (
     <section className="flex flex-col gap-4">
@@ -284,6 +290,18 @@ export function TasksSection({
         onClose={() => setNewIdeaOpen(false)}
         onCreated={() => onSelectSub('backlog')}
       />
+
+      {openIdea ? (
+        <TaskDrawer
+          key={openIdea.id}
+          idea={openIdea}
+          projectId={projectId}
+          run={run}
+          onFrame={runFrame}
+          onOpenSession={onOpenSession}
+          onClose={() => onOpenTask(null)}
+        />
+      ) : null}
     </section>
   );
 }

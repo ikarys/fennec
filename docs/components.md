@@ -324,3 +324,13 @@ same accepted efforts: the probe stores them in the model's preferences, else th
 all efforts are offered. Changing the effort mid-session can make a local server re-read the whole context, and the
 picker's tooltip says so (`domain/model_choice.rs`, `web/routes/model_routes.rs`,
 `web/src/components/session/EffortPicker.tsx`).
+
+Task sheet, done: an idea is either run as a prompt or turned into a task with a sheet edited by hand like a
+ticket (objective, context, constraints, out of scope, deliverable, approach, done when with optional checks).
+Objective and done when are required to mark it ready; ready renders the sheet as the plan's markdown, so the
+queue and every plan reader are unchanged. Each save is `idea.sheet_edited`; a field last written by the model is
+marked as such. The model helps two ways, both indicative: a per-field suggestion accepted or rejected by the
+human, and the framing session, which sees the current sheet (a changed sheet reaches it as an appended notice)
+and whose plan can be applied to the sheet. The board opens a task in a right-side drawer kept in the URL
+(`?task=<id>`) (ADR 0006, `crates/backlog/src/sheet.rs`, `domain/sheet_notice.rs`,
+`web/src/components/project/ideas/TaskDrawer.tsx`).

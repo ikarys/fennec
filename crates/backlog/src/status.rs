@@ -168,6 +168,16 @@ impl Status {
             Status::Integrated | Status::Completed => &[MenuAction::Remove],
         }
     }
+
+    /// The menu of an idea with a task sheet: its plan is rendered from the
+    /// sheet, so it is edited there, never as raw text.
+    pub fn sheet_menu(self) -> Vec<MenuAction> {
+        self.menu()
+            .iter()
+            .copied()
+            .filter(|action| *action != MenuAction::EditPlan)
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -279,6 +289,15 @@ mod tests {
 
         assert_eq!(Status::Completed.stage(), Stage::Done);
         assert_eq!(Status::Completed.action(), Action::Open);
+    }
+
+    #[test]
+    fn a_sheet_hides_the_raw_plan_edit() {
+        assert_eq!(
+            Status::Queued.sheet_menu(),
+            [MenuAction::Reframe, MenuAction::Drop]
+        );
+        assert_eq!(Status::Inbox.sheet_menu(), Status::Inbox.menu());
     }
 
     #[test]
