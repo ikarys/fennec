@@ -1,5 +1,5 @@
 // A shared side rail: an icon tab rail with a floating or pinned drawer.
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useT } from '../../i18n';
 import { Button } from './Button';
 import { CloseIcon, PinIcon, type PuzzleIcon } from './Icons';
@@ -16,6 +16,9 @@ export interface RailPanel {
   alert?: boolean;
   body: ReactNode;
 }
+
+/** Set inside a narrow host (a split pane): the drawers float over the content whatever their stored pin. */
+export const SideRailFloat = createContext(false);
 
 interface SideRailProps {
   side: 'left' | 'right';
@@ -77,8 +80,11 @@ export function SideRail({
   width = 'w-[380px]',
 }: SideRailProps) {
   const t = useT();
+  const floating = useContext(SideRailFloat);
   const [pinned, setPinned] = useState(() => loadPinned(storageKey) ?? defaultPinned ?? false);
-  const [open, setOpen] = useState<string | null>(() => (pinned ? loadTab(storageKey) ?? panels[0]?.id ?? null : null));
+  const [open, setOpen] = useState<string | null>(() => (pinned && !floating ? loadTab(storageKey) ?? panels[0]?.id ?? null : null));
+
+  const docked = pinned && !floating;
 
   const openPanel = panels.find((panel) => panel.id === open);
   const current = open === null ? null : (openPanel?.id ?? panels[0]?.id ?? null);
@@ -96,13 +102,13 @@ export function SideRail({
   }, [reveal?.key]);
 
   useEffect(() => {
-    if (pinned || open === null) return;
+    if (docked || open === null) return;
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(null);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [pinned, open]);
+  }, [docked, open]);
 
   if (panels.length === 0) return null;
 
@@ -118,18 +124,20 @@ export function SideRail({
       </span>
       <span className="truncate text-sm font-semibold text-text">{drawerTitle}</span>
       <div className="ml-auto flex items-center gap-0.5">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          iconOnly
-          aria-pressed={pinned}
-          title={pinned ? t('contextUnpin') : t('contextPin')}
-          aria-label={pinned ? t('contextUnpin') : t('contextPin')}
-          onClick={() => setPinned((current) => !current)}
-        >
-          <PinIcon className="h-3.5 w-3.5" />
-        </Button>
+        {floating ? null : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-pressed={pinned}
+            title={pinned ? t('contextUnpin') : t('contextPin')}
+            aria-label={pinned ? t('contextUnpin') : t('contextPin')}
+            onClick={() => setPinned((current) => !current)}
+          >
+            <PinIcon className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"
@@ -155,7 +163,7 @@ export function SideRail({
     </>
   );
 
-  const drawer = pinned ? (
+  const drawer = docked ? (
     <div
       role="complementary"
       aria-label={drawerTitle}
@@ -180,7 +188,7 @@ export function SideRail({
       aria-label={label}
       className={`relative w-[52px] shrink-0 flex flex-col items-center bg-bg pt-2 ${edge} border-border`}
     >
-      {!pinned ? drawer : null}
+      {!docked ? drawer : null}
       {panels.map((panel) => (
         <RailTab
           key={panel.id}
@@ -200,13 +208,13 @@ export function SideRail({
 
   return side === 'right' ? (
     <>
-      {pinned ? drawer : null}
+      {docked ? drawer : null}
       {nav}
     </>
   ) : (
     <>
       {nav}
-      {pinned ? drawer : null}
+      {docked ? drawer : null}
     </>
   );
 }

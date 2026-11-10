@@ -7,6 +7,7 @@ import type { PageId } from '../components/layout/TopBar';
 import { Button } from '../components/ui/Button';
 import { PlusIcon, CloseIcon } from '../components/ui/Icons';
 import { SessionTabs, type TabInfo } from '../components/layout/SessionTabs';
+import { SideRailFloat } from '../components/ui/SideRail';
 
 const RATIO_KEY = 'fennec.split.ratio';
 const MIN_PCT = 25;
@@ -38,13 +39,13 @@ interface SplitPageProps {
   left: string | null;
   right: string | null;
   projects: Project[];
-  /** The app's open tabs: each pane's strip lists them all and highlights its own. */
-  tabs: TabInfo[];
+  /** Each pane's own open tabs: closing one in a pane leaves the other pane's list alone. */
+  paneTabs: { left: TabInfo[]; right: TabInfo[] };
   /** The projects the strips' "+" menu offers, most recently used first. */
   newSessionProjects: { id: string; name: string }[];
   /** A tab picked in a pane's strip: a session opens in that pane, a page leaves the split. */
   onPickTabInPane: (side: 'left' | 'right', id: string) => void;
-  onCloseTab: (id: string) => void;
+  onCloseTabInPane: (side: 'left' | 'right', id: string) => void;
   /** Closes a pane: the other one stays, alone. */
   onClosePane: (side: 'left' | 'right') => void;
   onChooseSession: (side: 'left' | 'right', sessionId: string) => void;
@@ -61,17 +62,17 @@ interface SplitPageProps {
 /**
  * Two sessions side by side, like two browser windows in one page. Each pane is
  * a full, independent SessionPage (its own thread, composer and SSE stream); the
- * panes' ids live in the URL, so the split survives a refresh. Each pane has its
- * own tab strip over the same open tabs.
+ * panes' ids live in the URL, so the split survives a refresh. Each pane keeps
+ * its own tab strip and tabs while the split lasts.
  */
 export function SplitPage({
   left,
   right,
   projects,
-  tabs,
+  paneTabs,
   newSessionProjects,
   onPickTabInPane,
-  onCloseTab,
+  onCloseTabInPane,
   onClosePane,
   onChooseSession,
   onNewSessionInPane,
@@ -171,16 +172,18 @@ export function SplitPage({
     >
       <div className="flex h-11 shrink-0 border-b border-border bg-panel px-2">
         <SessionTabs
-          tabs={tabs}
+          tabs={paneTabs[side]}
           activeTabId={value}
           onPickTab={(id) => onPickTabInPane(side, id)}
-          onCloseTab={onCloseTab}
+          onCloseTab={(id) => onCloseTabInPane(side, id)}
           currentProject={null}
           projects={newSessionProjects}
           onNewSession={(projectId) => onNewSessionInPane(side, projectId)}
         />
       </div>
-      <div className="flex min-h-0 min-w-0 grow">{renderPane(side, value)}</div>
+      <div className="flex min-h-0 min-w-0 grow">
+        <SideRailFloat.Provider value={true}>{renderPane(side, value)}</SideRailFloat.Provider>
+      </div>
     </div>
   );
 

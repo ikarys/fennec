@@ -26,6 +26,7 @@ import type { Lang } from './i18n/messages';
 import { useSettings } from './hooks/useSettings';
 import { useProjects } from './hooks/useProjects';
 import { useTabs } from './hooks/useTabs';
+import { usePaneTabs } from './hooks/usePaneTabs';
 import { useTurnNotices } from './hooks/useTurnNotices';
 import { PluginsVersionContext } from './hooks/usePluginsVersion';
 import { StatusBar } from './components/layout/StatusBar';
@@ -130,33 +131,39 @@ export default function App() {
     }
   }, []);
 
-  const tabInfos = useMemo<TabInfo[]>(() => {
-    const infos: TabInfo[] = tabs.map((id) => {
-      if (id.startsWith('page:')) {
-        const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
-        return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
+  const tabInfo = useCallback((id: string): TabInfo => {
+    if (id.startsWith('page:')) {
+      const page = PAGE_TABS.find((candidate) => candidate.page === id.slice(5));
+      return { id, title: page ? t(language, page.titleKey) : t(language, 'page'), kind: 'page', page: page?.page ?? 'settings' };
+    }
+    if (id.startsWith('new:')) {
+      const projectId = id.slice(4);
+      const project = projects.find((candidate) => candidate.id === projectId);
+      return {
+        id,
+        title: t(language, project?.chat ? 'paletteNewChat' : 'newSession'),
+        project: project?.name ?? projectId,
+        state: 'idle' as const,
+        kind: 'session' as const
+      };
+    }
+    for (const project of projects) {
+      const session = project.sessions.find((candidate) => candidate.id === id);
+      if (session) {
+        return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
       }
-      if (id.startsWith('new:')) {
-        const projectId = id.slice(4);
-        const project = projects.find((candidate) => candidate.id === projectId);
-        return {
-          id,
-          title: t(language, project?.chat ? 'paletteNewChat' : 'newSession'),
-          project: project?.name ?? projectId,
-          state: 'idle' as const,
-          kind: 'session' as const
-        };
-      }
-      for (const project of projects) {
-        const session = project.sessions.find((candidate) => candidate.id === id);
-        if (session) {
-          return { id, title: session.title, project: project.name, state: session.state, kind: 'session' as const };
-        }
-      }
-      return { id, title: t(language, 'session'), project: '—', state: 'idle' as const, kind: 'session' as const };
-    });
-    return infos;
-  }, [tabs, projects, language]);
+    }
+    return { id, title: t(language, 'session'), project: '—', state: 'idle' as const, kind: 'session' as const };
+  }, [projects, language]);
+  const tabInfos = useMemo(() => tabs.map(tabInfo), [tabs, tabInfo]);
+  const { paneTabs, closeTab: closePaneTabIn, replaceTab: replacePaneTab } = usePaneTabs(
+    route.name === 'split' ? { left: route.left, right: route.right } : null,
+    tabs
+  );
+  const paneTabInfos = useMemo(
+    () => ({ left: (paneTabs?.left ?? []).map(tabInfo), right: (paneTabs?.right ?? []).map(tabInfo) }),
+    [paneTabs, tabInfo]
+  );
 
   const openSession = useCallback(
     (sessionId: string) => {
@@ -171,11 +178,6 @@ export default function App() {
     (tabId: string) => {
       const next = tabs.filter((id) => id !== tabId);
       setTabs(next);
-      // In split view a closed tab empties the pane that shows it.
-      if (route.name === 'split' && (route.left === tabId || route.right === tabId)) {
-        navigate(splitPath(route.left === tabId ? null : route.left, route.right === tabId ? null : route.right));
-        return;
-      }
       // Only the tab that is on screen (per the route) triggers a navigation.
       // activeTabId can be stale when a session was opened by URL/bookmark, so
       // it is not a reliable "is this tab showing" signal.
@@ -304,6 +306,7 @@ export default function App() {
 
   const sessionCreatedInPane = useCallback(
     (side: 'left' | 'right', newId: string, pseudoId: string | null) => {
+      if (pseudoId) replacePaneTab(pseudoId, newId);
       setTabs((previous) => {
         const replaced = pseudoId ? previous.map((id) => (id === pseudoId ? newId : id)) : previous;
         return replaced.includes(newId) ? replaced : [...replaced, newId];
@@ -313,7 +316,7 @@ export default function App() {
       navigate(splitPath(side === 'left' ? newId : left, side === 'right' ? newId : right));
       refreshProjects();
     },
-    [activeTabId, route, navigate, refreshProjects]
+    [activeTabId, route, navigate, refreshProjects, replacePaneTab]
   );
 
   const toggleSplit = useCallback(() => {
@@ -368,6 +371,15 @@ export default function App() {
       navigate(splitPath(side === 'left' ? id : route.left, side === 'right' ? id : route.right));
     },
     [route, pickTab, navigate]
+  );
+
+  const closeTabInPane = useCallback(
+    (side: 'left' | 'right', id: string) => {
+      const fallback = closePaneTabIn(side, id);
+      if (route.name !== 'split' || route[side] !== id) return;
+      navigate(splitPath(side === 'left' ? fallback : route.left, side === 'right' ? fallback : route.right));
+    },
+    [closePaneTabIn, route, navigate]
   );
 
   const newSessionProjects = useMemo(
@@ -469,10 +481,10 @@ export default function App() {
               left={route.left}
               right={route.right}
               onClosePane={closePane}
-              tabs={tabInfos}
+              paneTabs={paneTabInfos}
               newSessionProjects={newSessionProjects}
               onPickTabInPane={pickTabInPane}
-              onCloseTab={closeTab}
+              onCloseTabInPane={closeTabInPane}
               projects={projects}
               onChooseSession={openSessionInPane}
               onNewSessionInPane={newSessionInPane}
