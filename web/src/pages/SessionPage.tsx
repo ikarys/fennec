@@ -656,6 +656,7 @@ export function SessionPage({
                             </h1>
                             <Badge
                               tone={status.tone}
+                              appearance="pill"
                               dot={status.live}
                               pulse={status.live}
                             >
