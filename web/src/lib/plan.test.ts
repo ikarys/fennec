@@ -10,6 +10,7 @@ import {
   type Report
 } from './plan';
 import type { ThreadItem } from './threadView';
+import { SHIP_PROPOSAL, SHIP_PLAN, SHIP_SUBMISSION, SHIP_REPORT } from './contract.fixtures';
 
 const split = (text: string) => splitContract(text);
 
@@ -212,30 +213,8 @@ describe('splitContract', () => {
 
 describe('planFromProposal', () => {
   it('builds the recorded plan, numbering the steps and keeping each check apart', () => {
-    const plan = planFromProposal({
-      title: 'Ship',
-      goal: 'Goal',
-      steps: [
-        { title: 'Add code', files: ['a.ts'], change: 'implement' },
-        { title: 'Docs', files: [], change: 'update' }
-      ],
-      doneWhen: [
-        { text: 'tests pass', check: 'cargo test' },
-        { text: 'docs updated' }
-      ],
-      risks: ['Risk one']
-    });
-    expect(plan).toEqual({
-      kind: 'plan',
-      title: 'Ship',
-      goal: 'Goal',
-      steps: [
-        { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
-        { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
-      ],
-      doneWhen: [{ text: 'tests pass', check: 'cargo test' }, { text: 'docs updated', check: '' }],
-      risks: ['Risk one']
-    });
+    const plan = planFromProposal(SHIP_PROPOSAL);
+    expect(plan).toEqual(SHIP_PLAN);
   });
 
   it('keeps empty arrays when the optional fields are absent', () => {
@@ -249,37 +228,8 @@ describe('planFromProposal', () => {
 
 describe('reportFromSubmission', () => {
   it('builds the recorded report, numbering the steps and keeping the checks', () => {
-    const report = reportFromSubmission({
-      title: 'Ship',
-      summary: 'What changed',
-      steps: [
-        { title: 'Add code', done: true, note: 'implemented' },
-        { title: 'Docs', done: false }
-      ],
-      doneWhen: [
-        { text: 'tests pass', met: true, how: 'cargo test' },
-        { text: 'docs updated', met: false }
-      ],
-      changed: [{ path: 'a.ts', what: 'the code' }],
-      test: 'Open the UI',
-      todo: ''
-    });
-    expect(report).toEqual({
-      kind: 'report',
-      title: 'Ship',
-      summary: 'What changed',
-      steps: [
-        { number: 1, checked: true, text: 'Add code', detail: 'implemented' },
-        { number: 2, checked: false, text: 'Docs', detail: '' }
-      ],
-      doneWhen: [
-        { number: 2, checked: false, text: 'docs updated', detail: '' },
-        { number: 1, checked: true, text: 'tests pass', detail: 'cargo test' }
-      ],
-      changed: [{ path: 'a.ts', what: 'the code' }],
-      test: ['Open the UI'],
-      todo: []
-    });
+    const report = reportFromSubmission(SHIP_SUBMISSION);
+    expect(report).toEqual(SHIP_REPORT);
   });
 
   it('keeps empty values when the optional fields are absent', () => {
