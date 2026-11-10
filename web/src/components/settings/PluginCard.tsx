@@ -73,15 +73,13 @@ export function PluginCard({ plugin, blocks, busy, onToggle }: PluginCardProps) 
           {t('pluginEnv')}: {envLine}
         </div>
       ) : null}
-      {blocks.length === 0 ? (
-        <p className="m-0 px-4 py-3 text-xs text-faint">{t('noPluginBlocks')}</p>
-      ) : (
+      {blocks.length > 0 ? (
         <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2">
           {blocks.map((block) => (
             <PluginBlockCard key={`${block.plugin}:${block.title}`} block={block} />
           ))}
         </div>
-      )}
+      ) : null}
     </Section>
   );
 }
