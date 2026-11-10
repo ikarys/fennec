@@ -431,7 +431,7 @@ export function ProjectRulesTile({ projectId }: { projectId: string }) {
       tone="accent"
       active={rules ? rules.length > 0 : false}
       onClick={() => {
-        window.location.hash = '#/settings/security';
+        window.location.hash = '#/settings/rules';
       }}
     />
   );

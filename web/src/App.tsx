@@ -221,7 +221,7 @@ export default function App() {
         .catch(() => true)
         .then((ready) => {
           if (!ready) {
-            navigate('#/settings/models');
+            navigate('#/settings/providers');
             return;
           }
           openTab(`new:${targetProjectId}`);
@@ -449,8 +449,7 @@ export default function App() {
             />
           ) : route.name === 'settings' ? (
             <SettingsPage
-              key={route.tab ?? ''}
-              initialTab={route.tab}
+              page={route.tab}
               settings={settings}
               theme={theme}
               onThemeChange={setTheme}

@@ -82,8 +82,8 @@ export function SetupChecklist({
                   className={buttonClass({ variant: "ghost", size: "sm" })}
                   href={
                     check.id === "model"
-                      ? "#/settings/models"
-                      : "#/settings/security"
+                      ? "#/settings/providers"
+                      : "#/settings/sandbox"
                   }
                 >
                   {t("setupFix")}
