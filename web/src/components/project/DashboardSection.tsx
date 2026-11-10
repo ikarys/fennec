@@ -40,7 +40,7 @@ export function DashboardSection({
   const lang = useLang();
   const t = useT();
 
-  const { data, error, loading } = useLoaded(() => getProjectDashboard(projectId), [projectId]);
+  const { data, error, loading } = useLoaded(() => getProjectDashboard(projectId), [projectId], `dashboard:${projectId}`);
 
   if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;

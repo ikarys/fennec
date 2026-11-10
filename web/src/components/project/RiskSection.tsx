@@ -50,7 +50,7 @@ export function RiskSection({
 }) {
   const t = useT();
   const [reloadKey, setReloadKey] = useState(0);
-  const { data, error, loading: measuring } = useLoaded(() => getProjectRisks(projectId), [projectId, reloadKey]);
+  const { data, error, loading: measuring } = useLoaded(() => getProjectRisks(projectId), [projectId, reloadKey], `risks:${projectId}`);
   // The brief to remediate, global or one module's; null when no confirmation is open.
   const [confirming, setConfirming] = useState<string | null>(null);
   const paged = usePaged(data?.modules ?? []);

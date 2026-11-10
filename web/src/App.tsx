@@ -105,10 +105,16 @@ export default function App() {
   const chatProjectId = projects.find((project) => project.chat)?.id ?? null;
 
   // The home page reloads its dashboard whenever the sessions change.
+  // The first loaded list is what the home page already loaded with: no reload for it.
   const [homeRefreshKey, setHomeRefreshKey] = useState(0);
+  const loadedProjects = useRef<typeof projects | null>(null);
   useEffect(() => {
-    setHomeRefreshKey((key) => key + 1);
-  }, [projects]);
+    if (projectsLoading) return;
+    if (loadedProjects.current !== null && loadedProjects.current !== projects) {
+      setHomeRefreshKey((key) => key + 1);
+    }
+    loadedProjects.current = projects;
+  }, [projects, projectsLoading]);
   useEffect(() => {
     if (projectsVisible) refreshProjects();
   }, [projectsVisible, refreshProjects]);

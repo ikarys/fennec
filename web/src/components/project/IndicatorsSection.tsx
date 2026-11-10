@@ -37,7 +37,7 @@ const ICONS: Record<IndicatorId, ReactNode> = {
 export function IndicatorsSection({ projectId }: { projectId: string }) {
   const t = useT();
 
-  const { data, error, loading } = useLoaded(() => getProjectIndicators(projectId), [projectId]);
+  const { data, error, loading } = useLoaded(() => getProjectIndicators(projectId), [projectId], `indicators:${projectId}`);
 
   if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;
