@@ -281,8 +281,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `GET /api/models/choices` → `{default, favorites}`, each a
   `{provider, model, providerName}`: what the composer's model picker offers;
   read from the stored preferences, no provider is called
-- `GET /api/projects` → `[{id, name, workdir, favorite, recentRank, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt}]}]`
-  (favourites first, then most recently active, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `favorite` is `true` when the project is pinned; `recentRank` is the project's place by recent activity alone, favourites ignored (0 = most recent), the order the top bar's "+" menu uses; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in the IDE of `display.editor`, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused))
+- `GET /api/projects` → `[{id, name, workdir, favorite, recentRank, branch, remote, editorUrl, sessionWorktree, sessions: [{id, title, state, createdAt, updatedAt, linkedProjectId}], chatGroups?, linkedChats?}]`
+  (favourites first, then most recently active, sessions newest first; `createdAt`/`updatedAt` are Unix milliseconds; `favorite` is `true` when the project is pinned; `recentRank` is the project's place by recent activity alone, favourites ignored (0 = most recent), the order the top bar's "+" menu uses; `branch` and `remote` may be `null`; `editorUrl` opens the workdir in the IDE of `display.editor`, through the WSL remote under WSL; `sessionWorktree` marks a workdir inside fennec's own store (a session's worktree opened as a project before that was refused); `linkedProjectId` is the project a chat is linked to, `null` for an unlinked chat or a project session; the chat project adds `chatGroups` (`[{projectId, projectName, sessionIds}]`, linked groups by project name then unlinked last) and every other project adds `linkedChats`, the number of chat sessions linked to it)
 - `GET /api/home` → `{running, recent, favorites}`: the home page's cross-project view; `running` counts running top-level sessions across all projects; `recent` is at most 8 top-level sessions across all projects (chat included), most recently updated first, ties broken by created time, each a session summary plus `projectId`, `projectName` and `chat` (`chat` is true only for the built-in chat project); `favorites` is the favourite projects in `GET /api/projects` order, chat excluded, each `{id, name, workdir, sessions, running}` (`sessions`/`running` count that project's top-level sessions); `createdAt`/`updatedAt` are Unix milliseconds
 - `POST /api/projects` `{workdir}` → the project (400 if not a directory, or inside fennec's store)
 - `POST /api/projects/{id}/delete` `{deleteFolder?}` → `{deleted: true, folderDeleted, folderError}`: deletes the project with every top-level session as `POST /api/sessions/delete` does (logs, children, worktrees, branches, session rules), then its project rules, its ideas backlog and the project. With `deleteFolder: true` the source folder is removed from disk afterwards; a failure there comes back as `folderError` (the project is already gone). 404 for an unknown project; 409 `{error}` while its queue runs, `{error, running}` while one of its sessions runs a turn, `{error, sessionId}` when a worktree cannot be removed (the project and the sessions not yet removed stay); 400 when the folder is the filesystem root, the home directory or an ancestor of it, or holds fennec's store (nothing is deleted then). The usage ledger keeps the calls.
@@ -722,6 +722,13 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
   400 with `unknown mode: <mode>` if the id is not a top-level agent; appends
   `mode.changed` when the mode changes; allowed while a turn runs
+- `POST /api/sessions/{id}/link` `{projectId: string | null}` → `{linkedProjectId}`:
+  links a chat to a project, or unlinks it with `null`. The link is a reference
+  for grouping chats only; the chat keeps no file. 404 if no session or for an
+  unknown `projectId`; 400 with `projectId must be a string or null` when the
+  body is not a string or null, `only a chat can be linked to a
+  project` for a project session, and `a chat cannot be linked to the chat` when
+  the target is the chat's own scratch project
 - `POST /api/sessions/{id}/model` `{provider, model}` → 200 `{model}` (the
   session's `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if
   the model is empty or the provider unknown; 409 while a workflow runs;

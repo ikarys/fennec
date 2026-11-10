@@ -13,6 +13,7 @@ pub mod audit;
 pub mod budget;
 pub mod bypass;
 pub mod changelog;
+pub mod chat_link;
 pub mod check_kind;
 pub mod clock;
 pub mod commit_subject;

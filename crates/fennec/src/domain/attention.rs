@@ -138,6 +138,7 @@ mod tests {
             last_done,
             parent_id: None,
             awaiting_integration: awaiting,
+            linked_project_id: None,
         }
     }
 

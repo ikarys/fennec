@@ -28,6 +28,7 @@ mod tests {
             last_done: None,
             parent_id: None,
             awaiting_integration: false,
+            linked_project_id: None,
         }
     }
 

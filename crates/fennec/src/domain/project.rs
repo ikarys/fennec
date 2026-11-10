@@ -3,6 +3,7 @@
 use super::event::DoneReason;
 use serde::Serialize;
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Project {
     pub id: String,
     pub name: String,
@@ -19,6 +20,8 @@ pub struct SessionSummary {
     pub parent_id: Option<String>,
     /// A workflow ended `done` and nothing integrated or discarded its work since.
     pub awaiting_integration: bool,
+    /// The project a chat is linked to, for grouping only; None for an unlinked chat or a project session.
+    pub linked_project_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]

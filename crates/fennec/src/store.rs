@@ -74,6 +74,7 @@ const SCHEMA: &str = "PRAGMA foreign_keys = ON;
        workdir TEXT NOT NULL,
        title TEXT,
        parent_id TEXT,
+       linked_project_id TEXT,
        created_at TEXT NOT NULL,
        updated_at TEXT NOT NULL
      );
@@ -120,28 +121,29 @@ impl SqliteStore {
         db.execute_batch(SCHEMA)?;
         db.execute_batch(ideas::SCHEMA)?;
         db.execute_batch(plugins::SCHEMA)?;
-        // Old databases predate child sessions; add the column then.
-        let has_parent = db
-            .prepare("PRAGMA table_info(sessions)")?
-            .query_map([], |r| r.get::<_, String>(1))?
-            .into_iter()
-            .any(|name| name.is_ok_and(|n| n == "parent_id"));
-        if !has_parent {
+        // Old databases predate child sessions, favourites and chat links;
+        // add the columns then.
+        if !Self::has_column(&db, "sessions", "parent_id")? {
             db.execute("ALTER TABLE sessions ADD COLUMN parent_id TEXT", [])?;
         }
-        // Old databases predate favourites; add the column then.
-        let has_favorite = db
-            .prepare("PRAGMA table_info(projects)")?
-            .query_map([], |r| r.get::<_, String>(1))?
-            .into_iter()
-            .any(|name| name.is_ok_and(|n| n == "favorite"));
-        if !has_favorite {
+        if !Self::has_column(&db, "projects", "favorite")? {
             db.execute(
                 "ALTER TABLE projects ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
                 [],
             )?;
         }
+        if !Self::has_column(&db, "sessions", "linked_project_id")? {
+            db.execute("ALTER TABLE sessions ADD COLUMN linked_project_id TEXT", [])?;
+        }
         Ok(SqliteStore { db })
+    }
+
+    fn has_column(db: &Connection, table: &str, column: &str) -> Result<bool> {
+        Ok(db
+            .prepare(&format!("PRAGMA table_info({table})"))?
+            .query_map([], |r| r.get::<_, String>(1))?
+            .into_iter()
+            .any(|name| name.is_ok_and(|n| n == column)))
     }
 
     /// The project for `workdir`, created on first use.
@@ -264,6 +266,16 @@ impl SqliteStore {
             params![title, id],
         )?;
         Ok(())
+    }
+
+    /// Links a chat to a project, or unlinks it with `None`: a reference for grouping only.
+    /// Returns whether a session matched.
+    pub fn link_session(&self, id: &str, project_id: Option<&str>) -> Result<bool> {
+        let rows = self.db.execute(
+            "UPDATE sessions SET linked_project_id = ?1 WHERE id = ?2",
+            params![project_id, id],
+        )?;
+        Ok(rows > 0)
     }
 
     fn insert_session(
@@ -487,6 +499,11 @@ impl SqliteStore {
             "DELETE FROM project_events WHERE project_id = ?1",
             params![id],
         )?;
+        // A chat linked to the project falls back to unlinked; the chat stays.
+        tx.execute(
+            "UPDATE sessions SET linked_project_id = NULL WHERE linked_project_id = ?1",
+            params![id],
+        )?;
         tx.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
         // The budget row is a setting keyed by the project id.
         tx.execute(
@@ -623,7 +640,8 @@ const SESSION_SELECT: &str = "SELECT s.id, s.project_id, COALESCE(s.title, ''), 
     COALESCE((SELECT e.event_type = 'workflow.finished' AND json_extract(e.payload, '$.data.outcome') = 'done'
        FROM events e WHERE e.session_id = s.id
          AND e.event_type IN ('workflow.finished', 'integration.applied', 'worktree.discarded')
-       ORDER BY seq DESC LIMIT 1), 0)
+       ORDER BY seq DESC LIMIT 1), 0),
+    s.linked_project_id
   FROM sessions s";
 
 fn session_row(r: &rusqlite::Row) -> rusqlite::Result<SessionSummary> {
@@ -638,6 +656,7 @@ fn session_row(r: &rusqlite::Row) -> rusqlite::Result<SessionSummary> {
             .and_then(|s| serde_json::from_value::<DoneReason>(serde_json::Value::String(s)).ok()),
         parent_id: r.get(6)?,
         awaiting_integration: r.get::<_, i64>(7)? != 0,
+        linked_project_id: r.get(8)?,
     })
 }
 
@@ -1161,6 +1180,46 @@ mod tests {
         let parent = store.create_session(&project, "p").unwrap();
         let child = store.create_child_session(&parent, "c").unwrap();
         assert!(store.session(&child).unwrap().unwrap().parent_id.is_some());
+        assert_eq!(
+            store.session(&child).unwrap().unwrap().linked_project_id,
+            None
+        );
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn link_session_links_and_unlinks_a_session() {
+        let store = SqliteStore::in_memory().unwrap();
+        let project = store.project_for("/link").unwrap();
+        let target = store.project_for("/link-target").unwrap();
+        let session = store.create_session(&project, "t").unwrap();
+        assert_eq!(
+            store.session(&session).unwrap().unwrap().linked_project_id,
+            None
+        );
+        assert!(store.link_session(&session, Some(&target.id)).unwrap());
+        assert_eq!(
+            store.session(&session).unwrap().unwrap().linked_project_id,
+            Some(target.id.clone())
+        );
+        assert!(store.link_session(&session, None).unwrap());
+        assert_eq!(
+            store.session(&session).unwrap().unwrap().linked_project_id,
+            None
+        );
+        assert!(!store.link_session("missing", Some(&target.id)).unwrap());
+    }
+
+    #[test]
+    fn deleting_a_project_unlinks_a_linked_chat_and_keeps_the_chat() {
+        let store = SqliteStore::in_memory().unwrap();
+        let chat = store.chat_project("/tmp/scratch-link").unwrap();
+        let target = store.project_for("/tmp/link-target-del").unwrap();
+        let session = store.create_session(&chat, "chat").unwrap();
+        assert!(store.link_session(&session, Some(&target.id)).unwrap());
+        store.delete_project(&target.id).unwrap();
+        let row = store.session(&session).unwrap().unwrap();
+        assert_eq!(row.linked_project_id, None);
+        assert!(store.project(&chat.id).unwrap().is_some());
     }
 }

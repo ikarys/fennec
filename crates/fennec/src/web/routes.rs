@@ -10,6 +10,7 @@ pub(super) mod backlog_routes;
 pub(super) mod budget_routes;
 pub(super) mod canvas_routes;
 pub(super) mod changelog_routes;
+pub(super) mod chat_link_routes;
 pub(super) mod contribution_routes;
 pub(super) mod diff_routes;
 pub(super) mod folder_routes;
@@ -245,6 +246,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "mode"]) => {
             session_routes::set_session_mode(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "link"]) => chat_link_routes::link(app, req, stream, id),
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
         ("GET", ["api", "sessions", id, "mcp"]) => mcp_routes::session_mcp(app, stream, id),
         ("POST", ["api", "sessions", id, "mcp"]) => {
