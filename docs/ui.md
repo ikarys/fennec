@@ -7,13 +7,13 @@ look lives in two places only, so a screen can never drift from the others:
    spacing unit, radii. Components use the tokens (`bg-panel`, `text-muted`),
    never a literal colour.
 2. **The primitives** (`web/src/components/ui/`): `Button`, `Badge`,
-   `SectionLabel`, `Stat` (a run metric chip: icon, figure, the detail in its tooltip), `Tile` (a dashboard figure: tinted icon, label, figure, detail; a tone bar when it counts something), `Card`, `TableHeader` (the column headings above a table-like list's rows), `Modal`, `ConfirmDialog`, `Section`, `Panel`,
+   `SectionLabel`, `Stat` (a run metric chip: icon, figure, the detail in its tooltip), `Tile` (a dashboard figure: tinted icon, label, figure, detail; a tone bar when it counts something), `Card`, `TableHeader` (the column headings above a table-like list's rows), `Modal`, `Drawer` (a panel docked right, full width under 900px, for an object edited at length), `ConfirmDialog`, `Section`, `Panel`,
    `Segmented`, `Switch` (an on/off that applies at once), `Tabs` (a page's sections, vertical or horizontal), `Menu`,
    `ChoiceMenu` (one value among grouped choices, each group under a tinted
    band; never a native `<select>` for a list of choices: the browser draws
    its list itself and ignores the theme tokens), and the
    fields (`TextInput`, `Select`, `TextArea`, `FieldRow`). Every modal and
-   confirmation is one of these: a dialog's shell is `Modal`, a "are you sure"
+   confirmation is one of these: a dialog's shell is `Modal` (or `Drawer`), a "are you sure"
    is `ConfirmDialog`, never a raw `<dialog>` overlay or a browser `confirm()`.
    A feature component picks a variant and adds only
    layout classes (width, margins, `shrink-0`); it never restyles a primitive's
