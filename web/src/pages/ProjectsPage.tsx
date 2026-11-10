@@ -12,6 +12,7 @@ import { Segmented } from '../components/ui/Segmented';
 import { ProjectTile } from '../components/project/ProjectTile';
 import { ProjectSection } from '../components/project/ProjectSection';
 import { useSessionSelection } from '../hooks/useSessionSelection';
+import { readStored, writeStored } from '../lib/storage';
 
 interface ProjectsPageProps {
   projects: Project[];
@@ -37,11 +38,7 @@ export function ProjectsPage({
   const t = useT();
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'tiles' | 'rows'>(() => {
-    try {
-      return localStorage.getItem('fennec.home.view') === 'rows' ? 'rows' : 'tiles';
-    } catch {
-      return 'tiles';
-    }
+    return readStored('fennec.home.view') === 'rows' ? 'rows' : 'tiles';
   });
   const { selected, toggle, clear, remove, dialog } = useSessionSelection(projects, onSessionsDeleted);
   const runningCount = projects.reduce(
@@ -107,10 +104,7 @@ export function ProjectsPage({
               value={view}
               onChange={(value) => {
                 setView(value);
-                // A blocked storage only loses the choice on reload.
-                try {
-                  localStorage.setItem('fennec.home.view', value);
-                } catch {}
+                writeStored('fennec.home.view', value);
               }}
             />
           }

@@ -1,6 +1,7 @@
 // Routes and tabs: the hash read as a route, a tab's path, what localStorage keeps of the tabs.
 // Pure, so the parsing is tested without a browser.
 import type { MsgKey } from '../i18n/messages';
+import { readStored } from './storage';
 
 /** The fixed pages a tab can show. */
 export type PageId = 'projects' | 'chats' | 'settings' | 'insight' | 'workflows' | 'backlog';
@@ -190,7 +191,7 @@ export function parsePaneToken(raw: string | null | undefined): string | null {
 
 export function loadTabs(): string[] {
   try {
-    const raw = localStorage.getItem(TABS_KEY);
+    const raw = readStored(TABS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
@@ -202,11 +203,7 @@ export function loadTabs(): string[] {
 }
 
 export function loadActiveTab(): string | null {
-  try {
-    const id = localStorage.getItem(ACTIVE_TAB_KEY);
-    // A route tab persisted by an older build is not a real session.
-    return id && !isRouteTab(id) ? id : null;
-  } catch {
-    return null;
-  }
+  const id = readStored(ACTIVE_TAB_KEY);
+  // A route tab persisted by an older build is not a real session.
+  return id && !isRouteTab(id) ? id : null;
 }

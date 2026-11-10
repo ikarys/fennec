@@ -16,6 +16,7 @@ export function useFetchedText(url: string | undefined, reloadKey: unknown): { t
     setLoading(true);
     setError(null);
     setText(null);
+    // Not lib/api/request: that one parses JSON, this reads a file's raw text.
     fetch(url)
       .then(async (response) => {
         if (!response.ok) {

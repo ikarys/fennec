@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRightIcon, InfoIcon } from './Icons';
 import type { BadgeTone } from './Badge';
+import { readStored, writeStored } from '../../lib/storage';
 
 /** The header's block icon carries the block's state; neutral stays quiet. */
 const ICON_TONES: Record<BadgeTone, string> = {
@@ -21,20 +22,12 @@ function storageKey(id: string): string {
 }
 
 function loadOpen(id: string, defaultOpen: boolean): boolean {
-  try {
-    const stored = localStorage.getItem(storageKey(id));
-    return stored === null ? defaultOpen : stored === '1';
-  } catch {
-    return defaultOpen;
-  }
+  const stored = readStored(storageKey(id));
+  return stored === null ? defaultOpen : stored === '1';
 }
 
 function saveOpen(id: string, open: boolean): void {
-  try {
-    localStorage.setItem(storageKey(id), open ? '1' : '0');
-  } catch {
-    // A blocked storage only loses the state on reload.
-  }
+  writeStored(storageKey(id), open ? '1' : '0');
 }
 
 export interface PanelProps {

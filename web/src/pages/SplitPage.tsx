@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { PlusIcon, CloseIcon } from '../components/ui/Icons';
 import { SessionTabs, type TabInfo } from '../components/layout/SessionTabs';
 import { SideRailFloat } from '../components/ui/SideRail';
+import { readStored, writeStored } from '../lib/storage';
 
 const RATIO_KEY = 'fennec.split.ratio';
 const MIN_PCT = 25;
@@ -18,20 +19,12 @@ function clampRatio(pct: number): number {
 }
 
 function loadRatio(): number {
-  try {
-    const stored = Number(localStorage.getItem(RATIO_KEY));
-    return stored ? clampRatio(stored) : 50;
-  } catch {
-    return 50;
-  }
+  const stored = Number(readStored(RATIO_KEY));
+  return stored ? clampRatio(stored) : 50;
 }
 
 function saveRatio(pct: number): void {
-  try {
-    localStorage.setItem(RATIO_KEY, String(clampRatio(pct)));
-  } catch {
-    // A blocked storage only loses the ratio on reload.
-  }
+  writeStored(RATIO_KEY, String(clampRatio(pct)));
 }
 
 interface SplitPageProps {

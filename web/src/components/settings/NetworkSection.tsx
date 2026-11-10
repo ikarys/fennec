@@ -102,6 +102,7 @@ export function NetworkSection() {
       tries += 1;
       try {
         if (servedByFennec && target !== view.runningPort) {
+          // Not lib/api/request: it probes the new port, another origin, without CORS.
           await fetch(`${window.location.protocol}//${window.location.hostname}:${target}/api/version`, {
             mode: 'no-cors',
           });

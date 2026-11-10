@@ -4,6 +4,7 @@ import { useT } from '../../i18n';
 import { Button } from './Button';
 import { CloseIcon, PinIcon, type PuzzleIcon } from './Icons';
 import { RailTab } from './RailTab';
+import { readStored, writeStored } from '../../lib/storage';
 
 export interface RailPanel {
   id: string;
@@ -36,38 +37,22 @@ interface SideRailProps {
 }
 
 function loadPinned(storageKey: string): boolean | null {
-  try {
-    const value = localStorage.getItem(`${storageKey}.pinned`);
-    if (value === '1') return true;
-    if (value === '0') return false;
-    return null;
-  } catch {
-    return null;
-  }
+  const value = readStored(`${storageKey}.pinned`);
+  if (value === '1') return true;
+  if (value === '0') return false;
+  return null;
 }
 
 function loadTab(storageKey: string): string | null {
-  try {
-    return localStorage.getItem(`${storageKey}.tab`);
-  } catch {
-    return null;
-  }
+  return readStored(`${storageKey}.tab`);
 }
 
 function savePinned(storageKey: string, pinned: boolean): void {
-  try {
-    localStorage.setItem(`${storageKey}.pinned`, pinned ? '1' : '0');
-  } catch {
-    // A blocked storage only loses the pin state on reload.
-  }
+  writeStored(`${storageKey}.pinned`, pinned ? '1' : '0');
 }
 
 function saveTab(storageKey: string, tab: string): void {
-  try {
-    localStorage.setItem(`${storageKey}.tab`, tab);
-  } catch {
-    // A blocked storage only loses the open tab on reload.
-  }
+  writeStored(`${storageKey}.tab`, tab);
 }
 
 export function SideRail({
