@@ -21,7 +21,8 @@ lands, add its paragraph to `docs/components.md`.
 
 ## Architecture rules
 
-- Dependencies point inward: adapters → agent → domain. The domain does no I/O. The agent loop
+- Dependencies point inward: adapters → agent → domain. The domain does no I/O; reading the clock
+  and minting ids (`domain/clock.rs`, `domain/id.rs`) are its only impure leaves. The agent loop
   only knows the ports in `agent/ports.rs`; a port exists because it decouples a layer or has a
   test double, not for show.
 - A root file named like a domain file is its adapter: `domain/budget.rs` decides, `budget.rs`
