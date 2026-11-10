@@ -176,7 +176,7 @@ export function SessionsSection({
             })}
           </ul>
         )}
-        <Pager page={paged.page} pageCount={paged.pageCount} from={paged.from} to={paged.to} total={sessions.length} onPage={paged.setPage} />
+        <Pager paged={paged} />
       </Section>
       {pendingDelete && (
         <DeleteSessionsDialog

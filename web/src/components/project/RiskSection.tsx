@@ -182,7 +182,7 @@ export function RiskSection({
                   ))}
                 </details>
               ))}
-              <Pager page={paged.page} pageCount={paged.pageCount} from={paged.from} to={paged.to} total={data.modules.length} onPage={paged.setPage} />
+              <Pager paged={paged} />
             </>
           ) : (
             <div className="px-4 py-3 text-sm text-muted">{t('noRiskZones')}</div>
