@@ -309,3 +309,10 @@ staged work out; a file can also be reset to HEAD after a confirmation (a new fi
 session, a modified file opens the session's diff on it while its branch has commits, else the working tree in
 the editor (`project_files.rs`, `domain/project_file.rs`, `web/routes/file_routes.rs`, `web/src/components/editor/`,
 `web/src/pages/EditorPage.tsx`). The diff page links to the whole file as the session's branch has it, read-only.
+
+Keyboard shortcuts, done: Alt+Shift+0 opens a new chat, Alt+Shift+1/2/3 switch the session's agent (plan,
+builder, ask), Alt+Shift+N starts a session in the current project, Alt+Shift+H/P/C/T/W/I/S open the main pages,
+Alt+Shift+→/←/X move between and close tabs, Mod+K opens the palette and Mod+\ splits the view. Keys match by
+position (`event.code`), so they work on any layout. Every binding can be changed or disabled in Settings →
+Shortcuts; the server validates the combos and refuses two actions sharing one, and the palette shows them
+(`domain/shortcut.rs`, `web/src/lib/shortcuts.ts`, `web/src/components/settings/ShortcutsSection.tsx`).

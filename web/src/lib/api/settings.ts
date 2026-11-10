@@ -1,4 +1,5 @@
 import { request } from "./request";
+import type { ShortcutBinding } from "../shortcuts";
 
 /** `ReasoningEffort`: how much a model may think. */
 export type ReasoningEffort =
@@ -118,6 +119,8 @@ export interface Preferences {
   enabledWorkflows?: string[];
   /** MCP servers, configured on the Settings page. */
   mcp?: McpServer[];
+  /** The human's keyboard shortcut overrides, action → combo; an empty combo disables. */
+  shortcuts?: Record<string, string>;
 }
 
 /** One tool of an MCP server, as listed by `tools/list`. */
@@ -252,6 +255,8 @@ export interface SettingsResponse {
   sandboxHealth: SandboxHealth;
   /** Per server, each cached tool's access and estimated token cost. */
   mcpTools: Record<string, McpToolSummary[]>;
+  /** Every keyboard shortcut, the stored override applied, in the Settings page's order. */
+  shortcuts: ShortcutBinding[];
 }
 
 export function getSettings(): Promise<SettingsResponse> {

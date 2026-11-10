@@ -1,6 +1,7 @@
 // The settings sub-pages, their groups in the side navigation, and the old addresses that still lead to them.
 export type SettingsPageId =
   | 'display'
+  | 'shortcuts'
   | 'providers'
   | 'instructions'
   | 'agents'
@@ -18,7 +19,7 @@ export type SettingsPageId =
 export type SettingsGroupId = 'general' | 'models' | 'agents' | 'security' | 'extensions' | 'about';
 
 export const SETTINGS_GROUPS: readonly { id: SettingsGroupId; pages: readonly SettingsPageId[] }[] = [
-  { id: 'general', pages: ['display'] },
+  { id: 'general', pages: ['display', 'shortcuts'] },
   { id: 'models', pages: ['providers'] },
   { id: 'agents', pages: ['instructions', 'agents', 'skills', 'workflows', 'autonomy'] },
   { id: 'security', pages: ['sandbox', 'rules', 'scanners'] },

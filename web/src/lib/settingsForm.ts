@@ -115,6 +115,7 @@ export interface SettingsForm {
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
   mcp: McpServer[];
+  shortcuts: Record<string, string>;
 }
 
 
@@ -132,7 +133,8 @@ export type SaveGroup =
   | 'skills'
   | 'workflows'
   | 'mcp'
-  | 'display';
+  | 'display'
+  | 'shortcuts';
 
 /**
  * What each group saves: its preference keys (stored on top of the others, so the other groups'
@@ -152,7 +154,8 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   skills: { prefs: ['alwaysOnSkills'], form: ['alwaysOnSkills'] },
   workflows: { prefs: ['enabledWorkflows'], form: ['enabledWorkflows'] },
   mcp: { prefs: ['mcp'], form: ['mcp'] },
-  display: { prefs: ['display'], form: ['display'] }
+  display: { prefs: ['display'], form: ['display'] },
+  shortcuts: { prefs: ['shortcuts'], form: ['shortcuts'] }
 };
 
 export const emptyModelForm: ModelForm = {
@@ -272,7 +275,8 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     integration: preferences.integration ?? { modelTrailers: true },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? [],
-    mcp: preferences.mcp ?? []
+    mcp: preferences.mcp ?? [],
+    shortcuts: preferences.shortcuts ?? {}
   };
 }
 
@@ -367,6 +371,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     integration: form.integration,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows,
-    mcp: form.mcp
+    mcp: form.mcp,
+    shortcuts: form.shortcuts
   };
 }

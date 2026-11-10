@@ -100,6 +100,7 @@ function form(
 function response(preferencesValue: Preferences, listings: ProviderListing[]): SettingsResponse {
   return {
     preferences: preferencesValue,
+    shortcuts: [],
     listings,
     defaults: {
       provider: 'local',
