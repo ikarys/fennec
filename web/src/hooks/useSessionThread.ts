@@ -60,7 +60,7 @@ export interface SessionThread {
   refreshThread: () => void;
 }
 
-const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, pendingPlan: null, handedPlan: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0, files: [] } };
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, pendingPlan: null, handedPlan: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0, percent: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0, files: [] } };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,

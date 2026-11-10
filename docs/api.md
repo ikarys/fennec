@@ -667,7 +667,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `queued` `[{queueId, content}]` the messages queued for the next rounds, in order; `criteria`
   `[{id, description, check?, status, passedBefore, existenceOnly}]` the criteria in force (the last `criteria.set` and the
   `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight, `existenceOnly` true when the check only searches the code: it proves the code exists, not that it works);
-  `criteriaTally` `{total, passed, failed, indicative}` those criteria counted (`indicative`: the passes an agent judged);
+  `criteriaTally` `{total, passed, failed, indicative, percent}` those criteria counted (`indicative`: the passes an agent judged; `percent`: the passes' share, 0 to 100, rounded down);
   `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; `replayable` the ids
   of the messages the human may replay (typed, in the model's current view: the UI offers the action on those only);
   `modifiedFiles` `{count, added, removed, files: [{path, added, removed}]}` (`files`: the 5 most changed, most lines first) what the `write_file` and `edit_file` calls changed (files merged by their path
