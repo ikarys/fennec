@@ -8,7 +8,7 @@ import { formatRelative, formatBytes } from '../lib/format';
 import { ActivityIcon, PlusIcon, FolderIcon, CheckIcon, CoinIcon, BacklogIcon, HardDriveIcon, InboxIcon, ChatIcon, StarIcon } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
-import { ListCard } from '../components/ui/ListCard';
+import { ListCard, listRowClass } from '../components/ui/ListCard';
 import { Badge } from '../components/ui/Badge';
 import { SetupChecklist } from '../components/project/SetupChecklist';
 import { SessionStateIcon } from '../components/session/SessionStateIcon';
@@ -130,7 +130,7 @@ export function HomePage({
                 key={item.sessionId}
                 type="button"
                 onClick={() => onOpenSession(item.sessionId)}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-accent-soft border-t border-border first:border-t-0"
+                className={listRowClass({}, 'w-full text-left border-t border-border first:border-t-0')}
               >
                 <Badge tone={item.kind === 'error' ? 'err' : 'attention'} dot>
                   {attentionKindLabel(item.kind, t)}
@@ -160,7 +160,7 @@ export function HomePage({
                       key={s.id}
                       type="button"
                       onClick={() => onOpenSession(s.id)}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-accent-soft border-t border-border first:border-t-0"
+                      className={listRowClass({}, 'w-full text-left border-t border-border first:border-t-0')}
                     >
                       <SessionStateIcon state={s.state} className="h-4 w-4" />
                       <span className="min-w-0 grow truncate text-sm font-medium text-text">{s.title}</span>
@@ -189,7 +189,7 @@ export function HomePage({
                 home.data.favorites.map((p) => (
                   <div
                     key={p.id}
-                    className="flex items-center gap-3 px-4 py-2.5 border-t border-border first:border-t-0 hover:bg-accent-soft"
+                    className={listRowClass({}, 'border-t border-border first:border-t-0')}
                   >
                     <a href={'#/project/' + encodeURIComponent(p.id)} className="min-w-0 grow">
                       <span className="block text-sm font-medium text-text truncate">{p.name}</span>

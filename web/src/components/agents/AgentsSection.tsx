@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ListCard } from '../ui/ListCard';
+import { ListCard, listRowClass } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { AlertIcon, BotIcon, CpuIcon, EditIcon, PlusIcon, ProjectIcon, TrashIcon } from '../ui/Icons';
@@ -94,7 +94,7 @@ function AgentRow({
 }) {
   const t = useT();
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent-soft">
+    <li className={listRowClass()}>
       <div className="min-w-0 grow">
         <div className="flex items-baseline gap-2">
           <span className="truncate text-sm font-medium">{agent.name}</span>

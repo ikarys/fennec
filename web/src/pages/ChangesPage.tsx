@@ -197,7 +197,7 @@ export default function ChangesPage({
                   {diff ? (
                     <a
                       href={diff.editorUrl}
-                      className="rounded-md p-1 text-muted hover:bg-accent-soft hover:text-accent"
+                      className={buttonClass({ variant: 'icon', size: 'sm', iconOnly: true })}
                       title={openInEditor}
                       aria-label={openInEditor}
                     >

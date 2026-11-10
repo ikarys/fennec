@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { listRowClass } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { TrashIcon, WandIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
@@ -77,7 +78,7 @@ export function CanvasSection({ projectId }: { projectId: string }) {
                       setOpenArtifactId(artifact.id);
                     }
                   }}
-                  className="group flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left text-sm hover:bg-accent-soft focus-visible:bg-accent-soft focus-visible:outline-none"
+                  className={listRowClass({}, 'group w-full cursor-pointer text-left text-sm focus-visible:bg-accent-soft focus-visible:outline-none')}
                 >
                   <span className="min-w-0 grow truncate font-medium group-hover:text-accent-strong">
                     {artifact.title}
