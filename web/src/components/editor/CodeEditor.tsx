@@ -10,6 +10,16 @@ import { HighlightStyle, LanguageDescription, syntaxHighlighting } from '@codemi
 import { languages } from '@codemirror/language-data';
 import { tags as t } from '@lezer/highlight';
 
+// No mode knows justfiles; their recipes are shell, so shell colours comments, strings and commands.
+const JUSTFILE = /(^|\/)(justfile|\.justfile|[^/]+\.just)$/i;
+
+function languageFor(path: string): LanguageDescription | null {
+  return (
+    LanguageDescription.matchFilename(languages, path) ??
+    (JUSTFILE.test(path) ? LanguageDescription.matchLanguageName(languages, 'shell') : null)
+  );
+}
+
 const highlightStyle = HighlightStyle.define([
   { tag: [t.keyword, t.controlKeyword, t.modifier], color: 'var(--accent)' },
   { tag: [t.string, t.special(t.string)], color: 'var(--ok)' },
@@ -160,7 +170,7 @@ export function CodeEditor({
     if (!view) return;
 
     let cancelled = false;
-    const description = LanguageDescription.matchFilename(languages, path);
+    const description = languageFor(path);
 
     if (!description) {
       view.dispatch({ effects: languageCompartmentRef.current.reconfigure([]) });
