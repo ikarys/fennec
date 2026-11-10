@@ -9,7 +9,7 @@ export function SectionLabel({
   className = '',
   children,
 }: {
-  as?: 'h2' | 'h3';
+  as?: 'h2' | 'h3' | 'span';
   className?: string;
   children: ReactNode;
 }) {

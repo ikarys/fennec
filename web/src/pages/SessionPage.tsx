@@ -685,14 +685,12 @@ export function SessionPage({
                         <div className="ml-auto flex shrink-0 items-center gap-1">
                           {sessionId && !isChat && (
                             <Button
-                              variant="ghost"
+                              variant="secondary"
                               size="sm"
-                              iconOnly
                               title={t('tryChange')}
-                              aria-label={t('tryChange')}
                               onClick={() => setTryOpen(true)}
                             >
-                              <PlayIcon className="h-3.5 w-3.5" />
+                              <PlayIcon className="h-3.5 w-3.5" />{t('tryChangeShort')}
                             </Button>
                           )}
                           {sessionId && isChat && detail && (
@@ -707,19 +705,18 @@ export function SessionPage({
                             <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />
                           )}
                         </div>
-                        <div className="ml-2">
-                          <ContextGauge
-                            context={context}
-                            compactDisabled={
-                              !sessionId ||
-                              state === "running" ||
-                              state === "waiting_for_user"
-                            }
-                            onCompact={handleCompact}
-                            compactError={compactError}
-                            onOpen={() => setContextRevealKey((key) => key + 1)}
-                          />
-                        </div>
+                        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-border" />
+                        <ContextGauge
+                          context={context}
+                          compactDisabled={
+                            !sessionId ||
+                            state === "running" ||
+                            state === "waiting_for_user"
+                          }
+                          onCompact={handleCompact}
+                          compactError={compactError}
+                          onOpen={() => setContextRevealKey((key) => key + 1)}
+                        />
                         {onClose && (
                           <Button
                             variant="ghost"

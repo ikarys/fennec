@@ -952,6 +952,7 @@ export const en = {
   contextOpenDetail: 'Show what the context is made of',
   compactTitle: 'Summarize the conversation to free context',
   compact: 'Compact',
+  contextShort: 'Context',
   failure: 'failure',
   queuedBadge: 'Queued',
   removeFromQueue: 'Remove from the queue',
@@ -1014,6 +1015,7 @@ export const en = {
   useThisCommand: 'Use this command',
   openTerminalInWorktree: 'Open a terminal in the worktree',
   tryChange: 'Try the change',
+  tryChangeShort: 'Try',
   tryChangeHint:
     "Starts the project in the session's worktree: nothing to check out, your branch stays untouched.",
   tryBeforeIntegrating: 'Try it',
@@ -2496,6 +2498,7 @@ export const fr: Record<MsgKey, string> = {
   contextOpenDetail: 'Voir de quoi le contexte est fait',
   compactTitle: 'Résumer la conversation pour libérer le contexte',
   compact: 'Compacter',
+  contextShort: 'Contexte',
   failure: 'échec',
   queuedBadge: 'En file',
   removeFromQueue: 'Retirer de la file',
@@ -2558,6 +2561,7 @@ export const fr: Record<MsgKey, string> = {
   useThisCommand: 'Utiliser cette commande',
   openTerminalInWorktree: 'Ouvrir un terminal dans le worktree',
   tryChange: 'Tester la modification',
+  tryChangeShort: 'Essayer',
   tryChangeHint:
     'Lance le projet dans le worktree de la session : rien à récupérer, votre branche reste intacte.',
   tryBeforeIntegrating: 'Tester',
