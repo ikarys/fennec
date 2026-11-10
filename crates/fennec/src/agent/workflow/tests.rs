@@ -1,70 +1,17 @@
 use super::*;
-use crate::agent::ports::{
-    AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog, Model,
-};
-use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
-use crate::domain::agent::AgentDefinition;
+use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog};
+use crate::agent::test_support::{Harness, Scripted, plan, reply};
 use crate::domain::criteria::{CriterionStatus, Provenance};
 use crate::domain::event::{DoneReason, Event, ToolCall, ToolResult};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
 };
 use crate::domain::workflow::run::{RunOutcome, Via};
-use crate::tools::LocalTools;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
-
-struct Harness<'a> {
-    log: MemoryLog,
-    model: Box<dyn Model>,
-    tools: LocalTools,
-    stop: &'a AtomicBool,
-    workdir: PathBuf,
-    on_event: Box<dyn FnMut(&Event) + 'a>,
-    agents: Vec<AgentDefinition>,
-}
-
-impl<'a> Harness<'a> {
-    fn new(model: Box<dyn Model>, workdir: PathBuf, stop: &'a AtomicBool) -> Self {
-        Harness {
-            log: MemoryLog::default(),
-            model,
-            tools: LocalTools::new(workdir.clone()),
-            stop,
-            workdir,
-            on_event: Box::new(|_: &Event| {}),
-            agents: builder(),
-        }
-    }
-
-    fn turn(&mut self) -> Turn<'_> {
-        Turn {
-            model: &*self.model,
-            log: &self.log,
-            tools: &self.tools,
-            session_id: "s",
-            workdir: &self.workdir,
-            instructions: "",
-            skills: &[],
-            always_on: &[],
-            agents: &self.agents,
-            max_tokens: 100,
-            context_window: 1000,
-            compact_at: 0.0,
-            reasoning_effort: None,
-            session_effort: None,
-            autonomous: false,
-            lang: crate::domain::lang::Lang::Fr,
-            preflight_sent_back: false,
-            stop: self.stop,
-            on_event: &mut self.on_event,
-            children: None,
-        }
-    }
-}
 
 #[derive(Default)]
 struct FakeChildren {

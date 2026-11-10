@@ -2,10 +2,13 @@
 //! in-memory log, so each test module keeps one copy.
 
 use crate::agent::ports::{Completion, Delta, EventLog, Model, Request, RuleCheck, Toolbox};
+use crate::agent::turn::Turn;
 use crate::domain::agent::{AgentDefinition, AgentOrigin, CommandAccess};
 use crate::domain::event::{Event, OutputStream, ToolCall, ToolResult};
+use crate::tools::LocalTools;
 use serde_json::{Value, json};
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 
 /// Plays back one scripted reply per call.
@@ -139,4 +142,76 @@ impl Toolbox for FakeToolbox {
             ToolResult::success("ok".into(), false)
         }
     }
+}
+
+/// Owns a turn's dependencies so a test can run several turns on the same
+/// session and inspect the log between them.
+pub struct Harness<'a> {
+    pub log: MemoryLog,
+    pub model: Box<dyn Model>,
+    pub tools: LocalTools,
+    pub stop: &'a AtomicBool,
+    pub workdir: PathBuf,
+    pub on_event: Box<dyn FnMut(&Event) + 'a>,
+    pub agents: Vec<AgentDefinition>,
+}
+
+impl<'a> Harness<'a> {
+    pub fn new(model: Box<dyn Model>, workdir: PathBuf, stop: &'a AtomicBool) -> Self {
+        Harness {
+            log: MemoryLog::default(),
+            model,
+            tools: LocalTools::new(workdir.clone()).with_rules(rules::Rules::default()),
+            stop,
+            workdir,
+            on_event: Box::new(|_: &Event| {}),
+            agents: builder(),
+        }
+    }
+
+    /// The same harness with the human's rules.
+    pub fn with_rules(mut self, rules: rules::Rules) -> Self {
+        self.tools = LocalTools::new(self.workdir.clone()).with_rules(rules);
+        self
+    }
+
+    pub fn turn(&mut self) -> Turn<'_> {
+        self.turn_with(false)
+    }
+
+    pub fn turn_autonomous(&mut self) -> Turn<'_> {
+        self.turn_with(true)
+    }
+
+    fn turn_with(&mut self, autonomous: bool) -> Turn<'_> {
+        Turn {
+            model: &*self.model,
+            log: &self.log,
+            tools: &self.tools,
+            session_id: "s",
+            workdir: &self.workdir,
+            instructions: "",
+            skills: &[],
+            always_on: &[],
+            agents: &self.agents,
+            max_tokens: 100,
+            context_window: 1000,
+            compact_at: 0.0,
+            reasoning_effort: None,
+            session_effort: None,
+            autonomous,
+            lang: crate::domain::lang::Lang::Fr,
+            preflight_sent_back: false,
+            stop: self.stop,
+            on_event: &mut self.on_event,
+            children: None,
+        }
+    }
+}
+
+/// A fresh empty directory under the system temp dir.
+pub fn scratch_dir() -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("fennec-test-{}", crate::domain::id::new_id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
 }
