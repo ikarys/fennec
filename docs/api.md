@@ -483,6 +483,11 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - `POST /api/projects/{id}/ideas/{ideaId}/edit` `{text}` (`idea.edited`; 400 if empty or over 4000 characters): the human rewrites the idea's text; a dropped or completed idea keeps its text
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`): abandons an idea, or removes a done one from the board (menu `remove`)
   - `POST /api/projects/{id}/ideas/{ideaId}/complete` `{}` (`idea.completed`)
+  - `POST /api/projects/{id}/ideas/{ideaId}/sheet/suggest` `{field}` → `{text}` or `{criteria}` (not the board, nothing
+    stored): a model's draft for one sheet field (`objective | context | constraints | outOfScope | deliverable |
+    approach | doneWhen`), from the idea's text and text files, the current sheet and the project's AGENTS.md (first
+    8000 characters); indicative, the UI saves an accepted draft through `sheet` with `by: agent`; criteria never carry
+    a check; 400 unknown field, 502 model error or empty reply
   - `POST /api/projects/{id}/ideas/{ideaId}/start` `{}`: builds this idea now, outside the queue: from its plan
     when ready, or when restarting a halted/failed idea that has a plan, else from its text (the workflow plans first;
     an idea without a session gets one, `idea.framing`), then `idea.started {ideaId, autonomous: false}`; 409 if

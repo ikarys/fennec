@@ -157,6 +157,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "ideas", "report", "read"]) => {
             idea_routes::report_read(app, stream, id)
         }
+        ("POST", ["api", "projects", id, "ideas", iid, "sheet", "suggest"]) => {
+            idea_routes::suggest_sheet_field(app, req, stream, id, iid)
+        }
         ("POST", ["api", "projects", id, "ideas", iid, "start"]) => {
             idea_routes::start_one(app, stream, id, iid)
         }

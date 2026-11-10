@@ -83,9 +83,7 @@ pub fn sheet_event(
             })
         }),
         "ready" => {
-            let Some(sheet) = idea.sheet.as_ref() else {
-                return None;
-            };
+            let sheet = idea.sheet.as_ref()?;
             let missing = sheet.missing();
             Some(if missing.is_empty() {
                 let plan = sheet.to_markdown(&backlog::title(&idea.text, None));
