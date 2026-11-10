@@ -12,7 +12,7 @@ import { Button } from '../ui/Button';
 import { ListCard } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { AlertIcon, EditIcon, PlusIcon, TrashIcon } from '../ui/Icons';
+import { AlertIcon, BotIcon, CpuIcon, EditIcon, PlusIcon, ProjectIcon, TrashIcon } from '../ui/Icons';
 import { InfoBar } from '../ui/InfoBar';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
 import { useT } from '../../i18n';
@@ -28,21 +28,24 @@ import {
   type AgentsOverview,
 } from '../../lib/api/agents';
 
-const ORIGIN_SECTIONS: { origin: AgentOrigin; title: MsgKey; description: MsgKey; empty: MsgKey }[] = [
+const ORIGIN_SECTIONS: { origin: AgentOrigin; Icon: typeof BotIcon; title: MsgKey; description: MsgKey; empty: MsgKey }[] = [
   {
     origin: 'user',
+    Icon: BotIcon,
     title: 'agentsUserTitle',
     description: 'agentsUserDescription',
     empty: 'agentsUserEmpty',
   },
   {
     origin: 'default',
+    Icon: CpuIcon,
     title: 'agentsDefaultTitle',
     description: 'agentsDefaultDescription',
     empty: 'agentsNone',
   },
   {
     origin: 'project',
+    Icon: ProjectIcon,
     title: 'agentsProjectTitle',
     description: 'agentsProjectDescription',
     empty: 'agentsNone',
@@ -285,12 +288,13 @@ export function AgentsSection() {
       {!loading && !error && !draft && formError ? <p className="m-0 text-xs text-err">{formError}</p> : null}
 
       {!loading && !error && overview
-        ? ORIGIN_SECTIONS.map(({ origin, title, description, empty }) => {
+        ? ORIGIN_SECTIONS.map(({ origin, Icon, title, description, empty }) => {
             const agents = overview.agents.filter((agent) => agent.origin === origin);
             if (origin === 'project' && agents.length === 0) return null;
             return (
               <ListCard
                 key={origin}
+                Icon={Icon}
                 title={t(title)}
                 description={t(description)}
                 count={agents.length}
