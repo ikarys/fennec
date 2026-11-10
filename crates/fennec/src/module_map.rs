@@ -73,4 +73,14 @@ mod tests {
         assert!(!has("crates/fennec/src/domain", "crates/fennec/src/web"));
         assert!(has("crates/fennec/src/web/views", "crates/token-usage/src"));
     }
+
+    #[test]
+    fn this_repository_commits_a_current_map() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        assert_eq!(
+            map_file_state(&root, &load(&root)),
+            MapFileState::Current,
+            "docs/map.md is stale: regenerate it (project page, Map, \"Write docs/map.md\")"
+        );
+    }
 }
