@@ -55,6 +55,10 @@ fn plan_proposed_round_trips() {
             plan: Plan {
                 title: "Add the plan tool".into(),
                 goal: "The plan ends with propose_plan".into(),
+                context: String::new(),
+                constraints: String::new(),
+                out_of_scope: String::new(),
+                deliverable: String::new(),
                 steps: vec![PlanStep {
                     title: "Write the domain".into(),
                     files: vec!["src/plan.rs".into()],

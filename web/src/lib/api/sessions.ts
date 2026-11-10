@@ -82,7 +82,7 @@ export interface SessionDetail {
     chat?: boolean;
   };
   /** The idea this session frames, or null. */
-  idea: { id: string; state: "inbox" | "framing" | "ready" } | null;
+  idea: { id: string; state: "inbox" | "framing" | "ready"; hasSheet: boolean } | null;
   /** Opens the folder the agent works in (its worktree, else the project) in the chosen IDE. */
   editorUrl: string;
   /** The last answer read as an audit report, or null. */

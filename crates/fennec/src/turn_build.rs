@@ -94,6 +94,7 @@ pub fn with_turn<R>(
     // loaded per turn so a rule changed in the UI applies from the next turn.
     let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
     let session = store.session(session_id)?;
+    let task_sheet = task_sheet(store, session.as_ref())?;
     // The budget is a human decision the kernel enforces before any turn starts:
     // every path that starts a turn (web, CLI, the ideas queue, workflow children)
     // goes through `with_turn`.
@@ -123,6 +124,7 @@ pub fn with_turn<R>(
         tools: &tools,
         session_id,
         workdir,
+        task_sheet: task_sheet.as_deref(),
         instructions: &instructions,
         skills: &skills,
         always_on: &prefs.always_on_skills,
@@ -140,6 +142,27 @@ pub fn with_turn<R>(
         children: options.children,
     };
     body(&mut turn, &tools)
+}
+
+/// The task sheet of the idea this session frames, as markdown.
+fn task_sheet(
+    store: &SqliteStore,
+    session: Option<&SessionSummary>,
+) -> Result<Option<String>, String> {
+    let Some(session) = session else {
+        return Ok(None);
+    };
+    let ideas = store
+        .backlog(&session.project_id)
+        .map_err(|e| e.to_string())?
+        .ideas;
+    let Some(idea) = backlog::idea_for_session(&ideas, &session.id) else {
+        return Ok(None);
+    };
+    let Some(sheet) = idea.sheet.as_ref() else {
+        return Ok(None);
+    };
+    Ok(Some(sheet.to_markdown(&backlog::title(&idea.text, None))))
 }
 
 /// Refuses the turn when the project's budget is spent: the refusal is logged as the turn's error.

@@ -9,6 +9,9 @@ use serde_json::{Value, json};
 
 pub const NAME: &str = "propose_plan";
 
+/// The longest optional section (context, constraints, ...), in characters.
+const MAX_SECTION_CHARS: usize = 4_000;
+
 /// What the model reads back once the plan is in the log.
 pub const RECORDED: &str = "Plan recorded. The human reviews it; end your turn here.";
 
@@ -29,6 +32,22 @@ pub fn definition() -> Value {
                     "goal": {
                         "type": "string",
                         "description": "One sentence: what is true once the plan is done"
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "What the work must know first, from the discussion; omit when it gave none."
+                    },
+                    "constraints": {
+                        "type": "string",
+                        "description": "Rules the change must respect, from the discussion; omit when none."
+                    },
+                    "outOfScope": {
+                        "type": "string",
+                        "description": "What the task must not touch, from the discussion; omit when none."
+                    },
+                    "deliverable": {
+                        "type": "string",
+                        "description": "What is handed over at the end; omit when the discussion said nothing."
                     },
                     "steps": {
                         "type": "array",
@@ -89,6 +108,11 @@ pub fn parse(args: &Value) -> Result<Plan, String> {
     let title = tool_args::single_line(&tool_args::required(NAME, args, "title")?, "'title'", 120)?;
     let goal = tool_args::single_line(&tool_args::required(NAME, args, "goal")?, "'goal'", 0)?;
 
+    let context = optional_section(args, "context")?;
+    let constraints = optional_section(args, "constraints")?;
+    let out_of_scope = optional_section(args, "outOfScope")?;
+    let deliverable = optional_section(args, "deliverable")?;
+
     let steps = tool_args::required_array(NAME, args, "steps")?;
     let mut plan_steps = Vec::with_capacity(steps.len());
     for (index, step) in steps.iter().enumerate() {
@@ -144,10 +168,36 @@ pub fn parse(args: &Value) -> Result<Plan, String> {
     Ok(Plan {
         title,
         goal,
+        context,
+        constraints,
+        out_of_scope,
+        deliverable,
         steps: plan_steps,
         done_when,
         risks,
     })
+}
+
+/// An optional free-text section: absent is empty. It may span lines but never holds a "## "
+/// line, which would split the plan's markdown (the model's output is untrusted).
+fn optional_section(args: &Value, field: &str) -> Result<String, String> {
+    let text = match args.get(field) {
+        None | Some(Value::Null) => return Ok(String::new()),
+        Some(Value::String(s)) => s.trim(),
+        Some(_) => return Err(format!("'{field}' must be a string.")),
+    };
+    if text.chars().count() > MAX_SECTION_CHARS {
+        return Err(format!("'{field}' is over {MAX_SECTION_CHARS} characters."));
+    }
+    if text
+        .lines()
+        .any(|line| line.trim_start().starts_with("## "))
+    {
+        return Err(format!(
+            "'{field}' must not contain a line starting with \"## \": it would split the plan's markdown."
+        ));
+    }
+    Ok(text.to_string())
 }
 
 pub fn event(call_id: &str, plan: Plan) -> Event {
@@ -325,6 +375,25 @@ mod tests {
         args["doneWhen"][0].as_object_mut().unwrap().remove("check");
         let p = parse(&args).unwrap();
         assert_eq!(p.done_when[0].check, None);
+    }
+
+    #[test]
+    fn parse_reads_the_optional_sections() {
+        let mut args = valid();
+        args["context"] = json!(" c \n more ");
+        args["outOfScope"] = json!("x");
+        let p = parse(&args).unwrap();
+        assert_eq!(p.context, "c \n more");
+        assert_eq!(p.out_of_scope, "x");
+        assert_eq!(p.constraints, "");
+        assert_eq!(p.deliverable, "");
+    }
+
+    #[test]
+    fn a_section_heading_in_a_section_is_refused() {
+        let mut args = valid();
+        args["context"] = json!("a\n## Done when");
+        assert!(parse(&args).err().unwrap().contains("## "));
     }
 
     #[test]

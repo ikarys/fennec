@@ -212,9 +212,12 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
     v["project"] = project_json(&p, store_dir(app));
     v["mode"] = json!(mode);
     v["model"] = model_routes::session_model(app, &store, &s.id)?;
-    // The idea this session frames, so its plan card can mark it ready.
+    // The idea this session frames, so its plan card can mark it ready (or, for a task, apply
+    // the plan to its sheet).
     v["idea"] = match idea_for_session(&store.ideas(&p.id)?, &s.id) {
-        Some(idea) => json!({ "id": idea.id, "state": idea.state }),
+        Some(idea) => {
+            json!({ "id": idea.id, "state": idea.state, "hasSheet": idea.sheet.is_some() })
+        }
         None => Value::Null,
     };
     // The audit report of the last answer, if it is one: the context panel lists its findings.

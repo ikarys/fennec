@@ -190,6 +190,7 @@ impl<'a> Harness<'a> {
             tools: &self.tools,
             session_id: "s",
             workdir: &self.workdir,
+            task_sheet: None,
             instructions: "",
             skills: &[],
             always_on: &[],

@@ -352,9 +352,14 @@ export function ReportCard({ report }: { report: Report }) {
   );
 }
 
-export const IDEA_LABELS: Record<'none' | 'framing' | 'ready' | 'saved', MsgKey> = {
+export const IDEA_LABELS: Record<IdeaButton, MsgKey> = {
   none: 'ideaSaveToBacklog',
   framing: 'ideaReady',
   ready: 'ideaUpdate',
   saved: 'ideaInBacklog',
+  sheet: 'applyToSheet',
+  applied: 'sheetApplied',
 };
+
+/** The plan's backlog button: a plain idea is marked ready, a task gets the plan applied to its sheet. */
+export type IdeaButton = 'none' | 'framing' | 'ready' | 'saved' | 'sheet' | 'applied';

@@ -45,6 +45,8 @@ export interface IdeaView {
   edit: 'editText' | null;
   sessionId: string | null;
   plan: string | null;
+  /** The task sheet rendered as the plan's markdown; null for an idea without a sheet. */
+  sheetMarkdown: string | null;
   halted: string | null;
   autonomous: boolean;
   position: number | null;
@@ -145,7 +147,7 @@ export async function frameIdea(
 
 /** What a framing idea puts in the composer: text files inlined, binaries
  *  named, images attached. The plan is written against all of it. */
-export function framingPrefill(idea: IdeaView): {
+export function framingPrefill(idea: Pick<IdeaView, 'text' | 'attachments' | 'sheetMarkdown'>): {
   text: string;
   attachments: { filename: string; data: string }[];
 } {
@@ -166,6 +168,9 @@ export function framingPrefill(idea: IdeaView): {
   }
   if (named.length > 0) {
     text += `\n\nAttached files (available when the idea is built): ${named.join(', ')}`;
+  }
+  if (idea.sheetMarkdown) {
+    text += `\n\n${idea.sheetMarkdown}`;
   }
   return { text, attachments };
 }
@@ -197,6 +202,14 @@ export async function markIdeaReady(
   return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/ready`, {
     method: 'POST',
     body: JSON.stringify({ plan }),
+  });
+}
+
+/** Saves the framing session's pending plan onto the task's sheet, as the agent's edit. */
+export async function applySheet(projectId: string, ideaId: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/sheet-apply`, {
+    method: 'POST',
+    body: '{}',
   });
 }
 

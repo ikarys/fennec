@@ -64,6 +64,7 @@ graph LR
   m56["crates/token-usage/tests"]
   m57["web"]
   m58["web/scripts"]
+  m13 -->|1| m32
   m13 -->|3| m21
   m13 -->|1| m23
   m13 -->|1| m18
@@ -107,8 +108,8 @@ graph LR
   m1 -->|4| m26
   m1 -->|2| m29
   m1 -->|2| m19
-  m26 -->|1| m32
-  m26 -->|7| m29
+  m26 -->|2| m32
+  m26 -->|8| m29
   m26 -->|1| m30
   m26 -->|1| m28
   m26 -->|4| m27
@@ -177,10 +178,10 @@ graph LR
   m6 -->|5| m32
   m6 -->|4| m25
   m6 -->|24| m13
-  m6 -->|11| m21
+  m6 -->|12| m21
   m6 -->|2| m12
   m6 -->|5| m18
-  m6 -->|29| m26
+  m6 -->|30| m26
   m6 -->|10| m29
   m6 -->|4| m28
   m6 -->|2| m24
@@ -370,7 +371,7 @@ graph LR
 | `crates/fennec/src/agent/turn` | 2 | 2 |  | The multi-turn loop. Each round streams the model (`round`), then runs its tool calls, until it answers without one. |
 | `crates/fennec/src/domain/workflow` | 6 | 5 |  | The workflow domain: definitions, templates, validation, and the run state folded from events. |
 | `crates/canvas/src` | 6 | 5 | yes | Storage and model for canvas artifacts. |
-| `crates/fennec/src/domain` | 76 | 74 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/fennec/src/domain` | 78 | 76 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
 | `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
 | `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
 | `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
@@ -395,7 +396,7 @@ graph LR
 | `web/src/components/workflow/session` | 8 | 0 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
-| `web/src/lib` | 46 | 16 |  |  |
+| `web/src/lib` | 47 | 17 |  |  |
 | `web/src/components/settings` | 26 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
 | `web/src/i18n` | 3 | 1 |  |  |

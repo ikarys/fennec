@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Plan } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { PlanBody, IDEA_LABELS } from './PlanCard';
+import { PlanBody, IDEA_LABELS, type IdeaButton } from './PlanCard';
 import { DecisionRow } from './DecisionBar';
 import { ArrowUpIcon, DecisionIcon, EditIcon, PlayIcon, StarIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
@@ -16,7 +16,7 @@ export interface PlanDecisionActions {
   onShowInThread: () => void;
   /** False when a launch cannot open a worktree (no default workflow, a chat): it runs in the human's folder. */
   worktreeAvailable: boolean;
-  ideaReady?: { onMark: () => void; idea: 'none' | 'framing' | 'ready' | 'saved' };
+  ideaReady?: { onMark: () => void; idea: IdeaButton };
   disabled?: boolean;
 }
 
@@ -92,8 +92,14 @@ export function PlanDecision({
               variant="secondary"
               size="sm"
               onClick={actions.ideaReady.onMark}
-              disabled={actions.disabled || actions.ideaReady.idea === 'saved'}
-              title={t('saveToBacklogTitle')}
+              disabled={
+                actions.disabled || actions.ideaReady.idea === 'saved' || actions.ideaReady.idea === 'applied'
+              }
+              title={t(
+                actions.ideaReady.idea === 'sheet' || actions.ideaReady.idea === 'applied'
+                  ? 'applyToSheetTitle'
+                  : 'saveToBacklogTitle',
+              )}
             >
               <StarIcon className="h-3.5 w-3.5" />
               {t(IDEA_LABELS[actions.ideaReady.idea])}

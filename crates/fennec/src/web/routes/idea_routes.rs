@@ -10,7 +10,9 @@ use serde_json::{Value, json};
 
 use super::sheet_input;
 
+use crate::agent::ports::EventLog;
 use crate::domain::id::new_id;
+use crate::domain::plan;
 use crate::web::App;
 use crate::web::http::{Request, error, require_project, send_json};
 use crate::web::jobs::{idea_queue, sheet_suggest};
@@ -131,7 +133,7 @@ pub fn add_idea(
     send_board(app, stream, project_id)
 }
 
-/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete,sheet,turn-into-task}`.
+/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete,sheet,sheet-apply,turn-into-task}`.
 pub fn update_idea(
     app: &App,
     req: &Request,
@@ -149,7 +151,16 @@ pub fn update_idea(
     let body = req.json()?;
     let field = |name: &str| body[name].as_str().unwrap_or("").trim().to_string();
     let idea_id = idea_id.to_string();
-    if let Some(decided) = sheet_input::sheet_event(idea, action, &body, MAX_IDEA_CHARS) {
+    // Only "Apply to the sheet" reads the framing session's log.
+    let pending = match (action, idea.session_id.as_deref()) {
+        ("sheet-apply", Some(session_id)) => {
+            plan::pending(&store.events(session_id)?).map(|pending| pending.plan)
+        }
+        _ => None,
+    };
+    if let Some(decided) =
+        sheet_input::sheet_event(idea, action, &body, MAX_IDEA_CHARS, pending.as_ref())
+    {
         match decided {
             Ok(event) => {
                 store.append_idea_event(project_id, &event)?;

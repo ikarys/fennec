@@ -31,6 +31,7 @@ use crate::domain::id::new_id;
 use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
+use crate::domain::sheet_notice;
 use crate::domain::skill::Skill;
 use crate::domain::workdir_notice;
 use std::path::Path;
@@ -51,6 +52,9 @@ pub struct Turn<'a> {
     pub tools: &'a dyn Toolbox,
     pub session_id: &'a str,
     pub workdir: &'a Path,
+    /// The task sheet of the idea this session frames, as markdown; a change
+    /// since the model last saw it is appended as a notice.
+    pub task_sheet: Option<&'a str>,
     /// The custom instructions, assembled by the adapter. Only a
     /// session's first turn uses them: the system prompt is frozen then.
     pub instructions: &'a str,
@@ -205,6 +209,7 @@ pub(super) fn answer_or_prompt(
     // input *is* that answer, so no user message is appended on top of it.
     let answered = close_open_calls(turn, prompt)?;
     ensure_workdir_notice(turn)?;
+    ensure_sheet_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     if !answered {
         turn.append_user(prompt, false, None, attachments.to_vec())?;
@@ -304,6 +309,17 @@ fn ensure_workdir_notice(turn: &mut Turn) -> Result<(), String> {
         Some(notice) => turn.append_system(&notice),
         None => Ok(()),
     }
+}
+
+/// Tells the framing agent the human edited the task sheet since it last saw
+/// it: the prompt only grows.
+fn ensure_sheet_notice(turn: &mut Turn) -> Result<(), String> {
+    if let Some(sheet) = turn.task_sheet
+        && let Some(notice) = sheet_notice::needed(&turn.log.events(turn.session_id)?, sheet)
+    {
+        turn.append_system(&notice)?;
+    }
+    Ok(())
 }
 
 /// Injects the agent's definition when the last reminder in the model's
@@ -521,6 +537,7 @@ pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<D
     }
 
     ensure_workdir_notice(turn)?;
+    ensure_sheet_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     turn.append_system(prompt)?;
     run_top_level_agent_loop(turn, agent)

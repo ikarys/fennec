@@ -373,6 +373,10 @@ mod tests {
         let first = Plan {
             title: "First".into(),
             goal: "goal".into(),
+            context: String::new(),
+            constraints: String::new(),
+            out_of_scope: String::new(),
+            deliverable: String::new(),
             steps: vec![PlanStep {
                 title: "s".into(),
                 files: vec![],
@@ -419,6 +423,10 @@ mod tests {
         let plan = Plan {
             title: "Plan".into(),
             goal: "goal".into(),
+            context: String::new(),
+            constraints: String::new(),
+            out_of_scope: String::new(),
+            deliverable: String::new(),
             steps: vec![PlanStep {
                 title: "s".into(),
                 files: vec![],

@@ -151,6 +151,7 @@ mod tests {
             tools: &tools,
             session_id: "s",
             workdir: Path::new("/tmp"),
+            task_sheet: None,
             instructions: "",
             skills: &[],
             always_on: &[],

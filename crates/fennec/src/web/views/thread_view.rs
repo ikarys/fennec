@@ -233,6 +233,10 @@ mod tests {
             plan: crate::domain::plan::Plan {
                 title: String::new(),
                 goal: String::new(),
+                context: String::new(),
+                constraints: String::new(),
+                out_of_scope: String::new(),
+                deliverable: String::new(),
                 steps: vec![],
                 done_when: vec![],
                 risks: vec![],
