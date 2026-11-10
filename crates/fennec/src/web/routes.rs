@@ -13,6 +13,7 @@ pub(super) mod changelog_routes;
 pub(super) mod contribution_routes;
 pub(super) mod diff_routes;
 pub(super) mod folder_routes;
+pub(super) mod home_routes;
 pub(super) mod idea_routes;
 pub(super) mod indicator_routes;
 pub(super) mod integration;
@@ -96,6 +97,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "folders"]) => folder_routes::list_folders(app, req, stream),
         ("POST", ["api", "folders", "create"]) => folder_routes::create_folder(req, stream),
         ("GET", ["api", "projects"]) => project_list_routes::list_projects(app, stream),
+        ("GET", ["api", "home"]) => home_routes::serve(app, stream),
         ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),
         ("POST", ["api", "projects"]) => project_list_routes::open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => {
