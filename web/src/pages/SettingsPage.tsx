@@ -32,7 +32,7 @@ import { InstructionsSection } from '../components/settings/InstructionsSection'
 import { NetworkSection } from '../components/settings/NetworkSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
-import { McpSection } from '../components/settings/McpSection';
+import { McpSection, emptyServer } from '../components/settings/McpSection';
 import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
@@ -85,6 +85,11 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
           <Button variant="primary" size="md" onClick={() => setAddingProvider(true)}>
             <PlusIcon className="h-[15px] w-[15px]" />
             {t('addProvider')}
+          </Button>
+        ) : active === 'mcp' ? (
+          <Button variant="primary" size="md" onClick={() => form && updateMcp([...form.mcp, emptyServer()])}>
+            <PlusIcon className="h-[15px] w-[15px]" />
+            {t('newServer')}
           </Button>
         ) : null
       }

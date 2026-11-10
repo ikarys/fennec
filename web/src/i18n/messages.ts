@@ -118,10 +118,10 @@ export const en = {
   pluginWaiting: "Nothing yet: the plugin shows its blocks from the session's next event.",
   statusBarLabel: 'Status bar',
 
-  noProjectBlocks: 'The active plugins emitted no global block.',
   pluginsDescription:
     'A plugin observes the session events of every project and displays typed blocks. It never touches the prompt, the tools or the log. The definitions live in ~/.agents/plugins.json, the code in ~/.agents/plugins/<name>/. Enabling it, and its network access, are your decisions; a changed definition or code deactivates it.',
   pluginEnabled: 'Enabled',
+  noPluginBlocks: 'No block placed',
   pluginDisabled: 'Disabled',
   pluginEnable: 'Enable',
   pluginDisable: 'Disable',
@@ -130,7 +130,7 @@ export const en = {
   pluginCodeChanged: 'The code changed: enable it again to run this version.',
   noPluginsDefined: 'No plugin is defined in ~/.agents/plugins.json.',
   pluginProblems: 'Left out of ~/.agents/plugins.json',
-  pluginBlocksTitle: 'Global blocks',
+
   // Session panels (components/session)
   noModifiedFiles: 'The agent modified no file.',
   previewOf: 'Preview of {name}',
@@ -520,10 +520,11 @@ export const en = {
     "Added to the system prompt of each new session, before the project's AGENTS.md files. A session in progress keeps the prompt of its first turn.",
   instructionsPlaceholder: 'E.g.: Answer in French, in a few lines, without a recap.',
   // MCP (components/settings/McpSection.tsx)
-  mcpTitle: 'MCP',
+
   mcpHint:
     "The model's tool servers (Model Context Protocol). \"Active\" sends their tools to the model; \"Shown\" shows them in the composer's dropdown. Connect lists a server's tools. The composer's per-session setting overrides \"Active\".",
   newServer: 'New server',
+  mcpEdit: 'Edit the server',
   noMcpServers: 'No MCP server.',
   mcpNameLabel: 'MCP server name',
   mcpNamePlaceholder: 'name',
@@ -1621,10 +1622,11 @@ export const fr: Record<MsgKey, string> = {
   pluginWaiting: "Rien pour l'instant : le plugin affiche ses blocs dès le prochain événement de la session.",
   statusBarLabel: 'Barre d’état',
 
-  noProjectBlocks: 'Les plugins actifs n’ont émis aucun bloc global.',
+
   pluginsDescription:
     'Un plugin observe les événements de session de tous les projets et affiche des blocs typés. Il ne touche jamais au prompt, aux outils ni au journal. Les définitions vivent dans ~/.agents/plugins.json, le code dans ~/.agents/plugins/<nom>/. L’activer, et son accès au réseau, sont vos décisions ; une définition ou un code modifié le désactive.',
   pluginEnabled: 'Activé',
+  noPluginBlocks: 'Aucun bloc placé',
   pluginDisabled: 'Désactivé',
   pluginEnable: 'Activer',
   pluginDisable: 'Désactiver',
@@ -1633,7 +1635,7 @@ export const fr: Record<MsgKey, string> = {
   pluginCodeChanged: 'Le code a changé : réactivez-le pour lancer cette version.',
   noPluginsDefined: 'Aucun plugin n’est défini dans ~/.agents/plugins.json.',
   pluginProblems: 'Écarté de ~/.agents/plugins.json',
-  pluginBlocksTitle: 'Blocs globaux',
+
   // Session panels (components/session)
   noModifiedFiles: "L'agent n'a modifié aucun fichier.",
   previewOf: 'Aperçu de {name}',
@@ -2023,10 +2025,11 @@ export const fr: Record<MsgKey, string> = {
     "Ajoutées au prompt système de chaque nouvelle session, avant les fichiers AGENTS.md du projet. Une session en cours garde le prompt de son premier tour.",
   instructionsPlaceholder: 'Ex. : Réponds en français, en quelques lignes, sans récapitulatif.',
   // MCP (components/settings/McpSection.tsx)
-  mcpTitle: 'MCP',
+
   mcpHint:
     "Les serveurs d'outils du modèle (Model Context Protocol). « Actif » envoie leurs outils au modèle ; « Affiché » les montre dans le dropdown du composer. Connecter liste les outils d'un serveur. Le réglage par session du composer prime sur « Actif ».",
   newServer: 'Nouveau serveur',
+  mcpEdit: 'Modifier le serveur',
   noMcpServers: 'Aucun serveur MCP.',
   mcpNameLabel: 'Nom du serveur MCP',
   mcpNamePlaceholder: 'nom',
