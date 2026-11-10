@@ -1,0 +1,10 @@
+# Third-party actions are pinned by commit SHA; this bumps the pins, one grouped PR a month.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
