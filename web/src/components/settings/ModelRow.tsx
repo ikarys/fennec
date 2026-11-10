@@ -21,7 +21,7 @@ type ListedModel = ProviderListing['models'][number];
 // The README section a billed flag's info icon opens.
 const BILLING_DOC_URL = 'https://github.com/ikarys/fennec#budgets-and-billed-models';
 
-/** The efforts the row's effort select offers: probed, accepted, catalog, plus the stored one. */
+/** The efforts the row's effort select offers: probed, accepted, plus the stored one. */
 function offeredEfforts(value: ModelForm, model: ListedModel | null): ReasoningEffort[] {
   const probed = value.reasoningEfforts ? (value.reasoningEfforts.split(',') as ReasoningEffort[]) : [];
   const accepted = model?.acceptedEfforts ?? [];

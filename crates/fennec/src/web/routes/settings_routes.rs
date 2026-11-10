@@ -177,7 +177,7 @@ fn model_entries(
                 "id": model.id,
                 "contextWindow": model.context_window,
                 "resolved": model_view::resolved(defaults, prefs, listed),
-                "acceptedEfforts": ModelPrefs::accepted_efforts(prefs, &model.id),
+                "acceptedEfforts": ModelPrefs::accepted_efforts(prefs),
             })
         })
         .collect();
@@ -193,7 +193,7 @@ fn model_entries(
                 "id": id,
                 "contextWindow": null,
                 "resolved": model_view::resolved(defaults, Some(prefs), None),
-                "acceptedEfforts": ModelPrefs::accepted_efforts(Some(prefs), id),
+                "acceptedEfforts": ModelPrefs::accepted_efforts(Some(prefs)),
                 "manual": true,
             }));
         }

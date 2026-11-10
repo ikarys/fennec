@@ -75,7 +75,7 @@ pub(crate) fn session_effort(
         provider: params.provider.clone(),
         model: params.model.clone(),
     };
-    let accepted = ModelPrefs::accepted_efforts(prefs_of(&prefs, &resolved), &params.model);
+    let accepted = ModelPrefs::accepted_efforts(prefs_of(&prefs, &resolved));
     Ok((usable_effort(chosen, &accepted), accepted))
 }
 
@@ -93,7 +93,7 @@ fn choice_value(prefs: &Preferences, model: &ModelRef) -> Value {
         "provider": model.provider,
         "model": model.model,
         "providerName": provider_name(prefs, &model.provider),
-        "acceptedEfforts": ModelPrefs::accepted_efforts(prefs_of(prefs, model), &model.model),
+        "acceptedEfforts": ModelPrefs::accepted_efforts(prefs_of(prefs, model)),
     })
 }
 
