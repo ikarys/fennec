@@ -27,6 +27,8 @@ export interface SessionSummary {
   parentId: string | null;
   /** The agent the session resolves to (analyze, audit-*, …), or null when it has none. */
   mode: string | null;
+  /** The project a chat is linked to, for grouping only; null otherwise. */
+  linkedProjectId: string | null;
   /** A workflow ended done and nothing integrated or discarded its work since. */
   awaitingIntegration: boolean;
 }
@@ -59,6 +61,8 @@ export interface SessionDetail {
   model: SessionModel;
   /** The agent id the session resolves to, or null when it has none. */
   mode: string | null;
+  /** The project a chat is linked to, for grouping only; null otherwise. */
+  linkedProjectId: string | null;
   /** The parent session id, or null for a top-level session. */
   parentId: string | null;
   /** The git worktree the session's agent works in, or null when it runs in place. */
@@ -496,6 +500,13 @@ export function setSessionMode(id: string, mode: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
     method: "POST",
     body: JSON.stringify({ mode }),
+  });
+}
+
+export function linkSession(id: string, projectId: string | null): Promise<{ linkedProjectId: string | null }> {
+  return request<{ linkedProjectId: string | null }>(`/api/sessions/${encodeURIComponent(id)}/link`, {
+    method: "POST",
+    body: JSON.stringify({ projectId }),
   });
 }
 

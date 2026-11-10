@@ -1,6 +1,12 @@
 import { request } from "./request";
 import type { SessionSummary } from "./sessions";
 
+export interface ChatGroup {
+  projectId: string | null;
+  projectName: string | null;
+  sessionIds: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -18,6 +24,10 @@ export interface Project {
   /** Opens the project in VS Code (through the WSL remote under WSL). */
   editorUrl: string;
   sessions: SessionSummary[];
+  /** The chat's groups, on the chat project only. */
+  chatGroups?: ChatGroup[];
+  /** Chats linked to this project. */
+  linkedChats?: number;
 }
 
 export interface SlashCommand {

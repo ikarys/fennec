@@ -27,6 +27,7 @@ import { useWorkflowActions } from "../hooks/useWorkflowActions";
 import { useSessionMcp } from "../hooks/useSessionMcp";
 import { useComposerPrefill } from "../hooks/useComposerPrefill";
 import { Composer } from "../components/session/Composer";
+import { ChatLinkPicker } from "../components/session/ChatLinkPicker";
 import { RunningStrip } from "../components/session/RunningStrip";
 import { modelShortName } from "../components/session/ModelPicker";
 import { Badge } from "../components/ui/Badge";
@@ -95,7 +96,7 @@ interface SessionPageProps {
   onSessionCreated: (newId: string, pseudoId: string | null) => void;
   /** Tabs and the palette show session states from the projects list. */
   onRunningChanged: () => void;
-  /** The generated session name changed; the tabs read titles from projects. */
+  /** The session's name or chat link changed; the tabs and the chats page read them from projects. */
   onRenamed: () => void;
 }
 
@@ -678,6 +679,14 @@ export function SessionPage({
                             >
                               <PlayIcon className="h-3.5 w-3.5" />
                             </Button>
+                          )}
+                          {sessionId && isChat && detail && (
+                            <ChatLinkPicker
+                              sessionId={sessionId}
+                              linkedProjectId={detail.linkedProjectId}
+                              projects={projects}
+                              onLinked={onRenamed}
+                            />
                           )}
                           {sessionId && (
                             <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={setCanvasId} />

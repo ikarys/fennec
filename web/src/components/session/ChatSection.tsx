@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import type { Project } from '../../lib/api';
+import type { SessionSummary } from '../../lib/api';
 import { useT } from '../../i18n';
 import { SessionList } from './SessionList';
 
 export function ChatSection({
-  project,
+  title,
+  sessions,
   onOpenSession,
   selected,
   selecting,
   onToggle,
   onDelete
 }: {
-  project: Project;
+  title: string;
+  sessions: SessionSummary[];
   onOpenSession: (sessionId: string) => void;
   selected: Set<string>;
   selecting: boolean;
@@ -23,16 +25,16 @@ export function ChatSection({
   return (
     <section className="overflow-hidden rounded-md border border-border bg-panel">
       <div className="flex min-h-12 items-center gap-2.5 px-3 py-2">
-        <span className="truncate text-sm font-semibold">{t('homeChat')}</span>
+        <span className="truncate text-sm font-semibold">{title}</span>
         <span className="ml-1 flex min-w-0 gap-3 font-mono text-xs text-faint">
           <span className="truncate whitespace-nowrap tabular-nums">
-            {t('homeConversationCount', { count: project.sessions.length })}
+            {t('homeConversationCount', { count: sessions.length })}
           </span>
         </span>
       </div>
 
       <SessionList
-        sessions={project.sessions}
+        sessions={sessions}
         selected={selected}
         selecting={selecting}
         onToggle={onToggle}
