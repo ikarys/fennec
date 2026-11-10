@@ -90,8 +90,8 @@ export interface Report {
   steps: NumberedCheck[];
   doneWhen: NumberedCheck[];
   changed: { path: string; what: string }[];
-  test: string;
-  todo: string;
+  test: string[];
+  todo: string[];
 }
 
 /**
@@ -121,8 +121,8 @@ export function reportFromSubmission(proposal: ReportProposal): Report {
     steps,
     doneWhen,
     changed: proposal.changed ?? [],
-    test: proposal.test ?? '',
-    todo: proposal.todo ?? ''
+    test: itemsOf(proposal.test ?? ''),
+    todo: itemsOf(proposal.todo ?? '')
   };
 }
 
@@ -184,6 +184,27 @@ function filesOf(text: string): string[] {
 
 function nothingOf(text: string): string {
   return /^(nothing|rien)\.?$/i.test(text.trim()) ? '' : text.trim();
+}
+
+// A free-text field as list items: its lines (bullets stripped) or, on one line, its sentences.
+function itemsOf(text: string): string[] {
+  const kept = nothingOf(text);
+  if (kept === '') return [];
+  const lines = kept
+    .split('\n')
+    .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s+/, '').trim())
+    .filter((line) => line.length > 0);
+  if (lines.length > 1) return lines;
+  return kept
+    .split(/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ«"`])/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+}
+
+/** A path as its folder (with the trailing slash, '' at the root) and its file name. */
+export function pathParts(path: string): { dir: string; name: string } {
+  const cut = path.lastIndexOf('/') + 1;
+  return { dir: path.slice(0, cut), name: path.slice(cut) };
 }
 
 function sectionOf(text: string): string {
@@ -285,8 +306,8 @@ function parseReport(title: string, lines: string[]): Report | null {
   const tokens = tokenize(lines);
   let summary = '';
   let section = '';
-  let test = '';
-  let todo = '';
+  let test: string[] = [];
+  let todo: string[] = [];
   const steps: NumberedCheck[] = [];
   const doneWhen: NumberedCheck[] = [];
   const changed: { path: string; what: string }[] = [];
@@ -330,11 +351,11 @@ function parseReport(title: string, lines: string[]): Report | null {
     if (section === 'next') {
       const t = labelOf(token.text, 'Test');
       if (t !== null) {
-        test = nothingOf(t);
+        test = itemsOf(t);
         continue;
       }
       const d = labelOf(token.text, 'To do');
-      if (d !== null) todo = nothingOf(d);
+      if (d !== null) todo = itemsOf(d);
     }
   }
 

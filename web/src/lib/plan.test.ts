@@ -5,6 +5,7 @@ import {
   splitContract,
   pendingPlanOf,
   lastHumanMessage,
+  pathParts,
   type Plan,
   type Report
 } from './plan';
@@ -118,8 +119,8 @@ describe('splitContract', () => {
       { path: 'a.ts', what: 'added' },
       { path: 'b.ts', what: 'edited' },
     ]);
-    expect(out.contract.test).toBe('run npm test');
-    expect(out.contract.todo).toBe('follow up');
+    expect(out.contract.test).toEqual(['run npm test']);
+    expect(out.contract.todo).toEqual(['follow up']);
   });
 
   it('returns null when there is no contract heading', () => {
@@ -187,8 +188,8 @@ describe('splitContract', () => {
 
   it('treats Nothing and Rien as empty next actions in reports', () => {
     const out = report('## Report: R\n## Steps\n- [x] Step 1: Done\n### Next\n- Test: Nothing.\n- To do: Rien.');
-    expect(out.contract.test).toBe('');
-    expect(out.contract.todo).toBe('');
+    expect(out.contract.test).toEqual([]);
+    expect(out.contract.todo).toEqual([]);
   });
 
   it('parses report steps without checkboxes as unchecked', () => {
@@ -276,8 +277,8 @@ describe('reportFromSubmission', () => {
         { number: 1, checked: true, text: 'tests pass', detail: 'cargo test' }
       ],
       changed: [{ path: 'a.ts', what: 'the code' }],
-      test: 'Open the UI',
-      todo: ''
+      test: ['Open the UI'],
+      todo: []
     });
   });
 
@@ -287,8 +288,19 @@ describe('reportFromSubmission', () => {
     expect(report.steps).toEqual([]);
     expect(report.doneWhen).toEqual([]);
     expect(report.changed).toEqual([]);
-    expect(report.test).toBe('');
-    expect(report.todo).toBe('');
+    expect(report.test).toEqual([]);
+    expect(report.todo).toEqual([]);
+  });
+
+  it('lists the free text by line, or by sentence on one line', () => {
+    const report = reportFromSubmission({ title: 'R', test: 'Open Tasks. Check the button on each tab. Create an idea.', todo: '- rerun vitest\n- update docs' });
+    expect(report.test).toEqual(['Open Tasks.', 'Check the button on each tab.', 'Create an idea.']);
+    expect(report.todo).toEqual(['rerun vitest', 'update docs']);
+  });
+
+  it('splits a path into its folder and file name', () => {
+    expect(pathParts('web/src/a.tsx')).toEqual({ dir: 'web/src/', name: 'a.tsx' });
+    expect(pathParts('README.md')).toEqual({ dir: '', name: 'README.md' });
   });
 });
 

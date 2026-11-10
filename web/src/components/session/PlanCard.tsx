@@ -1,8 +1,8 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Plan, PlanCriterion, Report } from '../../lib/plan';
+import { pathParts, type Plan, type PlanCriterion, type Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, PlayIcon } from '../ui/Icons';
+import { AlertIcon, CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, FileIcon, PlayIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
@@ -28,10 +28,6 @@ function Inline({ children }: { children: string }) {
       {children}
     </ReactMarkdown>
   );
-}
-
-function PathChip({ path }: { path: string }) {
-  return <code className="rounded-md bg-code px-1.5 py-0.5 font-mono text-xs text-text">{path}</code>;
 }
 
 // A step's files, on the raised inset: bg-panel keeps them lighter than bg-code.
@@ -215,6 +211,23 @@ function CheckRow({ checked, label, text, detail }: { checked: boolean; label: s
   );
 }
 
+function ChangedFileRow({ path, what }: { path: string; what: string }) {
+  const { dir, name } = pathParts(path);
+  return (
+    <li className="flex flex-col gap-0.5 px-3 py-2" title={path}>
+      <span className="min-w-0 truncate font-mono text-xs">
+        <span className="text-muted">{dir}</span>
+        <span className="font-semibold text-text">{name}</span>
+      </span>
+      {what && (
+        <span className="text-xs text-muted">
+          <Inline>{what}</Inline>
+        </span>
+      )}
+    </li>
+  );
+}
+
 export function ReportCard({ report }: { report: Report }) {
   const t = useT();
   const done = report.steps.filter((s) => s.checked).length;
@@ -275,40 +288,50 @@ export function ReportCard({ report }: { report: Report }) {
       )}
       {report.changed.length > 0 && (
         // Folded: on a large change the file list would outgrow the rest of the report.
-        <details className="group flex flex-col gap-1.5">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 select-none">
+        <details className="group overflow-hidden rounded-md border border-border">
+          <summary className="flex cursor-pointer list-none items-center gap-2 bg-raised px-3 py-1.5 select-none group-open:border-b group-open:border-border">
             <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-hover:text-text group-open:rotate-90" />
+            <FileIcon className="h-3.5 w-3.5 text-accent" />
             <SectionLabel>{t('panelModifiedFiles')}</SectionLabel>
             <Badge tone="neutral">{report.changed.length}</Badge>
           </summary>
-          <ul className="m-0 mt-1.5 flex flex-col gap-1.5">
+          <ul className="m-0 flex flex-col divide-y divide-border">
             {report.changed.map((c, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <PathChip path={c.path} />
-                {c.what && (
-                  <span className="min-w-0 text-muted">
-                    <Inline>{c.what}</Inline>
-                  </span>
-                )}
-              </li>
+              <ChangedFileRow key={i} path={c.path} what={c.what} />
             ))}
           </ul>
         </details>
       )}
-      {report.test && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>{t('toTest')}</SectionLabel>
-          <div className="text-sm text-text">
-            <Inline>{report.test}</Inline>
+      {report.test.length > 0 && (
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <EyeIcon className="h-3.5 w-3.5 text-accent" />
+            <SectionLabel>{t('toTest')}</SectionLabel>
           </div>
+          <ol className="m-0 flex flex-col gap-1.5 px-3 py-2.5">
+            {report.test.map((item, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-text">
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">{i + 1}</span>
+                <span className="min-w-0"><Inline>{item}</Inline></span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
-      {report.todo && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>{t('toDo')}</SectionLabel>
-          <div className="text-sm text-text">
-            <Inline>{report.todo}</Inline>
+      {report.todo.length > 0 && (
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <AlertIcon className="h-3.5 w-3.5 text-attention" />
+            <SectionLabel>{t('toDo')}</SectionLabel>
           </div>
+          <ul className="m-0 flex flex-col gap-1.5 px-3 py-2.5">
+            {report.todo.map((item, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-text">
+                <span aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-sm border-[1.5px] border-attention bg-attention/10" />
+                <span className="min-w-0"><Inline>{item}</Inline></span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </Card>

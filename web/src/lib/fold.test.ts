@@ -322,8 +322,8 @@ describe('createThreadFold', () => {
             { number: 1, checked: true, text: 'tests pass', detail: 'cargo test' }
           ],
           changed: [{ path: 'a.ts', what: 'the code' }],
-          test: 'Open the UI',
-          todo: ''
+          test: ['Open the UI'],
+          todo: []
         },
         markdown: '## Report: Ship'
       }
