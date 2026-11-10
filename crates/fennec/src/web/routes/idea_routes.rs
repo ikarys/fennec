@@ -5,7 +5,9 @@ use crate::web::http::HttpError;
 use std::net::TcpStream;
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
+
+use super::sheet_input;
 
 use crate::domain::id::new_id;
 use crate::web::App;
@@ -128,7 +130,7 @@ pub fn add_idea(
     send_board(app, stream, project_id)
 }
 
-/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete}`.
+/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete,sheet,turn-into-task}`.
 pub fn update_idea(
     app: &App,
     req: &Request,
@@ -139,17 +141,31 @@ pub fn update_idea(
 ) -> Result<(), HttpError> {
     let store = app.store()?;
     require_project(&store, project_id)?;
-    if !store
-        .backlog(project_id)?
-        .ideas
-        .iter()
-        .any(|idea| idea.id == idea_id)
-    {
+    let backlog = store.backlog(project_id)?;
+    let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
         return error(stream, 404, "no such idea");
-    }
+    };
     let body = req.json()?;
     let field = |name: &str| body[name].as_str().unwrap_or("").trim().to_string();
     let idea_id = idea_id.to_string();
+    if let Some(decided) = sheet_input::sheet_event(idea, action, &body, MAX_IDEA_CHARS) {
+        match decided {
+            Ok(event) => {
+                store.append_idea_event(project_id, &event)?;
+                return send_board(app, stream, project_id);
+            }
+            Err(refusal) if refusal.missing.is_empty() => {
+                return error(stream, refusal.status, &refusal.message);
+            }
+            Err(refusal) => {
+                return send_json(
+                    stream,
+                    refusal.status,
+                    &json!({ "error": refusal.message, "missing": refusal.missing }),
+                );
+            }
+        }
+    }
     let event = match action {
         "framing" => {
             let session_id = field("sessionId");

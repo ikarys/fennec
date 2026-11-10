@@ -330,6 +330,14 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "edit": status.edit(),
         "sessionId": idea.session_id,
         "plan": idea.plan,
+        "sheet": idea.sheet,
+        "sheetMarkdown": idea
+            .sheet
+            .as_ref()
+            .map(|sheet| sheet.to_markdown(&backlog::title(&idea.text, None))),
+        "missing": idea.sheet.as_ref().map(|sheet| sheet.missing()).unwrap_or_default(),
+        "completeness": idea.sheet.as_ref().map(|sheet| sheet.completeness()),
+        "modelFields": idea.model_fields,
         "halted": idea.halted,
         "autonomous": idea.autonomous,
         "position": position,

@@ -442,20 +442,23 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - `groups` `[{stage, ideas: [idea]}]`, all five groups always sent, in this order: `yours` (waits for the human: review, question,
     halted, failed), `running`, `queue` (in queue order), `drafts` (inbox, framing), `done` (integrated); outside the
     queue, the most recently changed first.
-  - `idea` `{id, text, attachments, status, stage, action, menu, edit, sessionId, plan, halted, autonomous, position, createdAt, startedAt,
-    durationMs, tokens, criteria, decisions, commits, files}`: `status` `inbox | framing | queued | running | question |
-    review | halted | failed | integrated | completed` (from the idea and its session's state; a started idea whose
-    session is gone is `failed`); `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the
-    idea (a base64 data URL in `data`; handed to the agent on framing and build: images as vision, text inlined,
-    binaries in the worktree); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
-    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop | remove | editPlan`
-    (`editPlan` posts `ready`; empty for running); `edit` the edit shown as its own button, `editText` (posts `edit`) on a
-    draft, else `null`; `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
-    new plan or start; `position` its 1-based place in the queue; `durationMs` from its start to now (running) or its
-    session's last change; `tokens` uncached prompt plus completion of the project's calls in that window (exact while
-    one idea runs at a time); `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its
-    session's run; `commits` and `files` of its worktree branch past its base, for `review`, `halted` and `failed` only.
-    Null when not applicable.
+  - `idea` `{id, text, attachments, status, stage, action, menu, edit, sessionId, plan, sheet, sheetMarkdown, missing,
+    completeness, modelFields, halted, autonomous, position, createdAt, startedAt, durationMs, tokens, criteria,
+    decisions, commits, files}`: `status` `inbox | framing | queued | running | question | review | halted | failed |
+    integrated | completed` (from the idea and its session's state; a started idea whose session is gone is `failed`);
+    `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the idea (a base64 data URL in
+    `data`; handed to the agent on framing and build: images as vision, text inlined, binaries in the worktree);
+    `action` the one next step `frame | resumeFraming | start | open | answer | review`; `menu` the secondary actions
+    `restart | reframe | startUnframed | complete | drop | remove | editPlan` (`editPlan` posts `ready`; empty for
+    running); `edit` the edit shown as its own button, `editText` (posts `edit`) on a draft, else `null`; `plan` the
+    approved plan verbatim; `sheet` the task sheet or null, `sheetMarkdown` it rendered as the plan, `missing` the
+    required fields it lacks (`objective`, `doneWhen`), `completeness` `{required, suggested}` the filled required (of
+    2) and suggested (of 4) fields, `modelFields` the fields whose last change came from a model (indicative);
+    `halted` why the night mode stopped or skipped it, cleared by a new plan or start; `position` its 1-based place in
+    the queue; `durationMs` from its start to now (running) or its session's last change; `tokens` uncached prompt
+    plus completion of the project's calls in that window (exact while one idea runs at a time); `criteria` `{passed,
+    failed, pending}` and `decisions` `[{title, choice}]` from its session's run; `commits` and `files` of its
+    worktree branch past its base, for `review`, `halted` and `failed` only. Null when not applicable.
   - `nightReport` the last queue run once finished and until read, if it started an idea: `{startedAt, finishedAt,
     reason, autonomous, summary: {started, running, review, question, halted, failed, integrated}, ideas: [idea]}`;
     `reason` `no idea ready | stopped by the human | project gone | server restarted | error: …`.
@@ -465,7 +468,18 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     with `sessionId` (a session of the project, else 404) and `plan` (400 if empty), also `idea.framing` and `idea.ready`:
     the plan card's "Mettre au backlog" for a plan written outside the backlog
   - `POST /api/projects/{id}/ideas/{ideaId}/framing` `{sessionId}` (`idea.framing`; 404 if the session is not the project's)
-  - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty)
+  - `POST /api/projects/{id}/ideas/{ideaId}/ready` `{plan}` (`idea.ready`; 400 if empty); for an idea with a task sheet,
+    `{}`: the sheet rendered as the plan's markdown (`## Plan: <title>`, `Goal:`, sections, `## Done when` with checks);
+    400 `{error, missing}` when the objective or every done-when criterion is missing; 409 once started, dropped or
+    completed
+  - `POST /api/projects/{id}/ideas/{ideaId}/sheet` `{sheet, by?}` (`idea.sheet_edited {ideaId, sheet, by}`): the whole
+    sheet `{objective, context, constraints, outOfScope, deliverable, approach, doneWhen: [{text, check?}]}`; `by`
+    `human` (default) or `agent` (an accepted model suggestion: the changed fields are shown as indicative); each text
+    field at most 4000 characters with no line starting with `## `, at most 20 criteria, each one line, a check one line
+    of at most 500 characters (else 400); saving a ready idea returns it to framing (inbox without a session); 409 once
+    started, dropped or completed
+  - `POST /api/projects/{id}/ideas/{ideaId}/turn-into-task` `{}` (`idea.sheet_edited`, by human): a sheet whose
+    objective is the idea's text; 409 if it already has one, or once started, dropped or completed
   - `POST /api/projects/{id}/ideas/{ideaId}/edit` `{text}` (`idea.edited`; 400 if empty or over 4000 characters): the human rewrites the idea's text; a dropped or completed idea keeps its text
   - `POST /api/projects/{id}/ideas/{ideaId}/drop` `{}` (`idea.dropped`): abandons an idea, or removes a done one from the board (menu `remove`)
   - `POST /api/projects/{id}/ideas/{ideaId}/complete` `{}` (`idea.completed`)

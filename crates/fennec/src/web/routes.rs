@@ -35,6 +35,7 @@ pub(super) mod session_delete;
 pub(super) mod session_routes;
 pub(super) mod settings_routes;
 pub(super) mod setup_routes;
+pub(super) mod sheet_input;
 pub(super) mod update_routes;
 pub(super) mod waiver_routes;
 pub(super) mod workflow_routes;
