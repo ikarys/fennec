@@ -5,6 +5,7 @@ import { useT } from '../i18n';
 import { ChatIcon, PlusIcon, SearchIcon } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Section } from '../components/ui/Section';
 import { TextInput } from '../components/ui/Field';
 import { ChatSection } from '../components/session/ChatSection';
 import { useSessionSelection } from '../hooks/useSessionSelection';
@@ -69,24 +70,6 @@ export function ChatsPage({
           }
         />
 
-        {chatProject && (
-          <div className="flex items-center gap-3">
-            <div className="relative min-w-0 grow">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
-              <TextInput
-                className="pl-8"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') setQuery('');
-                }}
-                placeholder={t('chatsFilter')}
-                aria-label={t('chatsFilter')}
-              />
-            </div>
-          </div>
-        )}
-
         {selected.size > 0 && (
           <div className="sticky top-0 z-10 flex items-center gap-3 rounded-md border border-border bg-raised px-3 py-2">
             {t('homeSelectedSessions', { count: selected.size })}
@@ -99,39 +82,61 @@ export function ChatsPage({
           </div>
         )}
 
-        {error && <p className="m-0 text-err">{error}</p>}
-
-        {loading && projects.length === 0 && <div className="text-sm text-muted">{t('loading')}</div>}
-
-        {chatProject && chatProject.sessions.length === 0 ? (
-          <ChatSection
-            title={t('homeChat')}
-            sessions={[]}
-            onOpenSession={onOpenSession}
-            selected={selected}
-            selecting={selected.size > 0}
-            onToggle={toggle}
-            onDelete={(id) => remove([id])}
-          />
-        ) : (
-          <>
-            {visibleGroups.map(({ group, sessions }) => (
-              <ChatSection
-                key={group.projectId ?? 'unlinked'}
-                title={group.projectName ?? t('chatsUnlinked')}
-                sessions={sessions}
-                onOpenSession={onOpenSession}
-                selected={selected}
-                selecting={selected.size > 0}
-                onToggle={toggle}
-                onDelete={(id) => remove([id])}
+        <Section
+          Icon={ChatIcon}
+          title={t('chatsSectionTitle')}
+          description={t('chatsCount', { count: chatProject?.sessions.length ?? 0 })}
+        >
+          {chatProject && (
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+              <TextInput
+                className="pl-8"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setQuery('');
+                }}
+                placeholder={t('chatsFilter')}
+                aria-label={t('chatsFilter')}
               />
-            ))}
-            {chatProject && query.trim() !== '' && visibleGroups.length === 0 && (
-              <p className="m-0 py-6 text-center text-sm text-muted">{t('chatsNoMatch', { query })}</p>
-            )}
-          </>
-        )}
+            </div>
+          )}
+
+          {error && <p className="m-0 text-err">{error}</p>}
+
+          {loading && projects.length === 0 && <div className="text-sm text-muted">{t('loading')}</div>}
+
+          {chatProject && chatProject.sessions.length === 0 ? (
+            <ChatSection
+              title={t('homeChat')}
+              sessions={[]}
+              onOpenSession={onOpenSession}
+              selected={selected}
+              selecting={selected.size > 0}
+              onToggle={toggle}
+              onDelete={(id) => remove([id])}
+            />
+          ) : (
+            <>
+              {visibleGroups.map(({ group, sessions }) => (
+                <ChatSection
+                  key={group.projectId ?? 'unlinked'}
+                  title={group.projectName ?? t('chatsUnlinked')}
+                  sessions={sessions}
+                  onOpenSession={onOpenSession}
+                  selected={selected}
+                  selecting={selected.size > 0}
+                  onToggle={toggle}
+                  onDelete={(id) => remove([id])}
+                />
+              ))}
+              {chatProject && query.trim() !== '' && visibleGroups.length === 0 && (
+                <p className="m-0 py-6 text-center text-sm text-muted">{t('chatsNoMatch', { query })}</p>
+              )}
+            </>
+          )}
+        </Section>
       </div>
 
       {dialog}
