@@ -96,6 +96,7 @@ describe('parseRoute', () => {
       projectId: 'a/b',
       tab: 'risks',
       sub: null,
+      session: null,
     });
   });
 
@@ -105,7 +106,24 @@ describe('parseRoute', () => {
       projectId: 'x',
       tab: 'map',
       sub: 'foo',
+      session: null,
     });
+  });
+
+  it('round-trips a project file path with a session', async () => {
+    const { projectFilePath } = await import('./route');
+    expect(parseRoute(projectFilePath('p', 'docs/a b.md', 's-1'))).toEqual({
+      name: 'project',
+      projectId: 'p',
+      tab: 'files',
+      sub: 'docs/a b.md',
+      session: 's-1',
+    });
+  });
+
+  it('builds a project files path without a file', async () => {
+    const { projectFilePath } = await import('./route');
+    expect(projectFilePath('p', null)).toBe('#/project/p/files');
   });
 
   it('parses workflows route without ids', () => {
@@ -262,6 +280,7 @@ describe('tabIdForRoute', () => {
         projectId: 'p1',
         tab: null,
         sub: null,
+        session: null,
       }),
     ).toBeNull();
   });

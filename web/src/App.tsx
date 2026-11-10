@@ -467,7 +467,7 @@ export default function App() {
             </Suspense>
           ) : route.name === 'project' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
+              <ProjectPage projects={projects} projectId={route.projectId} tab={route.tab} sub={route.sub} session={route.session} onOpenSession={openSession} onNewSession={(projectId) => startNewSession(projectId)} onDeleted={refreshProjects} onSessionsDeleted={handleSessionsDeleted} />
             </Suspense>
           ) : route.name === 'insight' ? (
             <InsightPage />

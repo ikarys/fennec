@@ -16,7 +16,7 @@ export type Route =
   | { name: 'projects' }
   | { name: 'chats' }
   | { name: 'split'; left: string | null; right: string | null }
-  | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
+  | { name: 'project'; projectId: string; tab: string | null; sub: string | null; session: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 export const TABS_KEY = 'fennec.tabs';
@@ -49,8 +49,16 @@ export function parseRoute(hash: string): Route {
     return { name: 'chats' };
   }
   if (hash.startsWith('#/project/')) {
-    const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
-    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null };
+    const [pathPart, query] = hash.slice('#/project/'.length).split('?');
+    const [rawId, tab, sub] = (pathPart ?? '').split('/');
+    const session = query ? new URLSearchParams(query).get('session') : null;
+    return {
+      name: 'project',
+      projectId: decodeURIComponent(rawId ?? ''),
+      tab: tab ?? null,
+      sub: sub ? decodeURIComponent(sub) : null,
+      session,
+    };
   }
   if (hash.startsWith('#/workflows')) {
     const path = hash.slice(12); // Remove '#/workflows'
@@ -104,6 +112,15 @@ export function tabPath(tabId: string): string {
 /** The changes page of a session. */
 export function changesPath(sessionId: string): string {
   return `#/s/${encodeURIComponent(sessionId)}/changes`;
+}
+
+/** The project page's Files tab on one file; with a session, the file as it is on that session's branch. */
+export function projectFilePath(projectId: string, path: string | null, sessionId: string | null = null): string {
+  return (
+    `#/project/${encodeURIComponent(projectId)}/files` +
+    (path ? `/${encodeURIComponent(path)}` : '') +
+    (sessionId ? `?session=${encodeURIComponent(sessionId)}` : '')
+  );
 }
 
 /** The tab id on screen, from the route; null on pages that have no tab (home, project, split). */

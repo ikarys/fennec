@@ -295,3 +295,10 @@ the recently updated sessions of every project and chat, the favourite projects 
 figures that link to their page (cost over 7 days, ideas ready, worktrees on disk). The server sorts and counts
 (`domain/home.rs`, `web/routes/home_routes.rs`); projects and chats have their own pages in the header's nav
 (`HomePage.tsx`, `ProjectsPage.tsx`, `ChatsPage.tsx`).
+
+File explorer, done: the project page's Files tab lists the project's files as git sees them (tracked and new,
+never ignored ones) in a collapsible tree; a file opens rendered (markdown) or as text, and a tracked one can be
+edited and saved as a commit of that file alone on the human's current branch, with a message they type, refused
+when the file changed since it was read (`project_files.rs`, `domain/project_file.rs`, `web/routes/file_routes.rs`,
+`web/src/components/project/files/`). The changed files of a report card and of the right panel link to the file
+as the session's branch has it, read-only, or to the working tree once the session is integrated.

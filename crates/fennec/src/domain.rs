@@ -50,6 +50,7 @@ pub mod preferences;
 pub mod preflight;
 pub mod pricing;
 pub mod project;
+pub mod project_file;
 pub mod protection;
 pub mod queue;
 pub mod release;

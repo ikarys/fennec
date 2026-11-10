@@ -8,6 +8,7 @@ import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { PreflightSection } from './PreflightSection';
 import { useT } from '../../i18n';
+import { useFileLink } from './FileLinkContext';
 import type { MsgKey } from '../../i18n/messages';
 
 const REMARK_PLUGINS = [remarkGfm];
@@ -213,12 +214,25 @@ function CheckRow({ checked, label, text, detail }: { checked: boolean; label: s
 
 function ChangedFileRow({ path, what }: { path: string; what: string }) {
   const { dir, name } = pathParts(path);
+  const fileLink = useFileLink();
   return (
     <li className="flex flex-col gap-0.5 px-3 py-2" title={path}>
-      <span className="min-w-0 truncate font-mono text-xs">
-        <span className="text-muted">{dir}</span>
-        <span className="font-semibold text-text">{name}</span>
-      </span>
+      {fileLink ? (
+        <a
+          href={fileLink(path)}
+          className="group min-w-0 truncate font-mono text-xs hover:text-accent-strong"
+        >
+          <span className="text-muted">{dir}</span>
+          <span className="font-semibold text-text group-hover:text-accent-strong">
+            {name}
+          </span>
+        </a>
+      ) : (
+        <span className="min-w-0 truncate font-mono text-xs">
+          <span className="text-muted">{dir}</span>
+          <span className="font-semibold text-text">{name}</span>
+        </span>
+      )}
       {what && (
         <span className="text-xs text-muted">
           <Inline>{what}</Inline>

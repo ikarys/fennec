@@ -12,6 +12,7 @@ pub(super) mod canvas_routes;
 pub(super) mod changelog_routes;
 pub(super) mod chat_link_routes;
 pub(super) mod diff_routes;
+pub(super) mod file_routes;
 pub(super) mod folder_routes;
 pub(super) mod home_routes;
 pub(super) mod idea_routes;
@@ -111,6 +112,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("GET", ["api", "projects", id, "dashboard"]) => project_dashboard::serve(app, stream, id),
         ("GET", ["api", "projects", id, "adrs"]) => project_routes::get_adrs(app, stream, id),
+        ("GET", ["api", "projects", id, "files"]) => file_routes::list(app, req, stream, id),
+        ("GET", ["api", "projects", id, "file"]) => file_routes::read(app, req, stream, id),
+        ("POST", ["api", "projects", id, "file"]) => file_routes::save(app, req, stream, id),
         ("GET", ["api", "projects", id, "risks"]) => project_routes::get_risks(app, stream, id),
         ("GET", ["api", "projects", id, "worktrees"]) => {
             worktree_routes::list(app, req, stream, id)

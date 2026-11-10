@@ -329,6 +329,19 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `[{number, file, title, status, date, body}]`, the MADR files of `docs/adr/` (`NNNN-slug.md`,
   sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
   first `# ` heading).
+- `GET /api/projects/{id}/files[?session=…]` → `{files, truncated, session}`, the project's file tree as git lists it.
+  `files` is `[{path, tracked}]`, sorted by path; `tracked` is true for files in `git ls-files --cached`.
+  `truncated` is true past 20,000 files. The `session` query reads the session's branch `fennec/<id>`
+  through git, read-only; once that branch is gone (integrated, discarded) the working tree is read
+  instead, and the reply's `session` says which one was read.
+- `GET /api/projects/{id}/file?path=…[&session=…]` → `{path, content, binary, tooLarge, blob, editable, session}`,
+  one file from the working tree or from a session's branch. `content` is null for binary files and for
+  files over 1 MiB; `blob` is the git blob id of the bytes; `editable` is true only for a tracked
+  working-tree file that is shown.
+- `POST /api/projects/{id}/file` body `{path, content, base, message}` → `{commit, blob}`. The human's
+  save is a commit of that file alone (`git commit --only`) on the human's current branch with their git
+  identity. `base` must be the blob id the human read; a mismatch answers 409. Only tracked regular
+  files inside the project are saved; never a symlink or `.git`.
 - `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
   Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
   these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.
