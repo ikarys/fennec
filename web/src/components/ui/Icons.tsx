@@ -400,16 +400,6 @@ export function SplitIcon({ className }: IconProps) {
   );
 }
 
-/** A frame with a bottom band: the app's footer. */
-export function FooterIcon({ className }: IconProps) {
-  return (
-    <Svg className={className}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 15h18" />
-    </Svg>
-  );
-}
-
 export function LocateIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
