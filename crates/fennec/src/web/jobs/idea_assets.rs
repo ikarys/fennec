@@ -74,6 +74,22 @@ pub fn prepare(attachments: &[IdeaAttachment], workdir: &Path) -> (Vec<Attachmen
     (images, addendum)
 }
 
+/// The idea's text files as (filename, content), for a prompt that must not write into the workdir.
+pub fn text_files(attachments: &[IdeaAttachment]) -> Vec<(String, String)> {
+    attachments
+        .iter()
+        .filter(|attachment| is_text(&attachment.mime_type))
+        .filter_map(|attachment| {
+            decode(&attachment.data).map(|bytes| {
+                (
+                    attachment.filename.clone(),
+                    String::from_utf8_lossy(&bytes).into_owned(),
+                )
+            })
+        })
+        .collect()
+}
+
 fn is_text(mime: &str) -> bool {
     mime.starts_with("text/")
         || matches!(
@@ -116,6 +132,35 @@ fn write_asset(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_files_keeps_only_text() {
+        let hello_b64 = base64::engine::general_purpose::STANDARD.encode("hello");
+
+        let text = IdeaAttachment {
+            filename: "notes.txt".to_string(),
+            mime_type: "text/plain".to_string(),
+            size: 5,
+            data: data_url("text/plain", &hello_b64),
+        };
+        let png = IdeaAttachment {
+            filename: "pic.png".to_string(),
+            mime_type: "image/png".to_string(),
+            size: png_data().len() as u64,
+            data: data_url("image/png", &png_data()),
+        };
+        let binary = IdeaAttachment {
+            filename: "bin.dat".to_string(),
+            mime_type: "application/octet-stream".to_string(),
+            size: 5,
+            data: data_url("application/octet-stream", &hello_b64),
+        };
+
+        assert_eq!(
+            text_files(&[text, png, binary]),
+            vec![("notes.txt".to_string(), "hello".to_string())]
+        );
+    }
 
     fn data_url(mime: &str, b64: &str) -> String {
         format!("data:{mime};base64,{b64}")

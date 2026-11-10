@@ -35,6 +35,7 @@ pub(super) mod session_delete;
 pub(super) mod session_routes;
 pub(super) mod settings_routes;
 pub(super) mod setup_routes;
+pub(super) mod sheet_input;
 pub(super) mod update_routes;
 pub(super) mod waiver_routes;
 pub(super) mod workflow_routes;
@@ -155,6 +156,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "projects", id, "ideas", "report", "read"]) => {
             idea_routes::report_read(app, stream, id)
+        }
+        ("POST", ["api", "projects", id, "ideas", iid, "sheet", "suggest"]) => {
+            idea_routes::suggest_sheet_field(app, req, stream, id, iid)
         }
         ("POST", ["api", "projects", id, "ideas", iid, "start"]) => {
             idea_routes::start_one(app, stream, id, iid)
