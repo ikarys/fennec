@@ -52,6 +52,7 @@ export function TasksOverview({
 
   return (
     <div className="flex flex-col gap-4">
+      <QueueBar queue={board.queue} projectId={projectId} run={run} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile
           icon={<ReviewIcon />}
@@ -99,8 +100,6 @@ export function TasksOverview({
           onClick={() => onSelect('done')}
         />
       </div>
-
-      <QueueBar queue={board.queue} projectId={projectId} run={run} />
 
       {board.nightReport ? (
         <NightReport
