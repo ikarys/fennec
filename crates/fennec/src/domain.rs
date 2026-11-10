@@ -70,6 +70,7 @@ pub mod service;
 pub mod session_name;
 pub mod session_skills;
 pub mod setup;
+pub mod sheet_notice;
 pub mod sheet_suggest;
 pub mod shortcut;
 pub mod skill;
