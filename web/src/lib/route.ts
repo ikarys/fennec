@@ -16,7 +16,8 @@ export type Route =
   | { name: 'projects' }
   | { name: 'chats' }
   | { name: 'split'; left: string | null; right: string | null }
-  | { name: 'project'; projectId: string; tab: string | null; sub: string | null; session: string | null }
+  | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
+  | { name: 'editor'; projectId: string; path: string | null; session: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 export const TABS_KEY = 'fennec.tabs';
@@ -49,14 +50,17 @@ export function parseRoute(hash: string): Route {
     return { name: 'chats' };
   }
   if (hash.startsWith('#/project/')) {
-    const [pathPart, query] = hash.slice('#/project/'.length).split('?');
-    const [rawId, tab, sub] = (pathPart ?? '').split('/');
+    const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
+    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null };
+  }
+  if (hash.startsWith('#/edit/')) {
+    const [pathPart, query] = hash.slice('#/edit/'.length).split('?');
+    const [rawId, rawPath] = (pathPart ?? '').split('/');
     const session = query ? new URLSearchParams(query).get('session') : null;
     return {
-      name: 'project',
+      name: 'editor',
       projectId: decodeURIComponent(rawId ?? ''),
-      tab: tab ?? null,
-      sub: sub ? decodeURIComponent(sub) : null,
+      path: rawPath ? decodeURIComponent(rawPath) : null,
       session,
     };
   }
@@ -114,10 +118,10 @@ export function changesPath(sessionId: string): string {
   return `#/s/${encodeURIComponent(sessionId)}/changes`;
 }
 
-/** The project page's Files tab on one file; with a session, the file as it is on that session's branch. */
-export function projectFilePath(projectId: string, path: string | null, sessionId: string | null = null): string {
+/** The editor page for a project's files; optional file path and session id. */
+export function editorPath(projectId: string, path: string | null, sessionId: string | null = null): string {
   return (
-    `#/project/${encodeURIComponent(projectId)}/files` +
+    `#/edit/${encodeURIComponent(projectId)}` +
     (path ? `/${encodeURIComponent(path)}` : '') +
     (sessionId ? `?session=${encodeURIComponent(sessionId)}` : '')
   );
@@ -143,6 +147,8 @@ export function tabIdForRoute(route: Route): string | null {
       return 'page:projects';
     case 'chats':
       return 'page:chats';
+    case 'editor':
+      return null;
     default:
       return null;
   }

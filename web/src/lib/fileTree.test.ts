@@ -58,8 +58,17 @@ describe('isMarkdown', () => {
 })
 
 describe('defaultCommitMessage', () => {
-  it('uses docs for markdown and chore for other files', () => {
-    expect(defaultCommitMessage('docs/a.md')).toBe('docs: update a.md')
-    expect(defaultCommitMessage('src/b.ts')).toBe('chore: update b.ts')
+  it('returns an empty message for no files', () => {
+    expect(defaultCommitMessage([])).toBe('')
+  })
+
+  it('uses docs for one markdown file and chore for other files', () => {
+    expect(defaultCommitMessage(['docs/a.md'])).toBe('docs: update a.md')
+    expect(defaultCommitMessage(['src/b.ts'])).toBe('chore: update b.ts')
+  })
+
+  it('uses docs for several markdown files and chore otherwise', () => {
+    expect(defaultCommitMessage(['docs/a.md', 'docs/b.md'])).toBe('docs: update 2 files')
+    expect(defaultCommitMessage(['docs/a.md', 'src/b.ts'])).toBe('chore: update 2 files')
   })
 })

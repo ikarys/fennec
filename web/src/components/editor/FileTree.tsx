@@ -1,10 +1,10 @@
 /**
- * The file tree in the project's Files tab: collapsible folders and files.
+ * The file tree of the editor page: collapsible folders and files.
  */
 import { useEffect, useState } from 'react';
-import { ChevronRightIcon, FileIcon, FolderIcon } from '../../ui/Icons';
-import { ancestorsOf, type FileTreeNode } from '../../../lib/fileTree';
-import { useT } from '../../../i18n';
+import { ChevronRightIcon, FileIcon, FolderIcon } from '../ui/Icons';
+import { ancestorsOf, type FileTreeNode } from '../../lib/fileTree';
+import { useT } from '../../i18n';
 
 function rowClass(active: boolean) {
   return (

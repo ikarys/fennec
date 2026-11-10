@@ -6,8 +6,8 @@ import {
   ActivityIcon,
   AlertIcon,
   BulbIcon,
+  EditIcon,
   ExternalIcon,
-  FileIcon,
   DecisionIcon,
   InsightIcon,
   LayersIcon,
@@ -23,7 +23,6 @@ import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DecisionsSection } from '../components/project/DecisionsSection';
-import { FilesSection } from '../components/project/files/FilesSection';
 import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
@@ -38,6 +37,7 @@ import {
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
 import { useOpenInEditorLabel } from '../lib/editors';
+import { editorPath } from '../lib/route';
 import { useT } from '../i18n';
 
 
@@ -49,7 +49,6 @@ const TABS = [
   { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
   { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
   { id: 'decisions', label: 'projectPageDecisions', Icon: DecisionIcon },
-  { id: 'files', label: 'projectPageFiles', Icon: FileIcon },
   { id: 'canvas', label: 'canvasLibraryTab', Icon: WandIcon },
   { id: 'analyses', label: 'analysesTitle', Icon: SearchIcon },
 ] as const;
@@ -111,7 +110,6 @@ export default function ProjectPage({
   projectId,
   tab,
   sub,
-  session,
   onOpenSession,
   onNewSession,
   onDeleted,
@@ -121,7 +119,6 @@ export default function ProjectPage({
   projectId: string;
   tab: string | null;
   sub: string | null;
-  session: string | null;
   onOpenSession: (sessionId: string) => void;
   onNewSession: (projectId: string) => void;
   /** Home and project pages both show the list, so going home does not refresh it. */
@@ -196,6 +193,14 @@ export default function ProjectPage({
       actions={
         <>
           <a
+            href={editorPath(projectId, null)}
+            title={t('editorOpen')}
+            aria-label={t('editorOpen')}
+            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+          >
+            <EditIcon className="h-4 w-4" />
+          </a>
+          <a
             href={project.editorUrl}
             title={openInEditor}
             aria-label={openInEditor}
@@ -263,7 +268,6 @@ export default function ProjectPage({
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
           {activeTab === 'decisions' ? <DecisionsSection projectId={projectId} /> : null}
-          {activeTab === 'files' ? <FilesSection projectId={projectId} path={sub} sessionId={session} /> : null}
           {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection

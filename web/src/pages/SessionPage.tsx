@@ -70,7 +70,7 @@ import { CanvasPane } from "../components/canvas/CanvasPane";
 import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
 import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
 import { FileLinkContext } from "../components/session/FileLinkContext";
-import { projectFilePath } from "../lib/route";
+import { editorPath } from "../lib/route";
 import { RunRail } from "../components/workflow/session/RunRail";
 import { useJumpToNode } from "../hooks/useJumpToNode";
 import { RunDecision } from "../components/workflow/session/RunDecision";
@@ -192,7 +192,7 @@ export function SessionPage({
   const isChat = detail?.project.chat ?? projectId === "chat";
   const linkProjectId = detail?.project.id ?? projectId;
   const fileLink = useMemo(
-    () => (sessionId && linkProjectId && !isChat ? (path: string) => projectFilePath(linkProjectId, path, sessionId) : null),
+    () => (sessionId && linkProjectId && !isChat ? (path: string) => editorPath(linkProjectId, path, sessionId) : null),
     [sessionId, linkProjectId, isChat],
   );
   const {

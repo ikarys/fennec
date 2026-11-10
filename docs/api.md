@@ -338,10 +338,15 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   one file from the working tree or from a session's branch. `content` is null for binary files and for
   files over 1 MiB; `blob` is the git blob id of the bytes; `editable` is true only for a tracked
   working-tree file that is shown.
-- `POST /api/projects/{id}/file` body `{path, content, base, message}` → `{commit, blob}`. The human's
-  save is a commit of that file alone (`git commit --only`) on the human's current branch with their git
-  identity. `base` must be the blob id the human read; a mismatch answers 409. Only tracked regular
-  files inside the project are saved; never a symlink or `.git`.
+- `POST /api/projects/{id}/file` body `{path, content, base}` → `{blob}`. The human's save writes only
+  that file to disk; nothing is committed. `base` must be the blob id the human read; a stale base
+  answers 409. Only tracked regular files inside the project are written; never a symlink or `.git`.
+- `GET /api/projects/{id}/changes` → `{files: [{path, status}]}`. `files` is the tracked files that
+  differ from HEAD, staged or not; `status` is `modified`, `added`, or `deleted`. Untracked files are
+  not listed.
+- `POST /api/projects/{id}/commit` body `{paths, message}` → `{commit}`. One commit of those files only
+  (`git commit --only`) on the human's current branch with their git identity; every path must be a
+  changed tracked file, at most 1000.
 - `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
   Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
   these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.

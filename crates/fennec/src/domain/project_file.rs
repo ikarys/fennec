@@ -3,6 +3,8 @@
 
 pub const MAX_FILE_BYTES: u64 = 1024 * 1024;
 pub const MAX_LISTED: usize = 20_000;
+/// The most files one commit from the file explorer may name.
+pub const MAX_COMMIT_PATHS: usize = 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelPath(String);

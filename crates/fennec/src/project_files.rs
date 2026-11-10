@@ -1,9 +1,10 @@
-//! The project file explorer's reads and the human's commit: the tree as git lists
-//! it, a file from the working tree or from a session's branch, and one file saved
-//! as a commit on the human's current branch. The checks live in `domain/project_file.rs`.
+//! The project file explorer's reads, writes, and commit: the tree as git lists it,
+//! a file from the working tree or from a session's branch, the changed tracked files,
+//! a file written to disk, and one commit of the ticked files on the human's current
+//! branch. The checks live in `domain/project_file.rs`.
 
 use crate::domain::project_file::{
-    CommitMessage, MAX_FILE_BYTES, MAX_LISTED, RelPath, SessionBranch,
+    CommitMessage, MAX_COMMIT_PATHS, MAX_FILE_BYTES, MAX_LISTED, RelPath, SessionBranch,
 };
 use crate::git;
 use serde::Serialize;
@@ -43,9 +44,17 @@ pub struct FileView {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Committed {
-    pub commit: String,
-    pub blob: String,
+pub struct ChangedFile {
+    pub path: String,
+    pub status: ChangeKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ChangeKind {
+    Modified,
+    Added,
+    Deleted,
 }
 
 #[derive(Debug)]
@@ -169,13 +178,51 @@ pub fn read(workdir: &Path, version: &Version, path: &RelPath) -> Result<FileVie
     }
 }
 
-pub fn commit(
+pub fn changes(workdir: &Path) -> Result<Vec<ChangedFile>, String> {
+    let output = git::run(
+        workdir,
+        &[
+            "-c",
+            "core.quotePath=false",
+            "diff",
+            "--name-status",
+            "--no-renames",
+            "-z",
+            "HEAD",
+        ],
+        None,
+    )?;
+
+    let chunks = split_nul(&output);
+    let mut files = Vec::new();
+    let mut seen = HashSet::new();
+
+    for [status, path] in chunks.as_chunks::<2>().0 {
+        let kind = match status.chars().next() {
+            Some('M' | 'T') => ChangeKind::Modified,
+            Some('A') => ChangeKind::Added,
+            Some('D') => ChangeKind::Deleted,
+            _ => continue,
+        };
+
+        let path = path.clone();
+        if RelPath::parse(&path).is_err() || !seen.insert(path.clone()) {
+            continue;
+        }
+
+        files.push(ChangedFile { path, status: kind });
+    }
+
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(files)
+}
+
+pub fn write(
     workdir: &Path,
     path: &RelPath,
     content: &str,
     base: &str,
-    message: &CommitMessage,
-) -> Result<Committed, FileError> {
+) -> Result<String, FileError> {
     if content.len() as u64 > MAX_FILE_BYTES {
         return Err(FileError::Invalid(
             "the file is too large to edit here".into(),
@@ -188,9 +235,9 @@ pub fn commit(
             "only a tracked file can be edited".into(),
         ));
     }
-    if parts.too_large {
+    if parts.too_large || parts.binary {
         return Err(FileError::Invalid(
-            "the file is too large to edit here".into(),
+            "only a text file under the size limit can be edited".into(),
         ));
     }
 
@@ -203,28 +250,49 @@ pub fn commit(
 
     std::fs::write(&parts.full, content).map_err(|e| FileError::Git(e.to_string()))?;
 
-    git::run(
-        workdir,
-        &[
-            "--literal-pathspecs",
-            "commit",
-            "--quiet",
-            "--only",
-            "-m",
-            message.as_str(),
-            "--",
-            path.as_str(),
-        ],
-        None,
-    )
-    .map_err(|e| FileError::Git(format!("the file was saved but not committed: {e}")))?;
+    hash_bytes(workdir, content.as_bytes())
+}
+
+pub fn commit(
+    workdir: &Path,
+    paths: &[RelPath],
+    message: &CommitMessage,
+) -> Result<String, FileError> {
+    if paths.is_empty() {
+        return Err(FileError::Invalid("no files to commit".into()));
+    }
+    if paths.len() > MAX_COMMIT_PATHS {
+        return Err(FileError::Invalid("too many files to commit".into()));
+    }
+
+    let changed = changes(workdir).map_err(FileError::Git)?;
+    let changed_paths: HashSet<&str> = changed.iter().map(|file| file.path.as_str()).collect();
+
+    for path in paths {
+        if !changed_paths.contains(path.as_str()) {
+            return Err(FileError::Invalid(format!(
+                "not a changed tracked file: {}",
+                path.as_str()
+            )));
+        }
+    }
+
+    let mut args: Vec<&str> = vec![
+        "--literal-pathspecs",
+        "commit",
+        "--quiet",
+        "--only",
+        "-m",
+        message.as_str(),
+        "--",
+    ];
+    args.extend(paths.iter().map(|path| path.as_str()));
+
+    git::run(workdir, &args, None).map_err(|e| FileError::Git(e.to_string()))?;
 
     let commit = git::stdout(workdir, &["rev-parse", "HEAD"])
-        .ok_or_else(|| FileError::Git("the file was saved but HEAD is unknown".into()))?;
-    let commit = commit.trim().to_string();
-    let blob = hash_bytes(workdir, content.as_bytes())?;
-
-    Ok(Committed { commit, blob })
+        .ok_or_else(|| FileError::Git("the commit was made but HEAD is unknown".into()))?;
+    Ok(commit.trim().to_string())
 }
 
 fn tree_parts(workdir: &Path, path: &RelPath) -> Result<TreeParts, FileError> {
@@ -483,35 +551,88 @@ mod tests {
     }
 
     #[test]
-    fn saving_commits_only_that_file_and_keeps_the_rest_staged() {
+    fn saving_writes_the_file_without_committing() {
         let dir = fresh_repo();
-        commit_file(&dir, "a.txt", "a1");
-        commit_file(&dir, "b.txt", "b1");
+        commit_file(&dir, "a.txt", "a");
 
-        std::fs::write(dir.join("b.txt"), "b2").unwrap();
-        git::run(&dir, &["add", "b.txt"], None).unwrap();
-
+        let head_before = git::stdout(&dir, &["rev-parse", "HEAD"]).unwrap();
         let base = read(&dir, &Version::Tree, &RelPath::parse("a.txt").unwrap())
             .unwrap()
             .blob
             .expect("a.txt should have a blob id");
-        let committed = commit(
+
+        let blob = write(&dir, &RelPath::parse("a.txt").unwrap(), "a2", &base).unwrap();
+
+        assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "a2");
+        assert_eq!(
+            git::stdout(&dir, &["rev-parse", "HEAD"]).unwrap(),
+            head_before
+        );
+
+        let expected = git::stdout(&dir, &["hash-object", "a.txt"])
+            .unwrap()
+            .trim()
+            .to_string();
+        assert_eq!(blob, expected);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn one_commit_takes_the_ticked_files_and_keeps_the_rest_staged() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "a1");
+        commit_file(&dir, "b.txt", "b1");
+        commit_file(&dir, "c.txt", "c1");
+
+        std::fs::write(dir.join("c.txt"), "c2").unwrap();
+        git::run(&dir, &["add", "c.txt"], None).unwrap();
+
+        let a_path = RelPath::parse("a.txt").unwrap();
+        let b_path = RelPath::parse("b.txt").unwrap();
+
+        let a_base = read(&dir, &Version::Tree, &a_path)
+            .unwrap()
+            .blob
+            .expect("a.txt should have a blob id");
+        let b_base = read(&dir, &Version::Tree, &b_path)
+            .unwrap()
+            .blob
+            .expect("b.txt should have a blob id");
+
+        write(&dir, &a_path, "a2", &a_base).unwrap();
+        write(&dir, &b_path, "b2", &b_base).unwrap();
+
+        let commit_id = commit(
             &dir,
-            &RelPath::parse("a.txt").unwrap(),
-            "a2",
-            &base,
-            &CommitMessage::parse("edit a").unwrap(),
+            &[a_path, b_path],
+            &CommitMessage::parse("edit a and b").unwrap(),
         )
         .unwrap();
+        assert!(!commit_id.is_empty());
 
-        assert!(!committed.commit.is_empty());
-        assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "a2");
-
-        let show = git::stdout(&dir, &["show", "--name-only", "--format=", "HEAD"]).unwrap();
-        assert_eq!(show.trim(), "a.txt");
+        let show = git::stdout(
+            &dir,
+            &[
+                "-c",
+                "core.quotePath=false",
+                "show",
+                "--name-only",
+                "--format=",
+                "HEAD",
+            ],
+        )
+        .unwrap();
+        let mut names: Vec<&str> = show
+            .lines()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .collect();
+        names.sort_unstable();
+        assert_eq!(names, vec!["a.txt", "b.txt"]);
 
         let cached = git::stdout(&dir, &["diff", "--cached", "--name-only"]).unwrap();
-        assert!(cached.lines().any(|line| line == "b.txt"));
+        assert_eq!(cached.trim(), "c.txt");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -524,12 +645,11 @@ mod tests {
         let head_before = git::stdout(&dir, &["rev-parse", "HEAD"]).unwrap();
         let before = std::fs::read_to_string(dir.join("a.txt")).unwrap();
 
-        let error = commit(
+        let error = write(
             &dir,
             &RelPath::parse("a.txt").unwrap(),
             "new",
             "0000000000000000000000000000000000000000",
-            &CommitMessage::parse("edit a").unwrap(),
         )
         .unwrap_err();
 
@@ -549,16 +669,62 @@ mod tests {
         commit_file(&dir, "tracked.txt", "tracked");
         std::fs::write(dir.join("new.txt"), "new").unwrap();
 
-        let error = commit(
-            &dir,
-            &RelPath::parse("new.txt").unwrap(),
-            "newer",
-            "0",
-            &CommitMessage::parse("edit new").unwrap(),
-        )
-        .unwrap_err();
+        let error = write(&dir, &RelPath::parse("new.txt").unwrap(), "newer", "0").unwrap_err();
 
         assert!(matches!(error, FileError::Invalid(_)));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn committing_a_file_that_did_not_change_is_refused() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "a");
+
+        let path = RelPath::parse("a.txt").unwrap();
+        let error = commit(&dir, &[path], &CommitMessage::parse("noop").unwrap()).unwrap_err();
+
+        match error {
+            FileError::Invalid(message) => {
+                assert_eq!(message, "not a changed tracked file: a.txt");
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn changes_lists_modified_added_and_deleted_tracked_files() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "a1");
+        commit_file(&dir, "b.txt", "b1");
+        commit_file(&dir, "c.txt", "c1");
+
+        std::fs::write(dir.join("a.txt"), "a2").unwrap();
+
+        std::fs::write(dir.join("d.txt"), "d").unwrap();
+        git::run(&dir, &["add", "d.txt"], None).unwrap();
+
+        git::run(&dir, &["rm", "c.txt"], None).unwrap();
+
+        std::fs::write(dir.join("e.txt"), "e").unwrap();
+
+        let changed = changes(&dir).unwrap();
+        let paths: Vec<&str> = changed.iter().map(|file| file.path.as_str()).collect();
+        assert_eq!(paths, vec!["a.txt", "c.txt", "d.txt"]);
+
+        let status = |name: &str| {
+            changed
+                .iter()
+                .find(|file| file.path == name)
+                .map(|file| file.status)
+        };
+
+        assert_eq!(status("a.txt"), Some(ChangeKind::Modified));
+        assert_eq!(status("c.txt"), Some(ChangeKind::Deleted));
+        assert_eq!(status("d.txt"), Some(ChangeKind::Added));
+        assert_eq!(status("e.txt"), None);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -608,29 +774,48 @@ mod tests {
     #[test]
     fn a_pathspec_magic_name_is_taken_literally() {
         let dir = fresh_repo();
-        commit_file(&dir, "x", "x");
+        let magic_name = ":(glob)*";
 
-        let head_before = git::stdout(&dir, &["rev-parse", "HEAD"]).unwrap();
-        let base = read(&dir, &Version::Tree, &RelPath::parse("x").unwrap())
+        std::fs::write(dir.join("b.txt"), "b1").unwrap();
+        git::run(&dir, &["add", "b.txt"], None).unwrap();
+
+        std::fs::write(dir.join(magic_name), "magic1").unwrap();
+        git::run(&dir, &["--literal-pathspecs", "add", magic_name], None).unwrap();
+        git::run(&dir, &["commit", "-q", "-m", "initial"], None).unwrap();
+
+        let magic_path = RelPath::parse(magic_name).unwrap();
+        let magic_base = read(&dir, &Version::Tree, &magic_path)
             .unwrap()
             .blob
-            .expect("x should have a blob id");
-        let path = RelPath::parse(":(glob)*").unwrap();
+            .expect("magic file should have a blob id");
 
-        let error = commit(
+        write(&dir, &magic_path, "magic2", &magic_base).unwrap();
+        std::fs::write(dir.join("b.txt"), "b2").unwrap();
+
+        let commit_id = commit(
             &dir,
-            &path,
-            "new",
-            &base,
+            &[magic_path],
             &CommitMessage::parse("edit magic").unwrap(),
         )
-        .unwrap_err();
+        .unwrap();
+        assert!(!commit_id.is_empty());
 
-        assert!(matches!(error, FileError::NotFound));
-        assert_eq!(
-            git::stdout(&dir, &["rev-parse", "HEAD"]).unwrap(),
-            head_before
-        );
+        let show = git::stdout(
+            &dir,
+            &[
+                "-c",
+                "core.quotePath=false",
+                "show",
+                "--name-only",
+                "--format=",
+                "HEAD",
+            ],
+        )
+        .unwrap();
+        assert_eq!(show.trim(), magic_name);
+
+        let diff = git::stdout(&dir, &["diff", "--name-only"]).unwrap();
+        assert_eq!(diff.trim(), "b.txt");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

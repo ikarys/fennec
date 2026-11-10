@@ -1,4 +1,4 @@
-// The project's files as listed and read on disk or on a session branch; a tracked file can be committed.
+// The project's files as listed and read on disk or on a session branch; files are saved, and tracked changes committed.
 import { request } from "./request";
 
 export interface ProjectFileEntry {
@@ -23,9 +23,9 @@ export interface ProjectFileView {
   session: boolean;
 }
 
-export interface ProjectFileCommit {
-  commit: string;
-  blob: string;
+export interface ProjectChange {
+  path: string;
+  status: 'modified' | 'added' | 'deleted';
 }
 
 export function getProjectFiles(
@@ -60,12 +60,31 @@ export function getProjectFile(
   );
 }
 
-export function commitProjectFile(
+export function saveProjectFile(
   projectId: string,
-  input: { path: string; content: string; base: string; message: string },
-): Promise<ProjectFileCommit> {
-  return request<ProjectFileCommit>(
+  input: { path: string; content: string; base: string },
+): Promise<{ blob: string }> {
+  return request<{ blob: string }>(
     `/api/projects/${encodeURIComponent(projectId)}/file`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getProjectChanges(projectId: string): Promise<{ files: ProjectChange[] }> {
+  return request<{ files: ProjectChange[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/changes`,
+  );
+}
+
+export function commitProjectFiles(
+  projectId: string,
+  input: { paths: string[]; message: string },
+): Promise<{ commit: string }> {
+  return request<{ commit: string }>(
+    `/api/projects/${encodeURIComponent(projectId)}/commit`,
     {
       method: "POST",
       body: JSON.stringify(input),
