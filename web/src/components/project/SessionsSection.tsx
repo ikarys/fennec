@@ -9,6 +9,8 @@ import { Badge } from '../ui/Badge';
 import { useLang, useT } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { usePaged } from '../../hooks/usePaged';
+import { Pager } from '../ui/Pager';
 
 export function SessionsSection({
   projectName,
@@ -27,6 +29,7 @@ export function SessionsSection({
   // Selection mode: a row click toggles it instead of opening the session.
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const paged = usePaged(sessions);
 
   // A running session cannot be deleted, so it is never selectable.
   const deletable = sessions.filter((s) => s.state !== 'running');
@@ -92,7 +95,7 @@ export function SessionsSection({
           <p className="py-3 text-xs text-muted">{t('noSessionsYet')}</p>
         ) : (
           <ul className="divide-y divide-border">
-            {sessions.map((s) => {
+            {paged.visible.map((s) => {
               const running = s.state === 'running';
               const isSelected = selected.has(s.id);
               return (
@@ -173,6 +176,7 @@ export function SessionsSection({
             })}
           </ul>
         )}
+        <Pager page={paged.page} pageCount={paged.pageCount} from={paged.from} to={paged.to} total={sessions.length} onPage={paged.setPage} />
       </Section>
       {pendingDelete && (
         <DeleteSessionsDialog
