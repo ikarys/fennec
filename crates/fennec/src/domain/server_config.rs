@@ -51,6 +51,17 @@ pub fn password(content: &str) -> Result<Option<String>, String> {
     }
 }
 
+/// Listening beyond the loopback needs a password: without one, fennec refuses to listen.
+pub fn check_listen(listen: IpAddr, password_set: bool) -> Result<(), String> {
+    if listen.is_loopback() || password_set {
+        Ok(())
+    } else {
+        Err(format!(
+            "listen {listen} is not a loopback address; set a password first with `fennec password`"
+        ))
+    }
+}
+
 /// A port the human may choose: 1024..=65535 (below 1024 needs root).
 pub fn valid_port(port: u64) -> Result<u16, String> {
     if !(1024..=65535).contains(&port) {
@@ -117,6 +128,18 @@ pub fn with_listen(content: &str, ip: IpAddr) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn listening_beyond_the_loopback_needs_a_password() {
+        let anywhere: IpAddr = "0.0.0.0".parse().unwrap();
+        let lan: IpAddr = "192.168.1.10".parse().unwrap();
+        let loopback6: IpAddr = "::1".parse().unwrap();
+        assert!(check_listen(anywhere, false).is_err());
+        assert!(check_listen(lan, false).is_err());
+        assert!(check_listen(anywhere, true).is_ok());
+        assert!(check_listen(DEFAULT_LISTEN, false).is_ok());
+        assert!(check_listen(loopback6, false).is_ok());
+    }
 
     #[test]
     fn absent_port_is_none() {
