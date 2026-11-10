@@ -5,6 +5,7 @@ mod budgets;
 pub mod calls;
 mod ideas;
 mod mcp_credentials;
+mod migrations;
 mod plugins;
 mod project_events;
 mod settings;
@@ -59,8 +60,7 @@ pub struct SqliteStore {
     db: Connection,
 }
 
-const SCHEMA: &str = "PRAGMA foreign_keys = ON;
-     CREATE TABLE IF NOT EXISTS projects (
+const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS projects (
        id TEXT PRIMARY KEY,
        name TEXT NOT NULL,
        workdir TEXT NOT NULL UNIQUE,
@@ -118,32 +118,9 @@ impl SqliteStore {
     }
 
     fn init(db: Connection) -> Result<SqliteStore> {
-        db.execute_batch(SCHEMA)?;
-        db.execute_batch(ideas::SCHEMA)?;
-        db.execute_batch(plugins::SCHEMA)?;
-        // Old databases predate child sessions, favourites and chat links;
-        // add the columns then.
-        if !Self::has_column(&db, "sessions", "parent_id")? {
-            db.execute("ALTER TABLE sessions ADD COLUMN parent_id TEXT", [])?;
-        }
-        if !Self::has_column(&db, "projects", "favorite")? {
-            db.execute(
-                "ALTER TABLE projects ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
-                [],
-            )?;
-        }
-        if !Self::has_column(&db, "sessions", "linked_project_id")? {
-            db.execute("ALTER TABLE sessions ADD COLUMN linked_project_id TEXT", [])?;
-        }
+        db.execute_batch("PRAGMA foreign_keys = ON;")?;
+        migrations::migrate(&db)?;
         Ok(SqliteStore { db })
-    }
-
-    fn has_column(db: &Connection, table: &str, column: &str) -> Result<bool> {
-        Ok(db
-            .prepare(&format!("PRAGMA table_info({table})"))?
-            .query_map([], |r| r.get::<_, String>(1))?
-            .into_iter()
-            .any(|name| name.is_ok_and(|n| n == column)))
     }
 
     /// The project for `workdir`, created on first use.
