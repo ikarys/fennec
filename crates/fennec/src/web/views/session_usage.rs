@@ -134,19 +134,21 @@ fn view(message_id: &str, call: &CallRecord, lang: Lang) -> CallView {
         ),
         detail: match lang {
             Lang::En => format!(
-                "Input {} tokens, {} cached, {fresh} new at {} · output {} tokens at {}",
-                usage.prompt_tokens,
-                usage.cached_tokens,
+                "Input {} tokens, {} cached, {} new at {} · output {} tokens at {}",
+                display::tokens(usage.prompt_tokens, lang.locale()),
+                display::tokens(usage.cached_tokens, lang.locale()),
+                display::tokens(fresh, lang.locale()),
                 display::speed(call.prefill_speed),
-                usage.completion_tokens,
+                display::tokens(usage.completion_tokens, lang.locale()),
                 display::speed(call.generation_speed)
             ),
             Lang::Fr => format!(
-                "Entrée {} tokens dont {} en cache, {fresh} nouveaux à {} · sortie {} tokens à {}",
-                usage.prompt_tokens,
-                usage.cached_tokens,
+                "Entrée {} tokens dont {} en cache, {} nouveaux à {} · sortie {} tokens à {}",
+                display::tokens(usage.prompt_tokens, lang.locale()),
+                display::tokens(usage.cached_tokens, lang.locale()),
+                display::tokens(fresh, lang.locale()),
                 display::speed(call.prefill_speed),
-                usage.completion_tokens,
+                display::tokens(usage.completion_tokens, lang.locale()),
                 display::speed(call.generation_speed)
             ),
         },
@@ -286,7 +288,7 @@ mod tests {
         let views = call_views(&[done("a")], &[call], Lang::En);
         assert_eq!(
             views[0].detail,
-            "Input 1000 tokens, 800 cached, 200 new at 100 tok/s · output 100 tokens at 20 tok/s"
+            "Input 1.0k tokens, 800 cached, 200 new at 100 tok/s · output 100 tokens at 20 tok/s"
         );
     }
 }
