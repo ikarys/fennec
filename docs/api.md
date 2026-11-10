@@ -422,8 +422,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     session is gone is `failed`); `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the
     idea (a base64 data URL in `data`; handed to the agent on framing and build: images as vision, text inlined,
     binaries in the worktree); `action` the one next step `frame | resumeFraming | start | open | answer | review`;
-    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop` (empty for running, integrated
-    and completed); `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
+    `menu` the secondary actions `restart | reframe | startUnframed | complete | drop | remove | editText | editPlan`
+    (`editText` posts `edit`, `editPlan` posts `ready`; empty for running); `plan` the approved plan verbatim; `halted` why the night mode stopped or skipped it, cleared by a
     new plan or start; `position` its 1-based place in the queue; `durationMs` from its start to now (running) or its
     session's last change; `tokens` uncached prompt plus completion of the project's calls in that window (exact while
     one idea runs at a time); `criteria` `{passed, failed, pending}` and `decisions` `[{title, choice}]` from its

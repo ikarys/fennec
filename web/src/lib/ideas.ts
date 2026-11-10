@@ -21,7 +21,7 @@ export type IdeaStatus =
 
 export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
 
-export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove';
+export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editText' | 'editPlan';
 
 /** A file or image pinned to an idea, kept as a data URL. */
 export interface IdeaAttachmentView {
@@ -195,6 +195,13 @@ export async function markIdeaReady(
   return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/ready`, {
     method: 'POST',
     body: JSON.stringify({ plan }),
+  });
+}
+
+export async function editIdea(projectId: string, ideaId: string, text: string): Promise<IdeaBoard> {
+  return boardRequest(projectId, `/ideas/${encodeURIComponent(ideaId)}/edit`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
   });
 }
 
