@@ -17,7 +17,7 @@ export type Route =
   | { name: 'projects' }
   | { name: 'chats' }
   | { name: 'split'; left: string | null; right: string | null }
-  | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
+  | { name: 'project'; projectId: string; tab: string | null; sub: string | null; task: string | null }
   | { name: 'editor'; projectId: string; path: string | null; session: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
@@ -51,8 +51,10 @@ export function parseRoute(hash: string): Route {
     return { name: 'chats' };
   }
   if (hash.startsWith('#/project/')) {
-    const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
-    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null };
+    const [pathPart, query] = hash.slice('#/project/'.length).split('?');
+    const [rawId, tab, sub] = (pathPart ?? '').split('/');
+    const task = query ? new URLSearchParams(query).get('task') : null;
+    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null, task };
   }
   if (hash.startsWith('#/edit/')) {
     const [pathPart, query] = hash.slice('#/edit/'.length).split('?');
@@ -104,6 +106,12 @@ export function parseRoute(hash: string): Route {
 }
 
 /** A tab derived from the route (a page, a project's editor), never persisted nor split. */
+/** The same hash with its query replaced by the task open in the drawer, or none. */
+export function withTask(hash: string, ideaId: string | null): string {
+  const path = hash.split('?')[0];
+  return ideaId === null ? path : `${path}?task=${encodeURIComponent(ideaId)}`;
+}
+
 export function isRouteTab(id: string): boolean {
   return id.startsWith('page:') || id.startsWith('edit:');
 }

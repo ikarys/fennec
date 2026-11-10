@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: "2026-11-10"
 ---
 
@@ -71,7 +71,7 @@ is shown as today; no migration.
 - A new `Drawer` primitive (`web/src/components/ui/`, modelled on `Modal`: focus trap, Escape,
   full width under 900px). A board row opens it; the URL keeps it (`?task=<id>`). A modal was
   rejected: too tight on small screens.
-- Tab **Sheet**: one tinted `Card` per section, click to edit (`TextArea`), saved on blur;
+- Tab **Sheet**: one tinted `Card` per section, an always-editable `TextArea` saved on blur;
   required markers on objective and done when; criteria edited inline (text, optional check);
   header with title, state badge, the counts "required n/2 · suggested n/4" (approach not counted) and one text button,
   **Ready**, disabled with a tooltip naming what is missing. Completeness, provenance marks and

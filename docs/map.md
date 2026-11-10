@@ -274,10 +274,10 @@ graph LR
   m38 -->|24| m54
   m38 -->|19| m51
   m38 -->|5| m53
-  m39 -->|11| m45
+  m39 -->|17| m45
   m39 -->|1| m46
-  m39 -->|11| m54
-  m39 -->|11| m51
+  m39 -->|17| m54
+  m39 -->|17| m51
   m42 -->|1| m45
   m42 -->|1| m54
   m42 -->|1| m53
@@ -298,7 +298,7 @@ graph LR
   m52 -->|22| m51
   m52 -->|1| m53
   m45 -->|2| m46
-  m45 -->|3| m54
+  m45 -->|4| m54
   m45 -->|2| m51
   m40 -->|7| m45
   m40 -->|1| m43
@@ -384,13 +384,13 @@ graph LR
 | `web/src/components/agents` | 2 | 0 |  |  |
 | `web/src/components/editor` | 4 | 0 |  |  |
 | `web/src/components/project` | 24 | 0 |  |  |
-| `web/src/components/project/ideas` | 11 | 0 |  |  |
+| `web/src/components/project/ideas` | 17 | 0 |  |  |
 | `web/src/components/workflow` | 12 | 0 |  |  |
 | `web/src/components/plugins` | 3 | 0 |  |  |
 | `web/src/components/rules` | 1 | 0 |  |  |
 | `web/src/components/workflow/fields` | 5 | 0 |  |  |
 | `web/src/components/workflow/nodes` | 2 | 0 |  |  |
-| `web/src/components/ui` | 26 | 0 |  |  |
+| `web/src/components/ui` | 27 | 0 |  |  |
 | `web/src/hooks` | 35 | 1 |  |  |
 | `web/src/components/session` | 63 | 1 |  |  |
 | `web/src/components/workflow/session` | 8 | 0 |  |  |

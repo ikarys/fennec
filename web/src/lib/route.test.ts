@@ -21,6 +21,7 @@ import {
   ACTIVE_TAB_KEY,
   isRouteTab,
   rememberEditorHash,
+  withTask,
 } from './route';
 
 describe('changes', () => {
@@ -102,6 +103,7 @@ describe('parseRoute', () => {
       projectId: 'a/b',
       tab: 'risks',
       sub: null,
+      task: null,
     });
   });
 
@@ -111,7 +113,20 @@ describe('parseRoute', () => {
       projectId: 'x',
       tab: 'map',
       sub: 'foo',
+      task: null,
     });
+  });
+
+  it('reads the task open in the drawer', () => {
+    expect(parseRoute('#/project/x/tasks/backlog?task=i%2F1')).toEqual({
+      name: 'project',
+      projectId: 'x',
+      tab: 'tasks',
+      sub: 'backlog',
+      task: 'i/1',
+    });
+    expect(withTask('#/project/x/tasks/backlog', 'i/1')).toBe('#/project/x/tasks/backlog?task=i%2F1');
+    expect(withTask('#/project/x/tasks/backlog?task=a', null)).toBe('#/project/x/tasks/backlog');
   });
 
   it('round-trips an editor file path with a session', async () => {
@@ -307,6 +322,7 @@ describe('tabIdForRoute', () => {
         projectId: 'p1',
         tab: null,
         sub: null,
+        task: null,
       }),
     ).toBeNull();
   });
