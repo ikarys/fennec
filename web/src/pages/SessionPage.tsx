@@ -69,6 +69,8 @@ import { PreviewPane } from "../components/preview/PreviewPane";
 import { CanvasPane } from "../components/canvas/CanvasPane";
 import { SessionCanvasMenu } from "../components/canvas/SessionCanvasMenu";
 import { CanvasOpenerContext, CanvasSessionContext } from "../components/canvas/CanvasContext";
+import { FileLinkContext } from "../components/session/FileLinkContext";
+import { projectFilePath } from "../lib/route";
 import { RunRail } from "../components/workflow/session/RunRail";
 import { useJumpToNode } from "../hooks/useJumpToNode";
 import { RunDecision } from "../components/workflow/session/RunDecision";
@@ -188,6 +190,11 @@ export function SessionPage({
   // A chat has no folder: it starts in `builder` (talk, act on request), not
   // in the project's framing agent, and the header shows "Chat".
   const isChat = detail?.project.chat ?? projectId === "chat";
+  const linkProjectId = detail?.project.id ?? projectId;
+  const fileLink = useMemo(
+    () => (sessionId && linkProjectId && !isChat ? (path: string) => projectFilePath(linkProjectId, path, sessionId) : null),
+    [sessionId, linkProjectId, isChat],
+  );
   const {
     modelChoices,
     mode,
@@ -621,6 +628,7 @@ export function SessionPage({
     <PreviewContext.Provider value={setPreview}>
      <CanvasOpenerContext.Provider value={setCanvasId}>
       <CanvasSessionContext.Provider value={sessionId ?? undefined}>
+      <FileLinkContext.Provider value={fileLink}>
       {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
       <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
         <PendingPlanContext.Provider value={served.pendingPlan?.callId ?? null}>
@@ -1032,6 +1040,7 @@ export function SessionPage({
           </IntegrationInviteContext.Provider>
         </PendingPlanContext.Provider>
       </PreviewWorkdirContext.Provider>
+      </FileLinkContext.Provider>
       </CanvasSessionContext.Provider>
      </CanvasOpenerContext.Provider>
     </PreviewContext.Provider>

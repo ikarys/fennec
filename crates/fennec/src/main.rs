@@ -21,6 +21,7 @@ mod metering;
 mod module_map;
 mod notifier;
 mod plugins;
+mod project_files;
 mod protected;
 mod resources;
 mod risk;
