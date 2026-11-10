@@ -5,7 +5,7 @@ import { useT, useLang } from '../i18n';
 import { getHome, getBacklog, getInsight, getWorktreeSummary, type AttentionItem } from '../lib/api';
 import { useLoaded } from '../hooks/useLoaded';
 import { formatRelative, formatBytes } from '../lib/format';
-import { ActivityIcon, PlusIcon, FolderIcon, CheckIcon, CoinIcon, BacklogIcon, HardDriveIcon } from '../components/ui/Icons';
+import { ActivityIcon, PlusIcon, FolderIcon, CheckIcon, CoinIcon, BacklogIcon, HardDriveIcon, InboxIcon, ChatIcon, StarIcon } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ListCard } from '../components/ui/ListCard';
@@ -118,7 +118,7 @@ export function HomePage({
 
         <SetupChecklist projectCount={projectCount} onOpenProject={onOpenProjectDialog} />
 
-        <ListCard title={t('homeYourTurn')} description={t('homeYourTurnDescription')} count={attention.length}>
+        <ListCard Icon={InboxIcon} title={t('homeYourTurn')} description={t('homeYourTurnDescription')} count={attention.length}>
           {attention.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-muted">
               <CheckIcon className="mr-1 inline h-4 w-4 text-ok" />
@@ -150,7 +150,7 @@ export function HomePage({
           <p className="m-0 text-err">{home.error}</p>
         ) : home.data ? (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <ListCard title={t('homeRecentSessions')} count={home.data.recent.length}>
+            <ListCard Icon={ChatIcon} title={t('homeRecentSessions')} count={home.data.recent.length}>
               {home.data.recent.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-muted">{t('homeNoRecentSessions')}</div>
               ) : (
@@ -182,7 +182,7 @@ export function HomePage({
               )}
             </ListCard>
 
-            <ListCard title={t('homeFavoriteProjects')} count={home.data.favorites.length}>
+            <ListCard Icon={StarIcon} title={t('homeFavoriteProjects')} count={home.data.favorites.length}>
               {home.data.favorites.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-muted">{t('homeNoFavorites')}</div>
               ) : (

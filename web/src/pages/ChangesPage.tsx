@@ -161,7 +161,7 @@ export default function ChangesPage({ sessionId }: { sessionId: string }) {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-3 border-b border-border bg-raised px-4 py-2.5">
+              <div className="flex items-center gap-3 border-b border-border bg-linear-to-r from-accent-soft to-transparent to-75% px-4 py-2.5">
                 <span className="grow truncate font-mono text-sm" title={selectedPath ?? ''}>
                   {selectedPath}
                 </span>
