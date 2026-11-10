@@ -37,7 +37,7 @@ export function StatusBar({ sessionId, projectId }: { sessionId: string | null; 
     <div
       role="region"
       aria-label={t('statusBarLabel')}
-      className="flex shrink-0 items-center gap-x-3 overflow-x-auto border-t border-border bg-raised px-3 py-1"
+      className="flex shrink-0 items-center gap-x-3 overflow-x-auto border-t border-border bg-panel px-3 py-1"
     >
       {blocks.map((block) => {
         const provenance = t('pluginProvenance', { name: block.plugin });
