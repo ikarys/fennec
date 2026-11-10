@@ -35,10 +35,10 @@ export function HomePage({
 }: HomePageProps) {
   const t = useT();
   const lang = useLang();
-  const home = useLoaded(getHome, [refreshKey]);
-  const backlog = useLoaded(getBacklog, []);
-  const insight = useLoaded(() => getInsight('7', null), []);
-  const worktrees = useLoaded(getWorktreeSummary, []);
+  const home = useLoaded(getHome, [refreshKey], 'home');
+  const backlog = useLoaded(getBacklog, [], 'backlog');
+  const insight = useLoaded(() => getInsight('7', null), [], 'insight:7');
+  const worktrees = useLoaded(getWorktreeSummary, [], 'worktrees');
 
   // A greeting by local hour: morning, afternoon, evening.
   const hour = new Date().getHours();
