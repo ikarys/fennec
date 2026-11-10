@@ -1,5 +1,7 @@
+// Global instructions settings section.
 import { Section, type SectionSave } from '../ui/Section';
-import { FieldRow, TextArea } from '../ui/Field';
+import { TextArea } from '../ui/Field';
+import { FileIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 
 export function InstructionsSection({
@@ -14,16 +16,20 @@ export function InstructionsSection({
 }) {
   const t = useT();
   return (
-    <Section title={t('globalInstructionsTitle')} save={save}>
-      <FieldRow label={t('instructionsLabel')} hint={t('instructionsHint')}>
-        <TextArea
-          rows={16}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={t('instructionsPlaceholder')}
-          className="w-full"
-        />
-      </FieldRow>
+    <Section
+      Icon={FileIcon}
+      title={t('globalInstructionsTitle')}
+      description={t('instructionsHint')}
+      save={save}
+    >
+      <TextArea
+        aria-label={t('instructionsLabel')}
+        rows={16}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={t('instructionsPlaceholder')}
+        className="w-full"
+      />
     </Section>
   );
 }
