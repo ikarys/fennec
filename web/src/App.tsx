@@ -426,7 +426,7 @@ export default function App() {
       {/* h-full: the html/body/#root chain is 100%, which no page-level
           scaling can push past the window. */}
       <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
-        {!online && <OfflineNotice />}
+        <OfflineNotice visible={!online} />
         <TopBar
           tabs={tabInfos}
           // The highlighted tab follows the route: on home or a project page none is.
