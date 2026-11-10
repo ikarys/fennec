@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { listRowClass } from '../ui/ListCard';
 import { Tile } from '../ui/Tile';
 import {
   ClockIcon,
@@ -98,7 +99,7 @@ export function DashboardSection({
               <li key={session.id}>
                 <button
                   type="button"
-                  className="w-full text-left group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0"
+                  className={listRowClass({ bar: true }, 'group w-full text-left cursor-pointer')}
                   onClick={() => onOpenSession(session.id)}
                 >
                   <span

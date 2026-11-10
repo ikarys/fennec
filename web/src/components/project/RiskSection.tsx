@@ -7,6 +7,7 @@ import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
+import { listRowClass } from '../ui/ListCard';
 import { Pager } from '../ui/Pager';
 import { Tile } from '../ui/Tile';
 import { ActivityIcon, AlertIcon, ChevronRightIcon, RefreshIcon, ReviewIcon, SpinnerIcon, WandIcon } from '../ui/Icons';
@@ -137,7 +138,7 @@ export function RiskSection({
               {paged.visible.map((module, index) => (
                 <details key={module.path} className={`group ${index > 0 ? 'border-t border-border' : ''}`}>
                   {/* An open module keeps the accent edge, so its files read as its own. */}
-                  <summary className="group/row relative flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:opacity-0 hover:bg-accent-soft hover:before:opacity-100 group-open:bg-accent-soft group-open:before:opacity-100 [&::-webkit-details-marker]:hidden">
+                  <summary className={listRowClass({ bar: true }, 'group/row list-none cursor-pointer group-open:bg-accent-soft group-open:before:opacity-100 [&::-webkit-details-marker]:hidden')}>
                     <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-faint transition-transform group-open:rotate-90 group-open:text-accent" />
                     <span className="min-w-0 grow truncate font-mono text-xs text-text group-open:text-accent-strong" title={module.path}>
                       {module.path}

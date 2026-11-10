@@ -10,7 +10,7 @@ import { blankWorkflow } from '../lib/workflow';
 import { WorkflowEditor } from '../components/workflow/WorkflowEditor';
 import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { ListCard } from '../components/ui/ListCard';
+import { ListCard, listRowClass } from '../components/ui/ListCard';
 import { Select, TextInput } from '../components/ui/Field';
 
 interface WorkflowsPageProps {
@@ -172,7 +172,7 @@ export default function WorkflowsPage({ projects, projectId, workflowId, isNew }
                     onClick={() => {
                       window.location.hash = `#/workflows/${encodeURIComponent(selectedProjectId)}/${encodeURIComponent(wf.id)}`;
                     }}
-                    className={`group flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-accent-soft ${index > 0 ? 'border-t border-border' : ''}`}
+                    className={listRowClass({}, `group w-full text-left text-sm ${index > 0 ? 'border-t border-border' : ''}`)}
                   >
                     <span className="grid size-8 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
                       <WorkflowsIcon className="h-4 w-4" />

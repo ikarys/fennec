@@ -9,6 +9,7 @@ import { Badge } from '../ui/Badge';
 import { useLang, useT } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
+import { listRowClass } from '../ui/ListCard';
 import { usePaged } from '../../hooks/usePaged';
 import { Pager } from '../ui/Pager';
 
@@ -103,9 +104,7 @@ export function SessionsSection({
                 <li
                   key={s.id}
                   onClick={() => (selecting ? !running && toggle(s.id) : onOpenSession(s.id))}
-                  className={`group relative flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 ${
-                    isSelected ? 'bg-accent-soft before:opacity-100' : 'before:opacity-0'
-                  }`}
+                  className={listRowClass({ bar: true, selected: isSelected }, 'group cursor-pointer')}
                 >
                   {selecting ? (
                     <input

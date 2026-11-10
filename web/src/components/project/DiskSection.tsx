@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { listRowClass } from '../ui/ListCard';
 import { CopyButton } from '../session/CopyButton';
 import { BranchIcon, EraserIcon, HardDriveIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
 import {
@@ -258,7 +259,7 @@ function SessionRow({
   const lang = useLang();
   const t = useT();
   return (
-    <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
+    <li className={listRowClass({ bar: true }, 'group text-sm')}>
       <div className="min-w-0 grow">
         <button
           type="button"
@@ -331,7 +332,7 @@ function OrphanRow({
   const lang = useLang();
   const t = useT();
   return (
-    <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
+    <li className={listRowClass({ bar: true }, 'group text-sm')}>
       <div className="min-w-0 grow">
         <div className="font-mono text-xs">{entry.name}</div>
         <div className="mt-1 text-xs text-muted">
