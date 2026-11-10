@@ -765,7 +765,9 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `model` as in `GET /api/sessions/{id}`); 404 if no session; 400 if the effort
   is unknown; 409 while a workflow runs; appends `effort.changed`; the
   session's model JSON and the model choices carry `acceptedEfforts`
-  (empty = unknown), and the session's model JSON carries `effort`
+  (empty = unknown) and `defaultEffort` (what a turn uses while no effort is
+  chosen: the agent's, else the model's setting; the choices give the
+  model's), and the session's model JSON carries `effort`
 - `GET /api/sessions/{id}/mcp` → `{servers, totalTokens}`: each server with
   `name, visible, disabled, active, tokens, enabledToolTokens, toolCount, tools` (each tool with
   `name, enabled, tokens`); `active` is the session's effective state (the

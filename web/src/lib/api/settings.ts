@@ -86,6 +86,8 @@ export interface ModelChoice {
   providerName: string;
   /** The efforts the model accepts; empty when unknown. */
   acceptedEfforts?: ReasoningEffort[];
+  /** The effort used when the session chooses none: the agent's, else the model's setting. */
+  defaultEffort?: ReasoningEffort | null;
 }
 
 export interface ModelChoices {
@@ -103,6 +105,8 @@ export interface SessionModel {
   acceptedEfforts: ReasoningEffort[];
   /** The effort the human chose for the session; null is auto. */
   effort: ReasoningEffort | null;
+  /** The effort used while `effort` is null: the agent's, else the model's setting. */
+  defaultEffort: ReasoningEffort | null;
 }
 
 export interface Preferences {
