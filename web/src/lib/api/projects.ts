@@ -300,7 +300,7 @@ export function writeMapFile(
 }
 
 // The project dashboard: display-ready tiles and recent sessions.
-export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'map' | 'doc';
+export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'doc';
 
 export interface DashboardTile {
   id: string;

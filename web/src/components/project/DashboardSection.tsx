@@ -9,7 +9,6 @@ import {
   CoinIcon,
   FileIcon,
   LayersIcon,
-  ProjectIcon,
   ReviewIcon,
   TokensIcon,
 } from '../ui/Icons';
@@ -28,7 +27,6 @@ const ICONS: Record<DashboardIcon, ReactNode> = {
   tokens: <TokensIcon />,
   time: <ClockIcon />,
   cost: <CoinIcon />,
-  map: <ProjectIcon />,
   doc: <FileIcon />,
 };
 
