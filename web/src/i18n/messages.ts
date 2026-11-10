@@ -1051,6 +1051,7 @@ export const en = {
   serverEnded: 'ended',
   useThisCommand: 'Use this command',
   openTerminalInWorktree: 'Open a terminal in the worktree',
+  openTerminalInProject: 'Open a terminal in the project',
   tryChange: 'Try the change',
   tryChangeShort: 'Try',
   tryChangeHint:
@@ -2635,6 +2636,7 @@ export const fr: Record<MsgKey, string> = {
   serverEnded: 'terminé',
   useThisCommand: 'Utiliser cette commande',
   openTerminalInWorktree: 'Ouvrir un terminal dans le worktree',
+  openTerminalInProject: 'Ouvrir un terminal dans le projet',
   tryChange: 'Tester la modification',
   tryChangeShort: 'Essayer',
   tryChangeHint:

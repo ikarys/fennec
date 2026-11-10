@@ -7,7 +7,6 @@ import {
   AlertIcon,
   BulbIcon,
   EditIcon,
-  ExternalIcon,
   DecisionIcon,
   InsightIcon,
   LayersIcon,
@@ -20,6 +19,7 @@ import {
 } from '../components/ui/Icons';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
+import { ProjectOpenActions } from '../components/project/ProjectOpenActions';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
 import { DecisionsSection } from '../components/project/DecisionsSection';
@@ -36,7 +36,6 @@ import {
   type ProjectOverview,
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
-import { useOpenInEditorLabel } from '../lib/editors';
 import { editorPath } from '../lib/route';
 import { useT } from '../i18n';
 
@@ -126,7 +125,6 @@ export default function ProjectPage({
   onSessionsDeleted: (ids: string[]) => void;
 }) {
   const t = useT();
-  const openInEditor = useOpenInEditorLabel();
   const project = projects.find((p) => p.id === projectId) ?? null;
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -200,14 +198,7 @@ export default function ProjectPage({
           >
             <EditIcon className="h-4 w-4" />
           </a>
-          <a
-            href={project.editorUrl}
-            title={openInEditor}
-            aria-label={openInEditor}
-            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-          >
-            <ExternalIcon className="h-4 w-4" />
-          </a>
+          <ProjectOpenActions projectId={projectId} editorUrl={project.editorUrl} />
           <Button
             variant="ghost"
             size="sm"

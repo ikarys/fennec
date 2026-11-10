@@ -578,6 +578,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or
   `x-terminal-emulator`. Outside the sandbox: the human's action. 500 if it
   cannot start.
+- `POST /api/projects/{id}/terminal` → 202 `{path}`: the same, in the project's folder.
 - `POST /api/sessions/{id}/files` → 202 `{path}`: opens the human's own file
   manager in the session's project folder (their repository, not the worktree):
   Explorer under WSL, `open` on macOS, else `xdg-open`. 500 if it cannot start.

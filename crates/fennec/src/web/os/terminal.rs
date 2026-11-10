@@ -1,10 +1,11 @@
-//! Opens the human's own terminal in a session's folder: the worktree when it
-//! has one, the project otherwise. The human's action (trust zone 1), so it
-//! runs outside the sandbox; the path comes from the store, never the request.
+//! Opens the human's own terminal in a session's folder (the worktree when it
+//! has one, the project otherwise) or a project's folder. The human's action
+//! (trust zone 1), so it runs outside the sandbox; the path comes from the
+//! store, never the request.
 
 use crate::web::App;
 use crate::web::http::HttpError;
-use crate::web::http::{error, send_json};
+use crate::web::http::{error, require_project, send_json};
 use serde_json::json;
 use std::net::TcpStream;
 use std::path::Path;
@@ -17,6 +18,16 @@ pub(crate) fn open(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Ht
     let place = app.place(&store, &session, &project)?;
     match spawn(&place.workdir) {
         Ok(()) => send_json(stream, 202, &json!({ "path": place.workdir })),
+        Err(e) => error(stream, 500, &format!("could not open a terminal: {e}")),
+    }
+}
+
+/// `POST /api/projects/{id}/terminal`.
+pub(crate) fn open_project(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
+    let store = app.store()?;
+    let project = require_project(&store, id)?;
+    match spawn(Path::new(&project.workdir)) {
+        Ok(()) => send_json(stream, 202, &json!({ "path": project.workdir })),
         Err(e) => error(stream, 500, &format!("could not open a terminal: {e}")),
     }
 }

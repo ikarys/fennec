@@ -267,10 +267,10 @@ graph LR
   m38 -->|1| m41
   m38 -->|1| m42
   m38 -->|4| m47
-  m38 -->|22| m45
+  m38 -->|23| m45
   m38 -->|7| m46
-  m38 -->|23| m54
-  m38 -->|18| m51
+  m38 -->|24| m54
+  m38 -->|19| m51
   m38 -->|5| m53
   m39 -->|11| m45
   m39 -->|1| m46
@@ -327,7 +327,7 @@ graph LR
   m35 -->|1| m37
   m35 -->|2| m34
   m35 -->|1| m50
-  m35 -->|3| m38
+  m35 -->|4| m38
   m35 -->|1| m39
   m35 -->|1| m42
   m35 -->|5| m47
@@ -381,7 +381,7 @@ graph LR
 | `web/src/pages` | 12 | 0 |  |  |
 | `web/src/components/agents` | 2 | 0 |  |  |
 | `web/src/components/editor` | 4 | 0 |  |  |
-| `web/src/components/project` | 23 | 0 |  |  |
+| `web/src/components/project` | 24 | 0 |  |  |
 | `web/src/components/project/ideas` | 11 | 0 |  |  |
 | `web/src/components/workflow` | 12 | 0 |  |  |
 | `web/src/components/plugins` | 3 | 0 |  |  |

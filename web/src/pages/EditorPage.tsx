@@ -1,26 +1,27 @@
 /**
  * Editor page: file tree, file editor, and a changes panel for one project.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Badge } from '../components/ui/Badge';
-import { buttonClass } from '../components/ui/Button';
-import { EditIcon, ProjectIcon } from '../components/ui/Icons';
-import { InfoBar } from '../components/ui/InfoBar';
-import { PageHeader } from '../components/ui/PageHeader';
-import { SectionLabel } from '../components/ui/SectionLabel';
-import { FileTree } from '../components/editor/FileTree';
-import { EditorPane } from '../components/editor/EditorPane';
-import { ChangesPanel } from '../components/editor/ChangesPanel';
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "../components/ui/Badge";
+import { buttonClass } from "../components/ui/Button";
+import { EditIcon, ProjectIcon } from "../components/ui/Icons";
+import { InfoBar } from "../components/ui/InfoBar";
+import { PageHeader } from "../components/ui/PageHeader";
+import { SectionLabel } from "../components/ui/SectionLabel";
+import { FileTree } from "../components/editor/FileTree";
+import { EditorPane } from "../components/editor/EditorPane";
+import { ChangesPanel } from "../components/editor/ChangesPanel";
+import { ProjectOpenActions } from "../components/project/ProjectOpenActions";
 import {
   getProjectChanges,
   getProjectFiles,
   type Project,
   type ProjectChange,
   type ProjectFileListing,
-} from '../lib/api';
-import { buildFileTree } from '../lib/fileTree';
-import { editorPath } from '../lib/route';
-import { useT } from '../i18n';
+} from "../lib/api";
+import { buildFileTree } from "../lib/fileTree";
+import { editorPath } from "../lib/route";
+import { useT } from "../i18n";
 
 export default function EditorPage({
   projects,
@@ -44,7 +45,10 @@ export default function EditorPage({
   const [reloadToken, setReloadToken] = useState(0);
 
   const project = projects.find((item) => item.id === projectId);
-  const nodes = useMemo(() => (listing ? buildFileTree(listing.files) : []), [listing]);
+  const nodes = useMemo(
+    () => (listing ? buildFileTree(listing.files) : []),
+    [listing],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +64,7 @@ export default function EditorPage({
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : t('unknownError'));
+        setError(err instanceof Error ? err.message : t("unknownError"));
         setLoading(false);
       });
 
@@ -114,56 +118,73 @@ export default function EditorPage({
       <PageHeader
         Icon={EditIcon}
         title={project?.name ?? projectId}
-        subtitle={t('editorTitle')}
+        subtitle={t("editorTitle")}
         actions={
-          <a
-            href={`#/project/${encodeURIComponent(projectId)}`}
-            title={t('editorBackToProject')}
-            aria-label={t('editorBackToProject')}
-            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-          >
-            <ProjectIcon className="h-4 w-4" />
-          </a>
+          <>
+            <a
+              href={`#/project/${encodeURIComponent(projectId)}`}
+              title={t("editorBackToProject")}
+              aria-label={t("editorBackToProject")}
+              className={buttonClass({
+                variant: "ghost",
+                size: "sm",
+                iconOnly: true,
+              })}
+            >
+              <ProjectIcon className="h-4 w-4" />
+            </a>
+            {project ? (
+              <ProjectOpenActions
+                projectId={projectId}
+                editorUrl={project.editorUrl}
+              />
+            ) : null}
+          </>
         }
       />
 
       {listing?.session ? (
         <InfoBar>
           <span className="flex flex-wrap items-center gap-2">
-            {t('filesSessionVersion')}
+            {t("filesSessionVersion")}
             <a
               href={editorPath(projectId, path)}
-              className={buttonClass({ variant: 'ghost', size: 'sm' })}
+              className={buttonClass({ variant: "ghost", size: "sm" })}
             >
-              {t('filesSeeWorkingTree')}
+              {t("filesSeeWorkingTree")}
             </a>
           </span>
         </InfoBar>
       ) : null}
 
       {loading ? (
-        <p className="text-muted">{t('loading')}</p>
+        <p className="text-muted">{t("loading")}</p>
       ) : error ? (
         <p className="text-err">{error}</p>
       ) : (
         <div className="flex min-h-0 grow gap-3">
-          <nav aria-label={t('editorFiles')} className="w-64 shrink-0 overflow-y-auto">
+          <nav
+            aria-label={t("editorFiles")}
+            className="w-64 shrink-0 overflow-y-auto"
+          >
             <SectionLabel className="px-2.5 pb-1 pt-0.5">
               <span className="flex items-center gap-2">
-                {t('editorFiles')}
+                {t("editorFiles")}
                 <Badge tone="neutral">{listing?.files.length ?? 0}</Badge>
               </span>
             </SectionLabel>
             <FileTree nodes={nodes} selected={path} onSelect={navigateTo} />
             {listing?.truncated ? (
-              <p className="px-2.5 pt-2 text-xs text-muted">{t('filesTruncated')}</p>
+              <p className="px-2.5 pt-2 text-xs text-muted">
+                {t("filesTruncated")}
+              </p>
             ) : null}
           </nav>
 
           <div className="flex min-h-0 min-w-0 grow flex-col">
             {path ? (
               <EditorPane
-                key={`${sessionId ?? ''}:${path}:${reloadToken}`}
+                key={`${sessionId ?? ""}:${path}:${reloadToken}`}
                 projectId={projectId}
                 path={path}
                 sessionId={sessionId}
@@ -172,7 +193,7 @@ export default function EditorPage({
                 onSaved={handleSaved}
               />
             ) : (
-              <p className="text-xs text-muted">{t('filesPickOne')}</p>
+              <p className="text-xs text-muted">{t("filesPickOne")}</p>
             )}
           </div>
 
