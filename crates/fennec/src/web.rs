@@ -221,11 +221,8 @@ pub fn serve(
     password: Option<String>,
     settings: Settings,
 ) -> Result<(), String> {
-    if !listen.is_loopback() && password.is_none() {
-        return Err(format!(
-            "settings.yaml: listen {listen} is not a loopback address; set a password first with `fennec password`"
-        ));
-    }
+    crate::domain::server_config::check_listen(listen, password.is_some())
+        .map_err(|message| format!("settings.yaml: {message}"))?;
     let listener = TcpListener::bind((listen, port))
         .map_err(|e| format!("{}: {e}", std::net::SocketAddr::new(listen, port)))?;
     crate::sandbox::set_server_port(port);

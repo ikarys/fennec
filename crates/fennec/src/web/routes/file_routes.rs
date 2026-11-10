@@ -186,3 +186,46 @@ fn version(app: &App, req: &Request, project_id: &str) -> Result<Version, HttpEr
 
     Ok(Version::Session(branch))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::id::new_id;
+    use crate::web::test_support::{app, header, response};
+
+    #[test]
+    fn raw_serves_an_svg_with_the_sandbox_csp_and_nosniff() {
+        let base = std::env::temp_dir().join(format!("fennec-raw-route-{}", new_id()));
+        let workdir = base.join("work");
+        std::fs::create_dir_all(&workdir).unwrap();
+        std::fs::write(
+            workdir.join("a.svg"),
+            "<svg><script>alert(1)</script></svg>",
+        )
+        .unwrap();
+        let app = app(base.join("fennec.db"));
+        let project = app
+            .store()
+            .unwrap()
+            .project_for(&workdir.display().to_string())
+            .unwrap();
+        let req = Request {
+            method: "GET".into(),
+            path: format!("/api/projects/{}/raw", project.id),
+            query: "path=a.svg".into(),
+            headers: Vec::new(),
+            body: Vec::new(),
+        };
+
+        let reply = response(|stream| raw(&app, &req, stream, &project.id).unwrap());
+
+        assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+        let csp = header(&reply, "Content-Security-Policy").expect("a CSP header");
+        assert!(csp.contains("sandbox") && csp.contains("default-src 'none'"));
+        assert_eq!(
+            header(&reply, "X-Content-Type-Options").as_deref(),
+            Some("nosniff")
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
