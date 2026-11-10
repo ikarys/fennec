@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
-/* Nuit is the default theme. */
+/* Nuit is the default theme. Any element may carry data-theme: a theme preview renders in its own tokens. */
 :root,
-:root[data-theme="nuit"] {
+:root[data-theme="nuit"],
+[data-theme="nuit"] {
   color-scheme: dark;
   --bg: #0E1013;
   --panel: #15181D;
@@ -29,7 +30,8 @@
   --float-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 }
 
-:root[data-theme="jour"] {
+:root[data-theme="jour"],
+[data-theme="jour"] {
   color-scheme: light;
   --bg: #F6F6F3;
   --panel: #FFFFFF;
@@ -59,7 +61,8 @@
 /* Ardoise: a blue slate, lighter than Nuit, for long reading without glare.
    Its own hue family, so it never reads as a faded Nuit: periwinkle accent
    instead of orange, mint ok, rose err, all three far apart. */
-:root[data-theme="ardoise"] {
+:root[data-theme="ardoise"],
+[data-theme="ardoise"] {
   color-scheme: dark;
   --bg: #1E2332;
   --panel: #252B3C;
@@ -88,7 +91,8 @@
 
 /* Cyber: hominfer's terminal green. `ok` is cyan, not green, so a done or
    integrated badge stays distinct from the accent of a running one. */
-:root[data-theme="cyber"] {
+:root[data-theme="cyber"],
+[data-theme="cyber"] {
   color-scheme: dark;
   --bg: #000300;
   --panel: #020A03;

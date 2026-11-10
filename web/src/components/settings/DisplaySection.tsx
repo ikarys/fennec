@@ -1,12 +1,16 @@
+/** Appearance settings: theme, language/text, and thread defaults. */
 import type { DisplayPrefs, EditorId } from '../../lib/api';
 import { EDITORS } from '../../lib/editors';
 import { Segmented } from '../ui/Segmented';
 import { Section, type SectionSave } from '../ui/Section';
 import { Select } from '../ui/Field';
 import { Switch } from '../ui/Switch';
-import { themes, type ThemeId } from '../../lib/theme';
+import { ThemePicker } from '../settings/ThemePicker';
+import { SettingRow } from '../ui/SettingRow';
+import { ChatIcon, EyeIcon, GlobeIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
+import type { ThemeId } from '../../lib/theme';
 
 interface DisplaySectionProps {
   value: DisplayPrefs;
@@ -27,36 +31,31 @@ const LANGUAGES: { value: 'en' | 'fr'; label: MsgKey }[] = [
 
 export function DisplaySection({ value, onChange, theme, onThemeChange, save }: DisplaySectionProps) {
   const t = useT();
+
   return (
-    <Section title={t('displayTitle')} save={save}>
-      <div className="grid grid-cols-[minmax(7rem,max-content)_1fr] items-center justify-items-start gap-x-6 gap-y-3 text-sm text-text">
-        <span className="text-muted">{t('theme')}</span>
-        <Segmented
-          label={t('theme')}
-          value={theme}
-          onChange={onThemeChange}
-          segments={themes.map((option) => ({
-            value: option.id,
-            ariaLabel: `${t('theme')} ${option.label}`,
-            label: option.label
-          }))}
-        />
-        <span className="text-muted">{t('displayLanguage')}</span>
-        <Segmented
-          label={t('displayLanguage')}
-          value={value.language ?? 'en'}
-          onChange={(language) => onChange({ ...value, language })}
-          segments={LANGUAGES.map((language) => ({ value: language.value, label: t(language.label) }))}
-        />
-        <span className="text-muted">{t('fontSize')}</span>
-        <Segmented
-          label={t('fontSize')}
-          value={value.fontSize}
-          onChange={(size) => onChange({ ...value, fontSize: size })}
-          segments={FONT_SIZES.map((size) => ({ value: size, label: size }))}
-        />
-        <span className="self-start pt-1.5 text-muted">{t('editorLabel')}</span>
-        <div className="flex flex-col gap-1">
+    <>
+      <Section Icon={EyeIcon} title={t('theme')} flush>
+        <ThemePicker value={theme} onChange={onThemeChange} />
+      </Section>
+
+      <Section Icon={GlobeIcon} title={t('displayTextTitle')} flush save={save}>
+        <SettingRow label={t('displayLanguage')} hint={t('displayLanguageHint')}>
+          <Segmented
+            label={t('displayLanguage')}
+            value={value.language ?? 'en'}
+            onChange={(language) => onChange({ ...value, language })}
+            segments={LANGUAGES.map((language) => ({ value: language.value, label: t(language.label) }))}
+          />
+        </SettingRow>
+        <SettingRow label={t('fontSize')} hint={t('fontSizeHint')}>
+          <Segmented
+            label={t('fontSize')}
+            value={value.fontSize}
+            onChange={(size) => onChange({ ...value, fontSize: size })}
+            segments={FONT_SIZES.map((size) => ({ value: size, label: size }))}
+          />
+        </SettingRow>
+        <SettingRow label={t('editorLabel')} hint={t('editorHint')}>
           <Select
             aria-label={t('editorLabel')}
             className="w-48"
@@ -69,21 +68,25 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
               </option>
             ))}
           </Select>
-          <p className="m-0 text-xs text-faint">{t('editorHint')}</p>
-        </div>
-        <span className="text-muted">{t('reasoningOpen')}</span>
-        <Switch
-          label={t('reasoningOpen')}
-          checked={value.reasoningOpen}
-          onChange={(reasoningOpen) => onChange({ ...value, reasoningOpen })}
-        />
-        <span className="text-muted">{t('toolResultsOpen')}</span>
-        <Switch
-          label={t('toolResultsOpen')}
-          checked={value.toolResultsOpen}
-          onChange={(toolResultsOpen) => onChange({ ...value, toolResultsOpen })}
-        />
-      </div>
-    </Section>
+        </SettingRow>
+      </Section>
+
+      <Section Icon={ChatIcon} title={t('displayThreadTitle')} flush save={save}>
+        <SettingRow label={t('reasoningOpen')} hint={t('reasoningOpenHint')}>
+          <Switch
+            label={t('reasoningOpen')}
+            checked={value.reasoningOpen}
+            onChange={(reasoningOpen) => onChange({ ...value, reasoningOpen })}
+          />
+        </SettingRow>
+        <SettingRow label={t('toolResultsOpen')} hint={t('toolResultsOpenHint')}>
+          <Switch
+            label={t('toolResultsOpen')}
+            checked={value.toolResultsOpen}
+            onChange={(toolResultsOpen) => onChange({ ...value, toolResultsOpen })}
+          />
+        </SettingRow>
+      </Section>
+    </>
   );
 }
