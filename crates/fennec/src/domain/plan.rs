@@ -12,6 +12,14 @@ use serde::{Deserialize, Serialize};
 pub struct Plan {
     pub title: String,
     pub goal: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub context: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub constraints: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub out_of_scope: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub deliverable: String,
     pub steps: Vec<PlanStep>,
     pub done_when: Vec<PlannedCriterion>,
     pub risks: Vec<String>,
@@ -45,6 +53,19 @@ impl Plan {
             String::new(),
             format!("Goal: {}", self.goal),
         ];
+        let sections = [
+            ("Context", &self.context),
+            ("Constraints", &self.constraints),
+            ("Out of scope", &self.out_of_scope),
+            ("Deliverable", &self.deliverable),
+        ];
+        for (heading, text) in sections {
+            if !text.is_empty() {
+                lines.push(String::new());
+                lines.push(format!("## {heading}"));
+                lines.push(text.clone());
+            }
+        }
         for (index, step) in self.steps.iter().enumerate() {
             lines.push(String::new());
             lines.push(format!("### Step {}: {}", index + 1, step.title));
@@ -159,6 +180,10 @@ mod tests {
         Plan {
             title: "Add the plan tool".into(),
             goal: "The plan agent ends its turn with a propose_plan call".into(),
+            context: String::new(),
+            constraints: String::new(),
+            out_of_scope: String::new(),
+            deliverable: String::new(),
             steps: vec![
                 PlanStep {
                     title: "Write the domain".into(),
@@ -183,6 +208,20 @@ mod tests {
             ],
             risks: vec!["The model may still write the plan as text".into()],
         }
+    }
+
+    #[test]
+    fn optional_sections_render_only_when_set() {
+        assert!(!plan().to_markdown().contains("## Context"));
+        let mut with = plan();
+        with.context = "c".into();
+        with.deliverable = "d".into();
+        let markdown = with.to_markdown();
+        assert!(markdown.contains(&format!(
+            "Goal: {}\n\n## Context\nc\n\n## Deliverable\nd\n",
+            with.goal
+        )));
+        assert!(!markdown.contains("## Constraints"));
     }
 
     #[test]
@@ -279,6 +318,10 @@ mod tests {
             plan: Plan {
                 title: String::new(),
                 goal: String::new(),
+                context: String::new(),
+                constraints: String::new(),
+                out_of_scope: String::new(),
+                deliverable: String::new(),
                 steps: vec![],
                 done_when: vec![],
                 risks: vec![],
