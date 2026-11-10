@@ -150,7 +150,8 @@ as the `local` provider's, and written back in the new shape.
   "sandbox": {
     "enabled": true,
     "network": false
-  }
+  },
+  "shortcuts": {"<action>": "combo"}
 }
 ```
 
@@ -173,6 +174,8 @@ not in a command: the model only chooses the query. `webFetch` (fennec's own, de
 `delegation` (fennec's own) is the `delegate` tool: `enabled` (default true) lets an agent hand a task to a read-only agent in a hidden child session; `maxPerTurn` (default 5, 0 = no limit) caps the delegations one turn starts, the next ones fail and the agent goes on itself. Turned off, the agents' reminder no longer lists `delegate` and a call is refused.
 
 `billing` (fennec's own) is a `provider/model` → bool map: a model not listed follows the provider default (local models are not billed, paid providers are), and a listed entry overrides it.
+
+`shortcuts` (fennec's own) holds only the human's overrides of the keyboard shortcuts: an unknown action, a malformed combo (it needs `Mod` or `Alt` unless the key is F1–F12) or two actions on one combo are refused.
 
 `sandbox` (fennec's own) is how commands run: the `run_command` tool and the
 workflow shell nodes. Enabled (the default), each command runs in bwrap: the
@@ -223,8 +226,9 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   than the version the human last looked at, up to `current`. The first call records `current`, so a fresh install
   has nothing new.
 - `POST /api/changelog/seen` `{}` → `{unseen: 0}`: the human looked at the changelog of the running version.
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools, shortcuts}`
   (`listings` may be the last listing the endpoint answered, refreshed in the background)
+  - `shortcuts`: `[{action, combo, default}]`, every keyboard shortcut in the Settings page's order, the stored override applied (an empty combo: disabled). A combo is `Mod`/`Alt`/`Shift` (in that order) then a `KeyboardEvent.code`, e.g. `Alt+Shift+Digit1`; matching by code keeps a shortcut on the same key whatever the layout.
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
     MCP tool's access as its server declares it in its annotations (indicative, not verified;
     `undeclared` without annotations) and its definition's estimated token cost

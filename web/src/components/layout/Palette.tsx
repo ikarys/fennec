@@ -6,6 +6,7 @@ import { useLang, useT } from '../../i18n';
 import { SearchIcon } from '../ui/Icons';
 import { SectionLabel } from '../ui/SectionLabel';
 import type { PageId } from './TopBar';
+import type { ShortcutAction } from '../../lib/shortcuts';
 
 interface PaletteItem {
   id: string;
@@ -31,9 +32,11 @@ interface PaletteProps {
   onHome: () => void;
   onOpenPage: (page: PageId) => void;
   onOpenProject: (projectId: string) => void;
+  /** Each action's shortcut, as it reads. */
+  shortcuts?: Partial<Record<ShortcutAction, string>>;
 }
 
-export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome, onOpenPage, onOpenProject }: PaletteProps) {
+export function Palette({ open, projects, onClose, onOpenSession, onNewSession, onOpenProjectDialog, onHome, onOpenPage, onOpenProject, shortcuts }: PaletteProps) {
   const lang = useLang();
   const t = useT();
   const [query, setQuery] = useState('');
@@ -61,11 +64,11 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     const result: PaletteGroup[] = [];
 
     const pages: PaletteItem[] = [
-      { id: 'page-home', title: t('paletteHome'), meta: '', action: onHome },
-      { id: 'page-backlog', title: t('tasks'), meta: '', action: () => onOpenPage('backlog') },
-      { id: 'page-workflows', title: t('workflows'), meta: '', action: () => onOpenPage('workflows') },
-      { id: 'page-insight', title: t('insight'), meta: '', action: () => onOpenPage('insight') },
-      { id: 'page-settings', title: t('settings'), meta: '', action: () => onOpenPage('settings') }
+      { id: 'page-home', title: t('paletteHome'), meta: shortcuts?.goHome ?? '', action: onHome },
+      { id: 'page-backlog', title: t('tasks'), meta: shortcuts?.goTasks ?? '', action: () => onOpenPage('backlog') },
+      { id: 'page-workflows', title: t('workflows'), meta: shortcuts?.goWorkflows ?? '', action: () => onOpenPage('workflows') },
+      { id: 'page-insight', title: t('insight'), meta: shortcuts?.goInsight ?? '', action: () => onOpenPage('insight') },
+      { id: 'page-settings', title: t('settings'), meta: shortcuts?.goSettings ?? '', action: () => onOpenPage('settings') }
     ].filter((page) => !q || page.title.toLowerCase().includes(q));
 
     if (pages.length > 0) {
@@ -115,7 +118,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
       ...projects.filter((project) => project.chat).map((project) => ({
         id: `new-${project.id}`,
         title: t('paletteNewChat'),
-        meta: '',
+        meta: shortcuts?.newChat ?? '',
         action: () => onNewSession(project.id)
       })),
       {
@@ -131,7 +134,7 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
     }
 
     return result;
-  }, [query, projects, lang, onOpenSession, onNewSession, onOpenProjectDialog, onOpenPage, onOpenProject]);
+  }, [query, projects, lang, onOpenSession, onNewSession, onOpenProjectDialog, onOpenPage, onOpenProject, shortcuts]);
 
   const flatItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
 

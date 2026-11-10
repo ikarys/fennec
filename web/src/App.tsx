@@ -17,6 +17,7 @@ import { HomePage } from './pages/HomePage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ChatsPage } from './pages/ChatsPage';
 import { SessionPage } from './pages/SessionPage';
+import { AGENT_SHORTCUT_EVENT, comboLabel, comboOf, shortcutIndex, type ShortcutAction } from './lib/shortcuts';
 import { SplitPage } from './pages/SplitPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InsightPage } from './pages/InsightPage';
@@ -40,6 +41,16 @@ const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const BacklogPage = lazy(() => import('./pages/BacklogPage'));
 const ChangesPage = lazy(() => import('./pages/ChangesPage'));
 const EditorPage = lazy(() => import('./pages/EditorPage'));
+
+/** The page each page shortcut opens. */
+const SHORTCUT_PAGES = {
+  goProjects: 'projects',
+  goChats: 'chats',
+  goTasks: 'backlog',
+  goWorkflows: 'workflows',
+  goInsight: 'insight',
+  goSettings: 'settings'
+} as const;
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
@@ -122,14 +133,6 @@ export default function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key === '\\') {
-        event.preventDefault();
-        toggleSplitRef.current();
-      }
       if (event.key === 'Escape') {
         setPaletteOpen(false);
       }
@@ -388,6 +391,112 @@ export default function App() {
     [navigate]
   );
 
+  // The keyboard shortcuts: the server resolves the bindings, a key press only looks its combo up.
+  const shortcuts = useMemo(() => shortcutIndex(settings?.shortcuts ?? []), [settings?.shortcuts]);
+  const shortcutLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        (settings?.shortcuts ?? [])
+          .filter((binding) => binding.combo)
+          .map((binding) => [binding.action, comboLabel(binding.combo)])
+      ) as Partial<Record<ShortcutAction, string>>,
+    [settings?.shortcuts]
+  );
+  const runShortcut = useCallback(
+    (action: ShortcutAction) => {
+      switch (action) {
+        case 'newChat':
+          if (chatProjectId) startNewSession(chatProjectId);
+          break;
+        case 'agentPlan':
+          window.dispatchEvent(new CustomEvent(AGENT_SHORTCUT_EVENT, { detail: 'plan' }));
+          break;
+        case 'agentBuilder':
+          window.dispatchEvent(new CustomEvent(AGENT_SHORTCUT_EVENT, { detail: 'builder' }));
+          break;
+        case 'agentAsk':
+          window.dispatchEvent(new CustomEvent(AGENT_SHORTCUT_EVENT, { detail: 'ask' }));
+          break;
+        case 'newSession': {
+          let projectId: string | undefined;
+          if (route.name === 'new') {
+            projectId = route.id;
+          } else if (route.name === 'session') {
+            const project = projects.find((candidate) => candidate.sessions.some((session) => session.id === route.id));
+            projectId = project?.id;
+          } else if (route.name === 'project') {
+            projectId = route.projectId;
+          }
+          startNewSession(projectId);
+          break;
+        }
+        case 'goHome':
+          navigate('#/');
+          break;
+        case 'goProjects':
+        case 'goChats':
+        case 'goTasks':
+        case 'goWorkflows':
+        case 'goInsight':
+        case 'goSettings':
+          navigate(PAGE_TABS.find((tab) => tab.page === SHORTCUT_PAGES[action])?.path ?? '#/');
+          break;
+        case 'nextTab':
+        case 'prevTab': {
+          if (tabs.length === 0) break;
+          const step = action === 'nextTab' ? 1 : -1;
+          const index = tabs.indexOf(tabIdForRoute(route) ?? '');
+          const target =
+            index === -1
+              ? step > 0
+                ? tabs[0]
+                : tabs[tabs.length - 1]
+              : tabs[(index + step + tabs.length) % tabs.length];
+          if (target) pickTab(target);
+          break;
+        }
+        case 'closeTab': {
+          const id = tabIdForRoute(route);
+          if (id) closeTab(id);
+          break;
+        }
+        case 'palette':
+          setPaletteOpen((open) => !open);
+          break;
+        case 'split':
+          toggleSplit();
+          break;
+      }
+    },
+    [
+      chatProjectId,
+      closeTab,
+      navigate,
+      pickTab,
+      projects,
+      route,
+      startNewSession,
+      tabs,
+      toggleSplit
+    ]
+  );
+  const runShortcutRef = useRef(runShortcut);
+  useEffect(() => {
+    runShortcutRef.current = runShortcut;
+  }, [runShortcut]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      const combo = comboOf(event);
+      const action = combo ? shortcuts.get(combo) : undefined;
+      if (!action) return;
+      event.preventDefault();
+      runShortcutRef.current(action);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [shortcuts]);
+
   const pickTabInPane = useCallback(
     (side: 'left' | 'right', id: string) => {
       if (route.name !== 'split' || isRouteTab(id)) {
@@ -555,6 +664,7 @@ export default function App() {
         <Palette
           open={paletteOpen}
           projects={projects}
+          shortcuts={shortcutLabels}
           onClose={() => setPaletteOpen(false)}
           onOpenSession={openSession}
           onNewSession={(projectId) => startNewSession(projectId)}

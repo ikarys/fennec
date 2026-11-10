@@ -15,7 +15,8 @@ import {
   PuzzleIcon,
   ServerIcon,
   GlobeIcon,
-  InfoIcon
+  InfoIcon,
+  KeyboardIcon
 } from '../ui/Icons';
 import { SectionLabel } from '../ui/SectionLabel';
 import { SETTINGS_GROUPS, type SettingsPageId, type SettingsGroupId } from '../../lib/settingsPages';
@@ -25,6 +26,7 @@ export const SETTINGS_PAGE_META: Record<
   { Icon: typeof PuzzleIcon; labelKey: MsgKey; hintKey: MsgKey }
 > = {
   display: { Icon: EyeIcon, labelKey: 'settingsPageDisplay', hintKey: 'settingsPageDisplayHint' },
+  shortcuts: { Icon: KeyboardIcon, labelKey: 'settingsPageShortcuts', hintKey: 'settingsPageShortcutsHint' },
   providers: { Icon: CpuIcon, labelKey: 'settingsPageProviders', hintKey: 'settingsPageProvidersHint' },
   instructions: {
     Icon: FileIcon,

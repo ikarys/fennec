@@ -50,6 +50,9 @@ pub struct Preferences {
     pub enabled_workflows: Vec<String>,
     /// MCP servers, configured on the Settings page.
     pub mcp: Vec<McpServer>,
+    /// The human's keyboard shortcut overrides, action id → combo (`shortcut::ACTIONS`); an
+    /// action not listed keeps its default, an empty combo disables it.
+    pub shortcuts: BTreeMap<String, String>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,
@@ -313,6 +316,7 @@ impl Preferences {
                 return Err(problem);
             }
         }
+        super::shortcut::check(&self.shortcuts)?;
         Ok(())
     }
 
@@ -374,6 +378,23 @@ impl Preferences {
 mod tests {
     use super::*;
     use crate::domain::mcp::McpTool;
+
+    #[test]
+    fn preferences_stored_before_shortcuts_load_with_none() {
+        assert!(
+            serde_json::from_str::<Preferences>("{}")
+                .unwrap()
+                .shortcuts
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn preferences_validate_rejects_bad_shortcuts() {
+        let mut prefs = serde_json::from_str::<Preferences>("{}").unwrap();
+        prefs.shortcuts.insert("palette".into(), "KeyK".into());
+        assert!(prefs.validate().is_err());
+    }
 
     #[test]
     fn search_prefs_stored_before_web_fetch_allow_it() {

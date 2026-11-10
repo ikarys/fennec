@@ -38,6 +38,7 @@ import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
 import { DelegationSection } from '../components/settings/DelegationSection';
 import { IntegrationSection } from '../components/settings/IntegrationSection';
+import { ShortcutsSection } from '../components/settings/ShortcutsSection';
 import { ScannersSection } from '../components/settings/ScannersSection';
 import { PluginsSection } from '../components/settings/PluginsSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
@@ -262,6 +263,10 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
     setForm((previous) => (previous ? { ...previous, integration } : previous));
   }
 
+  function updateShortcuts(shortcuts: Record<string, string>) {
+    setForm((previous) => (previous ? { ...previous, shortcuts } : previous));
+  }
+
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
   }
@@ -440,6 +445,15 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
               onChange={updateDisplay}
               theme={theme}
               onThemeChange={onThemeChange}
+            />
+          )}
+
+          {active === 'shortcuts' && (
+            <ShortcutsSection
+              save={groupSave('shortcuts')}
+              bindings={settings.shortcuts ?? []}
+              value={form.shortcuts}
+              onChange={updateShortcuts}
             />
           )}
 

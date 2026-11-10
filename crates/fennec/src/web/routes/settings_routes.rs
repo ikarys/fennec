@@ -4,6 +4,7 @@
 use crate::domain::mcp;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
+use crate::domain::shortcut;
 use crate::sandbox::{SandboxHealth, probe};
 use crate::scanners;
 use crate::skills;
@@ -94,6 +95,7 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> 
         "scanners": scanners,
         "sandboxHealth": sandbox_health(),
         "mcpTools": mcp_tools(&prefs),
+        "shortcuts": shortcut::resolve(&prefs.shortcuts),
     });
     send_json(stream, 200, &body)
 }
