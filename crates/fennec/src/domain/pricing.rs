@@ -224,6 +224,7 @@ mod tests {
             model.to_string(),
             ModelPrefs {
                 price: Some(price),
+                reasoning_efforts: Vec::new(),
                 ..Default::default()
             },
         );

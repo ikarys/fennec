@@ -159,6 +159,7 @@ mod tests {
             context_window: 10_000,
             compact_at: 0.85,
             reasoning_effort: None,
+            session_effort: None,
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,

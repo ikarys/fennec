@@ -1,6 +1,6 @@
 // One model row: header with spec pills and an expandable parameter/price editor.
 import { useState } from 'react';
-import type { ModelRef, ParamSource, ProviderListing, ReasoningEffort, SettingsDefaults } from '../../lib/api';
+import { REASONING_EFFORTS, type ModelRef, type ParamSource, type ProviderListing, type ReasoningEffort, type SettingsDefaults } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ChevronDownIcon, CloseIcon, HeartIcon, InfoIcon, PinIcon, StarIcon } from '../ui/Icons';
@@ -21,7 +21,16 @@ type ListedModel = ProviderListing['models'][number];
 // The README section a billed flag's info icon opens.
 const BILLING_DOC_URL = 'https://github.com/ikarys/fennec#budgets-and-billed-models';
 
-const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+/** The efforts the row's effort select offers: probed, accepted, catalog, plus the stored one. */
+function offeredEfforts(value: ModelForm, model: ListedModel | null): ReasoningEffort[] {
+  const probed = value.reasoningEfforts ? (value.reasoningEfforts.split(',') as ReasoningEffort[]) : [];
+  const accepted = model?.acceptedEfforts ?? [];
+  const base = probed.length > 0 ? probed : accepted.length > 0 ? accepted : REASONING_EFFORTS;
+  if (value.reasoningEffort !== '' && !base.includes(value.reasoningEffort as ReasoningEffort)) {
+    return [...base, value.reasoningEffort as ReasoningEffort];
+  }
+  return base;
+}
 
 const SOURCE_LABELS: Record<ParamSource, MsgKey> = {
   perModel: 'sourcePerModel',
@@ -219,7 +228,7 @@ export function ModelRow({
                 className="w-full"
               >
                 <option value="">{t('effortAuto')}</option>
-                {REASONING_EFFORTS.map((effort) => (
+                {offeredEfforts(value, model).map((effort) => (
                   <option key={effort} value={effort}>
                     {effort}
                   </option>

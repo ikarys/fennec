@@ -100,6 +100,7 @@ mod tests {
                 context_window: 1000,
                 compact_at: 0.0,
                 reasoning_effort: None,
+                session_effort: None,
                 autonomous,
                 lang: crate::domain::lang::Lang::Fr,
                 preflight_sent_back: false,

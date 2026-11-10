@@ -15,6 +15,7 @@ function formPatch(probed: ProbedModel): Partial<ModelForm> {
   if (probed.maxTokens != null) patch.maxTokens = String(probed.maxTokens);
   // No accepted effort: the model must not be sent one.
   patch.reasoningEffort = probed.defaultReasoningEffort ?? '';
+  patch.reasoningEfforts = probed.reasoningEfforts.join(',');
   return patch;
 }
 

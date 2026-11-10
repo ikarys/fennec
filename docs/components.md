@@ -316,3 +316,11 @@ Alt+Shift+→/←/X move between and close tabs, Mod+K opens the palette and Mod
 position (`event.code`), so they work on any layout. Every binding can be changed or disabled in Settings →
 Shortcuts; the server validates the combos and refuses two actions sharing one, and the palette shows them
 (`domain/shortcut.rs`, `web/src/lib/shortcuts.ts`, `web/src/components/settings/ShortcutsSection.tsx`).
+
+Reasoning effort per session, done: the composer has an effort picker next to the model picker, offering auto and
+only the efforts the session's model accepts. The choice is recorded as `effort.changed` and wins over the agent's
+and the model's effort; a choice the current model does not accept falls back to auto. Settings → Models offers the
+same accepted efforts: the probe stores them in the model's preferences, else the connector's catalog answers, else
+all efforts are offered. Changing the effort mid-session can make a local server re-read the whole context, and the
+picker's tooltip says so (`domain/model_choice.rs`, `web/routes/model_routes.rs`,
+`web/src/components/session/EffortPicker.tsx`).

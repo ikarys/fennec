@@ -94,6 +94,7 @@ mod tests {
                 context_window: Some(2048),
                 compaction_threshold: Some(0.5),
                 reasoning_effort: None,
+                reasoning_efforts: Vec::new(),
             },
         );
         let mut prefs = Preferences {

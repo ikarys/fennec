@@ -229,10 +229,12 @@ pub(super) fn with_turn<R>(
     let store = SqliteStore::open(&settings.db_path)?;
     // A workflow's child sessions run on the model the human chose for the session.
     let (chosen, _) = model_routes::session_choice(&store, session_id)?;
+    let (effort, _) = model_routes::session_effort(settings, &store, session_id)?;
     let mut on_event = |_: &Event| {};
     let mut options = turn_build::Options {
         notifier: Some(notifier),
         model_choice: chosen,
+        effort_choice: effort,
         autonomous,
         delegated,
         on_event: &mut on_event,

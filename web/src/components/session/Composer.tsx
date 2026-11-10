@@ -8,6 +8,7 @@ import type {
   ModelChoice,
   ModelChoices,
   ModelRef,
+  ReasoningEffort,
   SlashCommand,
 } from "../../lib/api";
 import { IMAGE_TYPES } from "../../lib/attachments";
@@ -22,6 +23,7 @@ import { matchCommands, SlashMenu } from "./SlashMenu";
 import { ModePicker } from "./ModePicker";
 import { McpPicker } from "./McpPicker";
 import { ModelPicker, modelShortName } from "./ModelPicker";
+import { EffortPicker } from "./EffortPicker";
 import { Button } from "../ui/Button";
 import {
   WorkflowPicker,
@@ -41,6 +43,9 @@ interface ComposerProps {
   currentModel: ModelChoice | null;
   modelChoices: ModelChoices | null;
   onModelChange?: (ref: ModelRef) => void;
+  effort?: ReasoningEffort | null;
+  acceptedEfforts?: ReasoningEffort[];
+  onEffortChange?: (effort: ReasoningEffort | null) => void;
   error: string | null;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
@@ -69,6 +74,9 @@ export function Composer({
   currentModel,
   modelChoices,
   onModelChange,
+  effort,
+  acceptedEfforts,
+  onEffortChange,
   error,
   textareaRef,
   placeholder,
@@ -324,6 +332,13 @@ export function Composer({
           )}
           <div className="ml-auto flex items-center gap-1.5 px-1.5 text-xs text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />
+            {onEffortChange && (
+              <EffortPicker
+                effort={effort ?? null}
+                accepted={acceptedEfforts ?? []}
+                onChange={onEffortChange}
+              />
+            )}
             {onModelChange ? (
               <ModelPicker
                 current={currentModel}

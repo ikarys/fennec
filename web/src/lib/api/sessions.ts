@@ -384,6 +384,8 @@ export function getThread(id: string): Promise<ServedThread> {
   );
 }
 
+import type { ReasoningEffort } from './settings';
+
 export interface AttachmentInput {
   filename: string;
   data: string;
@@ -397,6 +399,7 @@ export function createSession(
   workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean },
   model?: ModelRef,
   mcpDisabled?: string[],
+  effort?: ReasoningEffort,
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -409,6 +412,7 @@ export function createSession(
     worktree?: boolean;
     model?: ModelRef;
     mcpDisabled?: string[];
+    effort?: ReasoningEffort;
   } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
@@ -426,6 +430,9 @@ export function createSession(
   }
   if (mcpDisabled !== undefined) {
     body.mcpDisabled = mcpDisabled;
+  }
+  if (effort) {
+    body.effort = effort;
   }
   return request<{ id: string }>("/api/sessions", {
     method: "POST",

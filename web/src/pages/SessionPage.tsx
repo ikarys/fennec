@@ -205,8 +205,12 @@ export function SessionPage({
     mode,
     currentModel,
     pendingModel,
+    pendingEffort,
+    effort,
+    acceptedEfforts,
     handleModeChange,
     handleModelChange,
+    handleEffortChange,
   } = useModeAndModel({
     sessionId,
     viewMode: view.mode,
@@ -500,6 +504,7 @@ export function SessionPage({
             },
             pendingModel ?? undefined,
             draftMcpDisabled ?? undefined,
+            pendingEffort?.value ?? undefined,
           );
           onSessionCreated(created.id, pseudoTabId);
         }
@@ -517,6 +522,7 @@ export function SessionPage({
           undefined,
           pendingModel ?? undefined,
           draftMcpDisabled ?? undefined,
+          pendingEffort?.value ?? undefined,
         );
         if (frameIdeaId) {
           await frameIdea(projectId, frameIdeaId, created.id);
@@ -971,6 +977,9 @@ export function SessionPage({
                         currentModel={currentModel}
                         modelChoices={modelChoices}
                         onModelChange={handleModelChange}
+                        effort={effort}
+                        acceptedEfforts={acceptedEfforts}
+                        onEffortChange={(next) => void handleEffortChange(next)}
                         error={sendError}
                         textareaRef={textareaRef}
                         placeholder={

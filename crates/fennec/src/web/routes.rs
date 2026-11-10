@@ -249,6 +249,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         }
         ("POST", ["api", "sessions", id, "link"]) => chat_link_routes::link(app, req, stream, id),
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "effort"]) => {
+            model_routes::set_effort(app, req, stream, id)
+        }
         ("GET", ["api", "sessions", id, "mcp"]) => mcp_routes::session_mcp(app, stream, id),
         ("POST", ["api", "sessions", id, "mcp"]) => {
             mcp_routes::set_session_mcp(app, req, stream, id)

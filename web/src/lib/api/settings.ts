@@ -5,11 +5,15 @@ import type { ShortcutBinding } from "../shortcuts";
 export type ReasoningEffort =
   "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
+export const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
 export interface ModelPrefs {
   maxTokens?: number;
   contextWindow?: number;
   compactionThreshold?: number;
   reasoningEffort?: ReasoningEffort | null;
+  /** The efforts a probe found the model accepts. */
+  reasoningEfforts?: ReasoningEffort[];
   price?: { inputPerM: number; cachedPerM: number; outputPerM: number } | null;
 }
 
@@ -80,6 +84,8 @@ export interface ModelChoice {
   provider: string;
   model: string;
   providerName: string;
+  /** The efforts the model accepts; empty when unknown. */
+  acceptedEfforts?: ReasoningEffort[];
 }
 
 export interface ModelChoices {
@@ -94,6 +100,9 @@ export interface SessionModel {
   contextWindow: number;
   compactAt: number;
   source: "session" | "parent" | "default";
+  acceptedEfforts: ReasoningEffort[];
+  /** The effort the human chose for the session; null is auto. */
+  effort: ReasoningEffort | null;
 }
 
 export interface Preferences {
@@ -194,6 +203,8 @@ export interface SettingsModel {
   id: string;
   contextWindow: number | null;
   resolved: ResolvedParams;
+  /** The efforts the model accepts (probed, else catalog); empty when unknown. */
+  acceptedEfforts: ReasoningEffort[];
   /** Added by hand: stored with no listing (the endpoint has no /models route). */
   manual?: boolean;
 }
@@ -338,6 +349,19 @@ export function setSessionModel(
     {
       method: "POST",
       body: JSON.stringify(ref),
+    },
+  );
+}
+
+export function setSessionEffort(
+  id: string,
+  effort: ReasoningEffort | null,
+): Promise<{ model: SessionModel }> {
+  return request<{ model: SessionModel }>(
+    `/api/sessions/${encodeURIComponent(id)}/effort`,
+    {
+      method: "POST",
+      body: JSON.stringify({ effort }),
     },
   );
 }

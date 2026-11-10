@@ -152,6 +152,7 @@ mod tests {
 
         let per_model = ModelPrefs {
             context_window: Some(64_000),
+            reasoning_efforts: Vec::new(),
             ..Default::default()
         };
         let r = resolved(&defaults(), Some(&per_model), Some(131_072));
@@ -166,6 +167,7 @@ mod tests {
             max_tokens: Some(16_000),
             compaction_threshold: Some(0.5),
             reasoning_effort: Some(ReasoningEffort::High),
+            reasoning_efforts: Vec::new(),
             ..Default::default()
         };
         let r = resolved(&d, Some(&per_model), None);
@@ -187,6 +189,7 @@ mod tests {
             context_window: Some(12_000),
             compaction_threshold: Some(0.7),
             reasoning_effort: Some(ReasoningEffort::Low),
+            reasoning_efforts: Vec::new(),
         };
         let concrete = ModelParams::resolve(
             &d,

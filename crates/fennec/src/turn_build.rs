@@ -11,7 +11,7 @@ use crate::domain::clock;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::kernel_rules;
 use crate::domain::mcp;
-use crate::domain::preferences::{ModelRef, Preferences};
+use crate::domain::preferences::{ModelRef, Preferences, ReasoningEffort};
 use crate::domain::project::SessionSummary;
 use crate::domain::test_files;
 use crate::domain::waiver;
@@ -35,6 +35,8 @@ pub struct Options<'a> {
     /// The model the session runs on (a workflow child inherits its parent's
     /// choice); `None` uses the default.
     pub model_choice: Option<ModelRef>,
+    /// The session's effort chosen by the human, already checked against the model.
+    pub effort_choice: Option<ReasoningEffort>,
     /// The human is away (the ideas queue's night mode).
     pub autonomous: bool,
     /// The turn runs a `delegate` call's child, hidden from the human: its agents lose the tools that leave something for them.
@@ -129,6 +131,7 @@ pub fn with_turn<R>(
         context_window: params.context_window,
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
+        session_effort: options.effort_choice,
         autonomous: options.autonomous,
         lang: prefs.display.language,
         preflight_sent_back: false,
@@ -297,6 +300,7 @@ mod tests {
         let mut options = Options {
             notifier: None,
             model_choice: None,
+            effort_choice: None,
             autonomous: true,
             delegated: false,
             on_event: &mut on_event,

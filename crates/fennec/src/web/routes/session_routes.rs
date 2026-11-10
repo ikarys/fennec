@@ -14,7 +14,7 @@ use crate::domain::clock;
 use crate::domain::conversation::last_assistant_text;
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
-use crate::domain::preferences::ModelRef;
+use crate::domain::preferences::{ModelRef, ReasoningEffort};
 use crate::domain::project::SessionSummary;
 use crate::domain::queue;
 use crate::domain::replay::replayable;
@@ -138,6 +138,11 @@ pub(crate) fn create_session(
         None => None,
     };
     let mcp_disabled = crate::web::routes::mcp_routes::disabled_servers(&body["mcpDisabled"]);
+    // Untrusted input: anything but a known effort or null is refused.
+    let Ok(effort) = serde_json::from_value::<Option<ReasoningEffort>>(body["effort"].clone())
+    else {
+        return error(stream, 400, "unknown effort");
+    };
     let title: String = if prompt.is_empty() {
         attachments
             .first()
@@ -158,6 +163,16 @@ pub(crate) fn create_session(
     append_human_event(app, &store, &id, mode_event)?;
     if let Some(model) = model_ref {
         append_human_event(app, &store, &id, Some(Event::ModelChanged { model }))?;
+    }
+    if let Some(effort) = effort {
+        append_human_event(
+            app,
+            &store,
+            &id,
+            Some(Event::EffortChanged {
+                effort: Some(effort),
+            }),
+        )?;
     }
     if let Some(servers) = mcp_disabled {
         append_human_event(app, &store, &id, Some(Event::McpDisabled { servers }))?;
@@ -699,7 +714,7 @@ pub(crate) fn session_json(app: &App, s: &SessionSummary) -> Value {
     })
 }
 
-/// Appends a choice the human made (mode, model) and wakes the session's streams.
+/// Appends a choice the human made (mode, model, effort) and wakes the session's streams.
 pub(crate) fn append_human_event(
     app: &App,
     store: &SqliteStore,

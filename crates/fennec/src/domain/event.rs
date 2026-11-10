@@ -4,7 +4,7 @@
 use super::attachment::Attachment;
 use super::criteria::{Criterion, CriterionStatus};
 use super::plan::Plan;
-use super::preferences::ModelRef;
+use super::preferences::{ModelRef, ReasoningEffort};
 use super::preflight::PreflightResult;
 use super::report::Report;
 use super::stats::MessageStats;
@@ -274,6 +274,10 @@ pub enum Event {
     /// The human chose the session's model.
     #[serde(rename = "model.changed", rename_all = "camelCase")]
     ModelChanged { model: ModelRef },
+    /// fennec's own: the human chose the session's reasoning effort; `None` is
+    /// "auto" (the agent's, else the model's).
+    #[serde(rename = "effort.changed", rename_all = "camelCase")]
+    EffortChanged { effort: Option<ReasoningEffort> },
     /// fennec's own: the session's disabled MCP servers, set by the composer.
     /// Carries the full disabled set (not a delta); the last event wins.
     #[serde(rename = "mcp.disabled", rename_all = "camelCase")]
@@ -612,6 +616,7 @@ impl Event {
             Event::RunningChanged { .. } => "running.changed",
             Event::ModeChanged { .. } => "mode.changed",
             Event::ModelChanged { .. } => "model.changed",
+            Event::EffortChanged { .. } => "effort.changed",
             Event::McpDisabled { .. } => "mcp.disabled",
             Event::SessionRewound { .. } => "session.rewound",
             Event::SessionNameGenerated { .. } => "session.name_generated",
@@ -848,6 +853,38 @@ mod tests {
             Event::ModelChanged { model }
                 if model.provider == "local" && model.model == "m"
         ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+    }
+
+    #[test]
+    fn effort_changed_round_trips() {
+        let wire = json!({
+            "type": "effort.changed",
+            "data": {
+                "effort": "high"
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(
+            &event,
+            Event::EffortChanged {
+                effort: Some(ReasoningEffort::High)
+            }
+        ));
+
+        assert_eq!(serde_json::to_value(&event).unwrap(), wire);
+
+        let wire = json!({
+            "type": "effort.changed",
+            "data": {
+                "effort": null
+            }
+        });
+
+        let event: Event = serde_json::from_value(wire.clone()).unwrap();
+        assert!(matches!(&event, Event::EffortChanged { effort: None }));
 
         assert_eq!(serde_json::to_value(&event).unwrap(), wire);
     }
