@@ -503,7 +503,7 @@ export default function App() {
             />
           ) : route.name === 'changes' ? (
             <Suspense fallback={<div className="flex grow items-center justify-center text-muted">{t(language, 'loading')}</div>}>
-              <ChangesPage sessionId={route.id} />
+              <ChangesPage sessionId={route.id} initialPath={route.path} projectId={currentProjectId ?? null} />
             </Suspense>
           ) : (
             <SessionPage

@@ -347,6 +347,9 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/projects/{id}/commit` body `{paths, message}` → `{commit}`. One commit of those files only
   (`git commit --only`) on the human's current branch with their git identity; every path must be a
   changed tracked file, at most 1000.
+- `POST /api/projects/{id}/restore` body `{path}` → `{}`. Puts one changed tracked file back as HEAD has it,
+  on disk and in the index; an added file is only unstaged and stays on disk. 400 when the path is not a
+  changed tracked file.
 - `GET /api/agents[?projectId=…]` → `{agents, tools, broken}`, the human's agent library (the Settings page's
   Agents tab). With `projectId` the named project's `.agents/agents` is included, read-only. No agent tool reaches
   these routes: `.agents` is protected from the file tools, and the CRUD below acts for the human only.

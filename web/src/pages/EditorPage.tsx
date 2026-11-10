@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../components/ui/Badge';
 import { buttonClass } from '../components/ui/Button';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EditIcon, ProjectIcon } from '../components/ui/Icons';
 import { InfoBar } from '../components/ui/InfoBar';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -41,8 +40,8 @@ export default function EditorPage({
   const [changes, setChanges] = useState<ProjectChange[]>([]);
   const [changesVersion, setChangesVersion] = useState(0);
   const [edited, setEdited] = useState<Set<string>>(() => new Set());
-  const [dirty, setDirty] = useState(false);
-  const [pendingFile, setPendingFile] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const project = projects.find((item) => item.id === projectId);
   const nodes = useMemo(() => (listing ? buildFileTree(listing.files) : []), [listing]);
@@ -90,27 +89,8 @@ export default function EditorPage({
     };
   }, [projectId, changesVersion]);
 
-  useEffect(() => {
-    if (!dirty) return;
-
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [dirty]);
-
   const navigateTo = (file: string) => {
     window.location.hash = editorPath(projectId, file, sessionId);
-  };
-
-  const selectFile = (file: string) => {
-    if (dirty) {
-      setPendingFile(file);
-      return;
-    }
-    navigateTo(file);
   };
 
   const handleSaved = (file: string) => {
@@ -120,6 +100,13 @@ export default function EditorPage({
       return next;
     });
     refreshChanges();
+  };
+
+  const handleRestored = (file: string) => {
+    refreshChanges();
+    if (path !== null && file === path) {
+      setReloadToken((token) => token + 1);
+    }
   };
 
   return (
@@ -167,7 +154,7 @@ export default function EditorPage({
                 <Badge tone="neutral">{listing?.files.length ?? 0}</Badge>
               </span>
             </SectionLabel>
-            <FileTree nodes={nodes} selected={path} onSelect={selectFile} />
+            <FileTree nodes={nodes} selected={path} onSelect={navigateTo} />
             {listing?.truncated ? (
               <p className="px-2.5 pt-2 text-xs text-muted">{t('filesTruncated')}</p>
             ) : null}
@@ -176,11 +163,12 @@ export default function EditorPage({
           <div className="flex min-h-0 min-w-0 grow flex-col">
             {path ? (
               <EditorPane
-                key={`${sessionId ?? ''}:${path}`}
+                key={`${sessionId ?? ''}:${path}:${reloadToken}`}
                 projectId={projectId}
                 path={path}
                 sessionId={sessionId}
-                onDirtyChange={setDirty}
+                editing={editing && !listing?.session}
+                onEditingChange={setEditing}
                 onSaved={handleSaved}
               />
             ) : (
@@ -193,25 +181,13 @@ export default function EditorPage({
               projectId={projectId}
               changes={changes}
               edited={edited}
-              onOpen={selectFile}
+              onOpen={navigateTo}
               onCommitted={refreshChanges}
+              onRestored={handleRestored}
             />
           ) : null}
         </div>
       )}
-
-      <ConfirmDialog
-        open={pendingFile !== null}
-        title={t('editorDiscardTitle')}
-        body={t('editorDiscardBody')}
-        confirmLabel={t('editorDiscard')}
-        variant="danger"
-        onConfirm={() => {
-          if (pendingFile) navigateTo(pendingFile);
-          setPendingFile(null);
-        }}
-        onCancel={() => setPendingFile(null)}
-      />
     </div>
   );
 }

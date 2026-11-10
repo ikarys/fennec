@@ -295,6 +295,53 @@ pub fn commit(
     Ok(commit.trim().to_string())
 }
 
+/// Put one changed tracked file back as HEAD has it, on disk and in the index; an
+/// added file is only unstaged and stays on disk.
+pub fn restore(workdir: &Path, path: &RelPath) -> Result<(), FileError> {
+    let changed = changes(workdir).map_err(FileError::Git)?;
+    let Some(file) = changed.iter().find(|file| file.path == path.as_str()) else {
+        return Err(FileError::Invalid(format!(
+            "not a changed tracked file: {}",
+            path.as_str()
+        )));
+    };
+
+    match file.status {
+        ChangeKind::Modified | ChangeKind::Deleted => {
+            git::run(
+                workdir,
+                &[
+                    "--literal-pathspecs",
+                    "restore",
+                    "--source=HEAD",
+                    "--staged",
+                    "--worktree",
+                    "--",
+                    path.as_str(),
+                ],
+                None,
+            )
+            .map_err(|e| FileError::Git(e.to_string()))?;
+        }
+        ChangeKind::Added => {
+            git::run(
+                workdir,
+                &[
+                    "--literal-pathspecs",
+                    "restore",
+                    "--staged",
+                    "--",
+                    path.as_str(),
+                ],
+                None,
+            )
+            .map_err(|e| FileError::Git(e.to_string()))?;
+        }
+    }
+
+    Ok(())
+}
+
 fn tree_parts(workdir: &Path, path: &RelPath) -> Result<TreeParts, FileError> {
     let full = workdir.join(path.as_str());
     let metadata = std::fs::symlink_metadata(&full).map_err(|e| {
@@ -816,6 +863,59 @@ mod tests {
 
         let diff = git::stdout(&dir, &["diff", "--name-only"]).unwrap();
         assert_eq!(diff.trim(), "b.txt");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restoring_a_modified_file_brings_back_head_on_disk_and_in_the_index() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "one");
+
+        std::fs::write(dir.join("a.txt"), "two").unwrap();
+        git::run(&dir, &["add", "a.txt"], None).unwrap();
+        std::fs::write(dir.join("a.txt"), "three").unwrap();
+
+        let path = RelPath::parse("a.txt").unwrap();
+        restore(&dir, &path).unwrap();
+
+        assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "one");
+        assert!(changes(&dir).unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restoring_an_added_file_unstages_it_and_keeps_it_on_disk() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "one");
+
+        std::fs::write(dir.join("new.txt"), "new").unwrap();
+        git::run(&dir, &["add", "new.txt"], None).unwrap();
+
+        let path = RelPath::parse("new.txt").unwrap();
+        restore(&dir, &path).unwrap();
+
+        assert_eq!(std::fs::read_to_string(dir.join("new.txt")).unwrap(), "new");
+        assert!(changes(&dir).unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restoring_a_file_that_did_not_change_is_refused() {
+        let dir = fresh_repo();
+        commit_file(&dir, "a.txt", "one");
+
+        let path = RelPath::parse("a.txt").unwrap();
+        let error = restore(&dir, &path).unwrap_err();
+
+        match error {
+            FileError::Invalid(message) => {
+                assert_eq!(message, "not a changed tracked file: a.txt");
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
 
         let _ = std::fs::remove_dir_all(&dir);
     }

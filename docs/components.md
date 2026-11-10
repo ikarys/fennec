@@ -298,10 +298,12 @@ figures that link to their page (cost over 7 days, ideas ready, worktrees on dis
 
 File editor, done: the editor page (`#/edit/<project>`, linked from the project page's header) lists the
 project's files as git sees them (tracked and new, never ignored ones) in a collapsible tree and opens a file in a
-code editor with syntax highlighting and line numbers (CodeMirror, loaded with the page only), or rendered for
-markdown. Ctrl+S writes a tracked file to disk, refused when it changed since it was read; nothing is committed
-then. The Changes panel lists the tracked files that differ from HEAD, the ones saved from the page ticked: one
-message makes one commit of the ticked files on the human's current branch, leaving the rest of their staged work
-out (`project_files.rs`, `domain/project_file.rs`, `web/routes/file_routes.rs`, `web/src/components/editor/`,
-`web/src/pages/EditorPage.tsx`). The changed files of a report card and of the right panel open the file as the
-session's branch has it, read-only, or the working tree once the session is integrated.
+code editor with syntax highlighting and line numbers (CodeMirror, loaded with the page only), read-only and
+rendered for markdown until the human switches to edit mode. While editing, a tracked file is saved to disk shortly
+after the last keystroke, refused when it changed since it was read (autosave then stops until a reload); nothing
+is committed then. The Changes panel lists the tracked files that differ from HEAD, the ones saved from the page
+ticked: one message makes one commit of the ticked files on the human's current branch, leaving the rest of their
+staged work out; a file can also be reset to HEAD after a confirmation (a new file is only unstaged). In a
+session, a modified file opens the session's diff on it while its branch has commits, else the working tree in
+the editor (`project_files.rs`, `domain/project_file.rs`, `web/routes/file_routes.rs`, `web/src/components/editor/`,
+`web/src/pages/EditorPage.tsx`). The diff page links to the whole file as the session's branch has it, read-only.

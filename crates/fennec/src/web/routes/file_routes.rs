@@ -115,6 +115,31 @@ pub fn commit(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Res
     send_json(stream, 200, &json!({ "commit": commit_id }))
 }
 
+/// `POST /api/projects/{id}/restore`: put one changed tracked file back as HEAD has it.
+pub fn restore(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
+    let project = require_project(&app.store()?, id)?;
+    let body = req.json()?;
+
+    let path_raw = body
+        .get("path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| HttpError::new(400, "missing path"))?;
+    let path = RelPath::parse(path_raw).map_err(|e| HttpError::new(400, e))?;
+    let workdir = Path::new(&project.workdir);
+
+    match project_files::restore(workdir, &path) {
+        Ok(()) => {}
+        Err(file_error) => return error(stream, file_error.status(), &file_error.message()),
+    }
+
+    send_json(stream, 200, &json!({}))
+}
+
 fn version(app: &App, req: &Request, project_id: &str) -> Result<Version, HttpError> {
     let Some(session_id) = req.query_param("session") else {
         return Ok(Version::Tree);

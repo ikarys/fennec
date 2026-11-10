@@ -23,12 +23,16 @@ import {
 
 describe('changes', () => {
   it('parses the changes page of a session', () => {
-    expect(parseRoute('#/s/abc-1/changes')).toEqual({ name: 'changes', id: 'abc-1' });
+    expect(parseRoute('#/s/abc-1/changes')).toEqual({ name: 'changes', id: 'abc-1', path: null });
   });
 
   it('round trips changesPath', () => {
     const sessionId = 'abc-1/slash';
-    expect(parseRoute(changesPath(sessionId))).toEqual({ name: 'changes', id: sessionId });
+    expect(parseRoute(changesPath(sessionId))).toEqual({ name: 'changes', id: sessionId, path: null });
+  });
+
+  it('parses a changes path with a file', () => {
+    expect(parseRoute(changesPath('s-1', 'src/a b.ts'))).toEqual({ name: 'changes', id: 's-1', path: 'src/a b.ts' });
   });
 
   it('keeps the session tab active on the changes page', () => {
