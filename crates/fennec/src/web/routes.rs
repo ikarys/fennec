@@ -11,7 +11,6 @@ pub(super) mod budget_routes;
 pub(super) mod canvas_routes;
 pub(super) mod changelog_routes;
 pub(super) mod chat_link_routes;
-pub(super) mod contribution_routes;
 pub(super) mod diff_routes;
 pub(super) mod folder_routes;
 pub(super) mod home_routes;
@@ -167,12 +166,6 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "projects", id, "budget"]) => budget_routes::get(app, stream, id),
         ("POST", ["api", "projects", id, "budget"]) => budget_routes::set(app, req, stream, id),
         ("GET", ["api", "projects", id, "indicators"]) => indicator_routes::serve(app, stream, id),
-        ("GET", ["api", "projects", id, "contributions"]) => {
-            contribution_routes::list(app, stream, id)
-        }
-        ("POST", ["api", "projects", id, "contributions"]) => {
-            contribution_routes::adopt(app, req, stream, id)
-        }
         ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
         ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
         ("GET", ["api", "plugins", "status-bar"]) => plugin_routes::status_bar(app, req, stream),

@@ -6,7 +6,6 @@ import {
   ActivityIcon,
   AlertIcon,
   BulbIcon,
-  CommitIcon,
   ExternalIcon,
   FileIcon,
   InsightIcon,
@@ -26,7 +25,6 @@ import { DocSection } from '../components/project/DocSection';
 import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
-import { ContributionsSection } from '../components/project/ContributionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
 import { IndicatorsSection } from '../components/project/IndicatorsSection';
 import { CanvasSection } from '../components/project/CanvasSection';
@@ -46,7 +44,6 @@ const TABS = [
   { id: 'indicators', label: 'indicatorsTab', Icon: InsightIcon },
   { id: 'tasks', label: 'tasks', Icon: BulbIcon },
   { id: 'sessions', label: 'sessionsSectionTitle', Icon: TerminalIcon },
-  { id: 'contributions', label: 'contributionsTitle', Icon: CommitIcon },
   { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
   { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
   { id: 'doc', label: 'projectPageDoc', Icon: FileIcon },
@@ -258,7 +255,6 @@ export default function ProjectPage({
             />
           ) : null}
           {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
-          {activeTab === 'contributions' ? <ContributionsSection projectId={projectId} onOpenSession={onOpenSession} /> : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
           {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}

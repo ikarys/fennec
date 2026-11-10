@@ -5,8 +5,6 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
-mod contributions;
-pub use contributions::contributions;
 
 /// Runs `git -C dir args…`; a non-zero exit is an `Err` with the command and
 /// its trimmed stderr.
