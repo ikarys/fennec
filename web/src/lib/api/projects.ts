@@ -34,11 +34,11 @@ export interface SlashCommand {
   name: string;
   description: string;
   /** A built-in command (`compact`) or a skill: the menu groups them. */
-  kind: 'command' | 'skill';
+  kind: "command" | "skill";
 }
 
 /** The step of a project an agent serves; the server sends agents ordered by it. */
-export type AgentPhase = 'start' | 'frame' | 'build' | 'understand' | 'check';
+export type AgentPhase = "start" | "frame" | "build" | "understand" | "check";
 
 /** An agent: a mode of the session (`plan`, `builder`, …), or a sub-agent that workflow nodes run in a fresh context. */
 export interface Agent {
@@ -53,7 +53,7 @@ export interface Agent {
   /** The workflow a message to this agent starts by default in the composer. */
   workflow: string | null;
   /** Where its `*.agent.md` came from: a default, the human's, or the project's. */
-  origin: 'default' | 'user' | 'project';
+  origin: "default" | "user" | "project";
 }
 
 export interface Folder {
@@ -77,7 +77,10 @@ export function listFolders(path?: string): Promise<FolderListing> {
 }
 
 /** Create a new project folder `name` inside `path` (an empty git repo). */
-export function createFolder(path: string, name: string): Promise<{ path: string }> {
+export function createFolder(
+  path: string,
+  name: string,
+): Promise<{ path: string }> {
   return request<{ path: string }>("/api/folders/create", {
     method: "POST",
     body: JSON.stringify({ path, name }),
@@ -102,7 +105,10 @@ export interface DeleteProjectResult {
 }
 
 /** Delete a project; `deleteFolder` also removes its source folder. */
-export function deleteProject(id: string, deleteFolder: boolean): Promise<DeleteProjectResult> {
+export function deleteProject(
+  id: string,
+  deleteFolder: boolean,
+): Promise<DeleteProjectResult> {
   return request<DeleteProjectResult>(
     `/api/projects/${encodeURIComponent(id)}/delete`,
     {
@@ -113,7 +119,10 @@ export function deleteProject(id: string, deleteFolder: boolean): Promise<Delete
 }
 
 /** Pin or unpin a project; the server lists favourites first. */
-export function setProjectFavorite(id: string, favorite: boolean): Promise<void> {
+export function setProjectFavorite(
+  id: string,
+  favorite: boolean,
+): Promise<void> {
   return request<void>(`/api/projects/${encodeURIComponent(id)}/favorite`, {
     method: "POST",
     body: JSON.stringify({ favorite }),
@@ -137,7 +146,14 @@ export interface BacklogProject {
 
 /** `GET /api/backlog`: one table row per project with its idea counts and queue controls. */
 export interface BacklogView {
-  total: { yours: number; running: number; ready: number; drafts: number; done: number; projects: number };
+  total: {
+    yours: number;
+    running: number;
+    ready: number;
+    drafts: number;
+    done: number;
+    projects: number;
+  };
   projects: BacklogProject[];
 }
 
@@ -290,8 +306,16 @@ export function writeMapFile(
   );
 }
 
+/** Opens the human's terminal in the project's folder. */
+export function openProjectTerminal(id: string): Promise<void> {
+  return request<void>(`/api/projects/${encodeURIComponent(id)}/terminal`, {
+    method: "POST",
+  });
+}
+
 // The project dashboard: display-ready tiles and recent sessions.
-export type DashboardIcon = 'sessions' | 'ideas' | 'tokens' | 'time' | 'cost' | 'decisions';
+export type DashboardIcon =
+  "sessions" | "ideas" | "tokens" | "time" | "cost" | "decisions";
 
 export interface DashboardTile {
   id: string;
@@ -299,7 +323,7 @@ export interface DashboardTile {
   label: string;
   figure: string;
   detail: string;
-  tone: 'accent' | 'info' | 'ok' | 'attention' | 'err' | 'neutral';
+  tone: "accent" | "info" | "ok" | "attention" | "err" | "neutral";
   active: boolean;
   href: string | null;
   title: string | null;
@@ -332,11 +356,13 @@ export interface ProjectBudgetView {
   label: string;
   figure: string;
   detail: string;
-  tone: DashboardTile['tone'];
+  tone: DashboardTile["tone"];
   active: boolean;
 }
 
-export function getProjectBudget(projectId: string): Promise<ProjectBudgetView> {
+export function getProjectBudget(
+  projectId: string,
+): Promise<ProjectBudgetView> {
   return request<ProjectBudgetView>(
     `/api/projects/${encodeURIComponent(projectId)}/budget`,
   );
@@ -357,26 +383,28 @@ export function setProjectBudget(
 }
 
 export type IndicatorId =
-  | 'integrity'
-  | 'sensitiveReview'
-  | 'understanding'
-  | 'architecture'
-  | 'security'
-  | 'cost'
-  | 'transmission'
-  | 'traceability'
-  | 'reviewLoad';
+  | "integrity"
+  | "sensitiveReview"
+  | "understanding"
+  | "architecture"
+  | "security"
+  | "cost"
+  | "transmission"
+  | "traceability"
+  | "reviewLoad";
 
 export interface IndicatorView {
   id: IndicatorId;
   label: string;
   figure: string;
   detail: string;
-  tone: DashboardTile['tone'];
+  tone: DashboardTile["tone"];
 }
 
 /** The project's verified indicators, read from recorded facts. */
-export function getProjectIndicators(projectId: string): Promise<IndicatorView[]> {
+export function getProjectIndicators(
+  projectId: string,
+): Promise<IndicatorView[]> {
   return request<{ indicators: IndicatorView[] }>(
     `/api/projects/${encodeURIComponent(projectId)}/indicators`,
   ).then((body) => body.indicators);

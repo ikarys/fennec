@@ -165,6 +165,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "map-file"]) => {
             project_routes::write_map_file(app, stream, id)
         }
+        ("POST", ["api", "projects", id, "terminal"]) => terminal::open_project(app, stream, id),
         ("POST", ["api", "projects", id, "delete"]) => {
             project_delete::delete_project(app, req, stream, id)
         }
