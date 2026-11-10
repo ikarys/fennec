@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Button } from "../../ui/Button";
 import {
-  EditIcon,
+  ChatIcon,
   ReviewIcon,
   EyeIcon,
   GripIcon,
@@ -35,9 +35,9 @@ const ACTION_LABELS: Record<IdeaAction, MsgKey> = {
   review: "actionReview",
 };
 
-const ACTION_ICONS: Record<IdeaAction, typeof EditIcon> = {
-  frame: EditIcon,
-  resumeFraming: EditIcon,
+const ACTION_ICONS: Record<IdeaAction, typeof ChatIcon> = {
+  frame: ChatIcon,
+  resumeFraming: ChatIcon,
   start: PlayIcon,
   open: EyeIcon,
   answer: ReplyIcon,
