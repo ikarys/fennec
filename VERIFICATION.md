@@ -16,7 +16,7 @@ Models used appear in each commit as `Assisted-by: <tool>:<model>` trailers: Cla
 | UI design rules | `web/scripts/check-ui.mjs` in `just lint` |
 | UI unit tests | `just check` runs `just test-web` with Vitest |
 | UI build | `just check` runs `just web` |
-| Architecture rules | Human review of every change, AGENTS.md "Architecture rules" and "Working method" (no automated test) |
+| Architecture rules | `crates/fennec/src/architecture.rs::fennec_keeps_its_own_architecture_rules` runs `.agents/architecture` (layer imports, no I/O in the domain) over fennec's production code in `just test`; the rest of AGENTS.md "Architecture rules" and "Working method" is human review |
 | Security claims | SECURITY.md table |
 | No secrets in history | `just secrets` (gitleaks) in CI on every pull request and in the pre-commit hook on staged files; `.gitleaksignore` lists the one known finding, a fake test token once in `crates/fennec/src/security_scan.rs` |
 | Coverage, advisories, outdated dependencies, duplication | `just evidence` writes them to `audit/evidence/`; `vibecheck` checks them against the thresholds in VIBECODING.md and writes `audit/status.json` (the README badge) |

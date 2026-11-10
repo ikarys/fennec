@@ -1,6 +1,8 @@
 # Layers point inward: adapters -> agent -> domain (see AGENTS.md "Layout").
 # Checked on the lines an integration adds; a violation must be accepted by the human.
-crates/fennec/src/domain/ forbids std::net
+# The domain may name values (IpAddr, the process id); it never opens a socket, file or process.
+crates/fennec/src/domain/ forbids std::net::Tcp
+crates/fennec/src/domain/ forbids std::net::Udp
 crates/fennec/src/domain/ forbids crate::agent
 crates/fennec/src/domain/ forbids crate::web
 crates/fennec/src/domain/ forbids crate::store
@@ -9,7 +11,7 @@ crates/fennec/src/domain/ forbids crate::llm
 crates/fennec/src/agent/ forbids crate::web
 crates/fennec/src/agent/ forbids crate::store
 crates/fennec/src/domain/ forbids std::fs
-crates/fennec/src/domain/ forbids std::process
+crates/fennec/src/domain/ forbids std::process::Command
 
 # Module rules: checked on every dependency of the project map (the "Carte des modules" tab).
 crates/fennec/src/domain never imports crates/fennec/src/agent
