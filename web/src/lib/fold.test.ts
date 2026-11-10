@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createThreadFold, type ThreadItem, type ToolCallView } from './fold';
+import { SHIP_PROPOSAL, SHIP_PLAN, SHIP_SUBMISSION, SHIP_REPORT } from './contract.fixtures';
 
 const ev = (type: string, data: Record<string, unknown> = {}) => ({ type, data });
 
@@ -228,19 +229,7 @@ describe('createThreadFold', () => {
     }));
     fold.apply(ev('plan.proposed', {
       callId: 'p1',
-      plan: {
-        title: 'Ship',
-        goal: 'Goal',
-        steps: [
-          { title: 'Add code', files: ['a.ts'], change: 'implement' },
-          { title: 'Docs', files: [], change: 'update' }
-        ],
-        doneWhen: [
-          { text: 'tests pass', check: 'cargo test' },
-          { text: 'docs updated' }
-        ],
-        risks: ['Risk one']
-      },
+      plan: SHIP_PROPOSAL,
       markdown: '## Plan: Ship'
     }));
     const item = fold.view().items[0];
@@ -250,17 +239,7 @@ describe('createThreadFold', () => {
       {
         kind: 'plan',
         id: 'p1',
-        plan: {
-          kind: 'plan',
-          title: 'Ship',
-          goal: 'Goal',
-          steps: [
-            { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
-            { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
-          ],
-          doneWhen: [{ text: 'tests pass', check: 'cargo test' }, { text: 'docs updated', check: '' }],
-          risks: ['Risk one']
-        },
+        plan: SHIP_PLAN,
         markdown: '## Plan: Ship'
       }
     ]);
@@ -285,21 +264,7 @@ describe('createThreadFold', () => {
     }));
     fold.apply(ev('report.submitted', {
       callId: 'r1',
-      report: {
-        title: 'Ship',
-        summary: 'What changed',
-        steps: [
-          { title: 'Add code', done: true, note: 'implemented' },
-          { title: 'Docs', done: false }
-        ],
-        doneWhen: [
-          { text: 'tests pass', met: true, how: 'cargo test' },
-          { text: 'docs updated', met: false }
-        ],
-        changed: [{ path: 'a.ts', what: 'the code' }],
-        test: 'Open the UI',
-        todo: ''
-      },
+      report: SHIP_SUBMISSION,
       markdown: '## Report: Ship'
     }));
     const item = fold.view().items[0];
@@ -309,22 +274,7 @@ describe('createThreadFold', () => {
       {
         kind: 'report',
         id: 'r1',
-        report: {
-          kind: 'report',
-          title: 'Ship',
-          summary: 'What changed',
-          steps: [
-            { number: 1, checked: true, text: 'Add code', detail: 'implemented' },
-            { number: 2, checked: false, text: 'Docs', detail: '' }
-          ],
-          doneWhen: [
-            { number: 2, checked: false, text: 'docs updated', detail: '' },
-            { number: 1, checked: true, text: 'tests pass', detail: 'cargo test' }
-          ],
-          changed: [{ path: 'a.ts', what: 'the code' }],
-          test: ['Open the UI'],
-          todo: []
-        },
+        report: SHIP_REPORT,
         markdown: '## Report: Ship'
       }
     ]);
