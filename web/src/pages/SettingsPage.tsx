@@ -18,6 +18,7 @@ import {
   emptyModelForm,
   providerFormToApiKey,
   toForm,
+  type ModelForm,
   type SaveGroup,
   type SettingsForm,
 } from '../lib/settingsForm';
@@ -26,7 +27,6 @@ import { resolveSettingsPage } from '../lib/settingsPages';
 import type { SectionSave } from '../components/ui/Section';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
-import { ModelPrefsSection, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { NetworkSection } from '../components/settings/NetworkSection';
@@ -47,6 +47,8 @@ import { WhatsNewSection } from '../components/settings/WhatsNewSection';
 import { AboutBrand } from '../components/settings/AboutBrand';
 import { useT } from '../i18n';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Button } from '../components/ui/Button';
+import { PlusIcon } from '../components/ui/Icons';
 import { SETTINGS_PAGE_META, SettingsNav } from '../components/settings/SettingsNav';
 
 /** The pause after the last edit before the page stores it. */
@@ -68,11 +70,26 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoSave, setAutoSave] = useState<{ saving: boolean; error: string | null }>({ saving: false, error: null });
+  const [addingProvider, setAddingProvider] = useState(false);
   const latestForm = useRef(form);
   latestForm.current = form;
   const active = resolveSettingsPage(page);
   const meta = SETTINGS_PAGE_META[active];
-  const header = <PageHeader Icon={meta.Icon} title={t(meta.labelKey)} subtitle={t(meta.hintKey)} />;
+  const header = (
+    <PageHeader
+      Icon={meta.Icon}
+      title={t(meta.labelKey)}
+      subtitle={t(meta.hintKey)}
+      actions={
+        active === 'providers' ? (
+          <Button variant="primary" size="md" onClick={() => setAddingProvider(true)}>
+            <PlusIcon className="h-[15px] w-[15px]" />
+            {t('addProvider')}
+          </Button>
+        ) : null
+      }
+    />
+  );
 
   useEffect(() => {
     if (settings && form === null) {
@@ -383,28 +400,29 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
                 onChange={updateModel}
               />
               <ProvidersSection
-                save={groupSave('providers')}
+                save={{
+                  dirty: isDirty('providers') || isDirty('modelPrefs'),
+                  onSave: () => saveGroups(['providers', 'modelPrefs']),
+                  auto: autoSave
+                }}
                 providers={form.providers}
-                listings={settings.listings}
-                values={form.models}
-                onChange={updateProvider}
-                onAdd={addProvider}
-                onRemove={removeProvider}
-                onFetch={handleFetch}
-                onAddModel={addModel}
-              />
-              <ModelPrefsSection
-                save={groupSave('modelPrefs')}
                 listings={settings.listings}
                 values={form.models}
                 billing={form.billing}
                 defaults={settings.defaults}
                 favorites={form.favorites}
+                defaultModel={form.model}
+                adding={addingProvider}
+                onAddingChange={setAddingProvider}
+                onChange={updateProvider}
+                onAdd={addProvider}
+                onRemove={removeProvider}
+                onFetch={handleFetch}
+                onAddModel={addModel}
                 onToggleFavorite={toggleFavorite}
                 onToggleBilled={toggleBilled}
-                defaultModel={form.model}
                 onSetDefault={setDefaultModel}
-                onChange={updateModelField}
+                onChangeModel={updateModelField}
                 onRemoveModel={removeModel}
               />
             </>

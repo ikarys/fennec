@@ -17,8 +17,77 @@ import type {
   SettingsResponse,
 } from './api';
 import type { ProviderForm } from '../components/settings/ProvidersSection';
-import type { ModelForm } from '../components/settings/ModelPrefsSection';
 import type { SearchForm } from '../components/settings/SearchSection';
+
+/** A model's editable per-field overrides, kept as strings in the form. */
+export interface ModelForm {
+  maxTokens: string;
+  contextWindow: string;
+  compactionThreshold: string;
+  reasoningEffort: string;
+  priceInput: string;
+  priceCached: string;
+  priceOutput: string;
+}
+
+type ListedModel = ProviderListing['models'][number];
+
+/** The model ids of `provider` edited in the form but absent from its listing: added by hand. */
+export function formOnlyModels(
+  values: Record<string, ModelForm>,
+  providerId: string,
+  listing: ProviderListing | undefined
+): string[] {
+  const listedIds = new Set(listing?.models.map((model) => model.id) ?? []);
+  const prefix = `${providerId}/`;
+  return Object.keys(values)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length))
+    .filter((modelId) => !listedIds.has(modelId))
+    .sort();
+}
+
+/** A token count as a pill shows it: `240000` → `240k`, `1234` → `1.2k`; anything else unchanged. */
+function compactTokens(text: string): string {
+  const value = Number(text);
+  if (!Number.isFinite(value) || value < 1000) return text;
+  return `${Number((value / 1000).toFixed(1))}k`;
+}
+
+/** Compact spec pills for a model row. */
+export function modelSpecs(
+  value: ModelForm,
+  model: ListedModel | null,
+  autoEffort: string
+): string[] {
+  const specs: string[] = [];
+
+  if (model === null) {
+    if (value.contextWindow !== '') {
+      specs.push(`ctx ${compactTokens(value.contextWindow)}`);
+    }
+  } else {
+    const window =
+      value.contextWindow !== '' ? value.contextWindow : String(model.resolved.contextWindow.value);
+    specs.push(`ctx ${compactTokens(window)}`);
+
+    const max =
+      value.maxTokens !== '' ? value.maxTokens : String(model.resolved.maxTokens.value);
+    specs.push(`max ${compactTokens(max)}`);
+
+    const effort =
+      value.reasoningEffort !== ''
+        ? value.reasoningEffort
+        : (model.resolved.reasoningEffort.value ?? autoEffort);
+    specs.push(`effort ${effort}`);
+  }
+
+  if (value.priceInput !== '' || value.priceOutput !== '') {
+    specs.push(`$${value.priceInput || '0'}/$${value.priceOutput || '0'}`);
+  }
+
+  return specs;
+}
 
 /** A fraction as the percentage the form shows (`0.85` → `85`). */
 export function percentFromFraction(fraction: number): string {

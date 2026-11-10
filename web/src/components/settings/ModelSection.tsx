@@ -1,6 +1,9 @@
+// The default-model picker: a framed section with one model choice row.
 import type { ModelRef, ProviderListing } from '../../lib/api';
 import { Section, type SectionSave } from '../ui/Section';
-import { FieldRow, Select } from '../ui/Field';
+import { SettingRow } from '../ui/SettingRow';
+import { Select } from '../ui/Field';
+import { StarIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 
 interface ModelSectionProps {
@@ -29,9 +32,9 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange, 
     : '';
 
   return (
-    <Section title={t('modelSectionTitle')} save={save}>
-      <FieldRow label={t('defaultModelLabel')}>
-        <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-full">
+    <Section Icon={StarIcon} flush title={t('defaultModelLabel')} save={save}>
+      <SettingRow label={t('defaultModelLabel')} hint={t('modelSectionHint')}>
+        <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-72 max-w-full">
           <option value="">{t('envDefaultOption', { model: defaultModel })}</option>
           {listings.map((listing) => (
             <optgroup key={listing.provider} label={listing.name}>
@@ -48,10 +51,7 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange, 
             </option>
           )}
         </Select>
-      </FieldRow>
-      <p className="m-0 text-xs text-muted">
-        {t('modelSectionHint')}
-      </p>
+      </SettingRow>
     </Section>
   );
 }
