@@ -26,7 +26,7 @@ export interface ProjectFileView {
 
 export interface ProjectChange {
   path: string;
-  status: 'modified' | 'added' | 'deleted';
+  status: 'modified' | 'added' | 'deleted' | 'untracked';
 }
 
 export function getProjectFiles(

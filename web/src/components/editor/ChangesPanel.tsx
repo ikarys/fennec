@@ -1,20 +1,20 @@
 /**
  * The editor page's changes panel: ticked files, one message, one commit.
  */
-import { useEffect, useState } from 'react';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { CheckIcon, ReplayIcon } from '../ui/Icons';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { SectionLabel } from '../ui/SectionLabel';
-import { TextInput } from '../ui/Field';
+import { useEffect, useState } from "react";
+import { Badge } from "../ui/Badge";
+import { Button } from "../ui/Button";
+import { CheckIcon, ReplayIcon } from "../ui/Icons";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { SectionLabel } from "../ui/SectionLabel";
+import { TextInput } from "../ui/Field";
 import {
   commitProjectFiles,
   restoreProjectFile,
   type ProjectChange,
-} from '../../lib/api';
-import { defaultCommitMessage } from '../../lib/fileTree';
-import { useT } from '../../i18n';
+} from "../../lib/api";
+import { defaultCommitMessage } from "../../lib/fileTree";
+import { useT } from "../../i18n";
 
 export function ChangesPanel({
   projectId,
@@ -33,7 +33,7 @@ export function ChangesPanel({
 }) {
   const t = useT();
   const [ticked, setTicked] = useState<Set<string>>(() => new Set());
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [touched, setTouched] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export function ChangesPanel({
       setTouched(false);
       onCommitted();
     } catch (err) {
-      setCommitError(err instanceof Error ? err.message : t('unknownError'));
+      setCommitError(err instanceof Error ? err.message : t("unknownError"));
     } finally {
       setCommitting(false);
     }
@@ -106,7 +106,7 @@ export function ChangesPanel({
       await restoreProjectFile(projectId, restorePath);
       onRestored(restorePath);
     } catch (err) {
-      setRestoreError(err instanceof Error ? err.message : t('unknownError'));
+      setRestoreError(err instanceof Error ? err.message : t("unknownError"));
     } finally {
       setRestoring(false);
       setRestorePath(null);
@@ -118,14 +118,14 @@ export function ChangesPanel({
       <div className="shrink-0 border-b border-border p-3">
         <SectionLabel>
           <span className="flex items-center gap-2">
-            {t('editorChanges')}
+            {t("editorChanges")}
             <Badge tone="neutral">{changes.length}</Badge>
           </span>
         </SectionLabel>
       </div>
 
       {changes.length === 0 ? (
-        <p className="p-3 text-xs text-muted">{t('editorNoChanges')}</p>
+        <p className="p-3 text-xs text-muted">{t("editorNoChanges")}</p>
       ) : (
         <>
           <div className="min-h-0 grow overflow-y-auto">
@@ -143,16 +143,20 @@ export function ChangesPanel({
                 />
                 <Badge
                   tone={
-                    change.status === 'modified'
-                      ? 'attention'
-                      : change.status === 'added'
-                        ? 'ok'
-                        : 'err'
+                    change.status === "modified"
+                      ? "attention"
+                      : change.status === "deleted"
+                        ? "err"
+                        : "ok"
                   }
                 >
-                  {change.status === 'modified' ? 'M' : change.status === 'added' ? 'A' : 'D'}
+                  {
+                    { modified: "M", added: "A", deleted: "D", untracked: "N" }[
+                      change.status
+                    ]
+                  }
                 </Badge>
-                {change.status !== 'deleted' ? (
+                {change.status !== "deleted" ? (
                   <button
                     type="button"
                     className="min-w-0 truncate font-mono text-xs"
@@ -169,23 +173,27 @@ export function ChangesPanel({
                     {change.path}
                   </span>
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  className="ml-auto"
-                  title={t('editorRestore')}
-                  aria-label={t('editorRestore')}
-                  onClick={() => setRestorePath(change.path)}
-                >
-                  <ReplayIcon className="h-3.5 w-3.5" />
-                </Button>
+                {change.status !== "untracked" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    className="ml-auto"
+                    title={t("editorRestore")}
+                    aria-label={t("editorRestore")}
+                    onClick={() => setRestorePath(change.path)}
+                  >
+                    <ReplayIcon className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null}
               </div>
             ))}
           </div>
 
-          {restoreError ? <p className="px-3 py-2 text-xs text-err">{restoreError}</p> : null}
+          {restoreError ? (
+            <p className="px-3 py-2 text-xs text-err">{restoreError}</p>
+          ) : null}
 
           <div className="flex shrink-0 flex-col gap-2 border-t border-border p-3">
             <TextInput
@@ -194,33 +202,37 @@ export function ChangesPanel({
                 setTouched(true);
                 setMessage(event.target.value);
               }}
-              placeholder={t('filesCommitMessage')}
+              placeholder={t("filesCommitMessage")}
             />
             <Button
               type="button"
               variant="primary"
               className="w-full"
-              disabled={ticked.size === 0 || message.trim().length === 0 || committing}
+              disabled={
+                ticked.size === 0 || message.trim().length === 0 || committing
+              }
               onClick={() => void commit()}
             >
               <CheckIcon className="h-3.5 w-3.5" />
-              {t('filesCommit')}
+              {t("filesCommit")}
             </Button>
             {committed ? (
               <Badge tone="ok" className="w-fit">
-                {t('filesCommitted', { commit: committed.slice(0, 7) })}
+                {t("filesCommitted", { commit: committed.slice(0, 7) })}
               </Badge>
             ) : null}
-            {commitError ? <p className="text-xs text-err">{commitError}</p> : null}
+            {commitError ? (
+              <p className="text-xs text-err">{commitError}</p>
+            ) : null}
           </div>
         </>
       )}
 
       <ConfirmDialog
         open={restorePath !== null}
-        title={t('editorRestoreTitle')}
-        body={t('editorRestoreBody')}
-        confirmLabel={t('editorRestoreConfirm')}
+        title={t("editorRestoreTitle")}
+        body={t("editorRestoreBody")}
+        confirmLabel={t("editorRestoreConfirm")}
         variant="danger"
         onConfirm={() => void restore()}
         onCancel={() => setRestorePath(null)}
