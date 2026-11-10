@@ -2,9 +2,9 @@ import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { FieldRow, Select, TextInput } from '../ui/Field';
-import { ListCard } from '../ui/ListCard';
+import { InfoBar } from '../ui/InfoBar';
 import { Section } from '../ui/Section';
-import { ExternalIcon, PinIcon, TrashIcon } from '../ui/Icons';
+import { ChatIcon, ExternalIcon, GlobeIcon, PinIcon, PlusIcon, ProjectIcon, TrashIcon } from '../ui/Icons';
 import { Tile } from '../ui/Tile';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
@@ -315,12 +315,10 @@ export function RulesSection() {
   };
 
   return (
-    <>
-      <Section
-        title={t('settingsTabRules')}
-        description={t('rulesDescription')}
-      >
-        <details>
+    <div className="flex flex-col gap-6">
+      <InfoBar>
+        {t('rulesDescription')}
+        <details className="mt-1.5">
           <summary className="cursor-pointer text-xs text-muted">{t('rulesComparisonTitle')}</summary>
           <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-xs text-muted">
             <li>{t('rulesCommandComparison')}</li>
@@ -330,18 +328,23 @@ export function RulesSection() {
             </li>
           </ul>
         </details>
-        {loading ? <p className="text-xs text-muted">{t('loading')}</p> : null}
-        {!loading && error ? <p className="text-xs text-err">{error}</p> : null}
-        {!loading && !error ? (
-          <>
-            <RuleForm projects={projects} onAdded={() => void load(false)} />
-            {actionError ? <p className="mt-2 text-xs text-err">{actionError}</p> : null}
-          </>
-        ) : null}
-      </Section>
+      </InfoBar>
+      {loading ? <p className="text-xs text-muted">{t('loading')}</p> : null}
+      {!loading && error ? <p className="text-xs text-err">{error}</p> : null}
+      {!loading && !error ? (
+        <Section Icon={PlusIcon} title={t('rulesAddTitle')}>
+          <RuleForm projects={projects} onAdded={() => void load(false)} />
+          {actionError ? <p className="mt-2 text-xs text-err">{actionError}</p> : null}
+        </Section>
+      ) : null}
       {!loading && !error && overview ? (
         <>
-          <ListCard title={t('rulesGlobalSection')} count={overview.global.length}>
+          <Section
+            Icon={GlobeIcon}
+            flush
+            title={t('rulesGlobalSection')}
+            actions={<Badge tone="neutral">{overview.global.length}</Badge>}
+          >
             <RuleList
               rules={overview.global}
               editable
@@ -349,10 +352,12 @@ export function RulesSection() {
               onDelete={handleDelete}
               emptyMessage={t('rulesGlobalEmpty')}
             />
-          </ListCard>
+          </Section>
           {overview.projects.map((project) => (
-            <ListCard
+            <Section
               key={project.id}
+              Icon={ProjectIcon}
+              flush
               title={
                 project.name ?? (
                   <span>
@@ -360,15 +365,17 @@ export function RulesSection() {
                   </span>
                 )
               }
-              count={project.rules.length}
+              actions={<Badge tone="neutral">{project.rules.length}</Badge>}
             >
               <RuleList rules={project.rules} editable deletingId={deletingId} onDelete={handleDelete} />
-            </ListCard>
+            </Section>
           ))}
           {overview.sessions.length > 0 ? (
-            <ListCard
+            <Section
+              Icon={ChatIcon}
+              flush
               title={t('rulesSessionGranted')}
-              count={overview.sessions.reduce((sum, session) => sum + session.rules.length, 0)}
+              actions={<Badge tone="neutral">{overview.sessions.reduce((sum, session) => sum + session.rules.length, 0)}</Badge>}
             >
               {overview.sessions.map((session, index) => (
                 <div key={session.id}>
@@ -393,11 +400,11 @@ export function RulesSection() {
                   <RuleList rules={session.rules} editable deletingId={deletingId} onDelete={handleDelete} />
                 </div>
               ))}
-            </ListCard>
+            </Section>
           ) : null}
         </>
       ) : null}
-    </>
+    </div>
   );
 }
 
