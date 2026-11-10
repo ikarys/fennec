@@ -124,6 +124,13 @@ pub struct CallRow {
     pub lost_cache_tokens: u64,
 }
 
+/// One group (a project) and its most recent name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Group {
+    pub id: String,
+    pub name: String,
+}
+
 impl Ledger {
     pub fn summary(&self, f: &Filter) -> Result<Summary, Error> {
         Ok(summary_from_rows(&self.rows(f)?, f))
@@ -172,6 +179,25 @@ impl Ledger {
 
     pub fn series(&self, f: &Filter, by: GroupBy) -> Result<Vec<Row>, Error> {
         Ok(group_rows(&self.rows(f)?, f, by))
+    }
+
+    /// Every group a product has calls for, with its most recent name, by id.
+    /// One SQL scan: a project picker must not load every call ever recorded.
+    pub fn groups(&self, product: &str) -> Result<Vec<Group>, Error> {
+        let conn = self.db.lock().unwrap_or_else(PoisonError::into_inner);
+        // SQLite fills the bare column `group_name` from the row holding MAX(at_ms).
+        let mut stmt = conn.prepare(
+            "SELECT group_id, group_name, MAX(at_ms) FROM calls WHERE product = ?1 GROUP BY group_id ORDER BY group_id",
+        )?;
+        let groups = stmt
+            .query_map([product], |row| {
+                Ok(Group {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(groups)
     }
 
     /// Every call matching `f`, oldest first, with its `breakdown`, `savings`,
@@ -493,6 +519,40 @@ mod tests {
             savings: BTreeMap::new(),
             labels: BTreeMap::new(),
         }
+    }
+
+    #[test]
+    fn groups_list_each_group_once_with_its_latest_name() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let mut old = base_call();
+        old.group_name = "Old".into();
+        ledger.record(&old).unwrap();
+        let mut renamed = base_call();
+        renamed.at_ms = 5;
+        renamed.group_name = "New".into();
+        ledger.record(&renamed).unwrap();
+        let mut other = base_call();
+        other.group_id = "h".into();
+        ledger.record(&other).unwrap();
+        let mut foreign = base_call();
+        foreign.product = "x".into();
+        foreign.group_id = "z".into();
+        ledger.record(&foreign).unwrap();
+
+        let groups = ledger.groups("p").unwrap();
+        assert_eq!(
+            groups,
+            vec![
+                Group {
+                    id: "g".into(),
+                    name: "New".into()
+                },
+                Group {
+                    id: "h".into(),
+                    name: "G".into()
+                },
+            ]
+        );
     }
 
     #[test]

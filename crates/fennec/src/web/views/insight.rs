@@ -7,7 +7,9 @@ use serde::Serialize;
 use serde_json::json;
 use std::net::TcpStream;
 use token_usage::display::{duration, percent, tokens, usd};
-use token_usage::{CallRow, Filter, GroupBy, Ledger, Row, Summary, group_rows, summary_from_rows};
+use token_usage::{
+    CallRow, Filter, Group, GroupBy, Ledger, Row, Summary, group_rows, summary_from_rows,
+};
 
 use crate::domain::clock::now_ms;
 use crate::domain::context_parts::{PartKind, display_label};
@@ -128,7 +130,7 @@ pub struct InsightData {
     pub days: Vec<Row>,
     pub projects: Vec<Row>,
     pub models: Vec<Row>,
-    pub groups: Vec<Row>,
+    pub groups: Vec<Group>,
     pub project_models: BTreeMap<String, Vec<Row>>,
 }
 
@@ -235,16 +237,9 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Htt
         ..Default::default()
     };
 
-    // Two scans: the period's calls, and (for the picker) every project. Every
-    // figure below is grouped in memory from the period's rows, so one project
-    // never triggers an extra query.
+    // One scan for the period's calls, grouped in memory, plus one SQL query
+    // for the picker's projects.
     let period_rows = ledger.rows(&base).map_err(|e| e.to_string())?;
-    let picker_rows = ledger
-        .rows(&Filter {
-            product: Some("fennec".to_string()),
-            ..Default::default()
-        })
-        .map_err(|e| e.to_string())?;
 
     let total = summary_from_rows(&period_rows, &base);
     let days = group_rows(&period_rows, &base, GroupBy::Day);
@@ -254,7 +249,7 @@ pub fn serve(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), Htt
         Vec::new()
     };
     let models = group_rows(&period_rows, &base, GroupBy::Model);
-    let groups = group_rows(&picker_rows, &Filter::default(), GroupBy::Group);
+    let groups = ledger.groups("fennec").map_err(|e| e.to_string())?;
 
     let mut project_models: BTreeMap<String, Vec<Row>> = BTreeMap::new();
     for row in &projects {
@@ -454,12 +449,12 @@ fn row_view(row: &Row, model: bool, cost: &str, lang: Lang) -> RowView {
     }
 }
 
-fn project_options(groups: &[Row]) -> Vec<ProjectOption> {
+fn project_options(groups: &[Group]) -> Vec<ProjectOption> {
     let mut options: Vec<ProjectOption> = groups
         .iter()
-        .map(|row| ProjectOption {
-            id: row.key.clone(),
-            name: row.name.clone(),
+        .map(|group| ProjectOption {
+            id: group.id.clone(),
+            name: group.name.clone(),
         })
         .collect();
 
@@ -585,7 +580,10 @@ mod tests {
             row("p2", "Projet deux", summary(9, 3000, 0, 90, 0, 0, 2.0)),
         ];
         let models = vec![row("m1", "m1", summary(10, 4000, 0, 100, 0, 0, 3.0))];
-        let groups = vec![row("p1", "Projet un", summary(1, 1000, 0, 10, 0, 0, 1.0))];
+        let groups = vec![Group {
+            id: "p1".into(),
+            name: "Projet un".into(),
+        }];
 
         let prices = BTreeMap::from([("m1".to_string(), Price::default())]);
         let view = InsightData {
@@ -629,7 +627,10 @@ mod tests {
     #[test]
     fn view_with_project() {
         let total = summary(1, 100, 0, 10, 0, 0, 1.0);
-        let groups = vec![row("p1", "Projet un", summary(1, 100, 0, 10, 0, 0, 1.0))];
+        let groups = vec![Group {
+            id: "p1".into(),
+            name: "Projet un".into(),
+        }];
 
         let view = InsightData {
             total,

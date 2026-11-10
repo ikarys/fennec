@@ -1,5 +1,6 @@
-import { useEffect, useState, type ComponentType } from 'react';
-import { getInsight, type InsightCard, type InsightPeriod, type InsightRow, type InsightView } from '../lib/api';
+import { useState, type ComponentType } from 'react';
+import { useLoaded } from '../hooks/useLoaded';
+import { getInsight, type InsightCard, type InsightPeriod, type InsightRow } from '../lib/api';
 import {
   ActivityIcon,
   AlertIcon,
@@ -133,31 +134,7 @@ export function InsightPage() {
   const t = useT();
   const [period, setPeriod] = useState<InsightPeriod>('30');
   const [project, setProject] = useState<string | null>(null);
-  const [view, setView] = useState<InsightView | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setView(null);
-    setError(null);
-
-    getInsight(period, project)
-      .then((data) => {
-        if (!cancelled) {
-          setView(data);
-        }
-      })
-      .catch((fetchError) => {
-        if (!cancelled) {
-          setError(fetchError instanceof Error ? fetchError.message : t('insightLoadError'));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [period, project]);
+  const { data: view, error } = useLoaded(() => getInsight(period, project), [period, project], `insight:${period}:${project ?? ''}`);
 
   return (
     <div className="min-h-0 grow overflow-y-auto bg-bg">
@@ -191,7 +168,7 @@ export function InsightPage() {
           }
         />
 
-        {error ? <p className="text-err">{error}</p> : null}
+        {error ? <p className="text-err" title={error}>{t('insightLoadError')}</p> : null}
         {!view && !error ? <div className="text-muted">{t('loading')}</div> : null}
 
         {view ? (
