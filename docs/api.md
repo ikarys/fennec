@@ -326,8 +326,9 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     the last 30 days from the ledger; `disk` only reads the cached worktree scan (`—` until one ran), never scans.
   - `recent` `[{id, title, updatedAt, running}]`: the 5 top-level sessions updated last, newest first.
 - `GET /api/projects/{id}/docs` → `{files, adrs}`, the project's documentation, read from disk (verified):
-  - `files` `[{path, name, content}]`: the project's markdown (`AGENTS.md`, `README.md` and `docs/`, its
-    ADRs excluded), sorted by path; `path` forward slashes, `name` the file name.
+  - `files` `[{path, name, dir, content}]`: the project's markdown (`README.md` and `docs/`, its ADRs
+    excluded), sorted by `dir` then path; `path` forward slashes, `name` the file name, `dir` its folder
+    (empty at the root).
   - `adrs` `[{number, file, title, status, date, body}]`: the MADR files of `docs/adr/` (`NNNN-slug.md`,
     sorted by number; `status` and `date` from the frontmatter, null when absent; the title from the
     first `# ` heading).

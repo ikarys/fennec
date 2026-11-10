@@ -33,7 +33,7 @@ pub fn get_overview(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), H
 }
 
 /// `GET /api/projects/{id}/docs`: the project's documentation, read from disk
-/// (verified) — its markdown files (`AGENTS.md`, `README.md`, `docs/`) and its
+/// (verified) — its markdown files (`README.md`, `docs/`) and its
 /// ADRs, for the project page's Doc tab.
 pub fn get_docs(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let project = require_project(&app.store()?, id)?;

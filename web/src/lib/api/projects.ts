@@ -261,6 +261,8 @@ export type MapFileState = "missing" | "stale" | "current";
 export interface DocFile {
   path: string;
   name: string;
+  /** The folder the tab groups it under (`docs/guide`), empty at the root. */
+  dir: string;
   content: string;
 }
 

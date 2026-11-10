@@ -1,5 +1,5 @@
 //! The project's documentation files on disk: the markdown the human commits
-//! (`AGENTS.md`, `README.md`, `docs/`), read for the project page's Doc tab.
+//! (`README.md`, `docs/`), read for the project page's Doc tab.
 //! Its ADRs are read separately (`adr.rs`) and rendered on their own.
 
 use std::fs;
@@ -7,14 +7,13 @@ use std::path::Path;
 
 use crate::domain::doc::{self, DocFile};
 
-/// The project's doc files, sorted by path so the tab's list is stable.
+/// The project's doc files, sorted by folder then path so each folder's files sit together.
 pub fn load(workdir: &Path) -> Vec<DocFile> {
     let mut files = Vec::new();
-    push_root(workdir, "AGENTS.md", &mut files);
     push_root(workdir, "README.md", &mut files);
     let docs_dir = workdir.join("docs");
     collect(&docs_dir, "docs", &mut files);
-    files.sort_by(|a, b| a.path.cmp(&b.path));
+    files.sort_by(|a, b| (&a.dir, &a.path).cmp(&(&b.dir, &b.path)));
     files
 }
 
@@ -24,6 +23,7 @@ fn push_root(workdir: &Path, name: &str, files: &mut Vec<DocFile>) {
         files.push(DocFile {
             path: name.to_string(),
             name: name.to_string(),
+            dir: String::new(),
             content,
         });
     }
@@ -49,6 +49,7 @@ fn collect(dir: &Path, rel: &str, files: &mut Vec<DocFile>) {
             && let Ok(content) = fs::read_to_string(&path)
         {
             files.push(DocFile {
+                dir: doc::dir_of(&rel_path),
                 path: rel_path,
                 name: file_name,
                 content,
@@ -80,6 +81,7 @@ mod tests {
             "README.md",
             "docs/api.md",
             "docs/sub/notes.md",
+            "docs/zz.md",
             "docs/adr/0001-x.md",
             "docs/readme.txt",
         ] {
@@ -93,7 +95,8 @@ mod tests {
         let paths: Vec<String> = load(&workdir).into_iter().map(|f| f.path).collect();
         assert_eq!(
             paths,
-            vec!["AGENTS.md", "README.md", "docs/api.md", "docs/sub/notes.md"]
+            // AGENTS.md is left out; a folder's files come before its subfolders'.
+            vec!["README.md", "docs/api.md", "docs/zz.md", "docs/sub/notes.md"]
         );
 
         let _ = std::fs::remove_dir_all(&workdir);
@@ -104,14 +107,14 @@ mod tests {
     fn load_skips_symlinked_dirs() {
         let workdir = temp_dir("load_skips_symlinked_dirs");
         fs::create_dir_all(workdir.join("docs")).unwrap();
-        fs::write(workdir.join("AGENTS.md"), "# agents").unwrap();
+        fs::write(workdir.join("README.md"), "# readme").unwrap();
         fs::write(workdir.join("docs/api.md"), "# api").unwrap();
         // `docs/self -> .` points back to the workdir (which has `docs/`):
         // without the symlink guard this recurses forever.
         std::os::unix::fs::symlink(workdir.as_path(), workdir.join("docs/self")).unwrap();
 
         let paths: Vec<String> = load(&workdir).into_iter().map(|f| f.path).collect();
-        assert_eq!(paths, vec!["AGENTS.md", "docs/api.md"]);
+        assert_eq!(paths, vec!["README.md", "docs/api.md"]);
 
         let _ = std::fs::remove_dir_all(&workdir);
     }

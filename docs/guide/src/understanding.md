@@ -29,9 +29,9 @@ When rules are violated, the **Drift since docs/map.md** section lists **Forbidd
 
 ## Documentation and ADRs
 
-The **Doc** tab lists project documentation: `AGENTS.md`, `README`, and files under `docs/`. If none exist, it shows **No doc file (AGENTS.md, README, docs/).**
+The **Doc** tab is a reader: the navigation on the left lists the project's ADRs first (number, title, status), then its documentation (`README` and the files under `docs/`, grouped by folder); the selected one renders on the right. If there is no doc file, it shows **No doc file (README, docs/).**
 
-MADR files in `docs/adr/` are listed as project documentation and are protected from agent writes. If none exist, it shows **No ADR in docs/adr/.** ADRs bind the project; they are not the same as decisions an agent records in a session.
+The ADRs are the MADR files in `docs/adr/`; they are protected from agent writes. If none exist, the navigation shows **No ADR in docs/adr/.** ADRs bind the project; they are not the same as decisions an agent records in a session.
 
 ## Risk zones
 
