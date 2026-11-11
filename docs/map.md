@@ -248,8 +248,8 @@ graph LR
   m50 -->|2| m52
   m50 -->|3| m54
   m38 -->|1| m48
-  m38 -->|3| m46
-  m38 -->|3| m55
+  m38 -->|4| m46
+  m38 -->|4| m55
   m38 -->|3| m52
   m35 -->|1| m42
   m35 -->|2| m48
@@ -387,7 +387,7 @@ graph LR
 | `web/src/components/layout` | 10 | 0 |  |  |
 | `web/src/pages` | 12 | 0 |  |  |
 | `web/src/components/agents` | 2 | 0 |  |  |
-| `web/src/components/editor` | 4 | 0 |  |  |
+| `web/src/components/editor` | 5 | 0 |  |  |
 | `web/src/components/project` | 24 | 0 |  |  |
 | `web/src/components/project/ideas` | 17 | 0 |  |  |
 | `web/src/components/workflow` | 12 | 0 |  |  |
@@ -401,7 +401,7 @@ graph LR
 | `web/src/components/workflow/session` | 8 | 0 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
-| `web/src/lib` | 47 | 17 |  |  |
+| `web/src/lib` | 49 | 18 |  |  |
 | `web/src/components/settings` | 26 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
 | `web/src/i18n` | 3 | 1 |  |  |

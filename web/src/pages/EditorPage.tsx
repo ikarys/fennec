@@ -1,7 +1,7 @@
 /**
  * Editor page: file tree, file editor, and a changes panel for one project.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "../components/ui/Badge";
 import { buttonClass } from "../components/ui/Button";
 import { EditIcon, ProjectIcon } from "../components/ui/Icons";
@@ -10,6 +10,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { SectionLabel } from "../components/ui/SectionLabel";
 import { FileTree } from "../components/editor/FileTree";
 import { EditorPane } from "../components/editor/EditorPane";
+import { FileTabs } from "../components/editor/FileTabs";
 import { ChangesPanel } from "../components/editor/ChangesPanel";
 import { ProjectOpenActions } from "../components/project/ProjectOpenActions";
 import {
@@ -20,6 +21,7 @@ import {
   type ProjectFileListing,
 } from "../lib/api";
 import { buildFileTree } from "../lib/fileTree";
+import { closeFileTab, openFileTab } from "../lib/fileTabs";
 import { editorPath } from "../lib/route";
 import { useT } from "../i18n";
 
@@ -43,6 +45,16 @@ export default function EditorPage({
   const [edited, setEdited] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [openFiles, setOpenFiles] = useState<string[]>(() => (path ? [path] : []));
+  const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(() => new Set());
+
+  // The route can bring a file that is not in the list (browser back after a
+  // close): the on-screen file always has its tab.
+  useEffect(() => {
+    if (path !== null) {
+      setOpenFiles((previous) => (previous.includes(path) ? previous : [...previous, path]));
+    }
+  }, [path]);
 
   const project = projects.find((item) => item.id === projectId);
   const nodes = useMemo(
@@ -93,9 +105,41 @@ export default function EditorPage({
     };
   }, [projectId, changesVersion]);
 
-  const navigateTo = (file: string) => {
+  const openFile = (file: string) => {
+    setOpenFiles((previous) => openFileTab(previous, file));
     window.location.hash = editorPath(projectId, file, sessionId);
   };
+
+  const closeFile = (file: string) => {
+    const result = closeFileTab(openFiles, file);
+    setOpenFiles(result.open);
+    setDirtyPaths((previous) => {
+      if (!previous.has(file)) return previous;
+      const next = new Set(previous);
+      next.delete(file);
+      return next;
+    });
+    if (path !== null && file === path) {
+      window.location.hash = result.fallback
+        ? editorPath(projectId, result.fallback, sessionId)
+        : editorPath(projectId, null, sessionId);
+    }
+  };
+
+  const handleDirtyChange = useCallback(
+    (dirty: boolean) => {
+      if (path === null) return;
+      // One entry per file: a pane's signal never clears a sibling's.
+      setDirtyPaths((previous) => {
+        if (previous.has(path) === dirty) return previous;
+        const next = new Set(previous);
+        if (dirty) next.add(path);
+        else next.delete(path);
+        return next;
+      });
+    },
+    [path],
+  );
 
   const handleSaved = (file: string) => {
     setEdited((prev) => {
@@ -143,6 +187,21 @@ export default function EditorPage({
         }
       />
 
+      {openFiles.length > 0 ? (
+        <div className="flex min-h-12 shrink-0 items-stretch border-b border-border bg-panel px-3">
+          <FileTabs
+            tabs={openFiles.map((file) => ({
+              path: file,
+              name: file.slice(file.lastIndexOf("/") + 1),
+              dirty: dirtyPaths.has(file),
+            }))}
+            activePath={path}
+            onPick={openFile}
+            onClose={closeFile}
+          />
+        </div>
+      ) : null}
+
       {listing?.session ? (
         <InfoBar>
           <span className="flex flex-wrap items-center gap-2">
@@ -173,7 +232,7 @@ export default function EditorPage({
                 <Badge tone="neutral">{listing?.files.length ?? 0}</Badge>
               </span>
             </SectionLabel>
-            <FileTree nodes={nodes} selected={path} onSelect={navigateTo} />
+            <FileTree nodes={nodes} selected={path} onSelect={openFile} />
             {listing?.truncated ? (
               <p className="px-2.5 pt-2 text-xs text-muted">
                 {t("filesTruncated")}
@@ -191,6 +250,7 @@ export default function EditorPage({
                 editing={editing && !listing?.session}
                 onEditingChange={setEditing}
                 onSaved={handleSaved}
+                onDirtyChange={handleDirtyChange}
               />
             ) : (
               <p className="text-xs text-muted">{t("filesPickOne")}</p>
@@ -202,7 +262,7 @@ export default function EditorPage({
               projectId={projectId}
               changes={changes}
               edited={edited}
-              onOpen={navigateTo}
+              onOpen={openFile}
               onCommitted={refreshChanges}
               onRestored={handleRestored}
             />
