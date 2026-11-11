@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
-import { CheckIcon, CloseIcon, WandIcon } from '../../ui/Icons';
+import { CheckIcon, CloseIcon, SpinnerIcon, WandIcon } from '../../ui/Icons';
 import type { SheetField } from '../../../lib/ideas';
 import type { MsgKey } from '../../../i18n/messages';
 import { useT } from '../../../i18n';
@@ -37,6 +37,7 @@ export function SheetSection({
   required,
   model,
   editable,
+  suggesting,
   onSuggest,
   draft,
   onAccept,
@@ -48,6 +49,8 @@ export function SheetSection({
   /** A model wrote this field last: indicative. */
   model: boolean;
   editable: boolean;
+  /** A suggestion is on its way: the button spins and waits. */
+  suggesting: boolean;
   onSuggest: () => void;
   /** The model's pending proposal, rendered; null when none. */
   draft: ReactNode | null;
@@ -74,9 +77,11 @@ export function SheetSection({
             className="ml-auto"
             title={t('sheetSuggest')}
             aria-label={t('sheetSuggest')}
+            aria-busy={suggesting}
+            disabled={suggesting}
             onClick={onSuggest}
           >
-            <WandIcon className="h-4 w-4" />
+            {suggesting ? <SpinnerIcon className="h-4 w-4" /> : <WandIcon className="h-4 w-4" />}
           </Button>
         ) : null}
       </div>
