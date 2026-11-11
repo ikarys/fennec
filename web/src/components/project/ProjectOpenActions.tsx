@@ -27,7 +27,7 @@ export function ProjectOpenActions({
   return (
     <span className="flex items-center gap-1">
       <Button
-        variant="ghost"
+        variant="terminal"
         size="sm"
         iconOnly
         onClick={handleOpenTerminal}
@@ -41,7 +41,7 @@ export function ProjectOpenActions({
         title={openInEditor}
         aria-label={openInEditor}
         className={buttonClass({
-          variant: "ghost",
+          variant: 'outline',
           size: "sm",
           iconOnly: true,
         })}

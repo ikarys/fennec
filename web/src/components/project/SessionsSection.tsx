@@ -76,7 +76,7 @@ export function SessionsSection({
                   count: chosen.length,
                 })}
               </span>
-              <Button variant="danger" disabled={chosen.length === 0} onClick={() => setPendingDelete(chosen)}>
+              <Button variant="danger" size="sm" disabled={chosen.length === 0} onClick={() => setPendingDelete(chosen)}>
                 <TrashIcon className="h-3.5 w-3.5" />
                 {t('delete')}
               </Button>

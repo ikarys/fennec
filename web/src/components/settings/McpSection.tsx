@@ -195,7 +195,7 @@ function ServerCard({
             <EditIcon className="h-3.5 w-3.5" />
           </Button>
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
             iconOnly
             aria-label={t('mcpRemove')}

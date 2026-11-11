@@ -103,14 +103,15 @@ function RuleRow({
       <Badge tone={ACTION_TONES[rule.action]}>{t(ACTION_LABELS[rule.action])}</Badge>
       {editable ? (
         <Button
-          variant="ghost"
+          variant="danger"
+          size="sm"
           iconOnly
           title={t('delete')}
           aria-label={t('delete')}
           disabled={deleting}
           onClick={onDelete ?? (() => undefined)}
         >
-          <TrashIcon className="h-4 w-4" />
+          <TrashIcon className="h-3.5 w-3.5" />
         </Button>
       ) : (
         <span />

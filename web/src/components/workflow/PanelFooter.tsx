@@ -42,7 +42,7 @@ export function PanelFooter({
         title={deleteLabel}
         className="mt-2 self-start"
       >
-        <TrashIcon className="h-4 w-4" />
+        <TrashIcon className="h-3.5 w-3.5" />
       </Button>
     </>
   );

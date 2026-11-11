@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
-import { CloseIcon, PlusIcon } from '../ui/Icons';
+import { PlusIcon, TrashIcon } from '../ui/Icons';
 import { FieldRow, TextInput } from '../ui/Field';
 import { useT } from '../../i18n';
 
@@ -53,14 +53,14 @@ export function PortListEditor({ values, onChange, onRename, onRemove, label }: 
             />
             <Button
               type="button"
-              variant="ghost"
+              variant="danger"
               size="sm"
               iconOnly
               onClick={() => removeValue(value)}
               aria-label={t('delete')}
               title={t('delete')}
             >
-              <CloseIcon className="h-4 w-4" />
+              <TrashIcon className="h-3.5 w-3.5" />
             </Button>
           </div>
         ))}
