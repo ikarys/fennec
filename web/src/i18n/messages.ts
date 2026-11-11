@@ -1591,6 +1591,16 @@ export const en = {
   serverEdit: "Edit {name}",
   serverNameTaken: "Name already used by another server",
   contextTabCanvas: "Canvas",
+  agentStyleLabel: "Agent style",
+  agentStyleHint: "How the agents write to you; applies to new sessions.",
+  agentStyleConcise: "Concise",
+  agentStyleNormal: "Normal",
+  agentStyleExplanatory: "Explanatory",
+  agentStyleTechnical: "Technical",
+  agentStyleConciseTitle: "Short sentences, answer first, only what changes the decision.",
+  agentStyleNormalTitle: "Complete sentences with the context a colleague would need.",
+  agentStyleExplanatoryTitle: "Explains the why, for learning the code base or the domain.",
+  agentStyleTechnicalTitle: "Dense and precise for an expert: terms, types, failure modes.",
 };
 
 export type MsgKey = keyof typeof en;
@@ -3185,6 +3195,16 @@ export const fr: Record<MsgKey, string> = {
   serverEdit: "Modifier {name}",
   serverNameTaken: "Le nom est déjà utilisé par un autre serveur",
   contextTabCanvas: "Canevas",
+  agentStyleLabel: "Style des agents",
+  agentStyleHint: "Comment les agents vous écrivent ; s'applique aux nouvelles sessions.",
+  agentStyleConcise: "Concis",
+  agentStyleNormal: "Normal",
+  agentStyleExplanatory: "Explicatif",
+  agentStyleTechnical: "Technique",
+  agentStyleConciseTitle: "Phrases courtes, réponse d'abord, seulement ce qui change la décision.",
+  agentStyleNormalTitle: "Phrases complètes avec le contexte nécessaire à un collègue.",
+  agentStyleExplanatoryTitle: "Explique le pourquoi, pour apprendre la base de code ou le domaine.",
+  agentStyleTechnicalTitle: "Dense et précis pour un expert : termes, types, modes d'échec.",
 };
 
 const DICTS: Record<Lang, Record<MsgKey, string>> = { en, fr };

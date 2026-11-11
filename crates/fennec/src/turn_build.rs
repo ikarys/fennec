@@ -128,6 +128,7 @@ pub fn with_turn<R>(
         instructions: &instructions,
         skills: &skills,
         always_on: &prefs.always_on_skills,
+        style: prefs.agent_style,
         agents: &agents,
         max_tokens: params.max_tokens,
         context_window: params.context_window,

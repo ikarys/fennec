@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::agent_style::AgentStyle;
 use super::editor::Editor;
 use super::lang::Lang;
 use super::mcp::McpServer;
@@ -34,6 +35,8 @@ pub struct Preferences {
     /// `globalInstructions`: the human's instructions for every new
     /// session; `None` or blank adds nothing.
     pub global_instructions: Option<String>,
+    /// `agentStyle`: how the agents write to the human, read at a session's first turn.
+    pub agent_style: AgentStyle,
     /// The web_search tool's SearXNG instance.
     pub search: SearchPrefs,
     /// How commands run: in bwrap or on the host.

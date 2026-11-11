@@ -194,6 +194,7 @@ impl<'a> Harness<'a> {
             instructions: "",
             skills: &[],
             always_on: &[],
+            style: crate::domain::agent_style::AgentStyle::default(),
             agents: &self.agents,
             max_tokens: 100,
             context_window: 1000,

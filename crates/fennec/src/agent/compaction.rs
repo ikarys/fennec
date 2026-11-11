@@ -155,6 +155,7 @@ mod tests {
             instructions: "",
             skills: &[],
             always_on: &[],
+            style: crate::domain::agent_style::AgentStyle::default(),
             agents: &agents,
             max_tokens: 100,
             context_window: 10_000,
