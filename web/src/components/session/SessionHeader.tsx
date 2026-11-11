@@ -1,4 +1,4 @@
-// The session's header: title, state, project and date, the try, chat-link and canvas actions, and the context gauge.
+// The session's header: title, state, project and date, the chat-link and canvas actions, and the context gauge.
 import type { ContextView, Project, SessionDetail } from '../../lib/api';
 import type { ThreadView } from '../../lib/fold';
 import { formatDateTime } from '../../lib/format';
@@ -7,7 +7,7 @@ import { useLang, useT } from '../../i18n';
 import { SessionCanvasMenu } from '../canvas/SessionCanvasMenu';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { CloseIcon, PlayIcon } from '../ui/Icons';
+import { CloseIcon } from '../ui/Icons';
 import { ChatLinkPicker } from './ChatLinkPicker';
 import { ContextGauge } from './ContextGauge';
 
@@ -24,7 +24,6 @@ interface SessionHeaderProps {
   compactDisabled: boolean;
   onCompact: () => void;
   compactError: string | null;
-  onTry: () => void;
   onOpenCanvas: (artifactId: number) => void;
   onOpenContext: () => void;
   /** The chat link changed. */
@@ -46,7 +45,6 @@ export function SessionHeader({
   compactDisabled,
   onCompact,
   compactError,
-  onTry,
   onOpenCanvas,
   onOpenContext,
   onRenamed,
@@ -97,16 +95,6 @@ export function SessionHeader({
           </div>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          {sessionId && !isChat && (
-            <Button
-              variant="secondary"
-              size="sm"
-              title={t('tryChange')}
-              onClick={onTry}
-            >
-              <PlayIcon className="h-3.5 w-3.5" />{t('tryChangeShort')}
-            </Button>
-          )}
           {sessionId && isChat && detail && (
             <ChatLinkPicker
               sessionId={sessionId}

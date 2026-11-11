@@ -44,8 +44,9 @@ interface ContextPanelProps {
   vision: SeenImage[];
   served: ServedThread;
   context: ContextView | null;
-  /** Bumped by the header's gauge: opens the Session tab on its Context section. */
-  contextRevealKey: number;
+  /** The rail panel to open: the header's gauge opens session, the worktree's try opens servers. */
+  reveal: { id: string; key: number };
+  onTry: () => void;
 }
 
 export function ContextPanel({
@@ -61,7 +62,8 @@ export function ContextPanel({
   vision,
   served,
   context,
-  contextRevealKey,
+  reveal,
+  onTry,
 }: ContextPanelProps) {
   const t = useT();
   const [runningServers, setRunningServers] = useState(0);
@@ -94,6 +96,7 @@ export function ContextPanel({
           running={view.running}
           onDiscarded={onWorktreeChanged}
           integrationVersion={integrationVersion}
+          onTry={onTry}
         />
         <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} planAwaitingBuild={served.pendingPlan !== null || served.handedPlan !== null} />
         <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} hasDiff={Boolean(worktree?.commits)} />
@@ -119,7 +122,7 @@ export function ContextPanel({
     body: (
       <>
         <TokensSection usage={usage} />
-        <ContextSection context={context} revealKey={contextRevealKey} />
+        <ContextSection context={context} revealKey={reveal.id === 'session' ? reveal.key : 0} />
         <DecisionsSection decisions={served.decisions} />
         <SkillsSection skills={skills} hasSession={hasSession} />
         <VisionSection images={vision} />
@@ -155,7 +158,7 @@ export function ContextPanel({
       storageKey="fennec.contextPanel"
       defaultPinned
       panels={panels}
-      reveal={{ id: 'session', key: contextRevealKey }}
+      reveal={reveal}
     />
   );
 }

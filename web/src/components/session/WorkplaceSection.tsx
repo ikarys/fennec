@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
 import { discardWorktree, getIntegration, getRepoState, openFileManager, openTerminal, resolveConflict } from '../../lib/api';
-import { BranchIcon, ExternalIcon, FolderIcon, TerminalIcon, TrashIcon } from '../ui/Icons';
+import { BranchIcon, ExternalIcon, FolderIcon, PlayIcon, TerminalIcon, TrashIcon } from '../ui/Icons';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
@@ -33,6 +33,7 @@ export function WorkplaceSection({
   running,
   onDiscarded,
   integrationVersion,
+  onTry,
 }: {
   sessionId: string;
   worktree: NonNullable<SessionDetail['worktree']> | null;
@@ -40,6 +41,7 @@ export function WorkplaceSection({
   running: boolean;
   onDiscarded: () => void;
   integrationVersion: number;
+  onTry: () => void;
 }) {
   const t = useT();
   const openInEditor = useOpenInEditorLabel();
@@ -243,6 +245,16 @@ export function WorkplaceSection({
                 </Badge>
               )}
               <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={onTry}
+                  title={t('tryChange')}
+                  aria-label={t('tryChange')}
+                >
+                  <PlayIcon className="h-3.5 w-3.5" />
+                </Button>
                 {terminalButton}
                 {worktree.editorUrl !== null && editorLink(worktree.editorUrl)}
                 <Button

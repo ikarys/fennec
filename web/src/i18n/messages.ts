@@ -108,7 +108,6 @@ export const en = {
   panelWorkplace: 'Where the work lands',
   worktreeCommits: '{count} commits',
   landsOn: 'Lands on {branch} in {dir} after your review.',
-  serverStart: 'Start',
   serverLogs: 'Show the output',
   contextTabWork: 'Work',
   contextTabServers: 'Servers',
@@ -1093,9 +1092,6 @@ export const en = {
   openTerminalInWorktree: 'Open a terminal in the worktree',
   openTerminalInProject: 'Open a terminal in the project',
   tryChange: 'Try the change',
-  tryChangeShort: 'Try',
-  tryChangeHint:
-    "Starts the project in the session's worktree: nothing to check out, your branch stays untouched.",
   tryBeforeIntegrating: 'Try it',
   tryBeforeIntegratingHint: 'Run the change before integrating it',
   suggestedCommand:
@@ -1551,15 +1547,11 @@ export const en = {
   insightTableTime: 'Time',
   insightTableCostTitle: 'Estimated at the reference rate (Settings, Cost)',
   // components/session/ServerEditor.tsx
-  serverEditorConfigureLabel: 'Configure the servers',
-  serverEditorListHint: 'The project list, in .agents/servers.json.',
-  serverEditorNone: 'No server.',
   serverEditorNameLabel: 'Server name',
   serverEditorNamePlaceholder: 'web',
   serverEditorCommandLabel: 'Server command',
   serverEditorCommandPlaceholder: 'npm run dev',
   serverEditorRemoveServer: 'Remove this server',
-  serverEditorAddServer: 'Add a server',
   // components/workflow/PortListEditor.tsx
   portListAddPlaceholder: 'Add…',
   // components/session/CopyButton.tsx
@@ -1593,6 +1585,10 @@ export const en = {
   budgetSave: 'Save the budget',
   budgetRemove: 'Remove the budget',
   budgetCancel: 'Cancel',
+  runEndTryHint: "The change runs in its worktree — try it before integrating.",
+  serverAdd: "Add a server",
+  serverEdit: "Edit {name}",
+  serverNameTaken: "Name already used by another server",
 };
 
 export type MsgKey = keyof typeof en;
@@ -1728,7 +1724,6 @@ export const fr: Record<MsgKey, string> = {
   panelWorkplace: 'Où atterrit le travail',
   worktreeCommits: '{count} commits',
   landsOn: 'Atterrit sur {branch} dans {dir} après ta revue.',
-  serverStart: 'Lancer',
   serverLogs: 'Voir la sortie',
   contextTabWork: 'Travail',
   contextTabServers: 'Serveurs',
@@ -2718,9 +2713,6 @@ export const fr: Record<MsgKey, string> = {
   openTerminalInWorktree: 'Ouvrir un terminal dans le worktree',
   openTerminalInProject: 'Ouvrir un terminal dans le projet',
   tryChange: 'Tester la modification',
-  tryChangeShort: 'Essayer',
-  tryChangeHint:
-    'Lance le projet dans le worktree de la session : rien à récupérer, votre branche reste intacte.',
   tryBeforeIntegrating: 'Tester',
   tryBeforeIntegratingHint: 'Lancer la modification avant de l’intégrer',
   suggestedCommand:
@@ -3176,19 +3168,19 @@ export const fr: Record<MsgKey, string> = {
   insightTableTime: 'Temps',
   insightTableCostTitle: 'Estimation au tarif de référence (Paramètres, Coût)',
   // components/session/ServerEditor.tsx
-  serverEditorConfigureLabel: 'Configure les serveurs',
-  serverEditorListHint: 'La liste du projet, dans .agents/servers.json.',
-  serverEditorNone: 'Aucun serveur.',
   serverEditorNameLabel: 'Nom du serveur',
   serverEditorNamePlaceholder: 'web',
   serverEditorCommandLabel: 'Commande du serveur',
   serverEditorCommandPlaceholder: 'npm run dev',
   serverEditorRemoveServer: 'Supprimer ce serveur',
-  serverEditorAddServer: 'Ajouter un serveur',
   // components/workflow/PortListEditor.tsx
   portListAddPlaceholder: 'Ajouter…',
   // components/session/CopyButton.tsx
-  copyButton: 'Copier'
+  copyButton: 'Copier',
+  runEndTryHint: "Le changement tourne dans son worktree — essayez-le avant d'intégrer.",
+  serverAdd: "Ajouter un serveur",
+  serverEdit: "Modifier {name}",
+  serverNameTaken: "Le nom est déjà utilisé par un autre serveur",
 };
 
 const DICTS: Record<Lang, Record<MsgKey, string>> = { en, fr };

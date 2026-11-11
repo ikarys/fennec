@@ -176,7 +176,23 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
   );
 }
 
-export function ThreadItemView({ item, model, running, showHeader, onReplay, pendingCallId }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean; onReplay?: (messageId: string) => void; pendingCallId?: string }) {
+export function ThreadItemView({
+  item,
+  model,
+  running,
+  showHeader,
+  onReplay,
+  pendingCallId,
+  latest = false,
+}: {
+  item: ThreadItem;
+  model: string;
+  running: boolean;
+  showHeader: boolean;
+  onReplay?: (messageId: string) => void;
+  pendingCallId?: string;
+  latest?: boolean;
+}) {
   const t = useT();
   if (item.kind === 'mode') {
     // A mode change is a divider, not a message: the agent's color marks the
@@ -250,6 +266,6 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay, pen
   }
 
   if (item.kind === 'workflow-end') {
-    return <RunEndCard item={item} />;
+    return <RunEndCard item={item} latest={latest} />;
   }
 }

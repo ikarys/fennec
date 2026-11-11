@@ -40,6 +40,7 @@ export function SessionThreadPane({
   onReplay,
 }: SessionThreadPaneProps) {
   const t = useT();
+  const lastRunEndId = [...view.items].reverse().find((item) => item.kind === "workflow-end")?.id;
   return (
     /* The thread scrolls in its column, so the scrollbar sits beside it;
        a wheel over the margins still scrolls the thread. */
@@ -74,6 +75,7 @@ export function SessionThreadPane({
               {t('sessionPageNewSessionHint')}
             </div>
           )}
+          {/* Only the last run's end card invites trying its work. */}
           {view.items.map((item, index) => (
             <ThreadItemView
               key={item.id}
@@ -85,6 +87,7 @@ export function SessionThreadPane({
                 view.items[index - 1]?.kind !== "assistant"
               }
               onReplay={sessionId && replayable.includes(item.id) ? onReplay : undefined}
+              latest={item.id === lastRunEndId}
             />
           ))}
         </div>

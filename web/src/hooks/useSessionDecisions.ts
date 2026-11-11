@@ -17,6 +17,7 @@ interface UseSessionDecisionsArgs {
   pendingPlan: ReturnType<typeof pendingPlanOf>;
   planActions: PlanDecisionActions | null;
   openIntegration: () => void;
+  tryIt: () => void;
 }
 
 export function useSessionDecisions({
@@ -29,6 +30,7 @@ export function useSessionDecisions({
   pendingPlan,
   planActions,
   openIntegration,
+  tryIt,
 }: UseSessionDecisionsArgs) {
   // The decision bar opens one row at a time; the id is the decision's (a plan's call id).
   const [openDecision, setOpenDecision] = useState<string | null>(null);
@@ -57,8 +59,8 @@ export function useSessionDecisions({
   const integrationInvite = useMemo<IntegrationInvite | null>(() => {
     // No commit on the agent's branch: nothing to review, no invitation.
     if (!sessionId || !detail?.worktree?.commits) return null;
-    return { open: openIntegration };
-  }, [sessionId, detail?.worktree?.commits, openIntegration]);
+    return { open: openIntegration, tryIt };
+  }, [sessionId, detail?.worktree?.commits, openIntegration, tryIt]);
   // The agent's proposals wait in the bar until taken; none of them blocks the agent.
   const offered = detail && sessionId && !running ? detail : null;
   const proposals = {
