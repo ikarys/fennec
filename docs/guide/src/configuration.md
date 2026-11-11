@@ -32,7 +32,7 @@ These runtime variables are defaults. The Settings page adds providers and overr
 | --- | --- |
 | `port: <n>` | Server port. `--port` wins over this value; the default is `7777`. |
 | `listen: 0.0.0.0` | Allow remote connections. The default is local only. |
-| Password hash | Written by `fennec password`; a PBKDF2 hash used for remote login. |
+| Password hash | Written by `fennec remote enable` or `fennec password`; a PBKDF2 hash used for remote login. |
 
 Settings > **Security** > **Network** edits the port and password and restarts the server. Other lines are kept.
 

@@ -102,11 +102,11 @@ graph LR
   m13 -->|4| m31
   m13 -->|4| m25
   m19 -->|2| m27
-  m1 -->|5| m14
+  m1 -->|6| m14
   m1 -->|1| m22
   m1 -->|1| m24
   m1 -->|1| m19
-  m1 -->|4| m27
+  m1 -->|5| m27
   m1 -->|2| m31
   m1 -->|2| m20
   m27 -->|2| m33
@@ -350,7 +350,7 @@ graph LR
 | Module | Files | Tests | Entry point | What it is |
 |---|---|---|---|---|
 | `crates/fennec/src/agent/tool_calls` | 2 | 2 |  | Runs the model's tool calls and records their results. `ask_user` is special: it pauses the turn, so the calls after it in the batch are not run, and the turn ends waiting for the human. `propose_plan` and `submit_report` end the turn the same way: the plan or report is recorded, the calls after it in the batch are not run, and the turn ends complete. |
-| `crates/fennec/src/cli` | 6 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
+| `crates/fennec/src/cli` | 7 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
 | `crates/fennec/src/tools/run_command` | 3 | 2 |  | `run_command`: a shell command run in the working directory, in the sandbox when the human enabled it; what the model reads back is `report`. |
 | `crates/fennec/src/tools/web_fetch` | 5 | 5 |  | `web_fetch`: a web page fetched for the model, by pointer, not by copy: - the page is saved as a file in a cache and the model gets a short, deterministic pointer (path, size, outline, first lines), not the page: it reads the parts it needs with `read_file` or `rg`; - no `format` or `timeout` argument: always Markdown, fixed 30 s timeout; - private, loopback and link-local addresses are refused (SSRF), redirects are followed by hand so each hop is checked. |
 | `crates/fennec/src/web/routes/integration` | 2 | 2 |  | The integration routes (contract: `docs/api.md`): preview the session's branch, integrate it on the human's confirmation, or discard it. `routes.rs` only dispatches here. |

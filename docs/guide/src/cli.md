@@ -72,13 +72,21 @@ fennec compact <session>
 - `fennec log <session>` replays a session from the event store.
 - `fennec compact <session>` compacts a session in the current directory.
 
-## Remote password
+## Remote access
 
 ```bash
+fennec remote enable
+fennec remote disable
+fennec remote status
 fennec password
 ```
 
-Prompts for a password twice and stores a PBKDF2 hash in `~/.config/fennec/settings.yaml`. After that, allow remote connections in Settings > **Network**, or set `listen: 0.0.0.0` in that file. See [remote access](remote-access.md).
+- `fennec remote enable` opens the server to the network (`listen: 0.0.0.0` in `~/.config/fennec/settings.yaml`). It first prompts for a password twice when none is set.
+- `fennec remote disable` keeps the server on `127.0.0.1`.
+- `fennec remote status` shows the listen address and whether a password is set.
+- `fennec password` sets or changes the password, stored as a PBKDF2 hash.
+
+Restart the server to apply a change (`fennec service restart`). See [remote access](remote-access.md).
 
 ## Update and version
 
