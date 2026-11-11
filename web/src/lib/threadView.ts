@@ -1,6 +1,6 @@
 // The thread as the session page shows it: what the fold builds from the events.
 import type { NodeKind } from './workflow';
-import type { RunView } from './workflowRun';
+import type { RunView } from './runView';
 import type { Plan, Report } from './plan';
 
 export interface FennecEvent {

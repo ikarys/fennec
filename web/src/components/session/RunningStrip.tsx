@@ -1,4 +1,4 @@
-import type { RunView } from "../../lib/workflowRun";
+import type { RunView } from "../../lib/runView";
 import { useT } from "../../i18n";
 
 /** Above the composer, where the eyes are: holds the auto-scroll switch, always; during a run,

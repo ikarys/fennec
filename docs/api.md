@@ -830,11 +830,24 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   Older history exists while the first `seq` is above 1. `limit` must be in
   `1..=10000` (400 otherwise); 404 if no session; an empty array when there
   is nothing before `before`.
-- `GET /api/sessions/{id}/workflow/run?before=<seq>` → JSON `[{seq, event}]`,
-  ascending: the `workflow.*` events of the latest run started before
-  `before` (the log's end when omitted), from its `workflow.started`; empty
-  when none. The UI loads it once with the first page's first `seq`, so a run
-  that started before the loaded page keeps its strip.
+- `GET /api/sessions/{id}/workflow/run/view` → the latest run pre-calculated
+  by the server, which the UI renders as it is; 404 when the log has no run.
+  The body is a `RunView`: `{runId, workflow, task, stepByStep,
+  pauseRequested, runs, open, paused, questions, finished, lastComment,
+  rounds, upcoming, counts}`. `runs` is one `NodeRun` per started node in
+  start order (a node run twice appears twice): `{nodeId, label,
+  kind, pass, state: "running"|"done"|"ended"|"interrupted", port,
+  childSessionId, startedAt, durationMs, output}` (`kind` is a constant agent
+  kind; the server does not re-serialize each node's kind, so the UI resolves
+  the real kind from `workflow.nodes`). `open` lists the started,
+  not finished nodes; `paused` is `{from, port, to}` while the run waits at
+  an edge; `questions` maps human node ids to their question text with the
+  `{{…}}` names filled in; `finished` is `{outcome, reason}` when the run
+  ended; `lastComment` the last human comment in the run. `rounds` splits
+  `runs` into one row per pass over the workflow; `upcoming` is the
+  not-yet-reached steps on the nominal path from the current node
+  (`{nodeId, label}`); `counts` is `{done, open, total}` with `total` the
+  done and open runs plus the upcoming steps not run yet.
 - `GET /api/sessions/{id}/preview/<path>` → the file at `<path>` relative to
   the session's project, for the preview; 404 outside the project or for a
   missing file, 413 above 10 MiB; always sent with

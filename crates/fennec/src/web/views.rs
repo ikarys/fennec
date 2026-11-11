@@ -6,6 +6,7 @@ pub(super) mod indicators;
 pub(super) mod insight;
 pub(super) mod model_view;
 pub(super) mod project_dashboard;
+pub(super) mod run_view;
 pub(super) mod session_usage;
 pub(super) mod thread_view;
 pub(super) mod workflow_usage;
