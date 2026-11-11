@@ -93,7 +93,8 @@ export function SheetTab({
       field={field}
       required={required}
       model={idea.modelFields.includes(field)}
-      editable={editable && suggesting !== field}
+      editable={editable}
+      suggesting={suggesting === field}
       onSuggest={() => void suggest(field)}
       draft={draftView(field)}
       onAccept={() => accept(field)}
