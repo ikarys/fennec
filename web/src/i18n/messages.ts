@@ -1556,7 +1556,6 @@ export const en = {
   portListAddPlaceholder: 'Add…',
   // components/session/CopyButton.tsx
   copyButton: 'Copy',
-  canvasMenu: 'Canvas',
   canvasEmpty: 'No canvas artifacts yet',
   canvasPin: 'Pin to canvas',
   canvasVersionOf: 'v{n} / {latest}',
@@ -1589,6 +1588,7 @@ export const en = {
   serverAdd: "Add a server",
   serverEdit: "Edit {name}",
   serverNameTaken: "Name already used by another server",
+  contextTabCanvas: "Canvas",
 };
 
 export type MsgKey = keyof typeof en;
@@ -1601,7 +1601,6 @@ export const fr: Record<MsgKey, string> = {
   offlineBody: 'La connexion au serveur fennec est coupée. Votre travail est en sécurité côté serveur : cette page revient d\'elle-même dès qu\'il répond à nouveau.',
   offlineRetrying: 'Reconnexion…',
   offlineReload: 'Recharger la page',
-  canvasMenu: 'Canvas',
   canvasEmpty: 'Aucun artefact canvas',
   canvasPin: 'Épingler au canvas',
   canvasVersionOf: 'v{n} / {latest}',
@@ -3181,6 +3180,7 @@ export const fr: Record<MsgKey, string> = {
   serverAdd: "Ajouter un serveur",
   serverEdit: "Modifier {name}",
   serverNameTaken: "Le nom est déjà utilisé par un autre serveur",
+  contextTabCanvas: "Canevas",
 };
 
 const DICTS: Record<Lang, Record<MsgKey, string>> = { en, fr };

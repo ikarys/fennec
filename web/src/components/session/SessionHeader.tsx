@@ -1,10 +1,8 @@
-// The session's header: title, state, project and date, the chat-link and canvas actions, and the context gauge.
+// The session's header: title, state, project and date, the chat-link, and the context gauge.
 import type { ContextView, Project, SessionDetail } from '../../lib/api';
-import type { ThreadView } from '../../lib/fold';
 import { formatDateTime } from '../../lib/format';
 import type { sessionStatus } from '../../lib/sessionStatus';
 import { useLang, useT } from '../../i18n';
-import { SessionCanvasMenu } from '../canvas/SessionCanvasMenu';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { CloseIcon } from '../ui/Icons';
@@ -19,12 +17,10 @@ interface SessionHeaderProps {
   projectName: string;
   detail: SessionDetail | null;
   projects: Project[];
-  view: ThreadView;
   context: ContextView | null;
   compactDisabled: boolean;
   onCompact: () => void;
   compactError: string | null;
-  onOpenCanvas: (artifactId: number) => void;
   onOpenContext: () => void;
   /** The chat link changed. */
   onRenamed: () => void;
@@ -40,12 +36,10 @@ export function SessionHeader({
   projectName,
   detail,
   projects,
-  view,
   context,
   compactDisabled,
   onCompact,
   compactError,
-  onOpenCanvas,
   onOpenContext,
   onRenamed,
   onClose,
@@ -102,9 +96,6 @@ export function SessionHeader({
               projects={projects}
               onLinked={onRenamed}
             />
-          )}
-          {sessionId && (
-            <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={onOpenCanvas} />
           )}
         </div>
         <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-border" />

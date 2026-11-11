@@ -183,8 +183,9 @@ read-only sandbox without network (gitleaks on the branch's commits, cargo-audit
 the human's own `.semgrep.yml` on the changed files); each finding is a `securityFindings` blocker the human accepts, a
 scanner missing or failing a status line; they run in the background, each one's progress shown in the dialog and
 integrating refused until they end (verified, zero model tokens; `domain/security_scan.rs`, `security_scan.rs`).
-Try the change, done: a play button in the session header and a "Tester" section in the integration dialog start
-the project's servers in the session's worktree, with no git step for the human. Each shows its state (starting until
+Try the change, done: Try it, on the Work panel's worktree row, the integration decision and the last run's end card,
+opens the side rail's Servers panel, one compact row per server (state, port, edit, start or stop); the integration
+dialog keeps its own "Try it" section. They start the project's servers in the session's worktree, with no git step for the human. Each shows its state (starting until
 its port answers, ready, exited with its code), the URL it printed and its last output lines; a terminal opens in the
 worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
 Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
@@ -192,7 +193,7 @@ copied, and servers share the project's Cargo target (`web/os/servers.rs`, `doma
 Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, Mermaid, JSON, images, PDF), pinned from the
 preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
-crate owns it all (its own `canvas.db`, `FENNEC_CANVAS_DB`); a project's Canvas tab lists and deletes them, and deleting
+crate owns it all (its own `canvas.db`, `FENNEC_CANVAS_DB`); a session's Canvas tab in the side rail and a project's Canvas tab list and deletes them, and deleting
 a session or a project deletes its artifacts, never the file. A file's versions are taken when the canvas is read; a pinned block's, from the blocks of its format the agent writes after it (`canvas::revisions`).
 The agent opens and revises one itself with the `canvas` tool (title, format, the whole document; the same title is the
 same canvas, each call a version, `tools/canvas.rs`): it writes fennec's canvas store, never the project, so the read-only

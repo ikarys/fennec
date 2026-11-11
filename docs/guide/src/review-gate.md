@@ -88,7 +88,7 @@ The **Narrate** button opens a read-only agent that tells the change file by fil
 
 ## Try the change
 
-The play button in the session header and the **Try the change** section in the integration dialog start the project's servers in the session's worktree, outside the sandbox.
+**Try it**, on the Work panel and at the end of a run, opens the **Servers** panel; it and the **Try the change** section in the integration dialog start the project's servers in the session's worktree, outside the sandbox.
 
 Servers come from `.agents/servers.json`. With none, fennec guesses a command from `Justfile`, `package.json`, `Makefile`, or `Cargo.toml` and saves it once you confirm.
 

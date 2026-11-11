@@ -94,7 +94,7 @@ The **On (default for new sessions)** setting sends the server's tools to the mo
 
 ## Project servers
 
-The project's servers are listed in `.agents/servers.json`. Open **Try the change** in a session header, or **Try it** in the integration dialog, then **Configure** to edit the list.
+The project's servers are listed in `.agents/servers.json`. Open the **Servers** panel of a session's side rail: **+** adds a server, the pencil on a row edits or deletes it.
 
 Example:
 

@@ -276,12 +276,10 @@ export function SessionPage({
             projectName={projectName}
             detail={detail}
             projects={projects}
-            view={view}
             context={context}
             compactDisabled={!sessionId || state === "running" || state === "waiting_for_user"}
             onCompact={actions.handleCompact}
             compactError={actions.compactError}
-            onOpenCanvas={setCanvasId}
             onOpenContext={() => revealPanel('session')}
             onRenamed={onRenamed}
             onClose={onClose}
@@ -392,6 +390,11 @@ export function SessionPage({
           integrationVersion={integrationVersion}
           vision={vision}
           served={served}
+          onOpenCanvas={setCanvasId}
+          onNewCanvas={(id) => {
+            revealPanel('canvas');
+            setCanvasId(id);
+          }}
         />
         <SessionOverlays
           sessionId={sessionId}

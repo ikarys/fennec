@@ -83,10 +83,11 @@ fennec marks items **verified** when it computed them deterministically and **in
 - **Criteria** shows the plan's **Done when** list, check results, and agent verdicts.
 - **Modified files** links to the **Changes** page.
 - **Agent's workspace** shows the session's worktree and buttons to open a terminal, editor, or file manager there.
-- **Servers** starts the project's servers in the worktree with **Try the change** or **Try it**.
+- **Servers** starts the project's servers in the worktree. **Try it**, on the Work panel and at the end of a run, opens it.
 - **Skills** lists skills loaded into the model's context.
 - **Decisions** lists choices the agent recorded.
 - **Vision** shows images the model has seen; images out of context are dimmed.
+- **Canvas** lists the session's canvases; click one to open it.
 
 ## Session workspace and changes
 
