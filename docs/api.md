@@ -448,8 +448,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     integrated | completed` (from the idea and its session's state; a started idea whose session is gone is `failed`);
     `attachments` `[{filename, mimeType, size, data}]` the files and images pinned to the idea (a base64 data URL in
     `data`; handed to the agent on framing and build: images as vision, text inlined, binaries in the worktree);
-    `action` the one next step `frame | resumeFraming | start | open | answer | review`; `menu` the secondary actions
-    `restart | reframe | startUnframed | complete | drop | remove | editPlan` (`editPlan` posts `ready`; empty for
+    `action` the one next step `task | start | open | answer | review`; `menu` the secondary actions
+    `frame | restart | reframe | startUnframed | complete | drop | remove | editPlan` (`editPlan` posts `ready`; empty for
     running); `edit` the edit shown as its own button, `editText` (posts `edit`) on a draft, else `null`; `plan` the
     approved plan verbatim; `sheet` the task sheet or null, `sheetMarkdown` it rendered as the plan, `missing` the
     required fields it lacks (`objective`, `doneWhen`), `completeness` `{required, suggested}` the filled required (of

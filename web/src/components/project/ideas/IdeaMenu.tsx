@@ -1,5 +1,5 @@
 /**
- * The shared ⋯ menu for an idea: edit, reframe, start, restart, complete, drop, remove.
+ * The shared ⋯ menu for an idea: frame, edit, reframe, start, restart, complete, drop, remove.
  */
 import { useState } from 'react';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -47,6 +47,12 @@ export function IdeaMenu({
       <Menu label={t('menuActions')}>
         {idea.menu.map((action) => {
           switch (action) {
+            case 'frame':
+              return (
+                <MenuItem key={action} onSelect={handleFrame}>
+                  {t('actionFrame')}
+                </MenuItem>
+              );
             case 'editPlan':
               return (
                 <MenuItem key={action} onSelect={() => setEditing('plan')}>
