@@ -10,43 +10,40 @@ use crate::domain::rule_approval::Choice;
 
 /// Records the answer, produces the recorded call's `tool.result`, and runs
 /// the agent loop on.
-pub fn approve_turn(
+pub fn answer_approval(
     turn: &mut Turn,
     call_id: &str,
     choice: Choice,
     rule_id: Option<i64>,
 ) -> Result<DoneReason, String> {
-    turn::with_running(turn, |turn| {
-        let events = turn.log.events(turn.session_id)?;
-        let pending = crate::domain::rule_approval::pending(&events)
-            .filter(|pending| pending.call_id == call_id)
-            .ok_or_else(|| "no pending approval for this call".to_string())?;
-        let agent =
-            resolve(turn.agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
+    let events = turn.log.events(turn.session_id)?;
+    let pending = crate::domain::rule_approval::pending(&events)
+        .filter(|pending| pending.call_id == call_id)
+        .ok_or_else(|| "no pending approval for this call".to_string())?;
+    let agent = resolve(turn.agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
 
-        turn.append(Event::RuleApprovalAnswered {
-            call_id: call_id.to_string(),
-            choice: choice.as_str().to_string(),
-            rule_id: rule_id.map(|id| id.to_string()),
-        })?;
+    turn.append(Event::RuleApprovalAnswered {
+        call_id: call_id.to_string(),
+        choice: choice.as_str().to_string(),
+        rule_id: rule_id.map(|id| id.to_string()),
+    })?;
 
-        let result = match choice {
-            Choice::Never => ToolResult::failure(
-                "Refused by the human. Do not retry it in another form.".to_string(),
-            ),
-            Choice::Once | Choice::Session | Choice::Always => {
-                tool_calls::run_tool(turn, agent, &pending.message_id, &pending.call, true)?
-            }
-        };
-        tool_calls::record(turn, &pending.message_id, &pending.call, result)?;
+    let result = match choice {
+        Choice::Never => ToolResult::failure(
+            "Refused by the human. Do not retry it in another form.".to_string(),
+        ),
+        Choice::Once | Choice::Session | Choice::Always => {
+            tool_calls::run_tool(turn, agent, &pending.message_id, &pending.call, true)?
+        }
+    };
+    tool_calls::record(turn, &pending.message_id, &pending.call, result)?;
 
-        turn::run_top_level_agent_loop(turn, agent)
-    })
+    turn::run_top_level_agent_loop(turn, agent)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::approve_turn;
+    use super::answer_approval;
     use crate::agent::test_support::{Harness, Scripted, reply, scratch_dir};
     use crate::agent::turn::run_turn;
     use crate::domain::event::{DoneReason, Event, ToolCall};
@@ -98,7 +95,7 @@ mod tests {
         );
         assert!(!dir.join("made").exists());
 
-        let reason = approve_turn(&mut h.turn(), "c1", Choice::Once, None).unwrap();
+        let reason = answer_approval(&mut h.turn(), "c1", Choice::Once, None).unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(events
@@ -132,7 +129,7 @@ mod tests {
         let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::WaitingForUser);
 
-        let reason = approve_turn(&mut h.turn(), "c1", Choice::Never, Some(7)).unwrap();
+        let reason = answer_approval(&mut h.turn(), "c1", Choice::Never, Some(7)).unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(events
@@ -209,7 +206,7 @@ mod tests {
             )
         );
 
-        let reason = approve_turn(&mut h.turn(), "c1", Choice::Once, None).unwrap();
+        let reason = answer_approval(&mut h.turn(), "c1", Choice::Once, None).unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(events

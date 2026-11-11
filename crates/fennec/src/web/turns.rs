@@ -3,7 +3,7 @@
 
 use crate::agent::ports::{ChildSessions, EventLog};
 use crate::agent::turn::{Turn, compact_session, replay_turn, retry_turn, run_turn};
-use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
+use crate::agent::workflow::{WorkflowEnv, WorkflowJob, answer_in_node, run_workflow};
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
 use crate::domain::event::Event;
@@ -302,11 +302,26 @@ fn run(
                 call_id,
                 choice,
                 rule_id,
-            } => crate::agent::rule_approval::approve_turn(turn, call_id, *choice, *rule_id)
-                .map(|_| ()),
-            Job::Waiver { call_id } => {
-                crate::agent::waiver::answer_waiver(turn, call_id).map(|_| ())
-            }
+            } => answer_in_node(
+                turn,
+                &WorkflowEnv {
+                    children: &here,
+                    commands: tools,
+                },
+                |turn| {
+                    crate::agent::rule_approval::answer_approval(turn, call_id, *choice, *rule_id)
+                },
+            )
+            .map(|_| ()),
+            Job::Waiver { call_id } => answer_in_node(
+                turn,
+                &WorkflowEnv {
+                    children: &here,
+                    commands: tools,
+                },
+                |turn| crate::agent::waiver::answer_waiver(turn, call_id),
+            )
+            .map(|_| ()),
         },
     )
 }

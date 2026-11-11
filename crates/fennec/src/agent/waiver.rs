@@ -12,40 +12,37 @@ use crate::domain::waiver;
 /// Produces the answered waiver call's `tool.result` (the answer itself was
 /// recorded at the human's click), and runs the agent loop on.
 pub fn answer_waiver(turn: &mut Turn, call_id: &str) -> Result<DoneReason, String> {
-    turn::with_running(turn, |turn| {
-        let events = turn.log.events(turn.session_id)?;
-        let (path, answer) = waiver::answered(&events, call_id)
-            .ok_or_else(|| "no answered waiver awaiting its result".to_string())?;
-        let agent =
-            resolve(turn.agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
-        let (message_id, call) = events
-            .iter()
-            .find_map(|event| match event {
-                Event::ToolCall {
-                    message_id,
-                    tool_call,
-                } if tool_call.id == call_id => Some((message_id.clone(), tool_call.clone())),
-                _ => None,
-            })
-            .ok_or_else(|| "no tool call for this waiver".to_string())?;
+    let events = turn.log.events(turn.session_id)?;
+    let (path, answer) = waiver::answered(&events, call_id)
+        .ok_or_else(|| "no answered waiver awaiting its result".to_string())?;
+    let agent = resolve(turn.agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
+    let (message_id, call) = events
+        .iter()
+        .find_map(|event| match event {
+            Event::ToolCall {
+                message_id,
+                tool_call,
+            } if tool_call.id == call_id => Some((message_id.clone(), tool_call.clone())),
+            _ => None,
+        })
+        .ok_or_else(|| "no tool call for this waiver".to_string())?;
 
-        let result = match (answer.granted, answer.expires_at, answer.adr) {
-            (true, Some(expires_at), Some(adr)) => ToolResult::success(
-                format!(
-                    "Granted by the human: you may write {path} until {} (UTC), in this session only. The waiver is recorded in {adr}.",
-                    clock::format_utc(expires_at)
-                ),
-                false,
+    let result = match (answer.granted, answer.expires_at, answer.adr) {
+        (true, Some(expires_at), Some(adr)) => ToolResult::success(
+            format!(
+                "Granted by the human: you may write {path} until {} (UTC), in this session only. The waiver is recorded in {adr}.",
+                clock::format_utc(expires_at)
             ),
-            _ => ToolResult::failure(
-                "Refused by the human. Do not work around it: say in your report what should change there and why."
-                    .to_string(),
-            ),
-        };
-        tool_calls::record(turn, &message_id, &call, result)?;
+            false,
+        ),
+        _ => ToolResult::failure(
+            "Refused by the human. Do not work around it: say in your report what should change there and why."
+                .to_string(),
+        ),
+    };
+    tool_calls::record(turn, &message_id, &call, result)?;
 
-        turn::run_top_level_agent_loop(turn, agent)
-    })
+    turn::run_top_level_agent_loop(turn, agent)
 }
 
 #[cfg(test)]
