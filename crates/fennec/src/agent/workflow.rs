@@ -105,7 +105,9 @@ fn walk(turn: &mut Turn, env: &WorkflowEnv, job: WorkflowJob) -> Result<DoneReas
             prompt,
             attachments,
         } => {
-            return agent_input(turn, env, &prompt, &attachments);
+            return continue_agent_node(turn, env, |turn| {
+                turn::answer_or_prompt(turn, &prompt, &attachments)
+            });
         }
         WorkflowJob::Resume => jobs::resume_interrupted(turn)?,
         WorkflowJob::Stop => return jobs::stop_run(turn),
@@ -166,11 +168,43 @@ fn walk_from(turn: &mut Turn, env: &WorkflowEnv, mut cursor: Cursor) -> Result<D
     }
 }
 
-fn agent_input(
+/// The human's answer to an open question inside a session-context agent
+/// node: the continuation is the node's work, so it finishes the node and
+/// walks on. Outside such a node it just runs the answer's own loop.
+pub fn answer_in_node(
     turn: &mut Turn,
     env: &WorkflowEnv,
-    prompt: &str,
-    attachments: &[Attachment],
+    step: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
+) -> Result<DoneReason, String> {
+    turn::with_running(turn, |turn| {
+        let events = turn.log.events(turn.session_id)?;
+        let in_node = run::current_run(&events).is_some_and(|state| {
+            state
+                .open
+                .first()
+                .and_then(|open| state.workflow.node(&open.node_id))
+                .is_some_and(|node| {
+                    matches!(
+                        node.kind,
+                        NodeKind::Agent {
+                            context: AgentContext::Session,
+                            ..
+                        }
+                    )
+                })
+        });
+        if in_node {
+            continue_agent_node(turn, env, step)
+        } else {
+            step(turn)
+        }
+    })
+}
+
+fn continue_agent_node(
+    turn: &mut Turn,
+    env: &WorkflowEnv,
+    step: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
 ) -> Result<DoneReason, String> {
     let events = turn.log.events(turn.session_id)?;
     let state = run::current_run(&events).ok_or("no active workflow run")?;
@@ -192,7 +226,7 @@ fn agent_input(
     };
 
     let before = events.len();
-    let reason = turn::answer_or_prompt(turn, prompt, attachments)?;
+    let reason = step(turn)?;
     let events = turn.log.events(turn.session_id)?;
     let text = node_output(&events[before..]);
     let label = node.label();
@@ -200,9 +234,9 @@ fn agent_input(
     let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
         session_send(turn, agent, reminder)
     })?;
-    let step = record(turn, &state, &node.id, end, None)?;
+    let next = record(turn, &state, &node.id, end, None)?;
 
-    match step {
+    match next {
         Step::Go(cursor) => walk_from(turn, env, cursor),
         Step::Exit(reason) => end_turn(turn, reason),
     }
