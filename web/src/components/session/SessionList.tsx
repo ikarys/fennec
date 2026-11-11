@@ -59,7 +59,7 @@ function SessionRow({
       </button>
       {!running && (
         <Button
-          variant="ghost"
+          variant="danger"
           size="sm"
           iconOnly
           aria-label={t('deleteSession')}

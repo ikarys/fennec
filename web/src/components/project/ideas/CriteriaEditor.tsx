@@ -52,7 +52,7 @@ export function CriteriaEditor({
             }}
           />
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
             iconOnly
             title={t('criterionRemove')}
@@ -60,7 +60,7 @@ export function CriteriaEditor({
             disabled={!editable}
             onClick={() => save(rows.filter((_, j) => j !== i))}
           >
-            <TrashIcon className="h-4 w-4" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
       ))}

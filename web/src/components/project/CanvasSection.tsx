@@ -100,7 +100,7 @@ export function CanvasSection({ projectId }: { projectId: string }) {
                       aria-label={t('canvasDelete')}
                       onClick={() => setDeleteId(artifact.id)}
                     >
-                      <TrashIcon className="h-4 w-4" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </Button>
                   </span>
                 </div>

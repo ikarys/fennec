@@ -179,11 +179,10 @@ export function ServerEditor({
             {editing !== null && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="danger"
                 size="sm"
                 iconOnly
                 disabled={busy}
-                className="text-muted hover:bg-err-soft hover:text-err"
                 aria-label={t('serverEditorRemoveServer')}
                 title={t('serverEditorRemoveServer')}
                 onClick={() => void handleDelete()}
