@@ -432,6 +432,18 @@ describe('createThreadFold', () => {
     expect(fold.view().name).toBe('Title');
   });
 
+  it('feeds workflow events into the run view', () => {
+    const fold = createThreadFold();
+    fold.apply(ev('workflow.started', {
+      runId: 'r1',
+      workflow: { id: 'w', name: 'W', nodes: [], edges: [] },
+      task: 't',
+      stepByStep: false
+    }));
+    expect(fold.view().run?.runId).toBe('r1');
+    expect(fold.view().run?.task).toBe('t');
+  });
+
   it('adds a workflow started note and task user item', () => {
     const fold = createThreadFold();
     fold.apply(ev('workflow.started', {
@@ -477,32 +489,5 @@ describe('createThreadFold', () => {
       childSessionId: 's1',
       startedAt: 123
     });
-  });
-
-  it('patches dividers when the workflow definition arrives after the page', () => {
-    const fold = createThreadFold();
-    // No workflow.started in the page: dividers fall back to the node id.
-    fold.apply(ev('workflow.node.started', { runId: 'r1', nodeId: 'h', pass: 1 }));
-    fold.apply(ev('workflow.node.started', { runId: 'r1', nodeId: 'p', pass: 1 }));
-    let items = fold.view().items.filter((item) => item.kind === 'workflow-node');
-    expect(items).toEqual([
-      { kind: 'workflow-node', id: 'wf-r1-h-1', nodeId: 'h', label: 'h', nodeKind: 'agent', pass: 1 },
-      { kind: 'workflow-node', id: 'wf-r1-p-1', nodeId: 'p', label: 'p', nodeKind: 'agent', pass: 1 }
-    ]);
-    // The served definition arrives: the human node gets its label and kind,
-    // the parallel node (structural) is dropped.
-    fold.setWorkflow({
-      id: 'w',
-      name: 'W',
-      nodes: [
-        { id: 'h', kind: 'human', name: 'Ask', position: { x: 0, y: 0 } },
-        { id: 'p', kind: 'parallel', position: { x: 0, y: 0 } }
-      ],
-      edges: []
-    });
-    items = fold.view().items.filter((item) => item.kind === 'workflow-node');
-    expect(items).toEqual([
-      { kind: 'workflow-node', id: 'wf-r1-h-1', nodeId: 'h', label: 'Ask', nodeKind: 'human', pass: 1 }
-    ]);
   });
 });

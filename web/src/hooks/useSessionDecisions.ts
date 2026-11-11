@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ServedThread, SessionDetail } from '../lib/api';
 import type { ThreadView } from '../lib/fold';
 import type { pendingPlanOf } from '../lib/plan';
-import type { runWaiting } from '../lib/runView';
+import type { runWaiting } from '../lib/workflowRun';
 import type { IntegrationInvite } from '../components/session/IntegrationInvite';
 import type { PlanDecisionActions } from '../components/session/PlanDecision';
 

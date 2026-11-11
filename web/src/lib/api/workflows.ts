@@ -1,12 +1,11 @@
 import { request } from "./request";
-import type { AttachmentInput } from "./sessions";
+import type { EventPageEntry, AttachmentInput } from "./sessions";
 import type {
   Origin,
   WorkflowDef,
   WorkflowIssue,
   WorkflowSummary,
 } from "../workflow";
-import type { RunView } from "../runView";
 
 export class WorkflowSaveError extends Error {
   issues: WorkflowIssue[];
@@ -153,12 +152,17 @@ export function pauseWorkflow(sessionId: string, runId: string): Promise<void> {
 }
 
 /**
- * The run view, pre-calculated by the server: steps, states, ports, rounds,
- * upcoming steps and completion counts; the run rail renders it as it is.
+ * The `workflow.*` events of the latest run started before `before`
+ * (the log's end when 0), ascending, from its `workflow.started`.
  */
-export function getRunView(id: string): Promise<RunView> {
-  return request<RunView>(
-    `/api/sessions/${encodeURIComponent(id)}/workflow/run/view`,
+export function getRunEventsBefore(
+  id: string,
+  before: number,
+): Promise<EventPageEntry[]> {
+  const params = new URLSearchParams();
+  if (before > 0) params.set("before", String(before));
+  return request<EventPageEntry[]>(
+    `/api/sessions/${encodeURIComponent(id)}/workflow/run?${params}`,
   );
 }
 

@@ -1,0 +1,394 @@
+import type { FennecEvent } from "./fold";
+import type { NodeKind, WorkflowDef, WorkflowNode } from "./workflow";
+
+export type NodeRunState = "running" | "done" | "ended" | "interrupted";
+
+export interface NodeRun {
+  nodeId: string;
+  label: string;
+  kind: NodeKind;
+  pass: number;
+  state: NodeRunState;
+  port?: string;
+  childSessionId?: string;
+  /** Unix ms; absent in older logs. */
+  startedAt?: number;
+  /** The node's working time in ms; none for a human node or a session-context agent node. */
+  durationMs?: number;
+  /** What the node returned (its report, a check's output); shown when it failed. */
+  output?: string;
+}
+
+export interface RunView {
+  runId: string;
+  workflow: WorkflowDef;
+  task: string;
+  stepByStep: boolean;
+  /** The human asked to pause at the next edge; cleared once paused. */
+  pauseRequested: boolean;
+  /** Node runs in the order they started (a node run twice appears twice). */
+  runs: NodeRun[];
+  /** Nodes started and not finished. */
+  open: string[];
+  paused?: { from: string; port: string; to: string };
+  /** Human nodes' questions with their {{…}} names filled in by the server. */
+  questions: Record<string, string>;
+  finished?: {
+    outcome: "done" | "blocked" | "stopped" | "error";
+    reason?: string;
+  };
+  lastComment?: string;
+}
+
+export interface RunFold {
+  /** Applies an event; returns true when it was a workflow event. */
+  apply(event: FennecEvent): boolean;
+  /** The latest run, or undefined when there is none. */
+  view(): RunView | undefined;
+}
+
+function nodeById(def: WorkflowDef, nodeId: string): WorkflowNode | undefined {
+  return def.nodes.find((node) => node.id === nodeId);
+}
+
+function labelOf(node: WorkflowNode | undefined, nodeId: string): string {
+  return node?.name ?? nodeId;
+}
+
+function choicesOf(node: WorkflowNode | undefined): string[] {
+  if (!node || !Array.isArray(node.choices)) return [];
+  return node.choices.filter(
+    (choice): choice is string => typeof choice === "string",
+  );
+}
+
+export function createRunFold(): RunFold {
+  let run: RunView | undefined;
+
+  const apply = (event: FennecEvent): boolean => {
+    const data = event.data ?? {};
+    switch (event.type) {
+      case "workflow.started": {
+        run = {
+          runId: String(data.runId ?? ""),
+          workflow: data.workflow as WorkflowDef,
+          task: String(data.task ?? ""),
+          stepByStep: Boolean(data.stepByStep),
+          pauseRequested: false,
+          runs: [],
+          open: [],
+          questions: {},
+        };
+        return true;
+      }
+      case "workflow.node.started": {
+        if (!run) return true;
+        const nodeId = String(data.nodeId ?? "");
+        const pass = typeof data.pass === "number" ? data.pass : 1;
+        const existing = run.runs.find(
+          // A resume restarts an interrupted node on its own pass: same row.
+          (candidate) =>
+            candidate.nodeId === nodeId &&
+            candidate.pass === pass &&
+            (candidate.state === "running" ||
+              candidate.state === "interrupted"),
+        );
+        if (existing) {
+          existing.state = "running";
+          if (typeof data.childSessionId === "string") {
+            existing.childSessionId = data.childSessionId;
+          }
+          if (typeof data.startedAt === "number") {
+            existing.startedAt = data.startedAt;
+          }
+          // workflow.resumed emptied open; the restarted node is open again.
+          if (!run.open.includes(nodeId)) run.open.push(nodeId);
+          return true;
+        }
+        const node = nodeById(run.workflow, nodeId);
+        const nodeRun: NodeRun = {
+          nodeId,
+          label: labelOf(node, nodeId),
+          kind: node?.kind ?? "agent",
+          pass,
+          state: "running",
+        };
+        if (typeof data.childSessionId === "string") {
+          nodeRun.childSessionId = data.childSessionId;
+        }
+        if (typeof data.startedAt === "number") {
+          nodeRun.startedAt = data.startedAt;
+        }
+        run.runs.push(nodeRun);
+        run.open.push(nodeId);
+        return true;
+      }
+      case "workflow.node.finished": {
+        if (!run) return true;
+        const nodeId = String(data.nodeId ?? "");
+        for (let i = run.runs.length - 1; i >= 0; i -= 1) {
+          const candidate = run.runs[i];
+          if (candidate.nodeId === nodeId && candidate.state === "running") {
+            candidate.state = "done";
+            candidate.port = String(data.port ?? "");
+            if (typeof data.durationMs === "number") {
+              candidate.durationMs = data.durationMs;
+            }
+            if (typeof data.output === "string") {
+              candidate.output = String(data.output ?? "");
+            }
+            break;
+          }
+        }
+        const openIndex = run.open.lastIndexOf(nodeId);
+        if (openIndex >= 0) {
+          run.open.splice(openIndex, 1);
+        }
+        return true;
+      }
+      case "workflow.human.asked": {
+        if (!run) return true;
+        run.questions[String(data.nodeId ?? "")] = String(data.question ?? "");
+        return true;
+      }
+
+      case "workflow.pause_requested": {
+        if (!run) return true;
+        run.pauseRequested = true;
+        return true;
+      }
+
+      case "workflow.paused": {
+        if (!run) return true;
+        run.pauseRequested = false;
+        run.paused = {
+          from: String(data.from ?? ""),
+          port: String(data.port ?? ""),
+          to: String(data.to ?? ""),
+        };
+        return true;
+      }
+      case "workflow.resumed": {
+        if (!run) return true;
+        for (const nodeRun of run.runs) {
+          if (nodeRun.state === "running") {
+            nodeRun.state = "interrupted";
+          }
+        }
+        run.paused = undefined;
+        run.open = [];
+        // A resume after a finish (a run relaunched on its error) is active
+        // again: the next workflow.finished ends it.
+        run.finished = undefined;
+        run.lastComment =
+          typeof data.comment === "string" ? data.comment : undefined;
+        return true;
+      }
+      case "workflow.finished": {
+        if (!run) return true;
+        const outcome =
+          typeof data.outcome === "string" ? data.outcome : "error";
+        for (const nodeRun of run.runs) {
+          // A node still running when the run finishes is the one that ended it
+          // (a criteria node blocking, a stop): its port is the run's outcome.
+          if (nodeRun.state === "running") {
+            nodeRun.state = "ended";
+            nodeRun.port = outcome;
+          }
+        }
+        run.open = [];
+        run.paused = undefined;
+        run.pauseRequested = false;
+        run.finished = {
+          outcome:
+            (data.outcome as "done" | "blocked" | "stopped" | "error") ??
+            "error",
+          reason: typeof data.reason === "string" ? data.reason : undefined,
+        };
+        return true;
+      }
+      default:
+        return false;
+    }
+  };
+
+  const view = (): RunView | undefined => {
+    if (!run) return undefined;
+    return {
+      ...run,
+      runs: [...run.runs],
+      open: [...run.open],
+    };
+  };
+
+  return { apply, view };
+}
+
+/** Where an active run waits, for the action card. Mirrors the server's `waiting`. */
+export type RunWaiting =
+  | { kind: "human"; nodeId: string; question: string; choices: string[] }
+  | { kind: "pause"; to: string; toLabel: string }
+  | { kind: "interrupted" }
+  | { kind: "relaunch" };
+
+export function runWaiting(
+  run: RunView | undefined,
+  running: boolean,
+  lastDone: string | undefined,
+): RunWaiting | undefined {
+  if (!run || running) return undefined;
+  if (run.finished) {
+    // A run that ended in error can be relaunched on its failed node.
+    return run.finished.outcome === "error" ? { kind: "relaunch" } : undefined;
+  }
+  if (run.paused) {
+    const toLabel = labelOf(
+      nodeById(run.workflow, run.paused.to),
+      run.paused.to,
+    );
+    return { kind: "pause", to: run.paused.to, toLabel };
+  }
+  for (const nodeId of run.open) {
+    const node = nodeById(run.workflow, nodeId);
+    if (node?.kind === "human") {
+      return {
+        kind: "human",
+        nodeId,
+        // Runs from before workflow.human.asked show the raw question.
+        question:
+          run.questions[nodeId] ??
+          (typeof node.question === "string" ? node.question : ""),
+        choices: choicesOf(node),
+      };
+    }
+  }
+  for (const nodeId of run.open) {
+    const node = nodeById(run.workflow, nodeId);
+    if (node?.kind === "agent" && lastDone === "waiting_for_user") {
+      return undefined;
+    }
+  }
+  return { kind: "interrupted" };
+}
+
+const POSITIVE_PORTS = new Set([
+  "next",
+  "done",
+  "pass",
+  "success",
+  "clean",
+  "true",
+  "go",
+  "ok",
+  "accept",
+  "minor",
+]);
+
+const NEGATIVE_PORTS = new Set([
+  "fail",
+  "failure",
+  "findings",
+  "false",
+  "exhausted",
+  "blocked",
+  "stop",
+  "revise",
+]);
+
+export function portTone(port: string): "positive" | "negative" | "other" {
+  const normalized = port.trim().toLowerCase();
+  if (POSITIVE_PORTS.has(normalized)) return "positive";
+  if (NEGATIVE_PORTS.has(normalized)) return "negative";
+  return "other";
+}
+
+/** A step the run has not reached yet, on its nominal path. */
+export interface UpcomingStep {
+  nodeId: string;
+  label: string;
+}
+
+/**
+ * The nodes still to come after the current one, following at each node its
+ * nominal edge: a positive port first (portTone), else the first edge whose
+ * port is not negative, in the definition's order. Stops at an end node (not
+ * listed), at a node already listed (a loop), or when nothing leads on. A
+ * finished run has none.
+ */
+export function upcomingSteps(run: RunView): UpcomingStep[] {
+  if (run.finished) return [];
+  const nodes = run.workflow.nodes;
+  if (nodes.length === 0) return [];
+  const edges = run.workflow.edges;
+  const steps: UpcomingStep[] = [];
+  const seen = new Set<string>();
+
+  const nextNode = (nodeId: string): string | undefined => {
+    const outgoing = edges.filter((edge) => edge.from === nodeId);
+    return (
+      outgoing.find((edge) => portTone(edge.port) === "positive")?.to ??
+      outgoing.find((edge) => portTone(edge.port) !== "negative")?.to
+    );
+  };
+
+  const addStep = (nodeId: string): void => {
+    const node = nodeById(run.workflow, nodeId);
+    // Terminal nodes are not steps to come.
+    if (node?.kind === "end") return;
+    if (seen.has(nodeId)) return;
+    seen.add(nodeId);
+    steps.push({ nodeId, label: labelOf(node, nodeId) });
+  };
+
+  const start =
+    run.paused?.to ??
+    run.open[run.open.length - 1] ??
+    run.runs[run.runs.length - 1]?.nodeId;
+  if (!start) return [];
+
+  if (run.paused?.to) {
+    addStep(start);
+  } else {
+    // The current node is already a row; only mark it so a loop does not relist it.
+    seen.add(start);
+  }
+
+  let current = start;
+  // One guard per node, so a malformed cycle cannot run the walk forever.
+  for (let i = 0; i < nodes.length && steps.length < nodes.length; i += 1) {
+    const next = nextNode(current);
+    if (!next) break;
+    const node = nodeById(run.workflow, next);
+    if (node?.kind === "end") break;
+    if (seen.has(next)) break;
+    seen.add(next);
+    steps.push({ nodeId: next, label: labelOf(node, next) });
+    current = next;
+  }
+
+  return steps;
+}
+
+/**
+ * Split node runs, in the order they started, into rounds. A new round starts
+ * at a node run whose nodeId already appeared in the current round, which is
+ * how a loop's second pass of the same node is separated from its first.
+ */
+export function runRounds(runs: NodeRun[]): NodeRun[][] {
+  const rounds: NodeRun[][] = [];
+  let current: NodeRun[] = [];
+  const seen = new Set<string>();
+
+  for (const nodeRun of runs) {
+    if (seen.has(nodeRun.nodeId)) {
+      if (current.length > 0) rounds.push(current);
+      current = [];
+      seen.clear();
+    }
+    current.push(nodeRun);
+    seen.add(nodeRun.nodeId);
+  }
+
+  if (current.length > 0) rounds.push(current);
+  return rounds;
+}

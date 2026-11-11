@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project, SessionState } from "../lib/api";
-import { runWaiting } from "../lib/runView";
+import { runWaiting } from "../lib/workflowRun";
 import { sessionStatus } from "../lib/sessionStatus";
 import { useLang, useT } from "../i18n";
 import { useSessionThread } from "../hooks/useSessionThread";

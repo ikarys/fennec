@@ -3,7 +3,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useT } from '../../../i18n';
-import type { RunWaiting } from '../../../lib/runView';
+import type { RunWaiting } from '../../../lib/workflowRun';
 import { DecisionRow } from '../../session/DecisionBar';
 import { PauseIcon, StopIcon } from '../../ui/Icons';
 import { Button } from '../../ui/Button';
