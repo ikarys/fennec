@@ -42,8 +42,8 @@ pub enum Stage {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Action {
-    Frame,
-    ResumeFraming,
+    /// A draft turned into a task, or a task's sheet opened.
+    Task,
     Start,
     Open,
     Answer,
@@ -54,6 +54,8 @@ pub enum Action {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MenuAction {
+    /// A draft framed with the agent in a plan session (`idea.framing`).
+    Frame,
     Restart,
     Reframe,
     StartUnframed,
@@ -123,8 +125,7 @@ impl Status {
     /// The single next action for this status.
     pub fn action(self) -> Action {
         match self {
-            Status::Inbox => Action::Frame,
-            Status::Framing => Action::ResumeFraming,
+            Status::Inbox | Status::Framing => Action::Task,
             Status::Queued => Action::Start,
             Status::Running => Action::Open,
             Status::Question => Action::Answer,
@@ -150,7 +151,11 @@ impl Status {
     /// the server would ignore.
     pub fn menu(self) -> &'static [MenuAction] {
         match self {
-            Status::Inbox => &[MenuAction::StartUnframed, MenuAction::Drop],
+            Status::Inbox => &[
+                MenuAction::Frame,
+                MenuAction::StartUnframed,
+                MenuAction::Drop,
+            ],
             // A failed idea is retried by framing it again.
             Status::Framing => &[MenuAction::Complete, MenuAction::Reframe, MenuAction::Drop],
             Status::Queued => &[MenuAction::EditPlan, MenuAction::Reframe, MenuAction::Drop],
@@ -261,10 +266,10 @@ mod tests {
     #[test]
     fn stage_and_action_match_the_human_view() {
         assert_eq!(Status::Inbox.stage(), Stage::Drafts);
-        assert_eq!(Status::Inbox.action(), Action::Frame);
+        assert_eq!(Status::Inbox.action(), Action::Task);
 
         assert_eq!(Status::Framing.stage(), Stage::Drafts);
-        assert_eq!(Status::Framing.action(), Action::ResumeFraming);
+        assert_eq!(Status::Framing.action(), Action::Task);
 
         assert_eq!(Status::Queued.stage(), Stage::Queue);
         assert_eq!(Status::Queued.action(), Action::Start);
@@ -304,7 +309,11 @@ mod tests {
     fn menu_lists_match_the_states() {
         assert_eq!(
             Status::Inbox.menu(),
-            &[MenuAction::StartUnframed, MenuAction::Drop]
+            &[
+                MenuAction::Frame,
+                MenuAction::StartUnframed,
+                MenuAction::Drop
+            ]
         );
         assert_eq!(Status::Inbox.edit(), Some(MenuAction::EditText));
         assert_eq!(Status::Queued.edit(), None);
@@ -365,8 +374,8 @@ mod tests {
     fn stage_and_action_serialize_camel_case() {
         assert_eq!(serde_json::to_string(&Stage::Yours).unwrap(), r#""yours""#);
         assert_eq!(
-            serde_json::to_string(&Action::ResumeFraming).unwrap(),
-            r#""resumeFraming""#
+            serde_json::to_string(&MenuAction::StartUnframed).unwrap(),
+            r#""startUnframed""#
         );
         assert_eq!(
             serde_json::to_string(&MenuAction::Restart).unwrap(),

@@ -7,7 +7,6 @@ import { useState } from "react";
 import { Button } from "../../ui/Button";
 import {
   BacklogIcon,
-  ChatIcon,
   EditIcon,
   ReviewIcon,
   EyeIcon,
@@ -31,18 +30,15 @@ import {
 import type { MsgKey } from "../../../i18n/messages";
 import { useT } from "../../../i18n";
 
-const ACTION_LABELS: Record<IdeaAction, MsgKey> = {
-  frame: "actionFrame",
-  resumeFraming: "actionResumeFraming",
+const ACTION_LABELS: Record<Exclude<IdeaAction, "task">, MsgKey> = {
   start: "actionStart",
   open: "actionOpen",
   answer: "actionAnswer",
   review: "actionReview",
 };
 
-const ACTION_ICONS: Record<IdeaAction, typeof ChatIcon> = {
-  frame: ChatIcon,
-  resumeFraming: ChatIcon,
+const ACTION_ICONS: Record<IdeaAction, typeof PlayIcon> = {
+  task: BacklogIcon,
   start: PlayIcon,
   open: EyeIcon,
   answer: ReplyIcon,
@@ -98,15 +94,6 @@ export function IdeaRow({
     }
   };
 
-  const handleFrame = async () => {
-    setBusy(true);
-    try {
-      await onFrame(idea);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const openTask = () => {
     window.location.hash = withTask(window.location.hash, idea.id);
   };
@@ -121,14 +108,13 @@ export function IdeaRow({
     }
   };
 
-  const canTurnIntoTask =
-    !idea.sheet && (idea.status === "inbox" || idea.status === "framing");
-
   // The one primary action the server chose for this idea.
   const renderAction = () => {
     const onClick =
-      idea.action === "frame"
-        ? () => void handleFrame()
+      idea.action === "task"
+        ? idea.sheet
+          ? openTask
+          : () => void handleTurnIntoTask()
         : idea.action === "start"
           ? () => void handleStart()
           : idea.sessionId
@@ -136,7 +122,10 @@ export function IdeaRow({
             : null;
     if (!onClick || !idea.action) return null;
     const Icon = ACTION_ICONS[idea.action];
-    const actionLabel = t(ACTION_LABELS[idea.action]);
+    const actionLabel =
+      idea.action === "task"
+        ? t(idea.sheet ? "openTask" : "turnIntoTask")
+        : t(ACTION_LABELS[idea.action]);
     return (
       <Button
         variant="soft"
@@ -269,19 +258,6 @@ export function IdeaRow({
             onClick={() => setEditing(true)}
           >
             <EditIcon className="h-4 w-4" />
-          </Button>
-        ) : null}
-        {canTurnIntoTask || idea.sheet ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            disabled={busy}
-            title={t(idea.sheet ? "openTask" : "turnIntoTask")}
-            aria-label={t(idea.sheet ? "openTask" : "turnIntoTask")}
-            onClick={idea.sheet ? openTask : () => void handleTurnIntoTask()}
-          >
-            <BacklogIcon className="h-4 w-4" />
           </Button>
         ) : null}
         {renderAction()}

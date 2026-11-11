@@ -19,9 +19,9 @@ export type IdeaStatus =
   | 'integrated'
   | 'completed';
 
-export type IdeaAction = 'frame' | 'resumeFraming' | 'start' | 'open' | 'answer' | 'review';
+export type IdeaAction = 'task' | 'start' | 'open' | 'answer' | 'review';
 
-export type IdeaMenuAction = 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editPlan';
+export type IdeaMenuAction = 'frame' | 'restart' | 'reframe' | 'startUnframed' | 'complete' | 'drop' | 'remove' | 'editPlan';
 
 export type SheetField = 'objective' | 'context' | 'constraints' | 'outOfScope' | 'deliverable' | 'approach' | 'doneWhen';
 
