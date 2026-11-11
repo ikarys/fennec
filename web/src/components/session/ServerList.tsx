@@ -1,11 +1,11 @@
-// The project's servers in a session's worktree: their state, output and URL, a terminal there.
+// The project's servers in a session's worktree: their state, output and URL.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
-import { getServers, openTerminal, saveServers, startServer, stopServer } from '../../lib/api';
+import { getServers, saveServers, startServer, stopServer } from '../../lib/api';
 import { serverBadge, serversPollMs } from '../../lib/servers';
-import { ActivityIcon, ExternalIcon, PlayIcon, SettingsIcon, SpinnerIcon, StopIcon, TerminalIcon } from '../ui/Icons';
+import { EditIcon, PlayIcon, ServerIcon, SpinnerIcon, StopIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
-import { Button, buttonClass } from '../ui/Button';
+import { Button } from '../ui/Button';
 import { useLang, useT } from '../../i18n';
 
 function ServerOutput({ lines }: { lines: string[] }) {
@@ -28,11 +28,11 @@ function ServerOutput({ lines }: { lines: string[] }) {
 
 interface ServerListProps {
   sessionId: string;
-  onConfigure?: () => void;
+  onEdit?: (name: string) => void;
   onServers?: (servers: ServerView[]) => void;
 }
 
-export function ServerList({ sessionId, onConfigure, onServers }: ServerListProps) {
+export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
   const t = useT();
   const lang = useLang();
 
@@ -130,16 +130,6 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
     }
   };
 
-  const openTerminalHere = async () => {
-    setError(null);
-
-    try {
-      await openTerminal(sessionId);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : tRef.current('error'));
-    }
-  };
-
   const toggleLogs = (name: string) => {
     setOpenLogs((current) => {
       const next = new Set(current);
@@ -151,32 +141,6 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-end gap-0.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title={t('openTerminalInWorktree')}
-          aria-label={t('openTerminalInWorktree')}
-          onClick={() => void openTerminalHere()}
-        >
-          <TerminalIcon className="h-3.5 w-3.5" />
-        </Button>
-
-        {onConfigure && (
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            title={t('configure')}
-            aria-label={t('configure')}
-            onClick={onConfigure}
-          >
-            <SettingsIcon className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
-
       {servers === null && <div className="text-xs text-muted">{t('loading')}</div>}
 
       {servers !== null && servers.length === 0 && (
@@ -189,104 +153,139 @@ export function ServerList({ sessionId, onConfigure, onServers }: ServerListProp
           server.output.length > 0 && (openLogs.has(server.name) || badge.tone === 'err');
         const stopLabel = t('stopServer', { name: server.name });
         const startLabel = t('startServer', { name: server.name });
+        const url = server.url;
+        let portLabel: string | null = null;
+
+        if (url !== null && server.state === 'ready') {
+          try {
+            const port = new URL(url).port;
+            portLabel = port === '' ? url : `:${port}`;
+          } catch {
+            portLabel = url;
+          }
+        }
 
         return (
-          <div key={server.name} className="flex flex-col gap-1.5">
+          <div key={server.name} className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent-soft">
-              <Badge tone={badge.tone} dot pulse={badge.pulse}>
-                {badge.text}
-              </Badge>
+              <ServerIcon
+                className={`h-3.5 w-3.5 shrink-0 ${server.running ? 'text-ok' : 'text-muted'}`}
+              />
 
               <span
-                className="truncate font-mono text-xs text-text shrink-0"
-                title={server.command}
+                className="min-w-0 truncate text-xs font-semibold text-text"
+                title={server.name}
               >
-                {server.suggested ? server.command : server.name}
+                {server.name}
               </span>
 
-              {!server.suggested && (
-                <span
-                  className="min-w-0 grow truncate font-mono text-[11px] text-muted"
-                  title={server.command}
-                >
-                  {server.command}
-                </span>
-              )}
-
-              {server.url !== null && server.state === 'ready' && (
-                <a
-                  href={server.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-                  aria-label={t('openUrl', { url: server.url })}
-                  title={t('openUrl', { url: server.url })}
-                >
-                  <ExternalIcon className="h-3.5 w-3.5" />
-                </a>
-              )}
-
-              {server.suggested ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={busyName !== null}
-                  onClick={() => void adoptSuggested(server)}
-                >
-                  {busyName === server.name && <SpinnerIcon className="h-3.5 w-3.5" />}
-                  {t('useThisCommand')}
-                </Button>
-              ) : server.running ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  disabled={busyName !== null}
-                  aria-label={stopLabel}
-                  title={stopLabel}
-                  onClick={() => void toggle(server)}
-                >
-                  {busyName === server.name ? (
-                    <SpinnerIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <StopIcon className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={busyName !== null}
-                  aria-label={startLabel}
-                  title={startLabel}
-                  onClick={() => void toggle(server)}
-                >
-                  {busyName === server.name ? (
-                    <SpinnerIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <PlayIcon className="h-3.5 w-3.5" />
-                  )}
-                  {t('serverStart')}
-                </Button>
-              )}
-
-              {server.output.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
+              {server.output.length > 0 ? (
+                <button
+                  type="button"
                   aria-pressed={openLogs.has(server.name)}
                   title={t('serverLogs')}
                   aria-label={t('serverLogs')}
                   onClick={() => toggleLogs(server.name)}
+                  className="rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-soft"
                 >
-                  <ActivityIcon className="h-3.5 w-3.5" />
-                </Button>
+                  <Badge tone={badge.tone} dot pulse={badge.pulse} appearance="pill">
+                    {badge.text}
+                  </Badge>
+                </button>
+              ) : (
+                <Badge tone={badge.tone} dot pulse={badge.pulse} appearance="pill">
+                  {badge.text}
+                </Badge>
               )}
+
+              {portLabel !== null && url !== null && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={t('openUrl', { url })}
+                  className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-soft"
+                >
+                  <Badge tone="info" appearance="pill">
+                    {portLabel}
+                  </Badge>
+                </a>
+              )}
+
+              <div className="ml-auto flex items-center gap-0.5">
+                {server.suggested ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={busyName !== null}
+                    onClick={() => void adoptSuggested(server)}
+                  >
+                    {busyName === server.name && <SpinnerIcon className="h-3.5 w-3.5" />}
+                    {t('useThisCommand')}
+                  </Button>
+                ) : (
+                  <>
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        title={t('serverEdit', { name: server.name })}
+                        aria-label={t('serverEdit', { name: server.name })}
+                        onClick={() => onEdit?.(server.name)}
+                      >
+                        <EditIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+
+                    {server.running ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        disabled={busyName !== null}
+                        className="text-err hover:text-err"
+                        aria-label={stopLabel}
+                        title={stopLabel}
+                        onClick={() => void toggle(server)}
+                      >
+                        {busyName === server.name ? (
+                          <SpinnerIcon className="h-3.5 w-3.5" />
+                        ) : (
+                          <StopIcon className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        iconOnly
+                        disabled={busyName !== null}
+                        aria-label={startLabel}
+                        title={startLabel}
+                        onClick={() => void toggle(server)}
+                      >
+                        {busyName === server.name ? (
+                          <SpinnerIcon className="h-3.5 w-3.5" />
+                        ) : (
+                          <PlayIcon className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div
+              className="truncate pl-5 font-mono text-[11px] text-faint"
+              title={server.command}
+            >
+              {server.command}
             </div>
 
             {server.suggested && (
-              <p className="m-0 text-[11px] text-muted">{t('suggestedCommand')}</p>
+              <p className="m-0 pl-5 text-[11px] text-muted">{t('suggestedCommand')}</p>
             )}
 
             {showOutput && <ServerOutput lines={server.output} />}

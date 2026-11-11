@@ -91,13 +91,14 @@ export function SessionPage({
 
   const [sendError, setSendError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
-  const [contextRevealKey, setContextRevealKey] = useState(0);
+  const [reveal, setReveal] = useState({ id: 'session', key: 0 });
   const [canvasId, setCanvasId] = useState<number | null>(null);
   const [runComment, setRunComment] = useState("");
   const [integrationOpen, setIntegrationOpen] = useState(false);
-  const [tryOpen, setTryOpen] = useState(false);
   const [integrationVersion, setIntegrationVersion] = useState(0);
   const openIntegration = useCallback(() => setIntegrationOpen(true), []);
+  const revealPanel = useCallback((id: string) => setReveal((r) => ({ id, key: r.key + 1 })), []);
+  const revealServers = useCallback(() => revealPanel('servers'), [revealPanel]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // The detail is fetched once; the event stream says how a turn ended.
@@ -219,6 +220,7 @@ export function SessionPage({
     pendingPlan,
     planActions,
     openIntegration,
+    tryIt: revealServers,
   });
 
   useEffect(() => {
@@ -259,7 +261,7 @@ export function SessionPage({
       onPreview={setPreview}
       onOpenCanvas={setCanvasId}
       pendingPlanCallId={served.pendingPlan?.callId ?? null}
-      integrationInvite={decisions.integrationInvite}
+      integrationInvite={decisions.proposals.integration}
       calls={calls}
       workflowUsage={workflowUsage}
     >
@@ -274,14 +276,11 @@ export function SessionPage({
             projectName={projectName}
             detail={detail}
             projects={projects}
-            view={view}
             context={context}
             compactDisabled={!sessionId || state === "running" || state === "waiting_for_user"}
             onCompact={actions.handleCompact}
             compactError={actions.compactError}
-            onTry={() => setTryOpen(true)}
-            onOpenCanvas={setCanvasId}
-            onOpenContext={() => setContextRevealKey((key) => key + 1)}
+            onOpenContext={() => revealPanel('session')}
             onRenamed={onRenamed}
             onClose={onClose}
           />
@@ -381,7 +380,8 @@ export function SessionPage({
           skills={skills}
           usage={usage}
           context={context}
-          contextRevealKey={contextRevealKey}
+          reveal={reveal}
+          onTry={revealServers}
           hasSession={sessionId !== null}
           worktree={detail?.worktree ?? null}
           editorUrl={detail?.editorUrl ?? null}
@@ -390,6 +390,11 @@ export function SessionPage({
           integrationVersion={integrationVersion}
           vision={vision}
           served={served}
+          onOpenCanvas={setCanvasId}
+          onNewCanvas={(id) => {
+            revealPanel('canvas');
+            setCanvasId(id);
+          }}
         />
         <SessionOverlays
           sessionId={sessionId}
@@ -400,8 +405,6 @@ export function SessionPage({
             setIntegrationOpen(false);
             setIntegrationVersion((version) => version + 1);
           }}
-          tryOpen={tryOpen}
-          onCloseTry={() => setTryOpen(false)}
           preview={preview}
           onClosePreview={() => setPreview(null)}
           canvasId={canvasId}

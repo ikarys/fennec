@@ -111,7 +111,7 @@ export function SessionDecisionBar({
       )}
       {proposals.integration && (
         <IntegrationDecision
-          onOpen={proposals.integration.open}
+          invite={proposals.integration}
           open={openDecision === "integration"}
           onToggle={() => toggleDecision("integration")}
         />

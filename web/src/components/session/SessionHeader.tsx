@@ -1,13 +1,11 @@
-// The session's header: title, state, project and date, the try, chat-link and canvas actions, and the context gauge.
+// The session's header: title, state, project and date, the chat-link, and the context gauge.
 import type { ContextView, Project, SessionDetail } from '../../lib/api';
-import type { ThreadView } from '../../lib/fold';
 import { formatDateTime } from '../../lib/format';
 import type { sessionStatus } from '../../lib/sessionStatus';
 import { useLang, useT } from '../../i18n';
-import { SessionCanvasMenu } from '../canvas/SessionCanvasMenu';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { CloseIcon, PlayIcon } from '../ui/Icons';
+import { CloseIcon } from '../ui/Icons';
 import { ChatLinkPicker } from './ChatLinkPicker';
 import { ContextGauge } from './ContextGauge';
 
@@ -19,13 +17,10 @@ interface SessionHeaderProps {
   projectName: string;
   detail: SessionDetail | null;
   projects: Project[];
-  view: ThreadView;
   context: ContextView | null;
   compactDisabled: boolean;
   onCompact: () => void;
   compactError: string | null;
-  onTry: () => void;
-  onOpenCanvas: (artifactId: number) => void;
   onOpenContext: () => void;
   /** The chat link changed. */
   onRenamed: () => void;
@@ -41,13 +36,10 @@ export function SessionHeader({
   projectName,
   detail,
   projects,
-  view,
   context,
   compactDisabled,
   onCompact,
   compactError,
-  onTry,
-  onOpenCanvas,
   onOpenContext,
   onRenamed,
   onClose,
@@ -97,16 +89,6 @@ export function SessionHeader({
           </div>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          {sessionId && !isChat && (
-            <Button
-              variant="secondary"
-              size="sm"
-              title={t('tryChange')}
-              onClick={onTry}
-            >
-              <PlayIcon className="h-3.5 w-3.5" />{t('tryChangeShort')}
-            </Button>
-          )}
           {sessionId && isChat && detail && (
             <ChatLinkPicker
               sessionId={sessionId}
@@ -114,9 +96,6 @@ export function SessionHeader({
               projects={projects}
               onLinked={onRenamed}
             />
-          )}
-          {sessionId && (
-            <SessionCanvasMenu sessionId={sessionId} refreshKey={view} onOpen={onOpenCanvas} />
           )}
         </div>
         <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-border" />

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Blocker, IntegrationPreview, RepoState, SessionDetail } from '../../lib/api';
 import { discardWorktree, getIntegration, getRepoState, openFileManager, openTerminal, resolveConflict } from '../../lib/api';
-import { BranchIcon, ExternalIcon, FolderIcon, TerminalIcon, TrashIcon } from '../ui/Icons';
+import { BranchIcon, ExternalIcon, FolderIcon, PlayIcon, TerminalIcon, TrashIcon } from '../ui/Icons';
 import { Button, buttonClass } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Panel } from '../ui/Panel';
@@ -33,6 +33,7 @@ export function WorkplaceSection({
   running,
   onDiscarded,
   integrationVersion,
+  onTry,
 }: {
   sessionId: string;
   worktree: NonNullable<SessionDetail['worktree']> | null;
@@ -40,6 +41,7 @@ export function WorkplaceSection({
   running: boolean;
   onDiscarded: () => void;
   integrationVersion: number;
+  onTry: () => void;
 }) {
   const t = useT();
   const openInEditor = useOpenInEditorLabel();
@@ -185,6 +187,12 @@ export function WorkplaceSection({
     </a>
   );
 
+  const targetBranch = repo?.branch ?? t('detachedHeadBranch');
+  // The sentence is translated whole; the branch is cut out of it to be set in bold.
+  const landsOnPlaceholder = '\u0000';
+  const landsOnSentence = repo !== null ? t('landsOn', { branch: landsOnPlaceholder, dir: lastSegment(repo.dir) }) : '';
+  const [landsOnBefore = '', landsOnAfter = ''] = landsOnSentence.split(landsOnPlaceholder);
+
   return (
     <Panel
       id="workplace"
@@ -233,39 +241,49 @@ export function WorkplaceSection({
         ) : (
           <>
             <div className="flex items-center gap-1.5 text-xs">
-              <BranchIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
+              <BranchIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
               <span title={worktree.branch} className="min-w-0 truncate font-mono">
                 {shortAgentBranch(worktree.branch)}
               </span>
               {worktree.commits > 0 && (
-                <Badge tone="neutral" appearance="pill">
+                <Badge tone="info" appearance="pill">
                   {t('worktreeCommits', { count: worktree.commits })}
                 </Badge>
               )}
-              <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                {terminalButton}
-                {worktree.editorUrl !== null && editorLink(worktree.editorUrl)}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={openDiscard}
-                  disabled={running || discarding}
-                  className="hover:text-err"
-                  title={t('discardWork')}
-                  aria-label={t('discardWork')}
-                >
-                  <TrashIcon className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+            </div>
+            <div className="flex items-center gap-0.5 pl-5">
+              <Button
+                variant="secondary"
+                size="sm"
+                iconOnly
+                className="text-accent"
+                onClick={onTry}
+                title={t('tryChange')}
+                aria-label={t('tryChange')}
+              >
+                <PlayIcon className="h-3.5 w-3.5" />
+              </Button>
+              {terminalButton}
+              {worktree.editorUrl !== null && editorLink(worktree.editorUrl)}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={openDiscard}
+                disabled={running || discarding}
+                className="hover:text-err"
+                title={t('discardWork')}
+                aria-label={t('discardWork')}
+              >
+                <TrashIcon className="h-3.5 w-3.5" />
+              </Button>
             </div>
 
             {repo !== null && (
               <p className="m-0 text-xs text-muted">
-                {t('landsOn', {
-                  branch: repo.branch ?? t('detachedHeadBranch'),
-                  dir: lastSegment(repo.dir),
-                })}
+                {landsOnBefore}
+                <strong className="text-text">{targetBranch}</strong>
+                {landsOnAfter}
               </p>
             )}
 

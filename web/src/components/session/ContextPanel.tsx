@@ -1,5 +1,5 @@
 /**
- * The session's right context rail: a SideRail of work, servers, session, and plugin panels.
+ * The session's right context rail: a SideRail of work, servers, canvas, session, and plugin panels.
  */
 import { useState } from 'react';
 import type {
@@ -15,9 +15,10 @@ import type {
 import type { ThreadView } from '../../lib/fold';
 import { useT } from '../../i18n';
 import { useSessionPluginBlocks } from '../../hooks/useSessionPluginBlocks';
-import { CheckIcon, LayersIcon, PuzzleIcon, ServerIcon } from '../ui/Icons';
+import { CheckIcon, CpuIcon, LayersIcon, PuzzleIcon, ServerIcon } from '../ui/Icons';
 import { SideRail, type RailPanel } from '../ui/SideRail';
 import { PLUGIN_ICONS } from '../plugins/pluginIcons';
+import { CanvasSection } from '../canvas/CanvasSection';
 import { CriteriaSection } from './CriteriaSection';
 import { ContextSection } from './ContextSection';
 import { DecisionsSection } from './DecisionsSection';
@@ -44,8 +45,11 @@ interface ContextPanelProps {
   vision: SeenImage[];
   served: ServedThread;
   context: ContextView | null;
-  /** Bumped by the header's gauge: opens the Session tab on its Context section. */
-  contextRevealKey: number;
+  /** The rail panel to open: the header's gauge opens session, the worktree's try opens servers. */
+  reveal: { id: string; key: number };
+  onTry: () => void;
+  onOpenCanvas: (id: number) => void;
+  onNewCanvas: (id: number) => void;
 }
 
 export function ContextPanel({
@@ -61,10 +65,14 @@ export function ContextPanel({
   vision,
   served,
   context,
-  contextRevealKey,
+  reveal,
+  onTry,
+  onOpenCanvas,
+  onNewCanvas,
 }: ContextPanelProps) {
   const t = useT();
   const [runningServers, setRunningServers] = useState(0);
+  const [canvasCount, setCanvasCount] = useState(0);
   const plugins = useSessionPluginBlocks(sessionId);
 
   if (!hasSession || sessionId === null) return null;
@@ -94,6 +102,7 @@ export function ContextPanel({
           running={view.running}
           onDiscarded={onWorktreeChanged}
           integrationVersion={integrationVersion}
+          onTry={onTry}
         />
         <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} planAwaitingBuild={served.pendingPlan !== null || served.handedPlan !== null} />
         <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} hasDiff={Boolean(worktree?.commits)} />
@@ -112,14 +121,23 @@ export function ContextPanel({
   });
 
   panels.push({
+    id: 'canvas',
+    title: t('contextTabCanvas'),
+    label: t('contextTabCanvas'),
+    Icon: LayersIcon,
+    status: canvasCount > 0 ? String(canvasCount) : undefined,
+    body: <CanvasSection sessionId={sessionId} refreshKey={view} onOpen={onOpenCanvas} onNew={onNewCanvas} onCount={setCanvasCount} />,
+  });
+
+  panels.push({
     id: 'session',
     title: t('contextTabSession'),
     label: t('contextTabSession'),
-    Icon: LayersIcon,
+    Icon: CpuIcon,
     body: (
       <>
         <TokensSection usage={usage} />
-        <ContextSection context={context} revealKey={contextRevealKey} />
+        <ContextSection context={context} revealKey={reveal.id === 'session' ? reveal.key : 0} />
         <DecisionsSection decisions={served.decisions} />
         <SkillsSection skills={skills} hasSession={hasSession} />
         <VisionSection images={vision} />
@@ -155,7 +173,7 @@ export function ContextPanel({
       storageKey="fennec.contextPanel"
       defaultPinned
       panels={panels}
-      reveal={{ id: 'session', key: contextRevealKey }}
+      reveal={reveal}
     />
   );
 }

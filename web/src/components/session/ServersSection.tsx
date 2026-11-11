@@ -3,7 +3,8 @@
  */
 import { useState } from 'react';
 import type { ServerView } from '../../lib/api';
-import { ServerIcon } from '../ui/Icons';
+import { PlusIcon, ServerIcon } from '../ui/Icons';
+import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 import { ServerEditor } from './ServerEditor';
 import { ServerList } from './ServerList';
@@ -17,7 +18,7 @@ interface ServersSectionProps {
 export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
   const t = useT();
   const [servers, setServers] = useState<ServerView[] | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<{ name: string | null } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (sessionId === null) {
@@ -25,7 +26,25 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
   }
 
   const runningCount = servers?.filter((server) => server.running).length ?? 0;
-  const summary = servers === null ? undefined : `${runningCount}/${servers.length}`;
+  const summary = (
+    <span className="flex items-center gap-1">
+      {servers !== null && `${runningCount}/${servers.length}`}
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        title={t('serverAdd')}
+        aria-label={t('serverAdd')}
+        onClick={(event) => {
+          // Inside the section's summary: adding must not fold the section.
+          event.preventDefault();
+          setEditing({ name: null });
+        }}
+      >
+        <PlusIcon className="h-3.5 w-3.5" />
+      </Button>
+    </span>
+  );
   const note = `${t('serversStartedNote')} $PORT.`;
 
   return (
@@ -41,7 +60,7 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
         <ServerList
           key={refreshKey}
           sessionId={sessionId}
-          onConfigure={() => setEditorOpen(true)}
+          onEdit={(name) => setEditing({ name })}
           onServers={(nextServers) => {
             setServers(nextServers);
             onServers?.(nextServers);
@@ -49,14 +68,15 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
         />
 
         <ServerEditor
-          open={editorOpen}
+          open={editing !== null}
           sessionId={sessionId}
-          initial={servers ?? []}
+          servers={servers ?? []}
+          editing={editing?.name ?? null}
           onSaved={() => {
-            setEditorOpen(false);
+            setEditing(null);
             setRefreshKey((key) => key + 1);
           }}
-          onClose={() => setEditorOpen(false)}
+          onClose={() => setEditing(null)}
         />
       </div>
     </Panel>

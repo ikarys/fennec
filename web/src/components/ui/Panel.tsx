@@ -70,12 +70,13 @@ export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone =
       className="group shrink-0 border-b border-border last:border-b-0"
     >
       <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 pt-3 pb-2 select-none [&::-webkit-details-marker]:hidden hover:text-text">
+        <ChevronRightIcon className="h-3 w-3 shrink-0 text-faint transition-transform group-open:rotate-90" />
         {icon !== undefined ? (
           <span aria-hidden className={`shrink-0 ${ICON_TONES[iconTone]}`}>
             {icon}
           </span>
         ) : null}
-        <h3 className="m-0 text-[11px] font-semibold text-muted group-hover:text-text">{title}</h3>
+        <h3 className="m-0 text-[11px] font-semibold uppercase tracking-wide text-muted group-hover:text-text">{title}</h3>
         {hint !== undefined ? (
           <span role="img" title={hint} aria-label={hint} className="cursor-help text-faint hover:text-accent">
             <InfoIcon className="h-3 w-3" />
@@ -86,7 +87,6 @@ export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone =
             {summary}
           </span>
         ) : null}
-        <ChevronRightIcon className={`h-3 w-3 shrink-0 text-faint transition-transform group-open:rotate-90 ${summary === undefined ? 'ml-auto' : ''}`} />
       </summary>
       <div className="flex flex-col gap-1.5 px-3 pb-3">{children}</div>
     </details>

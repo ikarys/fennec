@@ -7,6 +7,8 @@ import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
 import { Tile } from '../../ui/Tile';
 import { useRunUsage } from '../../session/CallUsage';
+import { useIntegrationInvite } from '../../session/IntegrationInvite';
+import { TryOrIntegrate } from '../../session/TryOrIntegrate';
 import { useLang, useT } from '../../../i18n';
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: 'workflow-end' }>;
@@ -75,12 +77,13 @@ function NodeTrack({
   );
 }
 
-export function RunEndCard({ item }: { item: WorkflowEndItem }) {
+export function RunEndCard({ item, latest }: { item: WorkflowEndItem; latest: boolean }) {
   const lang = useLang();
   const t = useT();
   const outcome = outcomeView(item.outcome, t);
   const stats = item.stats;
   const usage = useRunUsage(item.runId);
+  const invite = useIntegrationInvite();
 
   const startAt = stats?.startedAt;
   const endAt = stats?.finishedAt;
@@ -189,6 +192,12 @@ export function RunEndCard({ item }: { item: WorkflowEndItem }) {
         </div>
       )}
 
+      {latest && item.outcome === 'done' && invite !== null && (
+        <div className="flex items-center justify-between gap-3 border-t border-border bg-accent-soft px-4 py-2.5">
+          <span className="text-xs text-muted">{t('runEndTryHint')}</span>
+          <TryOrIntegrate invite={invite} primary="try" />
+        </div>
+      )}
     </Card>
   );
 }
