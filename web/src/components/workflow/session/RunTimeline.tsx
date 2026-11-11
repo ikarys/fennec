@@ -1,9 +1,9 @@
 // The workflow run's drawer body: a summary and a vertical step timeline.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { portTone, runRounds, upcomingSteps, type NodeRun, type RunView } from '../../../lib/workflowRun';
+import { nodeKindOf, portTone, type NodeRun, type RunView } from '../../../lib/runView';
 import { formatClock, formatDuration } from '../../../lib/format';
 import { useLang, useT } from '../../../i18n';
-import { NODE_KIND_LABELS } from '../../../lib/workflow';
+import { NODE_KIND_LABELS, type WorkflowDef } from '../../../lib/workflow';
 import { Badge } from '../../ui/Badge';
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, CloseIcon, PauseIcon, SpinnerIcon } from '../../ui/Icons';
 import { NodeOutputModal } from './NodeOutputModal';
@@ -25,10 +25,11 @@ function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLas
   const t = useT();
   const tone = stepTone(step);
   const nodeRun = step.kind === 'run' ? step.run : null;
+  const nodeKind = step.kind === 'run' ? step.nodeKind ?? step.run.kind : undefined;
   const upcoming = step.kind === 'upcoming' ? step.step : null;
   const label = nodeRun ? nodeRun.label : upcoming?.label ?? '';
   const isRunning = nodeRun?.state === 'running';
-  const isHumanRunning = isRunning && nodeRun?.kind === 'human';
+  const isHumanRunning = isRunning && nodeKind === 'human';
   const isInterrupted = nodeRun?.state === 'interrupted';
   const isFinished = nodeRun?.state === 'done' || nodeRun?.state === 'ended';
   const port = nodeRun?.port;
@@ -62,8 +63,7 @@ function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLas
     ?.replace(/[*_`]/g, '');
 
   const showPort = isFinished && !!port && !isPlainPort(port);
-  const kind = nodeRun?.kind;
-  const showKind = kind === 'human' || kind === 'criteria' || kind === 'shell';
+  const showKind = nodeKind === 'human' || nodeKind === 'criteria' || nodeKind === 'shell';
   const hasMeta = showPort || pass > 1 || time !== null || showKind;
 
   const portToneValue = port ? portTone(port) : 'neutral';
@@ -92,7 +92,7 @@ function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLas
         </div>
         {hasMeta ? (
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            {showKind && nodeRun ? <span className="text-[11px] text-faint">{t(NODE_KIND_LABELS[nodeRun.kind as keyof typeof NODE_KIND_LABELS])}</span> : null}
+            {showKind && nodeRun && nodeKind ? <span className="text-[11px] text-faint">{t(NODE_KIND_LABELS[nodeKind])}</span> : null}
             {showPort && portBadge ? (
               nodeRun?.output ? (
                 <button
@@ -125,6 +125,7 @@ function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLas
 function RoundRow({
   index,
   round,
+  workflow,
   expanded,
   isLast,
   onToggle,
@@ -133,6 +134,7 @@ function RoundRow({
 }: {
   index: number;
   round: NodeRun[];
+  workflow: WorkflowDef;
   expanded: boolean;
   isLast: boolean;
   onToggle: (index: number) => void;
@@ -144,7 +146,7 @@ function RoundRow({
   const last = round[round.length - 1];
   if (!last) return null;
 
-  const tone = nodeRunTone(last);
+  const tone = nodeRunTone(last, nodeKindOf(workflow, last.nodeId));
   const hasDuration = round.some((nodeRun) => nodeRun.durationMs != null);
   const totalDuration = round.reduce((total, nodeRun) => total + (nodeRun.durationMs ?? 0), 0);
 
@@ -171,7 +173,7 @@ function RoundRow({
             {round.map((nodeRun, runIndex) => (
               <StepRow
                 key={`${nodeRun.nodeId}-${nodeRun.pass}-${runIndex}`}
-                step={{ kind: 'run' as const, run: nodeRun }}
+                step={{ kind: 'run' as const, run: nodeRun, nodeKind: nodeKindOf(workflow, nodeRun.nodeId) }}
                 isLast={runIndex === round.length - 1}
                 onShowOutput={onShowOutput}
                 onJump={onJump}
@@ -190,8 +192,8 @@ export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: str
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
   const [outputRun, setOutputRun] = useState<NodeRun | null>(null);
 
-  const rounds = runRounds(run.runs);
-  const upcoming = upcomingSteps(run);
+  const rounds = run.rounds;
+  const upcoming = run.upcoming;
   const count = run.runs.length;
 
   useEffect(() => {
@@ -210,9 +212,8 @@ export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: str
     });
   };
 
-  const finishedCount = run.runs.filter((nodeRun) => nodeRun.state === 'done' || nodeRun.state === 'ended').length;
-  const openCount = run.runs.filter((nodeRun) => nodeRun.state === 'running').length;
-  const total = finishedCount + openCount + upcoming.length;
+  const finishedCount = run.counts.done;
+  const total = run.counts.total;
   const outcome = run.finished?.outcome;
 
   const stateTone = outcome === 'done' ? 'ok' : outcome === 'blocked' || outcome === 'error' ? 'err' : outcome === 'stopped' ? 'neutral' : 'accent';
@@ -235,6 +236,7 @@ export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: str
         <RoundRow
           index={index}
           round={round}
+          workflow={run.workflow}
           expanded={expandedRounds.has(index)}
           isLast={isLast}
           onToggle={toggleRound}
@@ -252,7 +254,7 @@ export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: str
         key: `run-${nodeRun.nodeId}-${nodeRun.pass}-${index}`,
         render: (isLast) => (
           <StepRow
-            step={{ kind: 'run' as const, run: nodeRun }}
+            step={{ kind: 'run' as const, run: nodeRun, nodeKind: nodeKindOf(run.workflow, nodeRun.nodeId) }}
             isLast={isLast}
             onShowOutput={setOutputRun}
             onJump={jump}

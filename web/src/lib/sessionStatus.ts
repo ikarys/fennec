@@ -1,7 +1,7 @@
 import type { SessionState } from './api';
 import { stateLabel } from './format';
 import { t, type Lang } from '../i18n/messages';
-import type { RunView, RunWaiting } from './workflowRun';
+import type { RunView, RunWaiting } from './runView';
 
 export type StatusTone = 'accent' | 'ok' | 'err' | 'neutral';
 

@@ -1,10 +1,11 @@
 // Shared tone helpers for the workflow run rail and its timeline.
-import { portTone, type NodeRun, type UpcomingStep } from '../../../lib/workflowRun';
+import { portTone, type NodeRun, type UpcomingStep } from '../../../lib/runView';
+import type { NodeKind } from '../../../lib/workflow';
 
 const PLAIN_PORTS = new Set(['next', 'done']);
 
 export type RailStep =
-  | { kind: 'run'; run: NodeRun }
+  | { kind: 'run'; run: NodeRun; nodeKind?: NodeKind }
   | { kind: 'upcoming'; step: UpcomingStep };
 
 export type StepTone = 'ok' | 'err' | 'running' | 'waiting' | 'interrupted' | 'upcoming';
@@ -25,7 +26,9 @@ export function isPlainPort(port: string): boolean {
 export function stepTone(step: RailStep): StepTone {
   if (step.kind === 'upcoming') return 'upcoming';
 
-  const { state, port, kind } = step.run;
+  const { state, port } = step.run;
+  // The served kind is a constant; the resolved kind from the definition wins.
+  const kind = step.nodeKind ?? step.run.kind;
   if (state === 'running') return kind === 'human' ? 'waiting' : 'running';
   if (state === 'interrupted') return 'interrupted';
   if (state === 'ended') return port === 'done' ? 'ok' : 'err';
@@ -37,6 +40,6 @@ export function stepTone(step: RailStep): StepTone {
   return 'upcoming';
 }
 
-export function nodeRunTone(nodeRun: NodeRun): StepTone {
-  return stepTone({ kind: 'run', run: nodeRun });
+export function nodeRunTone(nodeRun: NodeRun, nodeKind?: NodeKind): StepTone {
+  return stepTone({ kind: 'run', run: nodeRun, nodeKind });
 }

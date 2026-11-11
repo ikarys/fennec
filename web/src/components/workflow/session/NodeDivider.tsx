@@ -3,7 +3,7 @@ import type { ThreadItem } from '../../../lib/fold';
 import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
 import { useLang, useT } from '../../../i18n';
-import { portTone } from '../../../lib/workflowRun';
+import { portTone } from '../../../lib/runView';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../ui/Icons';
 import { useNodeUsage } from '../../session/CallUsage';
 import { Badge } from '../../ui/Badge';
