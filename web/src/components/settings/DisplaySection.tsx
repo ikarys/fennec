@@ -1,13 +1,15 @@
 /** Appearance settings: theme, language/text, thread defaults and notice sounds. */
 import type { DisplayPrefs, EditorId } from '../../lib/api';
 import { EDITORS } from '../../lib/editors';
+import { Button } from '../ui/Button';
 import { Segmented } from '../ui/Segmented';
 import { Section, type SectionSave } from '../ui/Section';
 import { Select } from '../ui/Field';
 import { Switch } from '../ui/Switch';
 import { ThemePicker } from '../settings/ThemePicker';
 import { SettingRow } from '../ui/SettingRow';
-import { BellIcon, ChatIcon, EyeIcon, GlobeIcon } from '../ui/Icons';
+import { BellIcon, ChatIcon, EyeIcon, GlobeIcon, PlayIcon } from '../ui/Icons';
+import { previewSounds } from '../../lib/sounds';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { ThemeId } from '../../lib/theme';
@@ -90,11 +92,24 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
 
       <Section Icon={BellIcon} title={t('displayNoticesTitle')} flush save={save}>
         <SettingRow label={t('soundsLabel')} hint={t('soundsHint')}>
-          <Switch
-            label={t('soundsLabel')}
-            checked={value.sounds ?? true}
-            onChange={(sounds) => onChange({ ...value, sounds })}
-          />
+          <div className="flex items-center gap-2">
+            <Switch
+              label={t('soundsLabel')}
+              checked={value.sounds ?? true}
+              onChange={(sounds) => onChange({ ...value, sounds })}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              iconOnly
+              title={t('soundsPreview')}
+              aria-label={t('soundsPreview')}
+              onClick={previewSounds}
+            >
+              <PlayIcon className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </SettingRow>
       </Section>
     </>
