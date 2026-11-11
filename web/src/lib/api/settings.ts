@@ -19,6 +19,9 @@ export interface ModelPrefs {
 
 export type EditorId = 'vscode' | 'vscode-insiders' | 'cursor' | 'windsurf' | 'vscodium';
 
+/** `AgentStyle`: how the agents write to the human. */
+export type AgentStyle = 'concise' | 'normal' | 'explanatory' | 'technical';
+
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
@@ -119,6 +122,8 @@ export interface Preferences {
   favorites?: ModelRef[];
   /** `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
+  /** `agentStyle`: how the agents write to the human, for new sessions. */
+  agentStyle?: AgentStyle;
   /** `search.*`: the web_search tool's SearXNG instance. */
   search?: SearchPrefs;
   /** fennec's bwrap world: how commands run. */

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
+  AgentStyle,
   AutonomyPrefs,
   DelegationPrefs,
   IntegrationPrefs,
@@ -239,6 +240,10 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
     setForm((previous) => (previous ? { ...previous, instructions } : previous));
   }
 
+  function updateAgentStyle(style: AgentStyle) {
+    setForm((previous) => (previous ? { ...previous, agentStyle: style } : previous));
+  }
+
   function updateSearch(search: SearchForm) {
     setForm((previous) => (previous ? { ...previous, search } : previous));
   }
@@ -458,7 +463,13 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
           )}
 
           {active === 'instructions' && (
-            <InstructionsSection save={groupSave('instructions')} value={form.instructions} onChange={updateInstructions} />
+            <InstructionsSection
+              save={groupSave('instructions')}
+              value={form.instructions}
+              onChange={updateInstructions}
+              style={form.agentStyle}
+              onStyleChange={updateAgentStyle}
+            />
           )}
 
           {active === 'agents' && (

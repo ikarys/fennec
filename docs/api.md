@@ -144,6 +144,7 @@ as the `local` provider's, and written back in the new shape.
     "sounds": true
   },
   "globalInstructions": "string | null",
+  "agentStyle": "concise | normal | explanatory | technical",
   "search": {
     "searxngUrl": "string | null",
     "searxngApiKey": "string | null"
@@ -166,6 +167,10 @@ or `https://`. `reasoningEffort` is sent as the
 filesystem root down to the session's working directory go into the system
 prompt of a new session; an existing session keeps the prompt of its first
 turn.
+
+`agentStyle` (default `concise`) opens the system prompt's Style section: how
+the agents write to the human. Like `globalInstructions`, it applies to new
+sessions only.
 
 `search` (SearXNG only) is the instance the `web_search`
 tool queries (`GET {searxngUrl}/search?format=json&q=…`, with

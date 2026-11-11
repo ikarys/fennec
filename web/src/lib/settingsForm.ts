@@ -1,6 +1,7 @@
 // The Settings page's form model: the stored preferences read into editable strings, and the
 // strings written back as preferences. Pure, so the round trip is tested without a browser.
 import type {
+  AgentStyle,
   ApiKey,
   AutonomyPrefs,
   DelegationPrefs,
@@ -109,6 +110,7 @@ export interface SettingsForm {
   billing: Record<string, boolean>;
   display: DisplayPrefs;
   instructions: string;
+  agentStyle: AgentStyle;
   search: SearchForm;
   sandbox: SandboxPrefs;
   autonomy: AutonomyPrefs;
@@ -147,7 +149,7 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   model: { prefs: ['selected'], form: ['model'] },
   providers: { prefs: ['providers'], form: ['providers', 'models'] },
   modelPrefs: { prefs: ['providers', 'favorites', 'billing'], form: ['providers', 'models', 'favorites', 'billing'] },
-  instructions: { prefs: ['globalInstructions'], form: ['instructions'] },
+  instructions: { prefs: ['globalInstructions', 'agentStyle'], form: ['instructions', 'agentStyle'] },
   search: { prefs: ['search'], form: ['search'] },
   sandbox: { prefs: ['sandbox'], form: ['sandbox'] },
   autonomy: { prefs: ['autonomy'], form: ['autonomy'] },
@@ -268,6 +270,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     billing: preferences.billing ?? {},
     display: preferences.display,
     instructions: preferences.globalInstructions ?? '',
+    agentStyle: preferences.agentStyle ?? 'concise',
     search: {
       url: preferences.search?.searxngUrl ?? '',
       apiKey: preferences.search?.searxngApiKey ?? '',
@@ -365,6 +368,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     billing: form.billing,
     display: form.display,
     globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
+    agentStyle: form.agentStyle,
     search: {
       searxngUrl: searxngUrl === '' ? null : searxngUrl,
       searxngApiKey: searxngApiKey === '' ? null : searxngApiKey,

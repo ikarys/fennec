@@ -21,6 +21,7 @@ use super::round::{self, CONTINUE_AFTER_STREAM_ERROR_PROMPT, Round, RoundPrompt}
 use super::snapshot::round_prompt_parts;
 use super::tool_calls::{Flow, INTERRUPTED_ERROR, execute_tools};
 use crate::domain::agent::{AgentDefinition, DEFAULT_COLOR, last_reminder, resolve};
+use crate::domain::agent_style::AgentStyle;
 use crate::domain::attachment::Attachment;
 use crate::domain::compaction::{context_tokens, should_compact};
 use crate::domain::criteria::{accepted_proposal, parse_done_when};
@@ -62,6 +63,8 @@ pub struct Turn<'a> {
     pub skills: &'a [Skill],
     /// Skill ids whose bodies the system prompt carries; frozen with it.
     pub always_on: &'a [String],
+    /// How the agent writes to the human; frozen with the system prompt.
+    pub style: AgentStyle,
     /// The agents the session can run as; the log's last `mode.changed`
     /// picks one.
     pub agents: &'a [AgentDefinition],

@@ -58,6 +58,7 @@ pub(super) fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), Str
             turn.instructions,
             turn.skills,
             turn.always_on,
+            turn.style,
         )
     });
     let tools = tools.cloned().unwrap_or_else(|| tool_definitions(turn));
