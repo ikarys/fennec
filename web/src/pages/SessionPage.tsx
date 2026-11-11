@@ -142,7 +142,6 @@ export function SessionPage({
     onModelApplied: reloadDetail,
   });
   const chooseAgent = useAgentChoice({
-    isChat,
     agents,
     workflows,
     setWorkflowSelection,
@@ -361,7 +360,7 @@ export function SessionPage({
               }
               commands={commands}
               // A chat talks to builder only: no agent nor workflow to pick.
-              agents={isChat ? undefined : agents}
+              agents={agents}
               mode={mode}
               onModeChange={chooseAgent}
               attachments={attachments}
