@@ -3,7 +3,8 @@
  */
 import { useState } from 'react';
 import type { ServerView } from '../../lib/api';
-import { ServerIcon } from '../ui/Icons';
+import { PlusIcon, ServerIcon } from '../ui/Icons';
+import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
 import { ServerEditor } from './ServerEditor';
 import { ServerList } from './ServerList';
@@ -25,7 +26,25 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
   }
 
   const runningCount = servers?.filter((server) => server.running).length ?? 0;
-  const summary = servers === null ? undefined : `${runningCount}/${servers.length}`;
+  const summary = (
+    <span className="flex items-center gap-1">
+      {servers !== null && `${runningCount}/${servers.length}`}
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        title={t('serverAdd')}
+        aria-label={t('serverAdd')}
+        onClick={(event) => {
+          // Inside the section's summary: adding must not fold the section.
+          event.preventDefault();
+          setEditing({ name: null });
+        }}
+      >
+        <PlusIcon className="h-3.5 w-3.5" />
+      </Button>
+    </span>
+  );
   const note = `${t('serversStartedNote')} $PORT.`;
 
   return (
@@ -42,7 +61,6 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
           key={refreshKey}
           sessionId={sessionId}
           onEdit={(name) => setEditing({ name })}
-          onAdd={() => setEditing({ name: null })}
           onServers={(nextServers) => {
             setServers(nextServers);
             onServers?.(nextServers);

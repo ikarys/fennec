@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, saveServers, startServer, stopServer } from '../../lib/api';
 import { serverBadge, serversPollMs } from '../../lib/servers';
-import { EditIcon, PlayIcon, PlusIcon, ServerIcon, SpinnerIcon, StopIcon } from '../ui/Icons';
+import { EditIcon, PlayIcon, ServerIcon, SpinnerIcon, StopIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useLang, useT } from '../../i18n';
@@ -29,11 +29,10 @@ function ServerOutput({ lines }: { lines: string[] }) {
 interface ServerListProps {
   sessionId: string;
   onEdit?: (name: string) => void;
-  onAdd?: () => void;
   onServers?: (servers: ServerView[]) => void;
 }
 
-export function ServerList({ sessionId, onEdit, onAdd, onServers }: ServerListProps) {
+export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
   const t = useT();
   const lang = useLang();
 
@@ -142,21 +141,6 @@ export function ServerList({ sessionId, onEdit, onAdd, onServers }: ServerListPr
 
   return (
     <div className="flex flex-col gap-1.5">
-      {onAdd && (
-        <div className="flex items-center justify-end gap-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            title={t('serverAdd')}
-            aria-label={t('serverAdd')}
-            onClick={onAdd}
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
-
       {servers === null && <div className="text-xs text-muted">{t('loading')}</div>}
 
       {servers !== null && servers.length === 0 && (
