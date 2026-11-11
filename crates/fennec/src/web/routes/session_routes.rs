@@ -685,27 +685,24 @@ pub(crate) fn serve_events_page(
     send_json(stream, 200, &Value::Array(out))
 }
 
-/// The `workflow.*` events of the latest run started before `before`
-/// (the log's end when omitted), ascending.
-/// `GET /api/sessions/{id}/workflow/run?before=<seq>`.
-pub(crate) fn serve_run_events(
+/// The run view, pre-calculated by the server: the run the UI renders as it is.
+pub(crate) fn serve_run_view(
     app: &App,
-    req: &Request,
+    _req: &Request,
     stream: &mut TcpStream,
     id: &str,
 ) -> Result<(), HttpError> {
-    let before = req
-        .query_param("before")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(u64::MAX);
     let store = app.store()?;
     require_session(&store, id)?;
-    let page = store.workflow_run_before(id, before)?;
-    let out: Vec<Value> = page
+    let events = store
+        .workflow_run_before(id, u64::MAX)?
         .into_iter()
-        .map(|(seq, event)| json!({ "seq": seq, "event": event }))
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
+        .map(|(_, event)| event)
+        .collect::<Vec<_>>();
+    let Some(view) = crate::web::views::run_view::run_view(&events) else {
+        return error(stream, 404, "no run");
+    };
+    send_json(stream, 200, &serde_json::to_value(&view)?)
 }
 
 pub(crate) fn session_json(app: &App, s: &SessionSummary) -> Value {

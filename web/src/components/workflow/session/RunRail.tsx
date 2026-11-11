@@ -1,7 +1,6 @@
 // The workflow run's left side rail: a SideRail whose run drawer holds the step timeline.
-import { useMemo } from 'react';
-import { upcomingSteps, type RunView } from '../../../lib/workflowRun';
 import { useT } from '../../../i18n';
+import { nodeKindOf, type RunView } from '../../../lib/runView';
 import { BranchIcon } from '../../ui/Icons';
 import { SideRail, type RailPanel } from '../../ui/SideRail';
 import { RunTimeline } from './RunTimeline';
@@ -11,12 +10,11 @@ type JumpToNode = (runId: string, nodeId: string, pass: number) => void;
 
 export function RunRail({ run, onJump }: { run: RunView; onJump: JumpToNode }) {
   const t = useT();
-  const upcoming = useMemo(() => upcomingSteps(run), [run]);
 
-  const finishedCount = run.runs.filter((nodeRun) => nodeRun.state === 'done' || nodeRun.state === 'ended').length;
-  const openCount = run.runs.filter((nodeRun) => nodeRun.state === 'running').length;
-  const anyHumanRunning = run.runs.some((nodeRun) => nodeRun.state === 'running' && nodeRun.kind === 'human');
-  const anyErr = run.runs.some((nodeRun) => nodeRunTone(nodeRun) === 'err');
+  const finishedCount = run.counts.done;
+  const openCount = run.counts.open;
+  const anyHumanRunning = run.runs.some((nodeRun) => nodeRun.state === 'running' && nodeKindOf(run.workflow, nodeRun.nodeId) === 'human');
+  const anyErr = run.runs.some((nodeRun) => nodeRunTone(nodeRun, nodeKindOf(run.workflow, nodeRun.nodeId)) === 'err');
   const outcome = run.finished?.outcome;
 
   let statusClass: string | undefined;
@@ -38,7 +36,7 @@ export function RunRail({ run, onJump }: { run: RunView; onJump: JumpToNode }) {
     label: t('runRailRun'),
     title: run.workflow.name,
     Icon: BranchIcon,
-    status: `${finishedCount}/${finishedCount + openCount + upcoming.length}`,
+    status: `${finishedCount}/${run.counts.total}`,
     statusClass,
     alert,
     body: <RunTimeline run={run} onJump={onJump} />,

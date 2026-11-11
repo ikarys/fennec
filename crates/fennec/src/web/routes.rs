@@ -304,8 +304,8 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
                 event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
             }
         }
-        ("GET", ["api", "sessions", id, "workflow", "run"]) => {
-            session_routes::serve_run_events(app, req, stream, id)
+        ("GET", ["api", "sessions", id, "workflow", "run", "view"]) => {
+            session_routes::serve_run_view(app, req, stream, id)
         }
         ("GET", ["api", "sessions", id, "canvas"]) => canvas_routes::list_session(app, stream, id),
         ("POST", ["api", "sessions", id, "canvas"]) => canvas_routes::create(app, req, stream, id),
