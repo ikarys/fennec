@@ -18,6 +18,7 @@ import {
   InfoIcon,
   KeyboardIcon
 } from '../ui/Icons';
+import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { SETTINGS_GROUPS, type SettingsPageId, type SettingsGroupId } from '../../lib/settingsPages';
 
@@ -63,35 +64,37 @@ export function SettingsNav({ active }: { active: SettingsPageId }) {
   const t = useT();
 
   return (
-    <nav aria-label={t('settingsSectionsLabel')} className="flex shrink-0 flex-col md:sticky md:top-6 md:w-56">
-      {SETTINGS_GROUPS.map((group, index) => (
-        <div key={group.id}>
-          <SectionLabel className={`px-2.5 pb-1 ${index === 0 ? 'pt-0.5' : 'pt-4'}`}>
-            {t(GROUP_HEADINGS[group.id])}
-          </SectionLabel>
-          {group.pages.map((id) => {
-            const meta = SETTINGS_PAGE_META[id];
-            const Icon = meta.Icon;
-            const isActive = id === active;
-            return (
-              <a
-                key={id}
-                href={`#/settings/${id}`}
-                aria-current={isActive ? 'page' : undefined}
-                className={
-                  'relative mb-px flex h-[34px] items-center gap-2.5 rounded-md pl-2 pr-2.5 text-sm transition-colors ' +
-                  (isActive
-                    ? 'bg-accent-soft font-semibold text-accent before:absolute before:-left-0.5 before:top-[7px] before:bottom-[7px] before:w-[2.5px] before:rounded-sm before:bg-accent'
-                    : 'text-muted hover:bg-raised hover:text-text')
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {t(meta.labelKey)}
-              </a>
-            );
-          })}
-        </div>
-      ))}
-    </nav>
+    <Card className="shrink-0 p-2 md:sticky md:top-6 md:w-56">
+      <nav aria-label={t('settingsSectionsLabel')} className="flex flex-col">
+        {SETTINGS_GROUPS.map((group, index) => (
+          <div key={group.id} className={index === 0 ? '' : 'mt-2 border-t border-border pt-2'}>
+            <SectionLabel className="px-2.5 pt-1 pb-1 text-accent/70!">
+              {t(GROUP_HEADINGS[group.id])}
+            </SectionLabel>
+            {group.pages.map((id) => {
+              const meta = SETTINGS_PAGE_META[id];
+              const Icon = meta.Icon;
+              const isActive = id === active;
+              return (
+                <a
+                  key={id}
+                  href={`#/settings/${id}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={
+                    'relative mb-px flex h-[34px] items-center gap-2.5 rounded-md pl-2 pr-2.5 text-sm transition-colors ' +
+                    (isActive
+                      ? 'bg-accent-soft font-semibold text-accent before:absolute before:-left-0.5 before:top-[7px] before:bottom-[7px] before:w-[2.5px] before:rounded-sm before:bg-accent'
+                      : 'text-muted hover:bg-raised hover:text-text')
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {t(meta.labelKey)}
+                </a>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+    </Card>
   );
 }
