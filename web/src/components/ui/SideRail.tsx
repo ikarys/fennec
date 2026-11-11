@@ -103,7 +103,7 @@ export function SideRail({
   const DrawerIcon = drawerPanel.Icon;
 
   const header = (
-    <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border pl-3 pr-2">
+    <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-gradient-to-r from-accent-soft to-transparent pl-3 pr-2">
       <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
         <DrawerIcon className="h-3.5 w-3.5" />
       </span>
@@ -115,6 +115,7 @@ export function SideRail({
             variant="ghost"
             size="sm"
             iconOnly
+            className="text-accent"
             aria-pressed={pinned}
             title={pinned ? t('contextUnpin') : t('contextPin')}
             aria-label={pinned ? t('contextUnpin') : t('contextPin')}
@@ -128,6 +129,7 @@ export function SideRail({
           variant="ghost"
           size="sm"
           iconOnly
+          className="text-accent"
           title={t('contextClose')}
           aria-label={t('contextClose')}
           onClick={() => setOpen(null)}
