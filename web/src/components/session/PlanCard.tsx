@@ -197,16 +197,30 @@ function Tally({ done, total, label }: { done: number; total: number; label: 'st
   return <Badge tone={all ? 'ok' : 'err'}>{t(label, { done, total })}</Badge>;
 }
 
+// The agent's explanation is folded: closed, the report reads as a checklist.
 function CheckRow({ checked, label, text, detail }: { checked: boolean; label: string; text: string; detail: string }) {
-  return (
-    <li className={`grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1 px-3 py-2.5 ${checked ? 'shadow-[inset_2px_0_0_var(--color-ok)]' : 'bg-err/5 shadow-[inset_2px_0_0_var(--color-err)]'}`}>
+  const head = (
+    <>
       <Badge tone={checked ? 'ok' : 'err'}>
         {checked ? <CheckIcon className="h-3 w-3" /> : <CloseIcon className="h-3 w-3" />}
         {label}
       </Badge>
       <span className="min-w-0 text-sm text-text"><Inline>{text}</Inline></span>
-      {detail && (
-        <span className="col-start-2 text-xs text-muted"><Inline>{detail}</Inline></span>
+    </>
+  );
+  const grid = 'grid grid-cols-[auto_1fr_auto] items-start gap-x-2.5';
+  return (
+    <li className={`px-3 py-2.5 ${checked ? 'shadow-[inset_2px_0_0_var(--color-ok)]' : 'bg-err/5 shadow-[inset_2px_0_0_var(--color-err)]'}`}>
+      {detail ? (
+        <details className="group">
+          <summary className={`${grid} cursor-pointer list-none select-none`}>
+            {head}
+            <ChevronRightIcon className="mt-1 h-3 w-3 shrink-0 text-muted transition-transform group-hover:text-text group-open:rotate-90" />
+          </summary>
+          <div className="pt-1.5 text-xs text-muted"><Inline>{detail}</Inline></div>
+        </details>
+      ) : (
+        <div className={grid}>{head}</div>
       )}
     </li>
   );
