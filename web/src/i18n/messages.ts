@@ -1552,6 +1552,7 @@ export const en = {
   serverEditorCommandLabel: 'Server command',
   serverEditorCommandPlaceholder: 'npm run dev',
   serverEditorRemoveServer: 'Remove this server',
+  serverEditorFileHint: "Saved in the project's .agents/servers.json",
   // components/workflow/PortListEditor.tsx
   portListAddPlaceholder: 'Add…',
   // components/session/CopyButton.tsx
@@ -3172,6 +3173,7 @@ export const fr: Record<MsgKey, string> = {
   serverEditorCommandLabel: 'Commande du serveur',
   serverEditorCommandPlaceholder: 'npm run dev',
   serverEditorRemoveServer: 'Supprimer ce serveur',
+  serverEditorFileHint: 'Enregistré dans .agents/servers.json du projet',
   // components/workflow/PortListEditor.tsx
   portListAddPlaceholder: 'Ajouter…',
   // components/session/CopyButton.tsx
