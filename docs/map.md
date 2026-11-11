@@ -376,7 +376,7 @@ graph LR
 | `crates/fennec/src/agent/turn` | 2 | 2 |  | The multi-turn loop. Each round streams the model (`round`), then runs its tool calls, until it answers without one. |
 | `crates/fennec/src/domain/workflow` | 6 | 5 |  | The workflow domain: definitions, templates, validation, and the run state folded from events. |
 | `crates/canvas/src` | 6 | 5 | yes | Storage and model for canvas artifacts. |
-| `crates/fennec/src/domain` | 78 | 76 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/fennec/src/domain` | 79 | 77 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
 | `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
 | `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
