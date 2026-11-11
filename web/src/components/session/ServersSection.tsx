@@ -17,7 +17,7 @@ interface ServersSectionProps {
 export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
   const t = useT();
   const [servers, setServers] = useState<ServerView[] | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<{ name: string | null } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (sessionId === null) {
@@ -41,7 +41,8 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
         <ServerList
           key={refreshKey}
           sessionId={sessionId}
-          onConfigure={() => setEditorOpen(true)}
+          onEdit={(name) => setEditing({ name })}
+          onAdd={() => setEditing({ name: null })}
           onServers={(nextServers) => {
             setServers(nextServers);
             onServers?.(nextServers);
@@ -49,14 +50,15 @@ export function ServersSection({ sessionId, onServers }: ServersSectionProps) {
         />
 
         <ServerEditor
-          open={editorOpen}
+          open={editing !== null}
           sessionId={sessionId}
-          initial={servers ?? []}
+          servers={servers ?? []}
+          editing={editing?.name ?? null}
           onSaved={() => {
-            setEditorOpen(false);
+            setEditing(null);
             setRefreshKey((key) => key + 1);
           }}
-          onClose={() => setEditorOpen(false)}
+          onClose={() => setEditing(null)}
         />
       </div>
     </Panel>
