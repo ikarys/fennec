@@ -47,7 +47,9 @@ use store::SqliteStore;
 const USAGE: &str = "usage:
   fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777 (or the port of
                                            ~/.config/fennec/settings.yaml, `port: <n>`)
-  fennec password                          set the remote-access password in settings.yaml
+  fennec remote <enable|disable|status>    open the server to the network (asks for a password
+                                           first) or keep it on 127.0.0.1
+  fennec password                          set or change the remote-access password
   fennec run [--session <id>] [--agent <id>] [--image <path>]... <prompt>
                                            run the agent loop in the current directory;
                                            agent: plan (default, read-only) or builder
@@ -98,6 +100,7 @@ fn run(args: &[String]) -> Result<(), String> {
             web::serve(port, listen, password, Settings::from_env()?)
         }
         Some("password") => cli::password::run(),
+        Some("remote") => cli::remote::run(&args[1..]),
         Some("run") => {
             let mut session = None;
             let mut agent = None;

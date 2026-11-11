@@ -18,12 +18,11 @@ From the UI:
 From a shell:
 
 ```bash
-fennec password
-echo "listen: 0.0.0.0" >> ~/.config/fennec/settings.yaml
-fennec
+fennec remote enable      # asks for a password if none is set, then listens on 0.0.0.0
+fennec service restart    # or start fennec again
 ```
 
-`fennec password` stores a PBKDF2 hash in `~/.config/fennec/settings.yaml`. With `listen: 0.0.0.0`, fennec refuses a non-local address without a password.
+`fennec remote enable` stores a PBKDF2 hash and `listen: 0.0.0.0` in `~/.config/fennec/settings.yaml`. `fennec remote disable` goes back to `127.0.0.1`, `fennec remote status` shows the state, and `fennec password` changes the password. fennec refuses a non-local address without a password.
 
 ## Login and cookies
 

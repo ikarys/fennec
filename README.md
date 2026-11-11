@@ -189,9 +189,8 @@ fennec listens on 127.0.0.1 only, and needs no password there. To use it from an
 then restart from there. Or, from a shell:
 
 ```bash
-fennec password                                       # stores a PBKDF2 hash in ~/.config/fennec/settings.yaml
-echo "listen: 0.0.0.0" >> ~/.config/fennec/settings.yaml
-fennec                                                # refuses a non-local address without a password
+fennec remote enable      # asks for a password if none is set, then listens on 0.0.0.0
+fennec service restart    # or start fennec again; `fennec remote disable` goes back to 127.0.0.1
 ```
 
 A remote browser gets a login page, then a session cookie (30 days, lost when fennec restarts).
@@ -226,7 +225,7 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 - The human owns the CLI/UI and configuration; fennec never blocks them.
 - The code that decides, such as integration, never runs what a model wrote.
-- The server answers local pages only (`Host`/`Origin` checked, JSON bodies); a remote caller needs the password set with `fennec password` (see "Remote access").
+- The server answers local pages only (`Host`/`Origin` checked, JSON bodies); a remote caller needs the password set with `fennec remote enable` (see "Remote access").
 - **Git hooks do not run on fennec's own git commands.** Every git command fennec runs itself (the commit that saves each turn's work in its worktree, the integration's cherry-pick and commit, status and diffs) passes `-c core.hooksPath=/dev/null -c core.fsmonitor=false`: a hook or fsmonitor in a repository may have been written by a model, and fennec's kernel never executes one. Your hooks still run on your own `git commit`; if a check matters (a commit-message format, a linter), run it in your own workflow after integrating, or make it a criterion's `check:` command.
 - Git's metadata (`.git`) is read-only inside the command sandbox and refused to the file tools, with no waiver: an agent cannot change the repository's config, hooks or refs through them.
 - Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox. **What the sandbox blocks, and how to run the app, add a dependency or see the agent's work anyway: [docs/sandbox.md](docs/sandbox.md).**
