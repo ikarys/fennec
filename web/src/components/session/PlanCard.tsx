@@ -112,13 +112,17 @@ export function PlanBody({ plan, preflight }: { plan: Plan; preflight?: Prefligh
       )}
       {preflight && preflight.length > 0 && <PreflightSection results={preflight} />}
       {plan.risks.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>{t('risksLabel')}</SectionLabel>
-          <ul className="m-0 flex flex-col gap-1">
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <AlertIcon className="h-3.5 w-3.5 text-attention" />
+            <SectionLabel>{t('risksLabel')}</SectionLabel>
+            <Badge tone="attention">{plan.risks.length}</Badge>
+          </div>
+          <ul className="m-0 flex flex-col divide-y divide-border">
             {plan.risks.map((risk, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-err">
-                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
-                <span>
+              <li key={i} className="flex items-start gap-2.5 px-3 py-2 text-sm text-text">
+                <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-attention" />
+                <span className="min-w-0">
                   <Inline>{risk}</Inline>
                 </span>
               </li>

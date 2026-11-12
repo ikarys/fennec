@@ -104,7 +104,8 @@ export function DecisionRow({
         />
         <span className="size-6 grid place-items-center rounded-md bg-accent-soft text-accent">{icon}</span>
         <span className="min-w-0 flex-1 flex items-baseline gap-2">
-          <span className="truncate font-semibold text-sm text-text">{title}</span>
+          {/* Open, the title wraps: for a question it is the sentence the human answers. */}
+          <span className={`${open ? 'break-words' : 'truncate'} min-w-0 font-semibold text-sm text-text`}>{title}</span>
           <span className="text-xs text-faint whitespace-nowrap">{meta}</span>
         </span>
         {!open && primary}
