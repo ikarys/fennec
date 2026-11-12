@@ -70,7 +70,7 @@ graph LR
   m14 -->|3| m22
   m14 -->|1| m24
   m14 -->|1| m19
-  m14 -->|19| m27
+  m14 -->|20| m27
   m14 -->|3| m31
   m14 -->|2| m30
   m14 -->|2| m29
@@ -81,7 +81,7 @@ graph LR
   m14 -->|3| m21
   m14 -->|4| m20
   m14 -->|1| m23
-  m14 -->|3| m18
+  m14 -->|4| m18
   m14 -->|1| m28
   m14 -->|3| m32
   m22 -->|1| m24
@@ -366,7 +366,7 @@ graph LR
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
 | `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
 | `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
-| `crates/fennec/src` | 28 | 20 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
+| `crates/fennec/src` | 29 | 21 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
 | `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |
 | `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
@@ -404,7 +404,7 @@ graph LR
 | `web/src/components/workflow/session` | 9 | 1 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
-| `web/src/lib` | 49 | 18 |  |  |
+| `web/src/lib` | 50 | 19 |  |  |
 | `web/src/components/settings` | 26 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
 | `web/src/i18n` | 5 | 1 |  |  |
