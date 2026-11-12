@@ -87,8 +87,8 @@ pub fn remove(top: &Path, wt: &Worktree) -> Result<(), String> {
     {
         return Err(e.clone());
     }
-    // A directory git could not empty (files a container wrote as root through a bind mount)
-    // is no longer a worktree: drop its registration, branch and refs all the same.
+    // A directory git could not empty, holding files a container wrote as root through a
+    // bind mount, is no longer a worktree: drop its registration, branch and refs all the same.
     let _ = git::run(top, &["worktree", "prune"], None);
     git::run(top, &["branch", "-D", &wt.branch], None)?;
     git::run(top, &["update-ref", "-d", &wt.base], None)?;

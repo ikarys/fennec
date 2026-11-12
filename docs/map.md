@@ -407,7 +407,7 @@ graph LR
 | `web/src/lib` | 49 | 18 |  |  |
 | `web/src/components/settings` | 26 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
-| `web/src/i18n` | 3 | 1 |  |  |
+| `web/src/i18n` | 5 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
 | `crates/token-usage/tests` | 1 | 1 |  |  |
 | `docs/users/theme` | 2 | 0 |  |  |

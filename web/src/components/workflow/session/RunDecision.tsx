@@ -184,8 +184,8 @@ export function RunDecision({
   const footer: ReactNode =
     waiting.kind === 'human' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {humanChoices
           .slice()
           .reverse()
@@ -207,20 +207,20 @@ export function RunDecision({
       </>
     ) : waiting.kind === 'pause' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {continueButton}
       </>
     ) : waiting.kind === 'child' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {childButton}
       </>
     ) : waiting.kind === 'interrupted' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {resumeButton}
       </>
     ) : (

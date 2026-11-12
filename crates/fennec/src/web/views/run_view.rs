@@ -238,44 +238,13 @@ fn apply(view: &mut RunView, event: &Event) {
             started_at,
             ..
         } if run_id == &view.run_id => {
-            // A resume restarts an interrupted node on its own pass: same row.
-            if let Some(existing) = view.runs.iter_mut().find(|candidate| {
-                candidate.node_id == *node_id
-                    && candidate.pass == *pass
-                    && matches!(
-                        candidate.state,
-                        RunStepState::Running | RunStepState::Interrupted
-                    )
-            }) {
-                existing.state = RunStepState::Running;
-                if let Some(child) = child_session_id {
-                    existing.child_session_id = Some(child.clone());
-                }
-                if let Some(at) = started_at {
-                    existing.started_at = Some(*at);
-                }
-                // workflow.resumed emptied open; the restarted node is open again.
-                if !view.open.contains(node_id) {
-                    view.open.push(node_id.clone());
-                }
-                return;
-            }
-            let node = view.workflow.node(node_id);
-            view.runs.push(NodeRun {
-                node_id: node_id.clone(),
-                label: node
-                    .map(|node| node.label().to_string())
-                    .unwrap_or_else(|| node_id.clone()),
-                kind: default_agent_kind(),
-                pass: *pass,
-                state: RunStepState::Running,
-                port: None,
-                child_session_id: child_session_id.clone(),
-                started_at: *started_at,
-                duration_ms: None,
-                output: None,
-            });
-            view.open.push(node_id.clone());
+            node_started(
+                view,
+                node_id.as_str(),
+                *pass,
+                child_session_id.as_ref(),
+                started_at.as_ref(),
+            );
         }
         Event::WorkflowNodeFinished {
             run_id,
@@ -285,21 +254,13 @@ fn apply(view: &mut RunView, event: &Event) {
             duration_ms,
             ..
         } if run_id == &view.run_id => {
-            // The last running row of the node is the one that finished.
-            if let Some(at) = view.runs.iter().rposition(|candidate| {
-                candidate.node_id == *node_id && candidate.state == RunStepState::Running
-            }) {
-                let candidate = &mut view.runs[at];
-                candidate.state = RunStepState::Done;
-                candidate.port = Some(port.clone());
-                if let Some(ms) = duration_ms {
-                    candidate.duration_ms = Some(*ms);
-                }
-                if !output.is_empty() {
-                    candidate.output = Some(output.clone());
-                }
-            }
-            view.open.remove_last(node_id);
+            node_finished(
+                view,
+                node_id.as_str(),
+                port.as_str(),
+                output.as_str(),
+                duration_ms.as_ref(),
+            );
         }
         Event::WorkflowHumanAsked {
             run_id,
@@ -325,21 +286,7 @@ fn apply(view: &mut RunView, event: &Event) {
             });
         }
         Event::WorkflowResumed { run_id, comment } if run_id == &view.run_id => {
-            for node_run in &mut view.runs {
-                if node_run.state == RunStepState::Running {
-                    node_run.state = RunStepState::Interrupted;
-                }
-            }
-            view.paused = None;
-            view.open.clear();
-            // A resume after a finish (a run relaunched on its error) is active
-            // again: the next workflow.finished ends it.
-            view.finished = None;
-            view.last_comment = if comment.is_empty() {
-                None
-            } else {
-                Some(comment.clone())
-            };
+            resumed(view, comment.as_str());
         }
         Event::WorkflowFinished {
             run_id,
@@ -347,25 +294,122 @@ fn apply(view: &mut RunView, event: &Event) {
             reason,
             ..
         } if run_id == &view.run_id => {
-            // A node still running when the run finishes is the one that ended it
-            // (a criteria node blocking, a stop): its port is the run's outcome.
-            let port = outcome_port(outcome);
-            for node_run in &mut view.runs {
-                if node_run.state == RunStepState::Running {
-                    node_run.state = RunStepState::Ended;
-                    node_run.port = Some(port.clone());
-                }
-            }
-            view.open.clear();
-            view.paused = None;
-            view.pause_requested = false;
-            view.finished = Some(Finished {
-                outcome: *outcome,
-                reason: reason.clone(),
-            });
+            finished(view, outcome, reason.as_ref());
         }
         _ => {}
     }
+}
+
+/// Fold a `workflow.node_started` event.
+fn node_started(
+    view: &mut RunView,
+    node_id: &str,
+    pass: u32,
+    child_session_id: Option<&String>,
+    started_at: Option<&u64>,
+) {
+    // A resume restarts an interrupted node on its own pass: same row.
+    if let Some(existing) = view.runs.iter_mut().find(|candidate| {
+        candidate.node_id == node_id
+            && candidate.pass == pass
+            && matches!(
+                candidate.state,
+                RunStepState::Running | RunStepState::Interrupted
+            )
+    }) {
+        existing.state = RunStepState::Running;
+        if let Some(child) = child_session_id {
+            existing.child_session_id = Some(child.clone());
+        }
+        if let Some(at) = started_at {
+            existing.started_at = Some(*at);
+        }
+        // workflow.resumed emptied open; the restarted node is open again.
+        if !view.open.contains(node_id) {
+            view.open.push(node_id.to_string());
+        }
+        return;
+    }
+    let node = view.workflow.node(node_id);
+    view.runs.push(NodeRun {
+        node_id: node_id.to_string(),
+        label: node
+            .map(|node| node.label().to_string())
+            .unwrap_or_else(|| node_id.to_string()),
+        kind: default_agent_kind(),
+        pass,
+        state: RunStepState::Running,
+        port: None,
+        child_session_id: child_session_id.cloned(),
+        started_at: started_at.copied(),
+        duration_ms: None,
+        output: None,
+    });
+    view.open.push(node_id.to_string());
+}
+
+/// Fold a `workflow.node_finished` event.
+fn node_finished(
+    view: &mut RunView,
+    node_id: &str,
+    port: &str,
+    output: &str,
+    duration_ms: Option<&u64>,
+) {
+    // The last running row of the node is the one that finished.
+    if let Some(at) = view.runs.iter().rposition(|candidate| {
+        candidate.node_id == node_id && candidate.state == RunStepState::Running
+    }) {
+        let candidate = &mut view.runs[at];
+        candidate.state = RunStepState::Done;
+        candidate.port = Some(port.to_string());
+        if let Some(ms) = duration_ms {
+            candidate.duration_ms = Some(*ms);
+        }
+        if !output.is_empty() {
+            candidate.output = Some(output.to_string());
+        }
+    }
+    view.open.remove_last(node_id);
+}
+
+/// Fold a `workflow.resumed` event.
+fn resumed(view: &mut RunView, comment: &str) {
+    for node_run in &mut view.runs {
+        if node_run.state == RunStepState::Running {
+            node_run.state = RunStepState::Interrupted;
+        }
+    }
+    view.paused = None;
+    view.open.clear();
+    // A resume after a finish (a run relaunched on its error) is active
+    // again: the next workflow.finished ends it.
+    view.finished = None;
+    view.last_comment = if comment.is_empty() {
+        None
+    } else {
+        Some(comment.to_string())
+    };
+}
+
+/// Fold a `workflow.finished` event.
+fn finished(view: &mut RunView, outcome: &RunOutcome, reason: Option<&String>) {
+    // A node still running when the run finishes is the one that ended it
+    // (a criteria node blocking, a stop): its port is the run's outcome.
+    let port = outcome_port(outcome);
+    for node_run in &mut view.runs {
+        if node_run.state == RunStepState::Running {
+            node_run.state = RunStepState::Ended;
+            node_run.port = Some(port.clone());
+        }
+    }
+    view.open.clear();
+    view.paused = None;
+    view.pause_requested = false;
+    view.finished = Some(Finished {
+        outcome: *outcome,
+        reason: reason.cloned(),
+    });
 }
 
 /// The kind a node run is served with: the definition's kind is looked up by
