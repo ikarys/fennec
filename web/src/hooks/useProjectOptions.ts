@@ -16,6 +16,11 @@ interface UseProjectOptionsArgs {
   frameIdeaId: string | null;
   /** The session is framing a backlog idea: its messages must not start a workflow. */
   framingIdea: boolean;
+  /**
+   * The session's agent; null for a new session (the server lists its default
+   * first), undefined while the session's detail is loading.
+   */
+  mode: string | null | undefined;
 }
 
 /**
@@ -27,6 +32,7 @@ export function useProjectOptions({
   testWorkflowId,
   frameIdeaId,
   framingIdea,
+  mode,
 }: UseProjectOptionsArgs): {
   commands: SlashCommand[];
   agents: Agent[];
@@ -87,23 +93,6 @@ export function useProjectOptions({
       .then((data) => {
         if (!ignore) {
           setWorkflows(data);
-          if (
-            testWorkflowId &&
-            data.some((workflow) => workflow.id === testWorkflowId)
-          ) {
-            setWorkflowSelection({
-              workflowId: testWorkflowId,
-              stepByStep: true,
-              worktree: true,
-            });
-          } else if (frameIdeaId) {
-            setWorkflowSelection({
-              ...defaultWorkflowSelection(data),
-              workflowId: null,
-            });
-          } else {
-            setWorkflowSelection(defaultWorkflowSelection(data));
-          }
         }
       })
       .catch(() => {
@@ -112,7 +101,20 @@ export function useProjectOptions({
     return () => {
       ignore = true;
     };
-  }, [projectId, testWorkflowId, frameIdeaId]);
+  }, [projectId]);
+
+  // The selection follows the session's agent: a session in an agent that
+  // only talks (ask) must not start a workflow because the page reloaded.
+  useEffect(() => {
+    if (mode === undefined || workflows.length === 0 || agents.length === 0) return;
+    if (testWorkflowId && workflows.some((workflow) => workflow.id === testWorkflowId)) {
+      setWorkflowSelection({ workflowId: testWorkflowId, stepByStep: true, worktree: true });
+      return;
+    }
+    const agent = agents.find((candidate) => candidate.id === mode) ?? agents[0];
+    const selection = defaultWorkflowSelection(workflows, agent);
+    setWorkflowSelection(frameIdeaId ? { ...selection, workflowId: null } : selection);
+  }, [workflows, agents, mode, testWorkflowId, frameIdeaId]);
 
   // A session framing a backlog idea only talks: its messages must not start
   // the default build workflow (a 'go on' there once ran a whole build).
