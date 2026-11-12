@@ -113,6 +113,7 @@ export function SessionPage({
     useProjectOptions({
       projectId: detail?.project.id ?? projectId,
       testWorkflowId,
+      runWorkflowId: run?.workflow.id,
       frameIdeaId,
       framingIdea,
       mode: sessionId ? detail?.mode : null,
@@ -267,7 +268,7 @@ export function SessionPage({
       workflowUsage={workflowUsage}
     >
       <div className="flex min-h-0 min-w-0 grow">
-        {run && <RunRail run={run} onJump={jumpToNode} />}
+        {run && <RunRail run={run} status={status} onJump={jumpToNode} />}
         <main className="flex min-h-0 min-w-0 flex-[999_1_560px] flex-col">
           <SessionHeader
             title={title}
@@ -297,6 +298,8 @@ export function SessionPage({
             pendingCallId={pendingCallId}
             model={currentModel ? modelShortName(currentModel.model) : t('sessionPageModelFallback')}
             running={running}
+            runId={run && !run.finished ? run.runId : undefined}
+            status={status}
             replayable={served.replayable}
             onReplay={actions.handleReplay}
           />

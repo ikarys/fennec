@@ -115,6 +115,7 @@ export const fr: Record<MsgKey, string> = {
   acceptedDespite: 'Accepté malgré : {kinds}',
   integratedNote: 'Intégré par toi · {commits} dans HEAD {head}',
   discardedNote: "Travail de l'agent abandonné · {commits}",
+  worktreeCleanedNote: "Espace de travail de l'agent nettoyé",
   commit: 'commit',
   commits: 'commits',
   // Context panel blocks and pages (lib/panelBlocks.ts)
@@ -131,7 +132,7 @@ export const fr: Record<MsgKey, string> = {
   diffEmpty: 'Aucune ligne modifiée (mode ou fichier vide).',
   diffTruncated: "Diff coupé à 5 000 lignes : ouvre le fichier dans l'éditeur pour la suite.",
   panelWorkplace: 'Où atterrit le travail',
-  worktreeCommits: '{count} commits',
+  worktreeCommits: '{count} commit{s}',
   landsOn: 'Atterrit sur {branch} dans {dir} après ta revue.',
   serverLogs: 'Voir la sortie',
   contextTabWork: 'Travail',
@@ -178,6 +179,7 @@ export const fr: Record<MsgKey, string> = {
   existenceOnly: 'existence seulement',
   existenceOnlyTitle: "Cette vérification ne fait que chercher dans le code : elle prouve que le code existe, pas qu'il marche. Préférez un test qui l'exerce.",
   verified: 'vérifié',
+  nothingVerified: 'rien de vérifié',
   verifiedTitle: 'La vérification a tourné elle-même : le résultat est déterministe.',
   indicative: 'indicatif',
   indicativeTitle: "Un agent l'a jugé : le résultat est le dire du modèle, à vérifier.",
@@ -945,7 +947,7 @@ export const fr: Record<MsgKey, string> = {
     "Un agent en lecture seule lit les modules les plus risqués et propose quelques tâches (5 au plus), les plus risqués d'abord ; les fichiers sans logique sont écartés. Tu choisis celles qui entrent au backlog. Relire reste ton travail : il te dit quels fichiers lire d'abord.",
   signalNeverReviewed: 'jamais relu',
   signalNoTest: 'sans test propre',
-  signalChurn: '{count} commits',
+  signalChurn: '{count} commit{s}',
   // Project: disk
   deleteFolderQuestion: 'Supprimer ce dossier ?',
   deleteWorktreeQuestion: 'Supprimer le worktree ?',
@@ -1364,7 +1366,6 @@ export const fr: Record<MsgKey, string> = {
   runRailStateDone: 'Terminé',
   runRailStateFailed: 'Échoué',
   runRailStateStopped: 'Arrêté',
-  runRailStateRunning: 'En cours',
   // components/workflow/session/WorkflowPicker.tsx
   workflowPickerLabel: 'Workflow',
   workflowPickerNone: 'Aucun workflow',
@@ -1415,6 +1416,8 @@ export const fr: Record<MsgKey, string> = {
   nodeDividerInterrupted: 'interrompu',
   nodeDividerDetails: 'détails',
   nodeDividerExitCode: 'code de sortie : {code}',
+  nodeDividerCommand: 'Commande',
+  nodeDividerNoOutput: 'Aucune sortie.',
   // components/workflow/fields/ShellFields.tsx
   shellCommand: 'Commande',
   shellTimeoutSecs: 'Délai (s)',

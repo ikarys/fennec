@@ -1,10 +1,10 @@
-//! The files a session's file tools changed, counted from its `tool.call` events: the
-//! context panel's badge and its section read the same totals and listed files.
+//! The files a session's file tools changed, counted from its successful `tool.call` events:
+//! the context panel's badge and its section read the same totals and listed files.
 
 use super::event::Event;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 /// One file a session's tools changed, with its line counts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -29,38 +29,59 @@ pub struct ModifiedFiles {
 /// The maximum number of files `ModifiedFiles::files` lists.
 pub const LISTED_FILES: usize = 5;
 
-/// Folds the `tool.call` events of `events`; `workdir` is the session's working directory.
-pub fn tally(events: &[Event], workdir: &str) -> ModifiedFiles {
+/// Folds the `tool.call` events of `events`, skipping the calls `results` reports as failed;
+/// `workdirs` are the directories a path may be relative to, tried in order.
+pub fn tally(events: &[Event], results: &[Event], workdirs: &[&str]) -> ModifiedFiles {
+    let failed: HashSet<&str> = results
+        .iter()
+        .filter_map(|event| match event {
+            Event::ToolResult {
+                tool_call_id,
+                result,
+                ..
+            } if !result.success => Some(tool_call_id.as_str()),
+            _ => None,
+        })
+        .collect();
     let mut files: BTreeMap<String, (usize, usize)> = BTreeMap::new();
-    let (mut added, mut removed) = (0, 0);
     for event in events {
         if let Event::ToolCall { tool_call, .. } = event {
+            if failed.contains(tool_call.id.as_str()) {
+                continue;
+            }
             let args = &tool_call.arguments;
             match tool_call.name.as_str() {
                 "write_file" => {
                     if let Some(path) = arg_str(args, "path").filter(|p| !p.is_empty()) {
                         let added_lines = line_count(arg_str(args, "content").unwrap_or(""));
-                        let entry = files.entry(file_key(path, workdir)).or_default();
+                        let entry = files.entry(file_key(path, workdirs)).or_default();
                         entry.0 += added_lines;
-                        added += added_lines;
                     }
                 }
                 "edit_file" => {
                     if let Some(path) = arg_str(args, "path").filter(|p| !p.is_empty()) {
                         let added_lines = line_count(arg_str(args, "new_string").unwrap_or(""));
                         let removed_lines = line_count(arg_str(args, "old_string").unwrap_or(""));
-                        let entry = files.entry(file_key(path, workdir)).or_default();
+                        let entry = files.entry(file_key(path, workdirs)).or_default();
                         entry.0 += added_lines;
                         entry.1 += removed_lines;
-                        added += added_lines;
-                        removed += removed_lines;
                     }
                 }
                 _ => {}
             }
         }
     }
+    summarize(files)
+}
+
+/// The listed files and the totals over them, most lines first, at most `LISTED_FILES`.
+pub fn summarize(files: BTreeMap<String, (usize, usize)>) -> ModifiedFiles {
     let count = files.len();
+    let (added, removed) = files
+        .values()
+        .fold((0, 0), |(added, removed), (file_added, file_removed)| {
+            (added + file_added, removed + file_removed)
+        });
     let mut listed: Vec<ModifiedFile> = files
         .into_iter()
         .map(|(path, (file_added, file_removed))| ModifiedFile {
@@ -92,8 +113,11 @@ fn line_count(value: &str) -> usize {
     value.split('\n').count()
 }
 
-fn file_key(path: &str, workdir: &str) -> String {
-    relative_to_workdir(path, workdir).unwrap_or_else(|| path.to_string())
+fn file_key(path: &str, workdirs: &[&str]) -> String {
+    workdirs
+        .iter()
+        .find_map(|workdir| relative_to_workdir(path, workdir))
+        .unwrap_or_else(|| path.to_string())
 }
 
 fn relative_to_workdir(path: &str, workdir: &str) -> Option<String> {
@@ -141,7 +165,7 @@ fn clean_relative(path: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::event::ToolCall;
+    use crate::domain::event::{ToolCall, ToolResult};
     use serde_json::json;
 
     fn call(name: &str, arguments: Value) -> Event {
@@ -157,8 +181,29 @@ mod tests {
         }
     }
 
-    fn assert_totals(events: &[Event], workdir: &str, count: usize, added: usize, removed: usize) {
-        let result = tally(events, workdir);
+    fn failed_result() -> Event {
+        Event::ToolResult {
+            message_id: "m".into(),
+            tool_call_id: "t".into(),
+            result: ToolResult {
+                success: false,
+                output: None,
+                error: None,
+                duration_ms: 0,
+                truncated: false,
+                metadata: None,
+            },
+        }
+    }
+
+    fn assert_totals(
+        events: &[Event],
+        workdirs: &[&str],
+        count: usize,
+        added: usize,
+        removed: usize,
+    ) {
+        let result = tally(events, events, workdirs);
         assert_eq!(
             (result.count, result.added, result.removed),
             (count, added, removed)
@@ -171,7 +216,7 @@ mod tests {
             "write_file",
             json!({"path": "a.ts", "content": "line1\nline2"}),
         );
-        assert_totals(&[event], "/w", 1, 2, 0);
+        assert_totals(&[event], &["/w"], 1, 2, 0);
     }
 
     #[test]
@@ -180,20 +225,20 @@ mod tests {
             call("write_file", json!({"path": "a.ts", "content": "one\ntwo"})),
             call("write_file", json!({"path": "a.ts", "content": "three"})),
         ];
-        assert_totals(&events, "/w", 1, 3, 0);
+        assert_totals(&events, &["/w"], 1, 3, 0);
     }
 
     #[test]
     fn edit_counts_new_and_old_lines() {
         let args = json!({"path": "a.ts", "old_string": "old1\nold2", "new_string": "new1"});
         let event = call("edit_file", args);
-        assert_totals(&[event], "/w", 1, 1, 2);
+        assert_totals(&[event], &["/w"], 1, 1, 2);
     }
 
     #[test]
     fn read_changes_nothing() {
         let event = call("read_file", json!({"path": "a.ts"}));
-        assert_totals(&[event], "/w", 0, 0, 0);
+        assert_totals(&[event], &["/w"], 0, 0, 0);
     }
 
     #[test]
@@ -202,7 +247,7 @@ mod tests {
             call("write_file", json!({"path": "/w/src/a.rs", "content": "x"})),
             call("write_file", json!({"path": "./src/a.rs", "content": "x"})),
         ];
-        assert_totals(&events, "/w", 1, 2, 0);
+        assert_totals(&events, &["/w"], 1, 2, 0);
     }
 
     #[test]
@@ -211,7 +256,7 @@ mod tests {
             call("write_file", json!({"path": "/other/x", "content": "x"})),
             call("write_file", json!({"path": "x", "content": "x"})),
         ];
-        assert_totals(&events, "/w", 2, 2, 0);
+        assert_totals(&events, &["/w"], 2, 2, 0);
     }
 
     #[test]
@@ -223,7 +268,7 @@ mod tests {
                 json!({"path": "b.ts", "content": "one\ntwo\nthree\nfour"}),
             ),
         ];
-        let result = tally(&events, "/w");
+        let result = tally(&events, &events, &["/w"]);
         assert_eq!(
             result.files,
             vec![
@@ -251,8 +296,31 @@ mod tests {
                 )
             })
             .collect();
-        let result = tally(&events, "/w");
+        let result = tally(&events, &events, &["/w"]);
         assert_eq!(result.count, LISTED_FILES + 2);
         assert_eq!(result.files.len(), LISTED_FILES);
+    }
+
+    #[test]
+    fn a_failed_write_changes_nothing() {
+        let events = vec![
+            call(
+                "write_file",
+                json!({"path": "a.ts", "content": "line1\nline2"}),
+            ),
+            failed_result(),
+        ];
+        assert_totals(&events, &["/w"], 0, 0, 0);
+    }
+
+    #[test]
+    fn a_path_under_the_second_workdir_is_relative_to_it() {
+        let event = call(
+            "write_file",
+            json!({"path": "/w2/src/a.rs", "content": "x"}),
+        );
+        let result = tally(&[event], &[], &["/w", "/w2"]);
+        assert_eq!(result.count, 1);
+        assert_eq!(result.files[0].path, "src/a.rs");
     }
 }

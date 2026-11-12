@@ -12,6 +12,8 @@ interface UseProjectOptionsArgs {
   projectId: string | null;
   /** A workflow opened from the editor's test button: preselected, step by step. */
   testWorkflowId: string | null;
+  /** The workflow of the session's latest run: the chip shows what the session runs. */
+  runWorkflowId: string | null | undefined;
   /** A backlog idea framed from the project page: no workflow for a framing session. */
   frameIdeaId: string | null;
   /** The session is framing a backlog idea: its messages must not start a workflow. */
@@ -30,6 +32,7 @@ interface UseProjectOptionsArgs {
 export function useProjectOptions({
   projectId,
   testWorkflowId,
+  runWorkflowId,
   frameIdeaId,
   framingIdea,
   mode,
@@ -113,8 +116,11 @@ export function useProjectOptions({
     }
     const agent = agents.find((candidate) => candidate.id === mode) ?? agents[0];
     const selection = defaultWorkflowSelection(workflows, agent);
-    setWorkflowSelection(frameIdeaId ? { ...selection, workflowId: null } : selection);
-  }, [workflows, agents, mode, testWorkflowId, frameIdeaId]);
+    // The chip shows the workflow the session runs, not the agent's default;
+    // an agent that only talks still starts none.
+    const ran = selection.workflowId && runWorkflowId && workflows.some((workflow) => workflow.id === runWorkflowId) ? runWorkflowId : selection.workflowId;
+    setWorkflowSelection({ ...selection, workflowId: frameIdeaId ? null : ran });
+  }, [workflows, agents, mode, testWorkflowId, runWorkflowId, frameIdeaId]);
 
   // A session framing a backlog idea only talks: its messages must not start
   // the default build workflow (a 'go on' there once ran a whole build).

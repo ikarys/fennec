@@ -85,6 +85,7 @@ export const en = {
   acceptedDespite: 'Accepted despite: {kinds}',
   integratedNote: 'Integrated by you · {commits} into HEAD {head}',
   discardedNote: "Agent's work discarded · {commits}",
+  worktreeCleanedNote: "Agent's workspace cleaned up",
   commit: 'commit',
   commits: 'commits',
   // Context panel blocks and pages (lib/panelBlocks.ts)
@@ -101,7 +102,7 @@ export const en = {
   diffEmpty: 'No line changed (mode or empty file).',
   diffTruncated: 'Diff cut at 5,000 lines: open the file in the editor for the rest.',
   panelWorkplace: 'Where the work lands',
-  worktreeCommits: '{count} commits',
+  worktreeCommits: '{count} commit{s}',
   landsOn: 'Lands on {branch} in {dir} after your review.',
   serverLogs: 'Show the output',
   contextTabWork: 'Work',
@@ -147,6 +148,7 @@ export const en = {
   existenceOnly: 'existence only',
   existenceOnlyTitle: 'This check only searches the code: it proves the code exists, not that it works. Prefer a test that exercises it.',
   verified: 'verified',
+  nothingVerified: 'nothing verified',
   verifiedTitle: 'The check ran itself: the result is deterministic.',
   indicative: 'indicative',
   indicativeTitle: 'An agent judged it: the result is the model\'s word, to be checked.',
@@ -912,7 +914,7 @@ export const en = {
     'A read-only agent reads the riskiest modules and proposes a few tasks (5 at most), the riskiest first; files without logic are set aside. You choose the ones that enter the backlog. Rereading stays your work: it tells you which files to read first.',
   signalNeverReviewed: 'never reviewed',
   signalNoTest: 'no own test',
-  signalChurn: '{count} commits',
+  signalChurn: '{count} commit{s}',
   // Project: disk
   deleteFolderQuestion: 'Delete this folder?',
   deleteWorktreeQuestion: 'Delete the worktree?',
@@ -1329,7 +1331,6 @@ export const en = {
   runRailStateDone: 'Finished',
   runRailStateFailed: 'Failed',
   runRailStateStopped: 'Stopped',
-  runRailStateRunning: 'Running',
   // components/workflow/session/WorkflowPicker.tsx
   workflowPickerLabel: 'Workflow',
   workflowPickerNone: 'No workflow',
@@ -1380,6 +1381,8 @@ export const en = {
   nodeDividerInterrupted: 'Interrupted',
   nodeDividerDetails: 'Details',
   nodeDividerExitCode: 'Exit code: {code}',
+  nodeDividerCommand: 'Command',
+  nodeDividerNoOutput: 'No output.',
   // components/workflow/fields/ShellFields.tsx
   shellCommand: 'Command',
   shellTimeoutSecs: 'Timeout (s)',

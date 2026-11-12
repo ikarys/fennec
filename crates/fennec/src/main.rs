@@ -18,6 +18,7 @@ mod llm;
 mod locks;
 mod mcp;
 mod metering;
+mod modified_files;
 mod module_map;
 mod notifier;
 mod plugins;

@@ -171,6 +171,20 @@ pub fn pending(events: &[Event]) -> Option<Pending> {
     pending
 }
 
+/// True while the last `plan.proposed` carries criteria and no `criteria.set` or
+/// `workflow.finished` followed it: the plan's criteria wait for its build.
+pub fn awaiting_build(events: &[Event]) -> bool {
+    let mut awaiting = false;
+    for event in events {
+        match event {
+            Event::PlanProposed { plan, .. } => awaiting = !plan.criteria().is_empty(),
+            Event::CriteriaSet { .. } | Event::WorkflowFinished { .. } => awaiting = false,
+            _ => {}
+        }
+    }
+    awaiting
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,6 +289,41 @@ mod tests {
             .unwrap();
         assert!(!step.contains("Files:"));
         assert!(step.contains("- Change: The loop runs it and records the plan"));
+    }
+
+    #[test]
+    fn a_plan_with_criteria_waits_for_its_build() {
+        let event = Event::PlanProposed {
+            call_id: "p1".into(),
+            plan: plan(),
+            markdown: plan().to_markdown(),
+        };
+        assert!(awaiting_build(&[event]));
+    }
+
+    #[test]
+    fn a_criteria_set_after_the_plan_clears_the_wait() {
+        let event = Event::PlanProposed {
+            call_id: "p1".into(),
+            plan: plan(),
+            markdown: plan().to_markdown(),
+        };
+        let events = vec![event, Event::CriteriaSet { criteria: vec![] }];
+        assert!(!awaiting_build(&events));
+    }
+
+    #[test]
+    fn a_finished_run_after_the_plan_clears_the_wait() {
+        let events = vec![
+            started(),
+            Event::PlanProposed {
+                call_id: "p1".into(),
+                plan: plan(),
+                markdown: plan().to_markdown(),
+            },
+            finished(),
+        ];
+        assert!(!awaiting_build(&events));
     }
 
     #[test]

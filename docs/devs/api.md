@@ -687,7 +687,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `GET /api/sessions/{id}/vision` → `[{label, anchorId, src, inContext}]`: the images the model received over the
   whole log, in log order; `inContext` false once a compaction, a replay or the image window (4 to 6 latest images)
   took it out of the model's view; deterministic; 404 if no session.
-- `GET /api/sessions/{id}/thread` → `{pendingApproval, pendingWaiver, pendingPlan, handedPlan, queued, criteria, criteriaTally, decisions, replayable, modifiedFiles}`: the session's
+- `GET /api/sessions/{id}/thread` → `{pendingApproval, pendingWaiver, pendingPlan, handedPlan, planAwaitingBuild, queued, criteria, criteriaTally, decisions, replayable, modifiedFiles}`: the session's
   blocks, folded by the server (the UI computes none): `pendingApproval` `{callId, subject, kind, pattern, access,
   folders}` or null, the tool call waiting for the human's answer; `pendingWaiver` `{callId, path, reason}` or null;
   `pendingPlan` `{callId, plan, markdown, preflight}` the last `plan.proposed` still waiting for the human, served whole
@@ -695,14 +695,17 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   it, so does a human message once the session left the plan agent; a question in plan mode keeps it (the decision bar);
   `handedPlan` `{ideaId, undoable}` or null: the session's idea carries that plan to the backlog (`idea.ready` with the same
   markdown, trimmed), so `pendingPlan` is null instead; `undoable` while the idea only waits (a `framing` takes it back);
+  `planAwaitingBuild` true while the last `plan.proposed` carries criteria and no `criteria.set` or `workflow.finished` followed it;
   `queued` `[{queueId, content}]` the messages queued for the next rounds, in order; `criteria`
   `[{id, description, check?, status, passedBefore, existenceOnly}]` the criteria in force (the last `criteria.set` and the
   `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight, `existenceOnly` true when the check only searches the code: it proves the code exists, not that it works);
   `criteriaTally` `{total, passed, failed, indicative, percent}` those criteria counted (`indicative`: the passes an agent judged; `percent`: the passes' share, 0 to 100, rounded down);
   `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; `replayable` the ids
   of the messages the human may replay (typed, in the model's current view: the UI offers the action on those only);
-  `modifiedFiles` `{count, added, removed, files: [{path, added, removed}]}` (`files`: the 5 most changed, most lines first) what the `write_file` and `edit_file` calls changed (files merged by their path
-  relative to the session's workdir, lines as the calls wrote them);
+  `modifiedFiles` `{count, added, removed, files: [{path, added, removed}]}` (`files`: the 5 most changed, most lines first) what the session's live worktree changed, counted by git
+  (tracked changes since the merge start, committed or not, plus untracked files, as the integration gate), else what the
+  `write_file` and `edit_file` calls changed, but those whose result in the model's window failed (paths relative to the session's workdir or its removed
+  worktree, lines as the calls wrote them);
   deterministic (the decisions and the indicative statuses record what a model said); 404 if no session.
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under
   each answer, written by the server from the ledger (`line` `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`, `detail` the
