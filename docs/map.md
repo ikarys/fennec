@@ -63,8 +63,9 @@ graph LR
   m55["web/src/i18n"]
   m56["crates/fennec"]
   m57["crates/token-usage/tests"]
-  m58["web"]
-  m59["web/scripts"]
+  m58["docs/users/theme"]
+  m59["web"]
+  m60["web/scripts"]
   m14 -->|1| m33
   m14 -->|3| m22
   m14 -->|1| m24
@@ -407,5 +408,6 @@ graph LR
 | `web/src/i18n` | 3 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
 | `crates/token-usage/tests` | 1 | 1 |  |  |
+| `docs/users/theme` | 2 | 0 |  |  |
 | `web` | 1 | 0 |  |  |
-| `web/scripts` | 1 | 0 |  |  |
+| `web/scripts` | 2 | 0 |  |  |
