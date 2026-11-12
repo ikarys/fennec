@@ -85,6 +85,10 @@ export interface IdeaView {
   tokens: number | null;
   criteria: { passed: number; failed: number; pending: number } | null;
   decisions: { title: string; choice: string }[];
+  /** The workflow step the idea's run reached last; null without a run. */
+  step: string | null;
+  /** Why the run ended, when it did not finish done. */
+  runEnd: string | null;
   commits: number | null;
   files: number | null;
 }
@@ -103,6 +107,7 @@ export interface IdeaBoard {
   queue: {
     running: boolean;
     autonomous: boolean;
+    lastAutonomous: boolean;
     ready: number;
     next: { id: string; text: string; title: string } | null;
     caps: { maxMinutes: number; maxTokens: number };

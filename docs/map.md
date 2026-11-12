@@ -383,7 +383,7 @@ graph LR
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
 | `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
 | `crates/token-usage/src` | 5 | 5 | yes | Append-only SQLite ledger for LLM calls. |
-| `crates/backlog/src` | 9 | 8 | yes | A fennec-free backlog of ideas. |
+| `crates/backlog/src` | 10 | 9 | yes | A fennec-free backlog of ideas. |
 | `web/src` | 2 | 0 | yes |  |
 | `web/src/components/layout` | 10 | 0 |  |  |
 | `web/src/pages` | 12 | 0 |  |  |

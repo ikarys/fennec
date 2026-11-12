@@ -726,73 +726,7 @@ fn shell_success_and_failure() {
 
 #[test]
 fn human_node() {
-    let workflow = Workflow {
-        id: "w".into(),
-        name: "w".into(),
-        description: String::new(),
-        max_steps: 50,
-        nodes: vec![
-            Node {
-                id: "start".into(),
-                name: None,
-                position: Position::default(),
-                kind: NodeKind::Start,
-            },
-            Node {
-                id: "approve".into(),
-                name: Some("Approve".into()),
-                position: Position::default(),
-                kind: NodeKind::Human {
-                    question: "Go on {{task}}?".into(),
-                    choices: vec!["Go".into()],
-                },
-            },
-            Node {
-                id: "a".into(),
-                name: Some("Agent".into()),
-                position: Position::default(),
-                kind: NodeKind::Agent {
-                    agent: "plan".into(),
-                    prompt: "do it".into(),
-                    retry_prompt: None,
-                    outputs: vec!["done".into()],
-                    context: AgentContext::Session,
-                    verdicts: false,
-                },
-            },
-            Node {
-                id: "end".into(),
-                name: None,
-                position: Position::default(),
-                kind: NodeKind::End {
-                    outcome: EndOutcome::Done,
-                },
-            },
-        ],
-        edges: vec![
-            Edge {
-                from: "start".into(),
-                port: "next".into(),
-                to: "approve".into(),
-                max_passes: None,
-                pause: false,
-            },
-            Edge {
-                from: "approve".into(),
-                port: "Go".into(),
-                to: "a".into(),
-                max_passes: None,
-                pause: false,
-            },
-            Edge {
-                from: "a".into(),
-                port: "done".into(),
-                to: "end".into(),
-                max_passes: None,
-                pause: false,
-            },
-        ],
-    };
+    let workflow = approval_workflow(vec!["Go".into()]);
 
     let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
     let stop = AtomicBool::new(false);
@@ -852,6 +786,140 @@ fn human_node() {
             is_system_generated: true,
             ..
         } if content.ends_with("Human comment: careful"))));
+}
+
+fn approval_workflow(choices: Vec<String>) -> Workflow {
+    let first = choices.first().expect("a choice");
+    let mut edges = vec![
+        Edge {
+            from: "start".into(),
+            port: "next".into(),
+            to: "approve".into(),
+            max_passes: None,
+            pause: false,
+        },
+        Edge {
+            from: "approve".into(),
+            port: first.clone(),
+            to: "a".into(),
+            max_passes: None,
+            pause: false,
+        },
+        Edge {
+            from: "a".into(),
+            port: "done".into(),
+            to: "end".into(),
+            max_passes: None,
+            pause: false,
+        },
+    ];
+    for choice in choices.iter().skip(1) {
+        edges.push(Edge {
+            from: "approve".into(),
+            port: choice.clone(),
+            to: "end".into(),
+            max_passes: None,
+            pause: false,
+        });
+    }
+    Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "approve".into(),
+                name: Some("Approve".into()),
+                position: Position::default(),
+                kind: NodeKind::Human {
+                    question: "Go on {{task}}?".into(),
+                    choices,
+                },
+            },
+            Node {
+                id: "a".into(),
+                name: Some("Agent".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "do it".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges,
+    }
+}
+
+#[test]
+fn night_mode_answers_a_human_node_with_its_first_choice() {
+    let workflow = approval_workflow(vec!["Go".into(), "Revise".into()]);
+
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let reason = run_workflow(
+        &mut h.turn_autonomous(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "go".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            Event::WorkflowNodeFinished {
+                node_id,
+                port,
+                comment,
+                ..
+            } if node_id == "approve" && port == "Go" && comment.is_none()
+        )
+    }));
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            Event::DecisionRecorded {
+                title,
+                choice,
+                alternatives,
+                ..
+            } if title.contains("Approve")
+                && choice == "Go"
+                && alternatives == &vec!["Revise".to_string()]
+        )
+    }));
 }
 
 #[test]
@@ -2085,6 +2153,41 @@ fn validating_the_tests_records_the_written_test_files() {
             )
         }),
         "{events:?}"
+    );
+}
+
+#[test]
+fn night_mode_validates_the_tests_like_a_click() {
+    let stop = AtomicBool::new(false);
+    let mut h = Harness::new(
+        Box::new(Scripted(RefCell::new(vec![]))),
+        PathBuf::from("/tmp"),
+        &stop,
+    );
+    for event in events_with_open_tests_gate("r") {
+        EventLog::append(&h.log, "s", &event).unwrap();
+    }
+    let choices = ["Validate".to_string(), "Rework".to_string()];
+    let node = Node {
+        id: "approve-tests".into(),
+        name: Some("Validate the tests".into()),
+        position: Position::default(),
+        kind: NodeKind::Human {
+            question: "Validate?".into(),
+            choices: choices.to_vec(),
+        },
+    };
+    super::jobs::answer_by_night(&mut h.turn_autonomous(), &node, &choices).unwrap();
+
+    let events = EventLog::events(&h.log, "s").unwrap();
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::DecisionRecorded { choice, .. } if choice == "Validate"
+    )));
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, Event::TestsApproved { .. }))
     );
 }
 

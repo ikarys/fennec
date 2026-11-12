@@ -186,12 +186,7 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
                 idea.started_at = Some(*timestamp);
                 idea.autonomous = *autonomous;
 
-                if let Some(run) = last_run.as_mut()
-                    && run.is_open()
-                    && !run.idea_ids.iter().any(|existing| existing.as_str() == id)
-                {
-                    run.idea_ids.push(id.to_string());
-                }
+                note_in_run(&mut last_run, id);
             }
             BacklogEvent::Dropped { .. } => idea.state = IdeaState::Dropped,
             BacklogEvent::Completed { .. } => {
@@ -199,7 +194,11 @@ pub fn fold(events: &[(u64, BacklogEvent)]) -> Backlog {
                 // Completion is the human's final word: no halt remains.
                 idea.halted = None;
             }
-            BacklogEvent::Halted { reason, .. } => idea.halted = Some(reason.clone()),
+            BacklogEvent::Halted { reason, .. } => {
+                idea.halted = Some(reason.clone());
+                // A task night mode halted belongs to the morning report too.
+                note_in_run(&mut last_run, id);
+            }
             BacklogEvent::Reordered { .. }
             | BacklogEvent::QueueStarted { .. }
             | BacklogEvent::QueueFinished { .. }
@@ -224,6 +223,16 @@ pub fn idea_for_session<'a>(ideas: &'a [Idea], session_id: &str) -> Option<&'a I
     ideas
         .iter()
         .find(|idea| idea.session_id.as_deref() == Some(session_id))
+}
+
+/// Lists the idea in the open queue run, once.
+fn note_in_run(last_run: &mut Option<QueueRun>, id: &str) {
+    if let Some(run) = last_run.as_mut()
+        && run.is_open()
+        && !run.idea_ids.iter().any(|existing| existing == id)
+    {
+        run.idea_ids.push(id.to_string());
+    }
 }
 
 #[cfg(test)]
@@ -621,6 +630,19 @@ mod tests {
         let backlog = fold(&events);
 
         let run = backlog.last_run.expect("run should be open");
+        assert_eq!(run.idea_ids, vec!["i1".to_string()]);
+    }
+
+    #[test]
+    fn a_halt_lists_the_idea_in_the_open_run() {
+        let events = vec![
+            ev(1, added("i1", "t")),
+            ev(2, ready("i1", "p")),
+            ev(3, queue_started(true)),
+            ev(4, halted("i1", "risky")),
+        ];
+
+        let run = fold(&events).last_run.expect("run should be open");
         assert_eq!(run.idea_ids, vec!["i1".to_string()]);
     }
 
