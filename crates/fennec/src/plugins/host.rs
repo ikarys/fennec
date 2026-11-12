@@ -4,6 +4,7 @@
 //! sandboxed — a turned-off sandbox is a refusal to start, not a fallback.
 
 use crate::domain::plugin::{BlockContent, BlockKey, MAX_BLOCKS, PluginBlockUpdate, PluginDef};
+use crate::domain::resources::ResourceFigures;
 use crate::sandbox::Sandbox;
 use serde_json::{Value, json};
 use std::collections::{BTreeSet, HashMap};
@@ -24,6 +25,8 @@ pub struct Host {
     blocks: Arc<RwLock<HashMap<BlockKey, BlockContent>>>,
     /// The event types the plugin asked for in its `init` reply.
     wanted: BTreeSet<String>,
+    /// Whether the plugin's `init` reply asked for fennec's resource figures (`"resources": true`).
+    wants_resources: bool,
 }
 
 impl Host {
@@ -128,15 +131,18 @@ impl Host {
             .and_then(|()| stdin.flush())
             .map_err(|e| format!("plugin {}: init: {e}", def.name))?;
 
-        let wanted = match init_rx.recv_timeout(INIT_TIMEOUT) {
-            Ok(result) => result
-                .get("wantedEvents")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|value| value.as_str().map(String::from))
-                .collect(),
+        let (wanted, wants_resources) = match init_rx.recv_timeout(INIT_TIMEOUT) {
+            Ok(result) => (
+                result
+                    .get("wantedEvents")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|value| value.as_str().map(String::from))
+                    .collect(),
+                result.get("resources").and_then(Value::as_bool) == Some(true),
+            ),
             Err(_) => {
                 let _ = child.kill();
                 return Err(format!("plugin {}: init timed out", def.name));
@@ -148,6 +154,7 @@ impl Host {
             stdin: Mutex::new(stdin),
             blocks,
             wanted,
+            wants_resources,
         })
     }
 
@@ -176,6 +183,25 @@ impl Host {
                 "type": event_type,
                 "event": payload,
             },
+        });
+        let mut stdin = crate::locks::lock(&self.stdin);
+        let _ = writeln!(stdin, "{message}").and_then(|()| stdin.flush());
+    }
+
+    /// Whether this plugin asked for fennec's resource figures.
+    pub fn wants_resources(&self) -> bool {
+        self.wants_resources
+    }
+
+    /// Send fennec's resource figures, when the plugin asked for them.
+    pub fn push_resources(&self, figures: &ResourceFigures) {
+        if !self.wants_resources {
+            return;
+        }
+        let message = json!({
+            "jsonrpc": "2.0",
+            "method": "resources",
+            "params": figures,
         });
         let mut stdin = crate::locks::lock(&self.stdin);
         let _ = writeln!(stdin, "{message}").and_then(|()| stdin.flush());
@@ -277,6 +303,7 @@ for line in sys.stdin:
             command: "python3".into(),
             args: vec!["echo.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: vec![crate::domain::plugin::PluginBlockDef {
                 id: "calls".into(),
                 title: "Calls".into(),
@@ -351,6 +378,7 @@ for line in sys.stdin:
             command: "python3".into(),
             args: vec!["stray.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: Vec::new(),
         };
         let host = Host::spawn(
@@ -388,6 +416,80 @@ for line in sys.stdin:
             }
         }
         assert_eq!(seen, Some("2".to_string()));
+        let _ = std::fs::remove_dir_all(&agents_home);
+    }
+
+    /// A plugin that asks for fennec's resource figures and echoes one of them
+    /// into a block.
+    const RESOURCES: &str = r#"
+import json, sys
+def send(o):
+    sys.stdout.write(json.dumps(o) + "\n"); sys.stdout.flush()
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("method") == "init":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"wantedEvents": [], "resources": True}})
+    elif msg.get("method") == "resources":
+        send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "res", "content": {"elements": [{"kind": "figure", "label": "rss", "value": str(msg["params"]["rssBytes"])}]}}})
+"#;
+
+    #[test]
+    fn a_host_gets_the_resources_it_asked_for() {
+        let agents_home = temp();
+        std::fs::create_dir_all(agents_home.join("plugins/resources")).unwrap();
+        let script = agents_home.join("plugins/resources/resources.py");
+        std::fs::write(&script, RESOURCES).unwrap();
+
+        let def = PluginDef {
+            name: "resources".into(),
+            command: "python3".into(),
+            args: vec!["resources.py".into()],
+            env: Default::default(),
+            icon: Default::default(),
+            blocks: vec![crate::domain::plugin::PluginBlockDef {
+                id: "res".into(),
+                title: "Resources".into(),
+                scope: BlockScope::Global,
+                placement: None,
+            }],
+        };
+        let host = Host::spawn(
+            &def,
+            false,
+            &sandbox(),
+            &agents_home.join("plugins/resources"),
+            &temp(),
+            no_update(),
+        )
+        .unwrap();
+
+        assert!(host.wants_resources());
+        host.push_resources(&ResourceFigures {
+            rss_bytes: 4096,
+            cpu_percent: Some(1.5),
+        });
+
+        let mut seen = None;
+        for _ in 0..200 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            let value = host
+                .blocks_snapshot()
+                .get(&BlockKey {
+                    block_id: "res".into(),
+                    session_id: None,
+                    project_id: None,
+                })
+                .and_then(|content| content.elements.first().cloned())
+                .and_then(|element| match element {
+                    BlockElement::Figure { value, .. } if value == "4096" => Some(value),
+                    _ => None,
+                });
+            if value.is_some() {
+                seen = value;
+                break;
+            }
+        }
+        assert_eq!(seen, Some("4096".to_string()));
         let _ = std::fs::remove_dir_all(&agents_home);
     }
 
@@ -447,6 +549,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             command: "python3".into(),
             args: vec!["probe.py".into()],
             env,
+            icon: Default::default(),
             blocks: vec![crate::domain::plugin::PluginBlockDef {
                 id: "probe".into(),
                 title: "Probe".into(),
@@ -500,6 +603,7 @@ send({"jsonrpc": "2.0", "method": "block.update", "params": {"block": "probe", "
             command: "python3".into(),
             args: vec!["echo.py".into()],
             env: Default::default(),
+            icon: Default::default(),
             blocks: Vec::new(),
         };
         let off = Sandbox::Off;

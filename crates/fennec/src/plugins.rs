@@ -9,6 +9,7 @@ pub mod host;
 pub mod pump;
 
 use crate::domain::plugin::{BlockKey, BlockScope, Placement, PluginDef, ServedPluginBlock};
+use crate::domain::resources::ResourceFigures;
 use crate::notifier::Notifier;
 use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
@@ -143,6 +144,23 @@ impl PluginManager {
         }
     }
 
+    /// Whether any running host asked for fennec's resource figures.
+    pub fn wants_resources(&self) -> bool {
+        crate::locks::lock(&self.hosts)
+            .as_ref()
+            .is_some_and(|hosts| hosts.iter().any(|managed| managed.host.wants_resources()))
+    }
+
+    /// Send fennec's resource figures to the hosts that asked for them.
+    pub fn push_resources(&self, figures: &ResourceFigures) {
+        let hosts = crate::locks::lock(&self.hosts);
+        if let Some(managed) = hosts.as_ref() {
+            for managed in managed {
+                managed.host.push_resources(figures);
+            }
+        }
+    }
+
     /// The global-scope blocks placed in Settings' Plugins tab.
     pub fn blocks_global(&self) -> Vec<ServedPluginBlock> {
         self.blocks(BlockScope::Global, None, None, |placement| {
@@ -155,6 +173,14 @@ impl PluginManager {
     pub fn blocks_for_session(&self, session_id: &str) -> Vec<ServedPluginBlock> {
         self.blocks(BlockScope::Session, Some(session_id), None, |placement| {
             matches!(placement, Placement::Panel | Placement::OwnPanel)
+        })
+    }
+
+    /// The context-rail tabs the active plugins declare for a session.
+    pub fn session_tabs(&self) -> Vec<crate::domain::plugin::PluginTab> {
+        let hosts = crate::locks::lock(&self.hosts);
+        hosts.as_ref().map_or_else(Vec::new, |managed| {
+            crate::domain::plugin::session_tabs(managed.iter().map(|m| &m.def))
         })
     }
 
@@ -214,6 +240,7 @@ impl PluginManager {
                         title: block.title.clone(),
                         scope,
                         placement: block.placement(),
+                        icon: managed.def.icon,
                         content: content.clone(),
                     });
                 }

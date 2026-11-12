@@ -1,21 +1,22 @@
+/** Home chat section: conversations with no project. */
 import { useState } from 'react';
-import type { Project } from '../../lib/api';
+import type { SessionSummary } from '../../lib/api';
 import { useT } from '../../i18n';
-import { PlusIcon } from '../ui/Icons';
-import { Button } from '../ui/Button';
+import { ChatIcon } from '../ui/Icons';
+import { Badge } from '../ui/Badge';
 import { SessionList } from './SessionList';
 
 export function ChatSection({
-  project,
-  onNewSession,
+  title,
+  sessions,
   onOpenSession,
   selected,
   selecting,
   onToggle,
   onDelete
 }: {
-  project: Project;
-  onNewSession: () => void;
+  title: string;
+  sessions: SessionSummary[];
   onOpenSession: (sessionId: string) => void;
   selected: Set<string>;
   selecting: boolean;
@@ -25,31 +26,19 @@ export function ChatSection({
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   return (
-    <section className="overflow-hidden rounded-md border border-border bg-panel">
-      <div className="flex min-h-12 items-center gap-2.5 px-3 py-2">
-        <span className="truncate text-sm font-semibold">{t('homeChat')}</span>
-        <span className="ml-1 flex min-w-0 gap-3 font-mono text-xs text-faint">
-          <span className="truncate whitespace-nowrap tabular-nums">
-            {t('homeConversationCount', { count: project.sessions.length })}
-          </span>
+    <section className="overflow-hidden rounded-xl border border-border bg-panel">
+      <div className="flex min-h-11 items-center gap-2.5 bg-linear-to-r from-accent-soft to-transparent to-75% px-3 py-2">
+        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+          <ChatIcon className="h-3.5 w-3.5" />
         </span>
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-accent hover:bg-accent-soft hover:text-accent-strong"
-            onClick={onNewSession}
-            title={t('homeNewChatTitle')}
-            aria-label={t('paletteNewChat')}
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-            {t('paletteNewChat')}
-          </Button>
-        </div>
+        <span className="min-w-0 grow truncate text-sm font-semibold">{title}</span>
+        <Badge tone="neutral" appearance="pill" title={t('homeConversationCount', { count: sessions.length })}>
+          {sessions.length}
+        </Badge>
       </div>
 
       <SessionList
-        sessions={project.sessions}
+        sessions={sessions}
         selected={selected}
         selecting={selecting}
         onToggle={onToggle}

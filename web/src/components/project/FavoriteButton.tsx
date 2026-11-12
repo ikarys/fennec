@@ -18,7 +18,7 @@ export function FavoriteButton({
       variant="icon"
       size="sm"
       iconOnly
-      className={project.favorite ? 'text-accent' : ''}
+      className={project.favorite ? 'text-attention! hover:text-attention!' : ''}
       title={label}
       aria-label={label}
       aria-pressed={project.favorite}

@@ -55,6 +55,11 @@ dev:
     # the server's origin guard does not know (5174+ → "forbidden origin").
     cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT" --strictPort
 
+# Measure fennec on a scripted session workload: `just perf` (fake model) or `just perf real` (the model at FENNEC_LLM_URL, default http://127.0.0.1:8000/v1)
+perf mode="fake":
+    cargo build --release -p fennec
+    python3 scripts/perf/run.py --mode {{mode}}
+
 # Everything CI checks: the conventions (web, lint) and the tests
 check: web lint test test-web licenses
 
@@ -99,12 +104,16 @@ evidence:
 
 # The project site and its user guide, as GitHub Pages serves them, on :8080 (needs mdbook)
 site:
-    mdbook build docs/guide -d ../../site/docs
+    mdbook build docs/users -d ../../site/docs
     python3 -m http.server -d site 8080
 
 # The user guide alone, rebuilt on save, on :3000
 guide:
-    mdbook serve docs/guide
+    mdbook serve docs/users
+
+# The user guide's annotated screenshots, from a blank fennec (needs a release build and a model endpoint: DOC_SHOTS_MODEL_URL)
+shots:
+    cd web && node scripts/doc-shots.mjs
 
 # Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
 setup:

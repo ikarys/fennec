@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { TrashIcon } from '../ui/Icons';
+import { PanelFooter } from './PanelFooter';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { useT } from '../../i18n';
 import type { Agent } from '../../lib/api';
@@ -96,29 +95,7 @@ export function NodePanel({ def, node, agents, issues, onChange, onRename, onDel
         </FieldRow>
       )}
 
-      {nodeIssues.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <div className="text-sm font-medium text-err">{t('edgeIssues')}</div>
-          {nodeIssues.map((issue, index) => (
-            <div key={index} className="rounded-md bg-del-bg px-2 py-1 text-xs text-err">
-              {issue.message}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Button
-        variant="danger"
-        size="sm"
-        type="button"
-        iconOnly
-        onClick={onDelete}
-        aria-label={t('nodePanelDeleteNode')}
-        title={t('nodePanelDeleteNode')}
-        className="mt-2 self-start"
-      >
-        <TrashIcon className="h-4 w-4" />
-      </Button>
+      <PanelFooter issues={nodeIssues} deleteLabel={t('nodePanelDeleteNode')} onDelete={onDelete} titleClass="text-sm" />
     </div>
   );
 }

@@ -51,7 +51,12 @@ pub fn set(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpE
     };
 
     let listen = server_config::listen()?;
-    if remote && server_config::password()?.is_none() {
+    let opened_to = if remote {
+        IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+    } else {
+        listen
+    };
+    if domain::check_listen(opened_to, server_config::password()?.is_some()).is_err() {
         return error(stream, 400, "set a password before allowing remote access");
     }
 

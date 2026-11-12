@@ -1,4 +1,4 @@
-//! The workflow routes (contract: `docs/api.md`): discovery, validation and
+//! The workflow routes (contract: `docs/devs/api.md`): discovery, validation and
 //! the run controls. `routes.rs` only dispatches here.
 
 use crate::agent::ports::EventLog;

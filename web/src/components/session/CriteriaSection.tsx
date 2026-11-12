@@ -47,9 +47,9 @@ export function CriterionProvenanceBadge({ provenance }: { provenance: Provenanc
   return <Badge tone={badge.tone} title={badge.title}>{badge.label}</Badge>;
 }
 
-export function CriteriaSection({ criteria, tally }: { criteria: CriterionView[]; tally: CriteriaTally }) {
+export function CriteriaSection({ criteria, tally, planAwaitingBuild }: { criteria: CriterionView[]; tally: CriteriaTally; planAwaitingBuild: boolean }) {
   const t = useT();
-  const { total, passed, failed, indicative } = tally;
+  const { total, passed, failed, indicative, percent } = tally;
   // The header's icon reports the block's state: red when a check failed, green when all pass.
   const iconTone: BadgeTone = failed > 0 ? 'err' : total > 0 && passed === total ? 'ok' : 'neutral';
 
@@ -71,11 +71,11 @@ export function CriteriaSection({ criteria, tally }: { criteria: CriterionView[]
       }
     >
       {criteria.length === 0 ? (
-        <div className="text-xs text-muted">{t('noCriteriaHint')}</div>
+        <div className="text-xs text-muted">{t(planAwaitingBuild ? 'criteriaAwaitBuild' : 'noCriteriaHint')}</div>
       ) : (
         <div className="flex flex-col">
           <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
-            <div className="h-full rounded-full bg-ok" style={{ width: `${(passed / total) * 100}%` }} />
+            <div className="h-full rounded-full bg-ok" style={{ width: `${percent}%` }} />
           </div>
           {criteria.map((criterion) => {
             const provenance = criterion.status.type === 'pending' ? undefined : criterion.status.provenance;

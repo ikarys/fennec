@@ -383,6 +383,16 @@ export function RefreshIcon({ className }: IconProps) {
   );
 }
 
+export function KeyboardIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01" />
+      <path d="M9 14h6" />
+    </Svg>
+  );
+}
+
 export function CompressIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
@@ -675,11 +685,59 @@ export function CpuIcon({ className }: IconProps) {
   );
 }
 
+export function BotIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <rect x="4" y="8" width="16" height="12" rx="3" />
+      <path d="M12 4v4M9 13v1M15 13v1M2 13v2M22 13v2" />
+      <circle cx="12" cy="3" r="1" />
+    </Svg>
+  );
+}
+
 export function KeyIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
       <circle cx="8" cy="15" r="4" />
       <path d="M10.8 12.2L20 3M17 6l3 3M14.5 8.5l2 2" />
+    </Svg>
+  );
+}
+
+/** A bar chart: the insight page. */
+export function InsightIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 3v18h18" />
+      <path d="M8 17v-5" />
+      <path d="M13 17v-9" />
+      <path d="M18 17v-3" />
+    </Svg>
+  );
+}
+
+/** Connected nodes: the workflows page. */
+export function WorkflowsIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="12" cy="18" r="3" />
+      <path d="M6 9v3a3 3 0 003 3h6a3 3 0 003-3V9" />
+    </Svg>
+  );
+}
+
+/** Checklist rows: the backlog page. */
+export function BacklogIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 6l2 2 3-3" />
+      <path d="M3 13l2 2 3-3" />
+      <path d="M3 20l2 2 3-3" />
+      <path d="M13 6h8" />
+      <path d="M13 13h8" />
+      <path d="M13 20h8" />
     </Svg>
   );
 }

@@ -3,6 +3,8 @@
 //! ever parse that markdown.
 
 use super::criteria::{self, Criterion};
+use super::event::{Event, Role};
+use super::preflight::PreflightResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -10,6 +12,14 @@ use serde::{Deserialize, Serialize};
 pub struct Plan {
     pub title: String,
     pub goal: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub context: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub constraints: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub out_of_scope: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub deliverable: String,
     pub steps: Vec<PlanStep>,
     pub done_when: Vec<PlannedCriterion>,
     pub risks: Vec<String>,
@@ -43,6 +53,19 @@ impl Plan {
             String::new(),
             format!("Goal: {}", self.goal),
         ];
+        let sections = [
+            ("Context", &self.context),
+            ("Constraints", &self.constraints),
+            ("Out of scope", &self.out_of_scope),
+            ("Deliverable", &self.deliverable),
+        ];
+        for (heading, text) in sections {
+            if !text.is_empty() {
+                lines.push(String::new());
+                lines.push(format!("## {heading}"));
+                lines.push(text.clone());
+            }
+        }
         for (index, step) in self.steps.iter().enumerate() {
             lines.push(String::new());
             lines.push(format!("### Step {}: {}", index + 1, step.title));
@@ -86,6 +109,68 @@ impl Plan {
     }
 }
 
+/// The plan still waiting for the human, served whole: the UI loads only the log's tail, so
+/// it cannot look an older plan up by its id.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pending {
+    pub call_id: String,
+    pub plan: Plan,
+    pub markdown: String,
+    /// The plan's checks run at the end of the planner's turn, empty when none ran.
+    pub preflight: Vec<PreflightResult>,
+}
+
+/// The last `plan.proposed`, unless a workflow started since or the human wrote after leaving
+/// the plan agent. A later human question in plan mode keeps it pending: the decision stays
+/// offered while they discuss. A plan proposed inside a run belongs to that run: its own nodes
+/// ask the human, and it is never offered once the run ends.
+pub fn pending(events: &[Event]) -> Option<Pending> {
+    let mut pending: Option<Pending> = None;
+    let mut left_plan = false;
+    let mut in_run = false;
+
+    for event in events {
+        match event {
+            Event::PlanProposed { .. } if in_run => {}
+            Event::PlanProposed {
+                call_id,
+                plan,
+                markdown,
+            } => {
+                pending = Some(Pending {
+                    call_id: call_id.clone(),
+                    plan: plan.clone(),
+                    markdown: markdown.clone(),
+                    preflight: Vec::new(),
+                });
+                left_plan = false;
+            }
+            Event::CriteriaPreflight { results, .. } => {
+                if let Some(pending) = pending.as_mut() {
+                    pending.preflight = results.clone();
+                }
+            }
+            Event::WorkflowStarted { .. } => {
+                pending = None;
+                in_run = true;
+            }
+            Event::WorkflowFinished { .. } => in_run = false,
+            Event::ModeChanged { mode, .. } => {
+                left_plan = mode.as_str() != "plan";
+            }
+            Event::MessageStart {
+                role: Role::User,
+                is_system_generated: false,
+                ..
+            } if left_plan => pending = None,
+            _ => {}
+        }
+    }
+
+    pending
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,6 +180,10 @@ mod tests {
         Plan {
             title: "Add the plan tool".into(),
             goal: "The plan agent ends its turn with a propose_plan call".into(),
+            context: String::new(),
+            constraints: String::new(),
+            out_of_scope: String::new(),
+            deliverable: String::new(),
             steps: vec![
                 PlanStep {
                     title: "Write the domain".into(),
@@ -119,6 +208,20 @@ mod tests {
             ],
             risks: vec!["The model may still write the plan as text".into()],
         }
+    }
+
+    #[test]
+    fn optional_sections_render_only_when_set() {
+        assert!(!plan().to_markdown().contains("## Context"));
+        let mut with = plan();
+        with.context = "c".into();
+        with.deliverable = "d".into();
+        let markdown = with.to_markdown();
+        assert!(markdown.contains(&format!(
+            "Goal: {}\n\n## Context\nc\n\n## Deliverable\nd\n",
+            with.goal
+        )));
+        assert!(!markdown.contains("## Constraints"));
     }
 
     #[test]
@@ -203,5 +306,158 @@ mod tests {
         );
         let back: Plan = serde_json::from_value(value).unwrap();
         assert_eq!(back, plan());
+    }
+
+    fn pending_id(events: &[Event]) -> Option<String> {
+        pending(events).map(|pending| pending.call_id)
+    }
+
+    fn proposed(id: &str) -> Event {
+        Event::PlanProposed {
+            call_id: id.into(),
+            plan: Plan {
+                title: String::new(),
+                goal: String::new(),
+                context: String::new(),
+                constraints: String::new(),
+                out_of_scope: String::new(),
+                deliverable: String::new(),
+                steps: vec![],
+                done_when: vec![],
+                risks: vec![],
+            },
+            markdown: String::new(),
+        }
+    }
+
+    fn human(text: &str) -> Event {
+        Event::MessageStart {
+            message_id: "m".into(),
+            role: Role::User,
+            content: Some(text.into()),
+            is_system_generated: false,
+            metadata: None,
+            attachments: vec![],
+        }
+    }
+
+    fn mode(m: &str) -> Event {
+        Event::ModeChanged {
+            mode: m.into(),
+            auto: false,
+            reason: None,
+        }
+    }
+
+    fn started() -> Event {
+        Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: serde_json::from_value(serde_json::json!({
+                "id": "w",
+                "name": "w",
+                "nodes": []
+            }))
+            .unwrap(),
+            task: String::new(),
+            step_by_step: false,
+            started_at: None,
+        }
+    }
+
+    fn finished() -> Event {
+        Event::WorkflowFinished {
+            run_id: "r".into(),
+            outcome: crate::domain::workflow::run::RunOutcome::Done,
+            reason: None,
+            stats: None,
+        }
+    }
+
+    #[test]
+    fn a_plan_proposed_inside_a_run_is_never_offered() {
+        assert_eq!(pending_id(&[started(), proposed("p1")]), None);
+        assert_eq!(pending_id(&[started(), proposed("p1"), finished()]), None);
+    }
+
+    #[test]
+    fn a_plan_after_the_run_ended_is_offered() {
+        assert_eq!(
+            pending_id(&[started(), finished(), proposed("p2")]),
+            Some("p2".into())
+        );
+    }
+
+    #[test]
+    fn no_plan_none_pending() {
+        assert_eq!(pending_id(&[]), None);
+    }
+
+    #[test]
+    fn a_proposed_plan_is_pending() {
+        assert_eq!(pending_id(&[proposed("p1")]), Some("p1".into()));
+    }
+
+    #[test]
+    fn a_question_in_plan_mode_keeps_it_pending() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), human("why?")]),
+            Some("p1".into())
+        );
+    }
+
+    #[test]
+    fn a_newer_plan_replaces_the_older() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), proposed("p2")]),
+            Some("p2".into())
+        );
+    }
+
+    #[test]
+    fn a_started_workflow_clears_it() {
+        assert_eq!(pending_id(&[proposed("p1"), started()]), None);
+    }
+
+    #[test]
+    fn writing_after_leaving_plan_clears_it() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), mode("builder"), human("go")]),
+            None
+        );
+    }
+
+    #[test]
+    fn switching_back_to_plan_keeps_it() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), mode("builder"), mode("plan"), human("hm")]),
+            Some("p1".into())
+        );
+    }
+
+    #[test]
+    fn switching_away_without_writing_keeps_it() {
+        assert_eq!(
+            pending_id(&[proposed("p1"), mode("builder")]),
+            Some("p1".into())
+        );
+    }
+
+    #[test]
+    fn carries_the_preflight_of_its_turn() {
+        let result = PreflightResult {
+            criterion_id: "c1".into(),
+            command: "cargo test".into(),
+            verdict: super::super::preflight::PreflightVerdict::Fails,
+            exit_code: Some(1),
+            output: String::new(),
+            existence_only: false,
+        };
+        let preflight = Event::CriteriaPreflight {
+            message_id: "m".into(),
+            results: vec![result.clone()],
+        };
+        let served = pending(&[proposed("p1"), preflight]).unwrap();
+        assert_eq!(served.preflight, vec![result]);
+        assert!(pending(&[proposed("p1")]).unwrap().preflight.is_empty());
     }
 }

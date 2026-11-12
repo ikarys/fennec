@@ -3,7 +3,7 @@
  * its sessions are on that page and in the list view.
  */
 import type { Project } from '../../lib/api';
-import { BulbIcon, PlusIcon } from '../ui/Icons';
+import { BulbIcon, FolderIcon, PlusIcon } from '../ui/Icons';
 import { FavoriteButton } from './FavoriteButton';
 import { Badge } from '../ui/Badge';
 import { Button, buttonClass } from '../ui/Button';
@@ -23,7 +23,19 @@ export function ProjectTile({
 
   return (
     <article className="group relative flex flex-col gap-2 rounded-xl border border-border bg-panel p-4 transition-colors hover:border-accent hover:bg-accent-soft">
-      <div className="flex min-w-0 items-center gap-2">
+      {/* Only favourites are tinted: the colour points them out instead of painting every tile. */}
+      <div
+        className={`-mx-4 -mt-4 mb-1 flex min-w-0 items-center gap-2.5 rounded-t-xl border-b border-border px-4 py-2 ${
+          project.favorite ? 'bg-linear-to-r from-accent-soft to-transparent to-75%' : ''
+        }`}
+      >
+        <span
+          className={`grid size-6 shrink-0 place-items-center rounded-md ${
+            project.favorite ? 'bg-accent-soft text-accent' : 'bg-raised text-muted group-hover:text-accent'
+          }`}
+        >
+          <FolderIcon className="h-3.5 w-3.5" />
+        </span>
         <a
           href={'#/project/' + encodeURIComponent(project.id)}
           title={t('viewProject')}
@@ -41,6 +53,9 @@ export function ProjectTile({
             {t('sessionWorktreeBadge')}
           </Badge>
         )}
+        <div className="relative z-10 ml-auto shrink-0">
+          <FavoriteButton project={project} onToggle={onToggleFavorite} />
+        </div>
       </div>
       <div className="truncate font-mono text-xs text-faint" title={project.workdir}>
         {project.workdir}
@@ -48,10 +63,9 @@ export function ProjectTile({
       <div className="mt-auto flex items-center gap-3 pt-1 font-mono text-xs text-muted">
         <span className="min-w-0 truncate">⎇ {project.branch ?? t('noBranch')}</span>
         <span className="shrink-0 tabular-nums">
-          {t('sessionCount', { count: project.sessions.length, s: project.sessions.length > 1 ? 's' : '' })}
+          {t('sessionCount', { count: project.sessions.length })}
         </span>
         <div className="relative z-10 ml-auto flex shrink-0 items-center gap-0.5">
-          <FavoriteButton project={project} onToggle={onToggleFavorite} />
           <Button
             variant="icon"
             size="sm"

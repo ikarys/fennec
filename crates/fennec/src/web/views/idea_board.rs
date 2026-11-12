@@ -1,4 +1,4 @@
-//! A project's ideas board, read side (contract: `docs/api.md`): each idea's
+//! A project's ideas board, read side (contract: `docs/devs/api.md`): each idea's
 //! status from its live session, the queue, the night report. Served by
 //! `idea_routes.rs` per project and gathered by `backlog_routes.rs` across them.
 
@@ -232,6 +232,8 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         status(
             &Idea {
                 state: IdeaState::Started,
+                sheet: None,
+                model_fields: Default::default(),
                 ..idea.clone()
             },
             progress,
@@ -320,14 +322,22 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "id": idea.id,
         "text": idea.text,
         "title": backlog::title(&idea.text, idea.plan.as_deref()),
-        "description": backlog::description(&idea.text, idea.plan.as_deref()),
         "attachments": serde_json::to_value(&idea.attachments).unwrap_or(Value::Array(vec![])),
         "status": status,
         "stage": stage,
         "action": action,
-        "menu": status.menu(),
+        "menu": if idea.sheet.is_some() { status.sheet_menu() } else { status.menu().to_vec() },
+        "edit": status.edit(),
         "sessionId": idea.session_id,
         "plan": idea.plan,
+        "sheet": idea.sheet,
+        "sheetMarkdown": idea
+            .sheet
+            .as_ref()
+            .map(|sheet| sheet.to_markdown(&backlog::title(&idea.text, None))),
+        "missing": idea.sheet.as_ref().map(|sheet| sheet.missing()).unwrap_or_default(),
+        "completeness": idea.sheet.as_ref().map(|sheet| sheet.completeness()),
+        "modelFields": idea.model_fields,
         "halted": idea.halted,
         "autonomous": idea.autonomous,
         "position": position,

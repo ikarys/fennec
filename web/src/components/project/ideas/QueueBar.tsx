@@ -85,7 +85,7 @@ export function QueueBar({
     <Card className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-text tabular-nums whitespace-nowrap">
-          {t('readyCount', { count: queue.ready, s: queue.ready > 1 ? 's' : '' })}
+          {t('readyCount', { count: queue.ready })}
         </span>
         {queue.next ? (
           <span className="min-w-0 truncate text-xs text-muted" title={queue.next.text}>
@@ -112,7 +112,7 @@ export function QueueBar({
             title={t('nightCapsTitle')}
             aria-label={t('nightCapsTitle')}
             onClick={() => {
-              window.location.hash = '#/settings';
+              window.location.hash = '#/settings/autonomy';
             }}
           >
             <SettingsIcon className="h-4 w-4" />

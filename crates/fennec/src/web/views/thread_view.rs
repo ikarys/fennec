@@ -6,11 +6,13 @@ use crate::domain::criteria_fold;
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::event::Event;
 use crate::domain::modified_files::{self, ModifiedFiles};
+use crate::domain::plan;
 use crate::domain::preflight;
 use crate::domain::queue;
 use crate::domain::replay;
 use crate::domain::rule_approval;
 use crate::domain::waiver;
+use backlog::{Idea, IdeaState};
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -56,6 +58,10 @@ pub struct CriterionView {
 pub struct ThreadView {
     pub pending_approval: Option<ApprovalView>,
     pub pending_waiver: Option<WaiverView>,
+    /// The plan waiting for the human's decision (the decision bar), served whole.
+    pub pending_plan: Option<plan::Pending>,
+    /// The plan the human handed to the backlog instead: the bar gives way to a note.
+    pub handed_plan: Option<HandedPlan>,
     pub queued: Vec<QueuedView>,
     pub criteria: Vec<CriterionView>,
     pub criteria_tally: criteria_fold::Tally,
@@ -130,6 +136,38 @@ pub const SESSION_KINDS: &[&str] = &[
 
 /// `window` is the model's window (`EventLog::window`), `session` the `SESSION_KINDS` events;
 /// either may be the whole log.
+/// A pending plan carried by the session's idea into the backlog (`Idea ready`).
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HandedPlan {
+    pub idea_id: String,
+    /// True while the idea only waits in the queue: the human may take the plan back.
+    pub undoable: bool,
+}
+
+impl ThreadView {
+    /// Once the session's idea carries the pending plan, the decision is made: the queue runs it,
+    /// so the bar no longer offers a launch that would run it a second time.
+    pub fn hand_to_backlog(&mut self, idea: Option<&Idea>) {
+        let (Some(pending), Some(idea)) = (&self.pending_plan, idea) else {
+            return;
+        };
+        // The ready route stores the plan trimmed.
+        let carried = idea.plan.as_deref().map(str::trim) == Some(pending.markdown.trim())
+            && matches!(
+                idea.state,
+                IdeaState::Ready | IdeaState::Started | IdeaState::Completed
+            );
+        if carried {
+            self.handed_plan = Some(HandedPlan {
+                idea_id: idea.id.clone(),
+                undoable: idea.state == IdeaState::Ready,
+            });
+            self.pending_plan = None;
+        }
+    }
+}
+
 pub fn thread_view(window: &[Event], session: &[Event], workdir: &str) -> ThreadView {
     // The domain folds each block; the view only shapes it for the UI.
     let passed_before = preflight::passed_before(session);
@@ -137,6 +175,8 @@ pub fn thread_view(window: &[Event], session: &[Event], workdir: &str) -> Thread
     ThreadView {
         pending_approval: rule_approval::pending(window).map(ApprovalView::from),
         pending_waiver: waiver::pending(window).map(WaiverView::from),
+        pending_plan: plan::pending(window),
+        handed_plan: None,
         queued: queue::pending(session)
             .into_iter()
             .map(QueuedView::from)
@@ -166,6 +206,77 @@ mod tests {
             arguments: serde_json::Value::Null,
             parse_error: None,
             raw_arguments: None,
+        }
+    }
+
+    fn idea(state: backlog::IdeaState, plan: &str) -> backlog::Idea {
+        backlog::Idea {
+            id: "i1".into(),
+            text: String::new(),
+            state,
+            session_id: Some("s1".into()),
+            plan: Some(plan.into()),
+            created_at: 0,
+            updated_at: 0,
+            halted: None,
+            started_at: None,
+            autonomous: false,
+            attachments: vec![],
+            sheet: None,
+            model_fields: Default::default(),
+        }
+    }
+
+    fn plan_view() -> super::ThreadView {
+        let proposed = Event::PlanProposed {
+            call_id: "p1".into(),
+            plan: crate::domain::plan::Plan {
+                title: String::new(),
+                goal: String::new(),
+                context: String::new(),
+                constraints: String::new(),
+                out_of_scope: String::new(),
+                deliverable: String::new(),
+                steps: vec![],
+                done_when: vec![],
+                risks: vec![],
+            },
+            markdown: "the plan\n".into(),
+        };
+        thread_view(&[proposed], &[], "/w")
+    }
+
+    #[test]
+    fn a_plan_handed_to_the_backlog_leaves_the_bar() {
+        let mut view = plan_view();
+        view.hand_to_backlog(Some(&idea(backlog::IdeaState::Ready, "the plan")));
+        assert!(view.pending_plan.is_none());
+        assert_eq!(
+            view.handed_plan,
+            Some(super::HandedPlan {
+                idea_id: "i1".into(),
+                undoable: true
+            })
+        );
+
+        let mut started = plan_view();
+        started.hand_to_backlog(Some(&idea(backlog::IdeaState::Started, "the plan")));
+        assert_eq!(
+            started.handed_plan.map(|handed| handed.undoable),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn a_revised_or_framing_plan_stays_in_the_bar() {
+        for idea in [
+            idea(backlog::IdeaState::Ready, "an older plan"),
+            idea(backlog::IdeaState::Framing, "the plan"),
+        ] {
+            let mut view = plan_view();
+            view.hand_to_backlog(Some(&idea));
+            assert!(view.pending_plan.is_some());
+            assert!(view.handed_plan.is_none());
         }
     }
 
@@ -539,12 +650,14 @@ mod tests {
             serde_json::json!({
                 "pendingApproval": null,
                 "pendingWaiver": null,
+                "pendingPlan": null,
+                "handedPlan": null,
                 "queued": [],
                 "criteria": [],
-                "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0},
+                "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0, "percent": 0},
                 "decisions": [],
                 "replayable": [],
-                "modifiedFiles": {"count": 0, "added": 0, "removed": 0}
+                "modifiedFiles": {"count": 0, "added": 0, "removed": 0, "files": []}
             })
         );
     }

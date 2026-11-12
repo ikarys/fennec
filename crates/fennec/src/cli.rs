@@ -3,6 +3,7 @@
 
 pub mod doctor;
 pub mod password;
+pub mod remote;
 pub mod service;
 mod transcript;
 pub mod update;
@@ -142,6 +143,7 @@ fn with_turn(
     let mut options = turn_build::Options {
         notifier: None,
         model_choice: None,
+        effort_choice: None,
         autonomous: false,
         delegated: false,
         on_event: &mut on_event,

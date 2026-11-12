@@ -1,8 +1,9 @@
+// Version information and update check.
 import { useState } from 'react';
 import { Section } from '../ui/Section';
 import { Badge } from '../ui/Badge';
-import { Button, buttonClass } from '../ui/Button';
-import { ExternalIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
+import { Button } from '../ui/Button';
+import { ExternalIcon, InfoIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { getVersion, getUpdate, type UpdateCheck } from '../../lib/api';
 import { useLoaded } from '../../hooks/useLoaded';
@@ -41,21 +42,17 @@ export function VersionSection() {
 
   return (
     <Section
+      Icon={InfoIcon}
       title={t('versionTitle')}
       description={t('versionDescription')}
       actions={
         // A local build updates from its checkout: the releases do not concern it.
-        !info.build && <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title={t('versionCheckTitle')}
-          aria-label={t('versionCheckTitle')}
-          disabled={checking}
-          onClick={onCheck}
-        >
-          {checking ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <RefreshIcon className="h-4 w-4" />}
-        </Button>
+        !info.build && (
+          <Button variant="primary" size="sm" disabled={checking} onClick={onCheck}>
+            {checking ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <RefreshIcon className="h-3.5 w-3.5" />}
+            {t('versionCheckTitle')}
+          </Button>
+        )
       }
     >
       {info.build && <p className="mb-2 text-xs text-muted">{t('versionLocalHint')}</p>}
@@ -70,11 +67,10 @@ export function VersionSection() {
           href={info.changelogUrl}
           target="_blank"
           rel="noreferrer"
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-          title={t('versionChangelog')}
-          aria-label={t('versionChangelog')}
+          className="ml-auto inline-flex items-center gap-1 text-xs text-accent-strong hover:underline"
         >
-          <ExternalIcon className="h-4 w-4" />
+          {t('aboutAllReleases')}
+          <ExternalIcon className="h-3 w-3" />
         </a>
       </div>
       {check && check.kind === 'checked' && check.check.newer && (

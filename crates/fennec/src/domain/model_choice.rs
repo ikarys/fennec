@@ -1,7 +1,7 @@
-//! The model a session runs on and the models it has used, read from its log.
+//! The model and effort a session runs on and the models it has used, read from its log.
 
 use super::event::Event;
-use super::preferences::ModelRef;
+use super::preferences::{ModelRef, ReasoningEffort};
 
 /// The model of the last `model.changed`, `None` if the session never chose one.
 pub fn chosen_model(events: &[Event]) -> Option<ModelRef> {
@@ -9,6 +9,26 @@ pub fn chosen_model(events: &[Event]) -> Option<ModelRef> {
         Event::ModelChanged { model } => Some(model.clone()),
         _ => None,
     })
+}
+
+/// The effort of the last `effort.changed`, `None` if never chosen or set back to auto.
+pub fn chosen_effort(events: &[Event]) -> Option<ReasoningEffort> {
+    events
+        .iter()
+        .rev()
+        .find_map(|event| match event {
+            Event::EffortChanged { effort } => Some(*effort),
+            _ => None,
+        })
+        .flatten()
+}
+
+/// `chosen` if the model accepts it; an empty `accepted` means unknown, so any effort is kept.
+pub fn usable_effort(
+    chosen: Option<ReasoningEffort>,
+    accepted: &[ReasoningEffort],
+) -> Option<ReasoningEffort> {
+    chosen.filter(|effort| accepted.is_empty() || accepted.contains(effort))
 }
 
 /// The distinct models that answered in the session, in order of first use.
@@ -49,6 +69,34 @@ mod tests {
             prefill_speed: 0.0,
             generation_speed: 0.0,
         }
+    }
+
+    #[test]
+    fn the_last_effort_choice_wins_and_auto_clears() {
+        let high = Event::EffortChanged {
+            effort: Some(ReasoningEffort::High),
+        };
+        let auto = Event::EffortChanged { effort: None };
+        assert_eq!(chosen_effort(&[]), None);
+        assert_eq!(
+            chosen_effort(&[auto.clone(), high.clone()]),
+            Some(ReasoningEffort::High)
+        );
+        assert_eq!(chosen_effort(&[high, auto]), None);
+    }
+
+    #[test]
+    fn an_effort_the_model_refuses_falls_back_to_auto() {
+        let accepted = [ReasoningEffort::Low, ReasoningEffort::High];
+        assert_eq!(
+            usable_effort(Some(ReasoningEffort::High), &accepted),
+            Some(ReasoningEffort::High)
+        );
+        assert_eq!(usable_effort(Some(ReasoningEffort::Max), &accepted), None);
+        assert_eq!(
+            usable_effort(Some(ReasoningEffort::Max), &[]),
+            Some(ReasoningEffort::Max)
+        );
     }
 
     #[test]

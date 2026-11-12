@@ -9,10 +9,11 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ListCard } from '../ui/ListCard';
+import { ListCard, listRowClass } from '../ui/ListCard';
 import { Section } from '../ui/Section';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { TrashIcon } from '../ui/Icons';
+import { AlertIcon, BotIcon, CpuIcon, EditIcon, PlusIcon, ProjectIcon, TrashIcon } from '../ui/Icons';
+import { InfoBar } from '../ui/InfoBar';
 import { AgentEditor, EMPTY_DRAFT } from './AgentEditor';
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
@@ -27,21 +28,24 @@ import {
   type AgentsOverview,
 } from '../../lib/api/agents';
 
-const ORIGIN_SECTIONS: { origin: AgentOrigin; title: MsgKey; description: MsgKey; empty: MsgKey }[] = [
+const ORIGIN_SECTIONS: { origin: AgentOrigin; Icon: typeof BotIcon; title: MsgKey; description: MsgKey; empty: MsgKey }[] = [
   {
     origin: 'user',
+    Icon: BotIcon,
     title: 'agentsUserTitle',
     description: 'agentsUserDescription',
     empty: 'agentsUserEmpty',
   },
   {
     origin: 'default',
+    Icon: CpuIcon,
     title: 'agentsDefaultTitle',
     description: 'agentsDefaultDescription',
     empty: 'agentsNone',
   },
   {
     origin: 'project',
+    Icon: ProjectIcon,
     title: 'agentsProjectTitle',
     description: 'agentsProjectDescription',
     empty: 'agentsNone',
@@ -90,7 +94,7 @@ function AgentRow({
 }) {
   const t = useT();
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent-soft">
+    <li className={listRowClass()}>
       <div className="min-w-0 grow">
         <div className="flex items-baseline gap-2">
           <span className="truncate text-sm font-medium">{agent.name}</span>
@@ -123,8 +127,8 @@ function AgentRow({
         </Button>
       )}
       {agent.editable ? (
-        <Button variant="ghost" iconOnly title={t('delete')} aria-label={t('delete')} disabled={busy} onClick={onDelete}>
-          <TrashIcon className="h-4 w-4" />
+        <Button variant="danger" size="sm" iconOnly title={t('delete')} aria-label={t('delete')} disabled={busy} onClick={onDelete}>
+          <TrashIcon className="h-3.5 w-3.5" />
         </Button>
       ) : (
         <span className="w-7 shrink-0" />
@@ -249,21 +253,22 @@ export function AgentsSection() {
   );
 
   return (
-    <>
-      <Section
-        title={t('agentsSectionTitle')}
-        description={t('agentsSectionDescription')}
-        actions={
-          draft ? null : (
-            <Button variant="primary" onClick={startNew} disabled={loading || busy}>
-              {t('agentsNew')}
-            </Button>
-          )
-        }
-      >
-        {loading ? <p className="text-xs text-muted">{t('loading')}</p> : null}
-        {!loading && error ? <p className="text-xs text-err">{error}</p> : null}
-        {!loading && !error && draft ? (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <InfoBar>{t('agentsSectionDescription')}</InfoBar>
+        </div>
+        {draft ? null : (
+          <Button variant="primary" onClick={startNew} disabled={loading || busy}>
+            <PlusIcon className="h-3.5 w-3.5" />
+            {t('agentsNew')}
+          </Button>
+        )}
+      </div>
+      {loading ? <p className="m-0 text-xs text-muted">{t('loading')}</p> : null}
+      {!loading && error ? <p className="m-0 text-xs text-err">{error}</p> : null}
+      {!loading && !error && draft ? (
+        <Section Icon={EditIcon} title={newAgent ? t('agentsNew') : draft.name}>
           <AgentEditor
             draft={draft}
             tools={overview?.tools ?? []}
@@ -278,16 +283,18 @@ export function AgentsSection() {
               clearError();
             }}
           />
-        ) : null}
-        {!loading && !error && !draft && formError ? <p className="text-xs text-err">{formError}</p> : null}
+        </Section>
+      ) : null}
+      {!loading && !error && !draft && formError ? <p className="m-0 text-xs text-err">{formError}</p> : null}
 
       {!loading && !error && overview
-        ? ORIGIN_SECTIONS.map(({ origin, title, description, empty }) => {
+        ? ORIGIN_SECTIONS.map(({ origin, Icon, title, description, empty }) => {
             const agents = overview.agents.filter((agent) => agent.origin === origin);
             if (origin === 'project' && agents.length === 0) return null;
             return (
               <ListCard
                 key={origin}
+                Icon={Icon}
                 title={t(title)}
                 description={t(description)}
                 count={agents.length}
@@ -302,17 +309,19 @@ export function AgentsSection() {
 
       {overview && overview.broken.length > 0 ? (
         <Section
+          Icon={AlertIcon}
           title={t('agentsBrokenTitle')}
           description={t('agentsBrokenDescription')}
           flush
         >
           <ul className="divide-y divide-border">
             {overview.broken.map((file) => (
-              <li key={file.id} className="flex items-center gap-3 py-2.5">
+              <li key={file.id} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="font-mono text-sm">{file.id}</span>
                 <span className="text-xs text-err">{file.error}</span>
                 <Button
-                  variant="ghost"
+                  variant="danger"
+                  size="sm"
                   iconOnly
                   className="ml-auto"
                   title={t('delete')}
@@ -335,14 +344,13 @@ export function AgentsSection() {
                     })
                   }
                 >
-                  <TrashIcon className="h-4 w-4" />
+                  <TrashIcon className="h-3.5 w-3.5" />
                 </Button>
               </li>
             ))}
           </ul>
         </Section>
       ) : null}
-      </Section>
 
       <ConfirmDialog
         open={pendingDelete !== null}
@@ -358,6 +366,6 @@ export function AgentsSection() {
         }}
         onCancel={() => setPendingDelete(null)}
       />
-    </>
+    </div>
   );
 }

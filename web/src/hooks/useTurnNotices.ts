@@ -13,6 +13,7 @@ import { useT } from '../i18n';
 import type { MsgKey } from '../i18n/messages';
 import type { AttentionItem } from '../lib/api';
 import type { BudgetNotice } from '../lib/api/sessions';
+import { playCue, unlockSounds, type Cue } from '../lib/sounds';
 
 /** True when the current hash shows this session: `#/s/<id>` or a split pane `#/split/<a>/<b>`. */
 function hashShowsSession(hash: string, sessionId: string): boolean {
@@ -41,14 +42,25 @@ function bodyFor(item: AttentionItem, t: (key: MsgKey, vars?: Record<string, str
   }
 }
 
-export function useTurnNotices(onOpen?: (sessionId: string) => void): {
+/** The one sound a snapshot plays for what is new in it, the most urgent first. */
+export function cueFor(kinds: AttentionItem['kind'][], newBudget: boolean): Cue | null {
+  if (newBudget || kinds.some((kind) => kind === 'error' || kind === 'conflict')) return 'problem';
+  if (kinds.some((kind) => kind === 'question' || kind === 'workflowPause')) return 'yourTurn';
+  if (kinds.some((kind) => kind === 'awaitingIntegration')) return 'done';
+  return null;
+}
+
+export function useTurnNotices(onOpen?: (sessionId: string) => void, sounds = true): {
   items: AttentionItem[];
   /** Moves on every accepted plugin block update: the block-fetching components refetch on it. */
   pluginsVersion: number;
+  /** False once the server stream has been down past a short grace delay. */
+  online: boolean;
 } {
   const t = useT();
   const [items, setItems] = useState<AttentionItem[]>([]);
   const [pluginsVersion, setPluginsVersion] = useState(0);
+  const [online, setOnline] = useState(true);
   const previous = useRef<Set<string>>(new Set());
   const previousBudgets = useRef<Set<string>>(new Set());
   const baseline = useRef(true);
@@ -56,67 +68,145 @@ export function useTurnNotices(onOpen?: (sessionId: string) => void): {
   // latest `openSession` without re-creating the stream on every render.
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
+  const soundsRef = useRef(sounds);
+  soundsRef.current = sounds;
 
   useEffect(() => {
-    const source = new EventSource('/api/notices');
-    source.onmessage = (event) => {
-      let snapshot: { items: AttentionItem[]; budgets?: BudgetNotice[]; pluginsVersion?: number };
-      try {
-        snapshot = JSON.parse(event.data);
-      } catch {
-        // A truncated frame (a dropped connection) waits for the next snapshot.
-        return;
-      }
-      const budgets = snapshot.budgets ?? [];
-      setItems(snapshot.items);
-      setPluginsVersion(snapshot.pluginsVersion ?? 0);
-      // The first snapshot is the baseline: it populates the badge but does
-      // not notify for what was already waiting before the tab opened.
-      const first = baseline.current;
-      baseline.current = false;
-      if (
-        !first &&
-        'Notification' in window &&
-        Notification.permission === 'granted'
-      ) {
-        for (const item of snapshot.items) {
-          if (previous.current.has(item.sessionId)) continue;
-          if (!document.hidden && hashShowsSession(window.location.hash, item.sessionId)) continue;
-          const notification = new Notification(item.title || 'fennec', {
-            body: bodyFor(item, t),
-            tag: item.sessionId,
-          });
-          notification.onclick = () => {
-            window.focus();
-            if (onOpenRef.current) {
-              onOpenRef.current(item.sessionId);
-            } else {
-              window.location.hash = '#/s/' + item.sessionId;
-            }
-            notification.close();
-          };
-        }
-        for (const budget of budgets) {
-          const key = budget.projectId + ':' + budget.status;
-          if (previousBudgets.current.has(key)) continue;
-          const notification = new Notification(budget.project, {
-            body: budget.detail,
-            tag: 'budget:' + key,
-          });
-          notification.onclick = () => {
-            window.focus();
-            window.location.hash = '#/project/' + encodeURIComponent(budget.projectId);
-            notification.close();
-          };
-        }
-      }
-      previous.current = new Set(snapshot.items.map((item) => item.sessionId));
-      previousBudgets.current = new Set(
-        budgets.map((budget) => budget.projectId + ':' + budget.status),
-      );
+    let source: EventSource | null = null;
+    let offlineTimer: number | null = null;
+    let reconnectTimer: number | null = null;
+
+    const clearOfflineTimer = () => {
+      if (offlineTimer === null) return;
+      window.clearTimeout(offlineTimer);
+      offlineTimer = null;
     };
-    return () => source.close();
+
+    // Down past this grace delay, the page says so: a quick restart does not flash it.
+    const armOffline = () => {
+      if (offlineTimer !== null) return;
+      offlineTimer = window.setTimeout(() => {
+        offlineTimer = null;
+        setOnline(false);
+      }, 2000);
+    };
+
+    // A stream not open after a while is rebuilt: the browser gives up for good on
+    // an error status, and the dev proxy leaves a request to a stopped server hanging.
+    const armWatchdog = () => {
+      if (reconnectTimer !== null) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        if (source?.readyState !== EventSource.OPEN) connect();
+      }, 3000);
+    };
+
+    const connect = () => {
+      source?.close();
+      const nextSource = new EventSource('/api/notices');
+      source = nextSource;
+      armOffline();
+      armWatchdog();
+
+      nextSource.onopen = () => {
+        setOnline(true);
+        clearOfflineTimer();
+      };
+
+      nextSource.onmessage = (event) => {
+        setOnline(true);
+        clearOfflineTimer();
+        let snapshot: { items: AttentionItem[]; budgets?: BudgetNotice[]; pluginsVersion?: number };
+        try {
+          snapshot = JSON.parse(event.data);
+        } catch {
+          // A truncated frame (a dropped connection) waits for the next snapshot.
+          return;
+        }
+        const budgets = snapshot.budgets ?? [];
+        setItems(snapshot.items);
+        setPluginsVersion(snapshot.pluginsVersion ?? 0);
+        // The first snapshot is the baseline: it populates the badge but does
+        // not notify for what was already waiting before the tab opened.
+        const first = baseline.current;
+        baseline.current = false;
+        if (!first && soundsRef.current) {
+          const newItems = snapshot.items.filter((item) => !previous.current.has(item.sessionId));
+          const newBudgets = budgets.filter(
+            (budget) => !previousBudgets.current.has(budget.projectId + ':' + budget.status),
+          );
+          const cue = cueFor(
+            newItems.map((item) => item.kind),
+            newBudgets.length > 0,
+          );
+          if (cue) playCue(cue);
+        }
+        if (
+          !first &&
+          'Notification' in window &&
+          Notification.permission === 'granted'
+        ) {
+          for (const item of snapshot.items) {
+            if (previous.current.has(item.sessionId)) continue;
+            if (!document.hidden && hashShowsSession(window.location.hash, item.sessionId)) continue;
+            const notification = new Notification(item.title || 'fennec', {
+              body: bodyFor(item, t),
+              tag: item.sessionId,
+            });
+            notification.onclick = () => {
+              window.focus();
+              if (onOpenRef.current) {
+                onOpenRef.current(item.sessionId);
+              } else {
+                window.location.hash = '#/s/' + item.sessionId;
+              }
+              notification.close();
+            };
+          }
+          for (const budget of budgets) {
+            const key = budget.projectId + ':' + budget.status;
+            if (previousBudgets.current.has(key)) continue;
+            const notification = new Notification(budget.project, {
+              body: budget.detail,
+              tag: 'budget:' + key,
+            });
+            notification.onclick = () => {
+              window.focus();
+              window.location.hash = '#/project/' + encodeURIComponent(budget.projectId);
+              notification.close();
+            };
+          }
+        }
+        previous.current = new Set(snapshot.items.map((item) => item.sessionId));
+        previousBudgets.current = new Set(
+          budgets.map((budget) => budget.projectId + ':' + budget.status),
+        );
+      };
+
+      nextSource.onerror = () => {
+        armOffline();
+        armWatchdog();
+      };
+    };
+
+    connect();
+
+    return () => {
+      source?.close();
+      clearOfflineTimer();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+    };
   }, []);
 
-  return { items, pluginsVersion };
+  useEffect(() => {
+    const unlock = () => unlockSounds();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  return { items, pluginsVersion, online };
 }

@@ -1,3 +1,5 @@
+//! Local ids: with `clock.rs`, the only impure leaf of the domain.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Unique enough for ids local to one machine; avoids a uuid dependency.

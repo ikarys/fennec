@@ -1,4 +1,4 @@
-//! The JSON API (contract: `docs/api.md`) and the UI's pages.
+//! The JSON API (contract: `docs/devs/api.md`) and the UI's pages.
 //!
 //! A thin dispatcher: each route points at the module that owns it. The
 //! session, project and folder handlers live in `session_routes`.
@@ -10,9 +10,11 @@ pub(super) mod backlog_routes;
 pub(super) mod budget_routes;
 pub(super) mod canvas_routes;
 pub(super) mod changelog_routes;
-pub(super) mod contribution_routes;
+pub(super) mod chat_link_routes;
 pub(super) mod diff_routes;
+pub(super) mod file_routes;
 pub(super) mod folder_routes;
+pub(super) mod home_routes;
 pub(super) mod idea_routes;
 pub(super) mod indicator_routes;
 pub(super) mod integration;
@@ -33,6 +35,7 @@ pub(super) mod session_delete;
 pub(super) mod session_routes;
 pub(super) mod settings_routes;
 pub(super) mod setup_routes;
+pub(super) mod sheet_input;
 pub(super) mod update_routes;
 pub(super) mod waiver_routes;
 pub(super) mod workflow_routes;
@@ -96,6 +99,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "folders"]) => folder_routes::list_folders(app, req, stream),
         ("POST", ["api", "folders", "create"]) => folder_routes::create_folder(req, stream),
         ("GET", ["api", "projects"]) => project_list_routes::list_projects(app, stream),
+        ("GET", ["api", "home"]) => home_routes::serve(app, stream),
         ("GET", ["api", "backlog"]) => backlog_routes::list_backlog(app, stream),
         ("POST", ["api", "projects"]) => project_list_routes::open_project(app, req, stream),
         ("GET", ["api", "projects", id, "commands"]) => {
@@ -108,7 +112,14 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             project_routes::get_overview(app, stream, id)
         }
         ("GET", ["api", "projects", id, "dashboard"]) => project_dashboard::serve(app, stream, id),
-        ("GET", ["api", "projects", id, "docs"]) => project_routes::get_docs(app, stream, id),
+        ("GET", ["api", "projects", id, "adrs"]) => project_routes::get_adrs(app, stream, id),
+        ("GET", ["api", "projects", id, "files"]) => file_routes::list(app, req, stream, id),
+        ("GET", ["api", "projects", id, "file"]) => file_routes::read(app, req, stream, id),
+        ("GET", ["api", "projects", id, "raw"]) => file_routes::raw(app, req, stream, id),
+        ("POST", ["api", "projects", id, "file"]) => file_routes::save(app, req, stream, id),
+        ("GET", ["api", "projects", id, "changes"]) => file_routes::changes(app, stream, id),
+        ("POST", ["api", "projects", id, "commit"]) => file_routes::commit(app, req, stream, id),
+        ("POST", ["api", "projects", id, "restore"]) => file_routes::restore(app, req, stream, id),
         ("GET", ["api", "projects", id, "risks"]) => project_routes::get_risks(app, stream, id),
         ("GET", ["api", "projects", id, "worktrees"]) => {
             worktree_routes::list(app, req, stream, id)
@@ -146,6 +157,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "ideas", "report", "read"]) => {
             idea_routes::report_read(app, stream, id)
         }
+        ("POST", ["api", "projects", id, "ideas", iid, "sheet", "suggest"]) => {
+            idea_routes::suggest_sheet_field(app, req, stream, id, iid)
+        }
         ("POST", ["api", "projects", id, "ideas", iid, "start"]) => {
             idea_routes::start_one(app, stream, id, iid)
         }
@@ -155,6 +169,7 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "projects", id, "map-file"]) => {
             project_routes::write_map_file(app, stream, id)
         }
+        ("POST", ["api", "projects", id, "terminal"]) => terminal::open_project(app, stream, id),
         ("POST", ["api", "projects", id, "delete"]) => {
             project_delete::delete_project(app, req, stream, id)
         }
@@ -164,12 +179,6 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("GET", ["api", "projects", id, "budget"]) => budget_routes::get(app, stream, id),
         ("POST", ["api", "projects", id, "budget"]) => budget_routes::set(app, req, stream, id),
         ("GET", ["api", "projects", id, "indicators"]) => indicator_routes::serve(app, stream, id),
-        ("GET", ["api", "projects", id, "contributions"]) => {
-            contribution_routes::list(app, stream, id)
-        }
-        ("POST", ["api", "projects", id, "contributions"]) => {
-            contribution_routes::adopt(app, req, stream, id)
-        }
         ("GET", ["api", "plugins"]) => plugin_routes::list(app, stream),
         ("POST", ["api", "plugins"]) => plugin_routes::set(app, req, stream),
         ("GET", ["api", "plugins", "status-bar"]) => plugin_routes::status_bar(app, req, stream),
@@ -243,7 +252,11 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
         ("POST", ["api", "sessions", id, "mode"]) => {
             session_routes::set_session_mode(app, req, stream, id)
         }
+        ("POST", ["api", "sessions", id, "link"]) => chat_link_routes::link(app, req, stream, id),
         ("POST", ["api", "sessions", id, "model"]) => model_routes::set_model(app, req, stream, id),
+        ("POST", ["api", "sessions", id, "effort"]) => {
+            model_routes::set_effort(app, req, stream, id)
+        }
         ("GET", ["api", "sessions", id, "mcp"]) => mcp_routes::session_mcp(app, stream, id),
         ("POST", ["api", "sessions", id, "mcp"]) => {
             mcp_routes::set_session_mcp(app, req, stream, id)
@@ -291,8 +304,8 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
                 event_stream::serve(&app.store()?, &app.notifier, req, stream, id)
             }
         }
-        ("GET", ["api", "sessions", id, "workflow", "run"]) => {
-            session_routes::serve_run_events(app, req, stream, id)
+        ("GET", ["api", "sessions", id, "workflow", "run", "view"]) => {
+            session_routes::serve_run_view(app, req, stream, id)
         }
         ("GET", ["api", "sessions", id, "canvas"]) => canvas_routes::list_session(app, stream, id),
         ("POST", ["api", "sessions", id, "canvas"]) => canvas_routes::create(app, req, stream, id),

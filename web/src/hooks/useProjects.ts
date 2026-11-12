@@ -14,7 +14,8 @@ export function useProjects(language: Lang) {
   const refreshProjects = useCallback(async () => {
     try {
       const data = await getProjects();
-      setProjects(data);
+      // An unchanged list keeps its identity, so nothing keyed on it reloads.
+      setProjects((current) => (JSON.stringify(current) === JSON.stringify(data) ? current : data));
       setProjectsError(null);
     } catch (error) {
       setProjectsError(error instanceof Error ? error.message : t(language, 'projectsLoadError'));

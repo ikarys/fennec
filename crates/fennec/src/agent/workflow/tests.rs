@@ -1,69 +1,17 @@
 use super::*;
-use crate::agent::ports::{
-    AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog, Model,
-};
-use crate::agent::test_support::{MemoryLog, Scripted, builder, plan, reply};
-use crate::domain::agent::AgentDefinition;
+use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog};
+use crate::agent::test_support::{Harness, Scripted, plan, reply};
 use crate::domain::criteria::{CriterionStatus, Provenance};
 use crate::domain::event::{DoneReason, Event, ToolCall, ToolResult};
 use crate::domain::workflow::definition::{
     AgentContext, Edge, EndOutcome, Node, NodeKind, Position, Workflow,
 };
 use crate::domain::workflow::run::{RunOutcome, Via};
-use crate::tools::LocalTools;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
-
-struct Harness<'a> {
-    log: MemoryLog,
-    model: Box<dyn Model>,
-    tools: LocalTools,
-    stop: &'a AtomicBool,
-    workdir: PathBuf,
-    on_event: Box<dyn FnMut(&Event) + 'a>,
-    agents: Vec<AgentDefinition>,
-}
-
-impl<'a> Harness<'a> {
-    fn new(model: Box<dyn Model>, workdir: PathBuf, stop: &'a AtomicBool) -> Self {
-        Harness {
-            log: MemoryLog::default(),
-            model,
-            tools: LocalTools::new(workdir.clone()),
-            stop,
-            workdir,
-            on_event: Box::new(|_: &Event| {}),
-            agents: builder(),
-        }
-    }
-
-    fn turn(&mut self) -> Turn<'_> {
-        Turn {
-            model: &*self.model,
-            log: &self.log,
-            tools: &self.tools,
-            session_id: "s",
-            workdir: &self.workdir,
-            instructions: "",
-            skills: &[],
-            always_on: &[],
-            agents: &self.agents,
-            max_tokens: 100,
-            context_window: 1000,
-            compact_at: 0.0,
-            reasoning_effort: None,
-            autonomous: false,
-            lang: crate::domain::lang::Lang::Fr,
-            preflight_sent_back: false,
-            stop: self.stop,
-            on_event: &mut self.on_event,
-            children: None,
-        }
-    }
-}
 
 #[derive(Default)]
 struct FakeChildren {
@@ -1564,6 +1512,12 @@ fn start_from_plan_records_the_plan_and_runs_the_criteria() {
     assert_eq!(reason, DoneReason::Complete);
 
     let events = h.log.0.into_inner();
+    // The session was empty: the plan lands in the thread for the builder.
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::MessageStart { role: crate::domain::event::Role::User, content: Some(content), .. }
+            if content.starts_with("do it") && content.contains("C1 — check")
+    )));
     assert!(events.iter().any(|e| matches!(
         e,
         Event::WorkflowNodeFinished {
@@ -2142,4 +2096,97 @@ fn reworking_the_tests_records_nothing() {
             .iter()
             .any(|event| matches!(event, Event::TestsApproved { .. }))
     );
+}
+
+#[test]
+fn approval_in_a_session_agent_node_finishes_the_node_and_walks_on() {
+    let id = crate::domain::id::new_id();
+    let workdir = std::env::temp_dir().join(format!("fennec-ap-work-{id}"));
+    let outside = std::env::temp_dir().join(format!("fennec-ap-outside-{id}"));
+    std::fs::create_dir_all(&workdir).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(outside.join("note.txt"), "outside text").unwrap();
+
+    let call = ToolCall {
+        id: "c1".into(),
+        name: "read_file".into(),
+        arguments: serde_json::json!({
+            "path": outside.join("note.txt").to_string_lossy()
+        }),
+        parse_error: None,
+        raw_arguments: None,
+    };
+    let model = Scripted(RefCell::new(vec![
+        reply("", vec![call]),
+        reply("done", vec![]),
+    ]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), workdir.clone(), &stop);
+    h.agents = vec![plan()];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+    let events = h.log.0.borrow().clone();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::RuleApprovalRequested { call_id, .. } if call_id == "c1"))
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeStarted { node_id, .. } if node_id == "a"))
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeFinished { node_id, .. } if node_id == "a"))
+    );
+
+    let reason = answer_in_node(&mut h.turn(), &env, |turn| {
+        crate::agent::rule_approval::answer_approval(
+            turn,
+            "c1",
+            crate::domain::rule_approval::Choice::Once,
+            None,
+        )
+    })
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let events = h.log.0.into_inner();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeFinished { node_id, port, .. } if node_id == "a" && port == "done"))
+    );
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::WorkflowFinished {
+            outcome: RunOutcome::Done,
+            ..
+        }
+    )));
+    // A finished run waits for nothing: no resume is asked.
+    let state = crate::domain::workflow::run::current_run(&events).unwrap();
+    assert_eq!(crate::domain::workflow::run::waiting(&state, &events), None);
+
+    let _ = std::fs::remove_dir_all(&workdir);
+    let _ = std::fs::remove_dir_all(&outside);
 }

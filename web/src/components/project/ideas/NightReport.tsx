@@ -37,7 +37,6 @@ export function NightReport({
     badges.push({
       label: t('attentionQuestions', {
         count: report.summary.question,
-        s: report.summary.question > 1 ? 's' : ''
       }),
       tone: 'accent'
     });
@@ -45,7 +44,6 @@ export function NightReport({
     badges.push({
       label: t('attentionHalted', {
         count: report.summary.halted,
-        s: report.summary.halted > 1 ? 's' : ''
       }),
       tone: 'err'
     });
@@ -53,7 +51,6 @@ export function NightReport({
     badges.push({
       label: t('reportFailed', {
         count: report.summary.failed,
-        s: report.summary.failed > 1 ? 's' : ''
       }),
       tone: 'err'
     });
@@ -61,7 +58,6 @@ export function NightReport({
     badges.push({
       label: t('integratedCount', {
         count: report.summary.integrated,
-        s: report.summary.integrated > 1 ? 's' : ''
       }),
       tone: 'ok'
     });
@@ -71,8 +67,12 @@ export function NightReport({
   const toggleLabel = open ? t('hideIdeas') : t('showIdeas');
 
   return (
-    <Card className="flex flex-col px-4 py-2.5">
-      <div className="flex items-center gap-3 min-h-8">
+    <Card className="flex flex-col overflow-hidden px-4 py-2.5">
+      <div
+        className={`-mx-4 -mt-2.5 flex min-h-8 items-center gap-3 px-4 py-2.5 bg-linear-to-r from-accent-soft to-transparent to-75% ${
+          open ? 'border-b border-border' : ''
+        }`}
+      >
         <Button
           variant="ghost"
           size="sm"
@@ -84,7 +84,11 @@ export function NightReport({
         >
           {open ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
         </Button>
-        {report.autonomous ? <MoonIcon className="h-4 w-4 text-muted" /> : null}
+        {report.autonomous ? (
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+            <MoonIcon className="h-3.5 w-3.5" />
+          </span>
+        ) : null}
         <h3 className="m-0 text-sm font-medium">
           {report.autonomous ? t('nightReportTitle') : t('queueReportTitle')}
         </h3>
@@ -114,7 +118,7 @@ export function NightReport({
       </div>
 
       {open ? (
-        <div className="mt-2 flex max-h-[32rem] flex-col overflow-y-auto border-t border-border">
+        <div className="mt-2 flex max-h-[32rem] flex-col overflow-y-auto">
           {report.ideas.map((idea, i) => {
             const sid = idea.sessionId;
             return (

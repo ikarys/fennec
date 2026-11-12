@@ -1,3 +1,5 @@
+import { readStored, writeStored } from './storage';
+
 export type ThemeId = 'nuit' | 'jour' | 'ardoise' | 'cyber';
 
 export interface ThemeOption {
@@ -16,21 +18,13 @@ const STORAGE_KEY = 'fennec.theme';
 
 export function applyTheme(id: ThemeId): void {
   document.documentElement.dataset.theme = id;
-  try {
-    localStorage.setItem(STORAGE_KEY, id);
-  } catch {
-    // localStorage can be unavailable in private mode.
-  }
+  writeStored(STORAGE_KEY, id);
 }
 
 export function getStoredTheme(): ThemeId {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    if (value === 'nuit' || value === 'jour' || value === 'ardoise' || value === 'cyber') {
-      return value;
-    }
-  } catch {
-    // Ignore storage errors.
+  const value = readStored(STORAGE_KEY);
+  if (value === 'nuit' || value === 'jour' || value === 'ardoise' || value === 'cyber') {
+    return value;
   }
   return 'nuit';
 }

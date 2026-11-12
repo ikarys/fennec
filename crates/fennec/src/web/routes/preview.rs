@@ -119,6 +119,27 @@ fn content_type_of(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::id::new_id;
+    use crate::web::test_support::{app, header, response};
+
+    #[test]
+    fn preview_serves_html_with_the_sandbox_csp() {
+        let base = std::env::temp_dir().join(format!("fennec-preview-route-{}", new_id()));
+        let workdir = base.join("work");
+        std::fs::create_dir_all(&workdir).unwrap();
+        std::fs::write(workdir.join("page.html"), "<script>alert(1)</script>").unwrap();
+        let app = app(base.join("fennec.db"));
+        let store = app.store().unwrap();
+        let project = store.project_for(&workdir.display().to_string()).unwrap();
+        let session = store.create_session(&project, "t").unwrap();
+
+        let reply = response(|stream| serve(&app, stream, &session, &["page.html"]).unwrap());
+
+        assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+        let csp = header(&reply, "Content-Security-Policy").expect("a CSP header");
+        assert!(csp.contains("sandbox"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn relative_path_from_segments_refuses_dot_segments() {

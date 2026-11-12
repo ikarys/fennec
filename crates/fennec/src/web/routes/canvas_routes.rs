@@ -1,4 +1,4 @@
-//! Canvas routes (contract `docs/api.md`).
+//! Canvas routes (contract `docs/devs/api.md`).
 //!
 //! The `canvas` crate owns the artifacts; this module only translates HTTP to
 //! its calls and reads the pinned files from the session's working directory.
@@ -375,6 +375,36 @@ fn store_error(stream: &mut TcpStream, e: StoreError) -> Result<(), HttpError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::id::new_id;
+    use crate::web::test_support::{app, header, response};
+
+    #[test]
+    fn canvas_content_serves_html_with_the_sandbox_csp() {
+        let base = std::env::temp_dir().join(format!("fennec-canvas-route-{}", new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let app = app(base.join("fennec.db"));
+        let artifact = canvas_store(&app)
+            .unwrap()
+            .create(
+                NewArtifact {
+                    project_id: "p".into(),
+                    session_id: "s".into(),
+                    format: Format::Html,
+                    source: Source::Message,
+                    title: None,
+                },
+                b"<script>alert(1)</script>",
+            )
+            .unwrap();
+
+        let reply =
+            response(|stream| content(&app, stream, &artifact.id.to_string(), "1").unwrap());
+
+        assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
+        let csp = header(&reply, "Content-Security-Policy").expect("a CSP header");
+        assert!(csp.contains("sandbox"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn parses_file_body() {

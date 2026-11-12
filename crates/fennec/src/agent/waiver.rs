@@ -12,110 +12,49 @@ use crate::domain::waiver;
 /// Produces the answered waiver call's `tool.result` (the answer itself was
 /// recorded at the human's click), and runs the agent loop on.
 pub fn answer_waiver(turn: &mut Turn, call_id: &str) -> Result<DoneReason, String> {
-    turn::with_running(turn, |turn| {
-        let events = turn.log.events(turn.session_id)?;
-        let (path, answer) = waiver::answered(&events, call_id)
-            .ok_or_else(|| "no answered waiver awaiting its result".to_string())?;
-        let agent =
-            resolve(turn.agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
-        let (message_id, call) = events
-            .iter()
-            .find_map(|event| match event {
-                Event::ToolCall {
-                    message_id,
-                    tool_call,
-                } if tool_call.id == call_id => Some((message_id.clone(), tool_call.clone())),
-                _ => None,
-            })
-            .ok_or_else(|| "no tool call for this waiver".to_string())?;
+    let events = turn.log.events(turn.session_id)?;
+    let (path, answer) = waiver::answered(&events, call_id)
+        .ok_or_else(|| "no answered waiver awaiting its result".to_string())?;
+    let agent = resolve(turn.agents, &events).ok_or_else(|| "no top-level agent".to_string())?;
+    let (message_id, call) = events
+        .iter()
+        .find_map(|event| match event {
+            Event::ToolCall {
+                message_id,
+                tool_call,
+            } if tool_call.id == call_id => Some((message_id.clone(), tool_call.clone())),
+            _ => None,
+        })
+        .ok_or_else(|| "no tool call for this waiver".to_string())?;
 
-        let result = match (answer.granted, answer.expires_at, answer.adr) {
-            (true, Some(expires_at), Some(adr)) => ToolResult::success(
-                format!(
-                    "Granted by the human: you may write {path} until {} (UTC), in this session only. The waiver is recorded in {adr}.",
-                    clock::format_utc(expires_at)
-                ),
-                false,
+    let result = match (answer.granted, answer.expires_at, answer.adr) {
+        (true, Some(expires_at), Some(adr)) => ToolResult::success(
+            format!(
+                "Granted by the human: you may write {path} until {} (UTC), in this session only. The waiver is recorded in {adr}.",
+                clock::format_utc(expires_at)
             ),
-            _ => ToolResult::failure(
-                "Refused by the human. Do not work around it: say in your report what should change there and why."
-                    .to_string(),
-            ),
-        };
-        tool_calls::record(turn, &message_id, &call, result)?;
+            false,
+        ),
+        _ => ToolResult::failure(
+            "Refused by the human. Do not work around it: say in your report what should change there and why."
+                .to_string(),
+        ),
+    };
+    tool_calls::record(turn, &message_id, &call, result)?;
 
-        turn::run_top_level_agent_loop(turn, agent)
-    })
+    turn::run_top_level_agent_loop(turn, agent)
 }
 
 #[cfg(test)]
 mod tests {
     use super::answer_waiver;
-    use crate::agent::ports::{EventLog, Model};
-    use crate::agent::test_support::{MemoryLog, Scripted, builder, reply};
-    use crate::agent::turn::{Turn, run_turn};
-    use crate::domain::agent::AgentDefinition;
+    use crate::agent::ports::EventLog;
+    use crate::agent::test_support::{Harness, Scripted, reply, scratch_dir};
+    use crate::agent::turn::run_turn;
     use crate::domain::event::{DoneReason, Event, ToolCall};
-    use crate::tools::LocalTools;
     use serde_json::json;
     use std::cell::RefCell;
-    use std::path::PathBuf;
     use std::sync::atomic::AtomicBool;
-
-    struct Harness<'a> {
-        log: MemoryLog,
-        model: Box<dyn Model>,
-        tools: LocalTools,
-        stop: &'a AtomicBool,
-        workdir: PathBuf,
-        on_event: Box<dyn FnMut(&Event) + 'a>,
-        agents: Vec<AgentDefinition>,
-    }
-
-    impl<'a> Harness<'a> {
-        fn new(model: Box<dyn Model>, workdir: PathBuf, stop: &'a AtomicBool) -> Self {
-            Harness {
-                log: MemoryLog::default(),
-                model,
-                tools: LocalTools::new(workdir.clone()).with_rules(rules::Rules::default()),
-                stop,
-                workdir,
-                on_event: Box::new(|_: &Event| {}),
-                agents: builder(),
-            }
-        }
-
-        fn turn(&mut self, autonomous: bool) -> Turn<'_> {
-            Turn {
-                model: &*self.model,
-                log: &self.log,
-                tools: &self.tools,
-                session_id: "s",
-                workdir: &self.workdir,
-                instructions: "",
-                skills: &[],
-                always_on: &[],
-                agents: &self.agents,
-                max_tokens: 100,
-                context_window: 1000,
-                compact_at: 0.0,
-                reasoning_effort: None,
-                autonomous,
-                lang: crate::domain::lang::Lang::Fr,
-                preflight_sent_back: false,
-                stop: self.stop,
-                on_event: &mut self.on_event,
-                children: None,
-            }
-        }
-    }
-
-    fn scratch_dir() -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("fennec-waiver-{}", crate::domain::id::new_id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
-    }
 
     fn waiver_call() -> ToolCall {
         ToolCall {
@@ -148,8 +87,8 @@ mod tests {
         let model = Scripted(RefCell::new(vec![reply("", vec![waiver_call()])]));
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
-        run_turn(&mut h.turn(false), "go", &[]).unwrap();
-        assert!(answer_waiver(&mut h.turn(false), "c1").is_err());
+        run_turn(&mut h.turn(), "go", &[]).unwrap();
+        assert!(answer_waiver(&mut h.turn(), "c1").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -163,7 +102,7 @@ mod tests {
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
 
-        let reason = run_turn(&mut h.turn(false), "go", &[]).unwrap();
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::WaitingForUser);
         let events = h.log.0.borrow().clone();
         assert!(
@@ -178,7 +117,7 @@ mod tests {
         );
 
         answer(&h, true);
-        let reason = answer_waiver(&mut h.turn(false), "c1").unwrap();
+        let reason = answer_waiver(&mut h.turn(), "c1").unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(events
@@ -201,11 +140,11 @@ mod tests {
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
 
-        let reason = run_turn(&mut h.turn(false), "go", &[]).unwrap();
+        let reason = run_turn(&mut h.turn(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::WaitingForUser);
 
         answer(&h, false);
-        let reason = answer_waiver(&mut h.turn(false), "c1").unwrap();
+        let reason = answer_waiver(&mut h.turn(), "c1").unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(events
@@ -228,7 +167,7 @@ mod tests {
         let stop = AtomicBool::new(false);
         let mut h = Harness::new(Box::new(model), dir.clone(), &stop);
 
-        let reason = run_turn(&mut h.turn(true), "go", &[]).unwrap();
+        let reason = run_turn(&mut h.turn_autonomous(), "go", &[]).unwrap();
         assert_eq!(reason, DoneReason::Complete);
         let events = h.log.0.borrow().clone();
         assert!(

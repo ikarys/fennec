@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { IntegrationConflict, IntegrationPreview, IntegrationResult } from '../../lib/api';
-import { createSession, getIntegration, integrate, startUnderstanding, suggestCommitMessage } from '../../lib/api';
+import { createSession, getIntegration, integrate, resolveConflict, startUnderstanding, suggestCommitMessage } from '../../lib/api';
 import { completeIdea } from '../../lib/ideas';
 import { IntegrationReview } from './IntegrationReview';
 import { ServerList } from './ServerList';
@@ -41,6 +41,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const [protectTests, setProtectTests] = useState(false);
   const [removeWorktree, setRemoveWorktree] = useState(true);
   const [suggested, setSuggested] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -161,6 +162,21 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
       }
     } finally {
       setPosting(false);
+    }
+  };
+
+  // A conflict is never accepted: the agent brings its branch up to date and
+  // resolves it in the session, and the human integrates once it is done.
+  const handleResolveConflict = async () => {
+    setResolving(true);
+    setError(null);
+    try {
+      await resolveConflict(sessionId);
+      closeDialog();
+    } catch (resolveError) {
+      setError(resolveError instanceof Error ? resolveError.message : t('error'));
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -323,6 +339,19 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                     {preview.blockers.map((blocker) => (
                       <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
                         <span className="grow break-words text-text">{blockerSentence(lang, blocker)}</span>
+                        {blocker.kind === 'conflict' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="shrink-0"
+                            disabled={resolving || posting}
+                            title={t('resolveConflictTitle')}
+                            onClick={() => void handleResolveConflict()}
+                          >
+                            {resolving && <SpinnerIcon className="h-3.5 w-3.5" />}
+                            {t('resolveWithAgent')}
+                          </Button>
+                        )}
                         {blocker.acknowledgeable && (
                           <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
                             <input

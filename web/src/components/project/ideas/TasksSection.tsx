@@ -9,8 +9,9 @@ import { TasksOverview } from './TasksOverview';
 import { QueueBar } from './QueueBar';
 import { StageGroup } from './StageGroup';
 import { NewIdeaDialog } from './NewIdeaDialog';
+import { TaskDrawer } from './TaskDrawer';
 import { Button } from '../../ui/Button';
-import { CloseIcon, PlusIcon } from '../../ui/Icons';
+import { ActivityIcon, BulbIcon, CheckIcon, CloseIcon, EditIcon, PlusIcon, ReviewIcon, type PuzzleIcon } from '../../ui/Icons';
 import {
   listIdeas,
   markReportRead,
@@ -22,12 +23,12 @@ import { useT } from '../../../i18n';
 
 export type TasksSub = 'overview' | 'yours' | 'backlog' | 'ready' | 'done';
 
-const TOP_TABS: readonly { id: TasksSub; labelKey: MsgKey }[] = [
-  { id: 'overview', labelKey: 'tasksTabOverview' },
-  { id: 'yours', labelKey: 'tasksTabYours' },
-  { id: 'ready', labelKey: 'tasksTabReady' },
-  { id: 'backlog', labelKey: 'tasksTabBacklog' },
-  { id: 'done', labelKey: 'tasksTabDone' },
+const TOP_TABS: readonly { id: TasksSub; labelKey: MsgKey; Icon: typeof PuzzleIcon }[] = [
+  { id: 'overview', labelKey: 'tasksTabOverview', Icon: ActivityIcon },
+  { id: 'yours', labelKey: 'tasksTabYours', Icon: ReviewIcon },
+  { id: 'ready', labelKey: 'tasksTabReady', Icon: BulbIcon },
+  { id: 'backlog', labelKey: 'tasksTabBacklog', Icon: EditIcon },
+  { id: 'done', labelKey: 'tasksTabDone', Icon: CheckIcon },
 ];
 
 function normalizeSub(sub: string | null): TasksSub {
@@ -46,12 +47,16 @@ function normalizeSub(sub: string | null): TasksSub {
 export function TasksSection({
   projectId,
   sub,
+  task,
+  onOpenTask,
   onFrame,
   onOpenSession,
   onSelectSub,
 }: {
   projectId: string;
   sub: string | null;
+  task: string | null;
+  onOpenTask: (ideaId: string | null) => void;
   onFrame: (idea: IdeaView) => Promise<void>;
   onOpenSession: (sessionId: string) => void;
   onSelectSub: (sub: TasksSub) => void;
@@ -143,6 +148,7 @@ export function TasksSection({
   const done = board.groups.find((g) => g.stage === 'done')?.ideas ?? [];
 
   const activeSub = normalizeSub(sub);
+  const openIdea = task ? board.groups.flatMap((g) => g.ideas).find((i) => i.id === task) : undefined;
 
   return (
     <section className="flex flex-col gap-4">
@@ -152,6 +158,7 @@ export function TasksSection({
         tabs={TOP_TABS.map((tab) => ({
           id: tab.id,
           label: t(tab.labelKey),
+          Icon: tab.Icon,
           count:
             tab.id === 'yours'
               ? yours.length
@@ -165,6 +172,12 @@ export function TasksSection({
         }))}
         active={activeSub}
         onSelect={(id) => onSelectSub(id as TasksSub)}
+        trailing={
+          <Button variant="secondary" size="sm" title={t('addIdeaToBacklog')} onClick={() => setNewIdeaOpen(true)}>
+            <PlusIcon className="h-4 w-4" />
+            {t('newIdea')}
+          </Button>
+        }
       />
 
       {actionError ? (
@@ -217,20 +230,6 @@ export function TasksSection({
       {activeSub === 'ready' || activeSub === 'backlog' ? (
         <div className="flex flex-col gap-4">
           <QueueBar queue={board.queue} projectId={projectId} run={run} />
-
-          <div className="flex items-center gap-2">
-            <div className="ml-auto">
-              <Button
-                variant="secondary"
-                size="sm"
-                title={t('addIdeaToBacklog')}
-                onClick={() => setNewIdeaOpen(true)}
-              >
-                <PlusIcon className="h-4 w-4" />
-                {t('newIdea')}
-              </Button>
-            </div>
-          </div>
 
           {activeSub === 'backlog' && drafts.length === 0 ? (
             <p className="m-0 text-sm text-muted">{t('noDraftsPending')}</p>
@@ -289,7 +288,20 @@ export function TasksSection({
         open={newIdeaOpen}
         run={run}
         onClose={() => setNewIdeaOpen(false)}
+        onCreated={() => onSelectSub('backlog')}
       />
+
+      {openIdea ? (
+        <TaskDrawer
+          key={openIdea.id}
+          idea={openIdea}
+          projectId={projectId}
+          run={run}
+          onFrame={runFrame}
+          onOpenSession={onOpenSession}
+          onClose={() => onOpenTask(null)}
+        />
+      ) : null}
     </section>
   );
 }

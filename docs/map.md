@@ -5,350 +5,409 @@ Each box is a module (a directory); an arrow `A --> B` means code in A imports c
 
 ```mermaid
 graph LR
-  m0["crates/fennec/src/cli"]
-  m1["crates/fennec/src/tools/run_command"]
-  m2["crates/fennec/src/tools/web_fetch"]
-  m3["crates/fennec/src/web"]
-  m4["crates/fennec/src/sandbox"]
-  m5["crates/fennec/src/web/routes"]
-  m6["crates/fennec/src/web/os"]
-  m7["crates/fennec/src/web/streams"]
-  m8["crates/fennec/src/web/views"]
-  m9["crates/fennec/src/plugins"]
-  m10["crates/fennec/src/web/jobs"]
-  m11["crates/fennec/src"]
-  m12["crates/fennec/src/agent/workflow"]
-  m13["crates/fennec/src/domain/risk"]
-  m14["crates/fennec/src/llm"]
-  m15["crates/fennec/src/agents"]
+  m0["crates/fennec/src/agent/tool_calls"]
+  m1["crates/fennec/src/cli"]
+  m2["crates/fennec/src/tools/run_command"]
+  m3["crates/fennec/src/tools/web_fetch"]
+  m4["crates/fennec/src/web/routes/integration"]
+  m5["crates/fennec/src/web"]
+  m6["crates/fennec/src/web/routes"]
+  m7["crates/fennec/src/plugins"]
+  m8["crates/fennec/src/web/os"]
+  m9["crates/fennec/src/web/streams"]
+  m10["crates/fennec/src/web/views/run_view"]
+  m11["crates/fennec/src/web/views"]
+  m12["crates/fennec/src/web/jobs"]
+  m13["crates/fennec/src/agent/workflow"]
+  m14["crates/fennec/src"]
+  m15["crates/fennec/src/llm"]
   m16["crates/fennec/src/mcp"]
-  m17["crates/fennec/src/worktree"]
-  m18["crates/fennec/src/store"]
-  m19["crates/fennec/src/tools"]
-  m20["crates/backlog/src"]
-  m21["crates/fennec/src/agent"]
-  m22["crates/canvas/src"]
-  m23["crates/fennec/src/domain/workflow"]
-  m24["crates/fennec/src/domain"]
-  m25["crates/fennec/src/domain/module_map"]
-  m26["crates/rules/src"]
-  m27["crates/token-usage/src"]
-  m28["web/src"]
-  m29["web/src/pages"]
-  m30["web/src/components/agents"]
-  m31["web/src/components/project"]
-  m32["web/src/components/project/ideas"]
-  m33["web/src/components/workflow"]
-  m34["web/src/components/rules"]
-  m35["web/src/components/workflow/fields"]
-  m36["web/src/components/workflow/nodes"]
-  m37["web/src/components"]
-  m38["web/src/components/layout"]
-  m39["web/src/components/plugins"]
-  m40["web/src/components/ui"]
-  m41["web/src/hooks"]
-  m42["web/src/components/workflow/session"]
-  m43["web/src/components/session"]
-  m44["web/src/components/preview"]
-  m45["web/src/components/canvas"]
-  m46["web/src/lib"]
-  m47["web/src/components/settings"]
-  m48["web/src/lib/api"]
-  m49["web/src/i18n"]
-  m50["crates/fennec"]
-  m51["crates/token-usage/tests"]
-  m52["web"]
-  m53["web/scripts"]
-  m11 -->|3| m21
-  m11 -->|1| m15
-  m11 -->|19| m24
-  m11 -->|2| m25
-  m11 -->|1| m13
-  m11 -->|1| m23
-  m11 -->|1| m14
-  m11 -->|1| m16
-  m11 -->|4| m18
-  m11 -->|3| m19
-  m11 -->|3| m17
-  m11 -->|1| m26
-  m11 -->|3| m27
-  m21 -->|20| m24
-  m21 -->|1| m23
-  m21 -->|3| m26
-  m12 -->|2| m21
-  m12 -->|3| m24
-  m12 -->|3| m23
-  m15 -->|2| m24
-  m0 -->|3| m11
-  m0 -->|1| m21
-  m0 -->|1| m15
-  m0 -->|3| m24
-  m0 -->|2| m18
-  m24 -->|1| m25
-  m24 -->|3| m26
-  m24 -->|2| m27
-  m23 -->|3| m24
-  m14 -->|2| m11
-  m14 -->|1| m21
+  m17["crates/fennec/src/domain/risk"]
+  m18["crates/fennec/src/worktree"]
+  m19["crates/fennec/src/agents"]
+  m20["crates/fennec/src/store"]
+  m21["crates/fennec/src/sandbox"]
+  m22["crates/fennec/src/agent"]
+  m23["crates/fennec/src/tools"]
+  m24["crates/fennec/src/agent/turn"]
+  m25["crates/fennec/src/domain/workflow"]
+  m26["crates/canvas/src"]
+  m27["crates/fennec/src/domain"]
+  m28["crates/rules/src"]
+  m29["crates/fennec/src/domain/preferences"]
+  m30["crates/fennec/src/domain/module_map"]
+  m31["crates/fennec/src/domain/event"]
+  m32["crates/token-usage/src"]
+  m33["crates/backlog/src"]
+  m34["web/src"]
+  m35["web/src/components/layout"]
+  m36["web/src/pages"]
+  m37["web/src/components/agents"]
+  m38["web/src/components/editor"]
+  m39["web/src/components/project"]
+  m40["web/src/components/project/ideas"]
+  m41["web/src/components/workflow"]
+  m42["web/src/components/plugins"]
+  m43["web/src/components/rules"]
+  m44["web/src/components/workflow/fields"]
+  m45["web/src/components/workflow/nodes"]
+  m46["web/src/components/ui"]
+  m47["web/src/hooks"]
+  m48["web/src/components/session"]
+  m49["web/src/components/workflow/session"]
+  m50["web/src/components/canvas"]
+  m51["web/src/components/preview"]
+  m52["web/src/lib"]
+  m53["web/src/components/settings"]
+  m54["web/src/lib/api"]
+  m55["web/src/i18n"]
+  m56["crates/fennec"]
+  m57["crates/token-usage/tests"]
+  m58["docs/users/theme"]
+  m59["web"]
+  m60["web/scripts"]
+  m14 -->|1| m33
+  m14 -->|3| m22
   m14 -->|1| m24
-  m16 -->|1| m11
-  m16 -->|2| m24
-  m16 -->|2| m18
-  m16 -->|2| m19
-  m9 -->|3| m11
-  m9 -->|3| m24
-  m9 -->|2| m18
-  m9 -->|2| m19
-  m18 -->|1| m20
-  m18 -->|1| m11
-  m18 -->|1| m21
-  m18 -->|8| m24
-  m19 -->|1| m22
-  m19 -->|2| m11
-  m19 -->|2| m21
-  m19 -->|8| m24
-  m19 -->|2| m26
-  m1 -->|3| m24
-  m1 -->|1| m4
-  m4 -->|1| m24
-  m2 -->|1| m24
-  m3 -->|4| m11
-  m3 -->|2| m21
-  m3 -->|1| m12
-  m3 -->|4| m24
-  m3 -->|1| m9
-  m3 -->|2| m18
-  m3 -->|2| m19
-  m3 -->|2| m5
-  m3 -->|1| m17
-  m10 -->|1| m20
-  m10 -->|3| m11
-  m10 -->|3| m21
-  m10 -->|1| m12
-  m10 -->|4| m24
-  m10 -->|2| m23
-  m10 -->|2| m14
-  m10 -->|4| m18
-  m10 -->|1| m3
-  m10 -->|1| m5
-  m10 -->|1| m27
-  m6 -->|1| m11
-  m6 -->|1| m24
-  m6 -->|3| m3
-  m6 -->|1| m17
-  m5 -->|6| m20
-  m5 -->|4| m22
-  m5 -->|22| m11
-  m5 -->|12| m21
-  m5 -->|2| m12
-  m5 -->|5| m15
-  m5 -->|29| m24
-  m5 -->|3| m23
-  m5 -->|2| m16
-  m5 -->|1| m9
-  m5 -->|7| m18
-  m5 -->|3| m19
-  m5 -->|35| m3
-  m5 -->|3| m10
-  m5 -->|3| m6
+  m14 -->|1| m19
+  m14 -->|19| m27
+  m14 -->|3| m31
+  m14 -->|2| m30
+  m14 -->|2| m29
+  m14 -->|1| m17
+  m14 -->|1| m25
+  m14 -->|1| m15
+  m14 -->|1| m16
+  m14 -->|3| m21
+  m14 -->|4| m20
+  m14 -->|1| m23
+  m14 -->|3| m18
+  m14 -->|1| m28
+  m14 -->|3| m32
+  m22 -->|1| m24
+  m22 -->|16| m27
+  m22 -->|20| m31
+  m22 -->|2| m29
+  m22 -->|1| m25
+  m22 -->|1| m23
+  m22 -->|3| m28
+  m0 -->|1| m22
+  m0 -->|1| m27
+  m0 -->|1| m31
+  m0 -->|1| m28
+  m24 -->|1| m27
+  m24 -->|1| m31
+  m24 -->|1| m29
+  m13 -->|3| m24
+  m13 -->|3| m27
+  m13 -->|4| m31
+  m13 -->|4| m25
+  m19 -->|2| m27
+  m1 -->|6| m14
+  m1 -->|1| m22
+  m1 -->|1| m24
+  m1 -->|1| m19
+  m1 -->|5| m27
+  m1 -->|2| m31
+  m1 -->|2| m20
+  m27 -->|2| m33
+  m27 -->|8| m31
+  m27 -->|1| m30
+  m27 -->|1| m29
+  m27 -->|4| m28
+  m27 -->|2| m32
+  m25 -->|3| m27
+  m25 -->|2| m31
+  m15 -->|2| m14
+  m15 -->|1| m22
+  m15 -->|1| m27
+  m15 -->|1| m31
+  m16 -->|1| m14
+  m16 -->|2| m27
+  m16 -->|1| m29
+  m16 -->|2| m21
+  m16 -->|2| m20
+  m7 -->|3| m14
+  m7 -->|4| m27
+  m7 -->|2| m21
+  m7 -->|2| m20
+  m21 -->|1| m29
+  m20 -->|1| m33
+  m20 -->|1| m14
+  m20 -->|1| m22
+  m20 -->|9| m27
+  m20 -->|3| m31
+  m20 -->|1| m29
+  m23 -->|1| m26
+  m23 -->|2| m14
+  m23 -->|2| m22
+  m23 -->|6| m27
+  m23 -->|7| m31
+  m23 -->|1| m29
+  m23 -->|2| m28
+  m2 -->|3| m31
+  m2 -->|2| m21
+  m3 -->|1| m31
+  m5 -->|5| m14
+  m5 -->|2| m22
+  m5 -->|2| m24
+  m5 -->|1| m13
+  m5 -->|4| m27
+  m5 -->|1| m31
+  m5 -->|1| m29
   m5 -->|1| m7
-  m5 -->|8| m8
-  m5 -->|5| m17
-  m5 -->|4| m26
-  m5 -->|3| m27
-  m7 -->|2| m11
-  m7 -->|1| m21
-  m7 -->|1| m24
-  m7 -->|2| m18
-  m7 -->|2| m3
-  m7 -->|1| m10
-  m7 -->|1| m17
-  m7 -->|1| m27
-  m8 -->|2| m20
-  m8 -->|2| m11
-  m8 -->|7| m24
-  m8 -->|1| m23
-  m8 -->|2| m18
-  m8 -->|3| m3
-  m8 -->|1| m10
-  m8 -->|6| m27
-  m17 -->|2| m11
-  m17 -->|2| m19
-  m28 -->|1| m37
-  m28 -->|1| m38
-  m28 -->|1| m31
-  m28 -->|1| m41
-  m28 -->|1| m49
-  m28 -->|2| m46
-  m28 -->|1| m29
-  m37 -->|1| m38
-  m37 -->|1| m43
-  m37 -->|1| m40
-  m37 -->|1| m49
-  m37 -->|1| m46
-  m30 -->|1| m37
-  m30 -->|2| m40
-  m30 -->|2| m49
-  m30 -->|2| m48
-  m45 -->|3| m37
-  m45 -->|1| m44
-  m45 -->|3| m40
-  m45 -->|3| m49
-  m45 -->|1| m46
-  m45 -->|3| m48
-  m38 -->|3| m37
-  m38 -->|1| m39
-  m38 -->|1| m43
-  m38 -->|4| m40
-  m38 -->|1| m41
-  m38 -->|4| m49
+  m5 -->|1| m21
+  m5 -->|3| m20
+  m5 -->|1| m23
+  m5 -->|2| m6
+  m5 -->|1| m18
+  m12 -->|3| m33
+  m12 -->|4| m14
+  m12 -->|4| m22
+  m12 -->|1| m13
+  m12 -->|5| m27
+  m12 -->|2| m31
+  m12 -->|3| m29
+  m12 -->|2| m25
+  m12 -->|3| m15
+  m12 -->|5| m20
+  m12 -->|1| m5
+  m12 -->|1| m32
+  m8 -->|1| m14
+  m8 -->|2| m27
+  m8 -->|3| m5
+  m8 -->|1| m18
+  m6 -->|5| m33
+  m6 -->|4| m26
+  m6 -->|24| m14
+  m6 -->|12| m22
+  m6 -->|2| m13
+  m6 -->|5| m19
+  m6 -->|30| m27
+  m6 -->|10| m31
+  m6 -->|4| m29
+  m6 -->|2| m25
+  m6 -->|2| m16
+  m6 -->|1| m7
+  m6 -->|2| m21
+  m6 -->|6| m20
+  m6 -->|36| m5
+  m6 -->|2| m12
+  m6 -->|3| m8
+  m6 -->|1| m9
+  m6 -->|7| m11
+  m6 -->|1| m10
+  m6 -->|3| m18
+  m6 -->|4| m28
+  m6 -->|3| m32
+  m4 -->|2| m33
+  m4 -->|2| m14
+  m4 -->|2| m22
+  m4 -->|1| m19
+  m4 -->|2| m27
+  m4 -->|1| m31
+  m4 -->|2| m25
+  m4 -->|1| m21
+  m4 -->|1| m20
+  m4 -->|2| m5
+  m4 -->|1| m12
+  m4 -->|1| m6
+  m4 -->|1| m11
+  m4 -->|2| m18
+  m9 -->|2| m14
+  m9 -->|1| m22
+  m9 -->|1| m27
+  m9 -->|2| m20
+  m9 -->|2| m5
+  m9 -->|1| m12
+  m9 -->|1| m18
+  m9 -->|1| m32
+  m11 -->|3| m33
+  m11 -->|2| m14
+  m11 -->|8| m27
+  m11 -->|5| m31
+  m11 -->|1| m25
+  m11 -->|2| m20
+  m11 -->|3| m5
+  m11 -->|1| m12
+  m11 -->|7| m32
+  m10 -->|1| m31
+  m10 -->|1| m25
+  m18 -->|2| m14
+  m18 -->|2| m21
+  m34 -->|1| m35
+  m34 -->|1| m39
+  m34 -->|1| m47
+  m34 -->|1| m55
+  m34 -->|2| m52
+  m37 -->|2| m46
+  m37 -->|2| m55
+  m37 -->|2| m54
+  m50 -->|1| m51
+  m50 -->|3| m46
+  m50 -->|3| m55
+  m50 -->|2| m52
+  m50 -->|3| m54
+  m38 -->|1| m48
   m38 -->|4| m46
-  m39 -->|2| m40
-  m39 -->|1| m49
-  m39 -->|2| m46
-  m44 -->|1| m37
-  m44 -->|2| m45
-  m44 -->|2| m43
-  m44 -->|1| m40
-  m44 -->|1| m41
-  m44 -->|5| m49
-  m44 -->|4| m46
-  m44 -->|2| m48
-  m31 -->|17| m37
-  m31 -->|1| m45
-  m31 -->|1| m39
-  m31 -->|1| m34
-  m31 -->|3| m43
-  m31 -->|22| m40
-  m31 -->|1| m41
-  m31 -->|23| m49
-  m31 -->|18| m46
-  m31 -->|5| m48
-  m32 -->|8| m37
-  m32 -->|10| m40
-  m32 -->|10| m49
-  m32 -->|11| m46
-  m34 -->|1| m37
-  m34 -->|1| m40
-  m34 -->|1| m49
-  m34 -->|1| m48
-  m43 -->|25| m37
-  m43 -->|1| m39
-  m43 -->|3| m44
-  m43 -->|40| m40
-  m43 -->|2| m42
-  m43 -->|2| m41
-  m43 -->|43| m49
-  m43 -->|41| m46
-  m43 -->|3| m48
-  m47 -->|8| m37
-  m47 -->|1| m39
-  m47 -->|2| m43
-  m47 -->|20| m40
-  m47 -->|1| m41
-  m47 -->|21| m49
-  m47 -->|17| m46
-  m47 -->|1| m48
-  m40 -->|3| m37
-  m40 -->|1| m41
-  m40 -->|1| m49
-  m33 -->|4| m37
-  m33 -->|6| m40
-  m33 -->|1| m35
-  m33 -->|1| m36
-  m33 -->|8| m49
-  m33 -->|8| m46
-  m35 -->|5| m40
-  m35 -->|4| m33
-  m35 -->|4| m49
-  m35 -->|5| m46
-  m36 -->|2| m46
-  m42 -->|5| m37
-  m42 -->|3| m43
-  m42 -->|6| m40
-  m42 -->|5| m49
-  m42 -->|6| m46
-  m41 -->|1| m42
-  m41 -->|4| m49
+  m38 -->|4| m55
+  m38 -->|3| m52
+  m35 -->|1| m42
+  m35 -->|2| m48
+  m35 -->|9| m46
+  m35 -->|3| m47
+  m35 -->|10| m55
+  m35 -->|9| m52
+  m35 -->|1| m36
+  m42 -->|3| m46
+  m42 -->|1| m55
+  m42 -->|2| m52
+  m42 -->|1| m54
+  m51 -->|2| m50
+  m51 -->|2| m48
+  m51 -->|1| m46
+  m51 -->|1| m47
+  m51 -->|5| m55
+  m51 -->|4| m52
+  m51 -->|2| m54
+  m39 -->|1| m50
+  m39 -->|1| m42
+  m39 -->|1| m43
+  m39 -->|4| m48
+  m39 -->|23| m46
+  m39 -->|7| m47
+  m39 -->|24| m55
+  m39 -->|19| m52
+  m39 -->|5| m54
+  m40 -->|17| m46
+  m40 -->|1| m47
+  m40 -->|17| m55
+  m40 -->|17| m52
+  m43 -->|1| m46
+  m43 -->|1| m55
+  m43 -->|1| m54
+  m48 -->|3| m50
+  m48 -->|2| m42
+  m48 -->|4| m51
+  m48 -->|51| m46
+  m48 -->|3| m49
+  m48 -->|3| m47
+  m48 -->|54| m55
+  m48 -->|51| m52
+  m48 -->|3| m54
+  m53 -->|1| m42
+  m53 -->|2| m48
+  m53 -->|25| m46
+  m53 -->|2| m47
+  m53 -->|26| m55
+  m53 -->|23| m52
+  m53 -->|1| m54
+  m46 -->|2| m47
+  m46 -->|5| m55
+  m46 -->|2| m52
   m41 -->|7| m46
-  m41 -->|2| m48
-  m46 -->|1| m47
-  m46 -->|2| m40
-  m46 -->|9| m49
-  m46 -->|1| m48
-  m48 -->|2| m46
-  m29 -->|7| m37
-  m29 -->|1| m30
-  m29 -->|1| m45
-  m29 -->|1| m38
-  m29 -->|1| m44
-  m29 -->|2| m31
-  m29 -->|1| m32
-  m29 -->|1| m34
-  m29 -->|4| m43
-  m29 -->|1| m47
-  m29 -->|9| m40
-  m29 -->|1| m33
-  m29 -->|1| m42
-  m29 -->|1| m41
-  m29 -->|9| m49
-  m29 -->|9| m46
-  m29 -->|1| m48
+  m41 -->|1| m44
+  m41 -->|1| m45
+  m41 -->|10| m55
+  m41 -->|9| m52
+  m44 -->|5| m46
+  m44 -->|4| m41
+  m44 -->|5| m55
+  m44 -->|5| m52
+  m45 -->|2| m52
+  m49 -->|4| m48
+  m49 -->|7| m46
+  m49 -->|6| m55
+  m49 -->|8| m52
+  m47 -->|2| m35
+  m47 -->|3| m48
+  m47 -->|4| m49
+  m47 -->|10| m55
+  m47 -->|27| m52
+  m47 -->|2| m54
+  m52 -->|1| m53
+  m52 -->|2| m46
+  m52 -->|9| m55
+  m52 -->|3| m54
+  m54 -->|4| m52
+  m36 -->|1| m37
+  m36 -->|1| m38
+  m36 -->|2| m35
+  m36 -->|1| m51
+  m36 -->|4| m39
+  m36 -->|1| m40
+  m36 -->|1| m43
+  m36 -->|5| m48
+  m36 -->|1| m53
+  m36 -->|11| m46
+  m36 -->|1| m41
+  m36 -->|1| m49
+  m36 -->|5| m47
+  m36 -->|12| m55
+  m36 -->|12| m52
+  m36 -->|1| m54
 ```
 
 | Module | Files | Tests | Entry point | What it is |
 |---|---|---|---|---|
-| `crates/fennec/src/cli` | 4 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
+| `crates/fennec/src/agent/tool_calls` | 2 | 2 |  | Runs the model's tool calls and records their results. `ask_user` is special: it pauses the turn, so the calls after it in the batch are not run, and the turn ends waiting for the human. `propose_plan` and `submit_report` end the turn the same way: the plan or report is recorded, the calls after it in the batch are not run, and the turn ends complete. |
+| `crates/fennec/src/cli` | 7 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
 | `crates/fennec/src/tools/run_command` | 3 | 2 |  | `run_command`: a shell command run in the working directory, in the sandbox when the human enabled it; what the model reads back is `report`. |
 | `crates/fennec/src/tools/web_fetch` | 5 | 5 |  | `web_fetch`: a web page fetched for the model, by pointer, not by copy: - the page is saved as a file in a cache and the model gets a short, deterministic pointer (path, size, outline, first lines), not the page: it reads the parts it needs with `read_file` or `rg`; - no `format` or `timeout` argument: always Markdown, fixed 30 s timeout; - private, loopback and link-local addresses are refused (SSRF), redirects are followed by hand so each hop is checked. |
-| `crates/fennec/src/web` | 8 | 4 |  | Web adapter: the server behind the UI. std only, one thread per connection, bound to the configured address. |
-| `crates/fennec/src/sandbox` | 2 | 2 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
-| `crates/fennec/src/web/routes` | 36 | 19 |  | The JSON API (contract: `docs/api.md`) and the UI's pages. |
-| `crates/fennec/src/web/os` | 4 | 1 |  |  |
-| `crates/fennec/src/web/streams` | 2 | 1 |  |  |
-| `crates/fennec/src/web/views` | 8 | 8 |  |  |
+| `crates/fennec/src/web/routes/integration` | 2 | 2 |  | The integration routes (contract: `docs/devs/api.md`): preview the session's branch, integrate it on the human's confirmation, or discard it. `routes.rs` only dispatches here. |
+| `crates/fennec/src/web` | 9 | 6 |  | Web adapter: the server behind the UI. std only, one thread per connection, bound to the configured address. |
+| `crates/fennec/src/web/routes` | 37 | 19 |  | The JSON API (contract: `docs/devs/api.md`) and the UI's pages. |
 | `crates/fennec/src/plugins` | 4 | 4 |  | The plugin manager: one sandboxed host per activated plugin, for the server's lifetime. Plugins are global: a host sees every session of every project. It starts hosts on demand, feeds them events, and serves the block data they emit. The core renders those blocks; a plugin never writes a session log and nothing of it runs in fennec's process. |
-| `crates/fennec/src/web/jobs` | 4 | 1 |  |  |
-| `crates/fennec/src` | 26 | 19 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
-| `crates/fennec/src/agent/workflow` | 6 | 4 |  | The workflow engine: walks a run through its graph (docs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
-| `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
+| `crates/fennec/src/web/os` | 5 | 1 |  | The human's own tools opened from the UI, and the project's dev servers. |
+| `crates/fennec/src/web/streams` | 3 | 1 |  | Server-Sent Event streams: a session's events and the human's notices. |
+| `crates/fennec/src/web/views/run_view` | 2 | 2 |  | The server-side run view: the run the server serves pre-calculated, so the UI renders it as it is. |
+| `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
+| `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
+| `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
+| `crates/fennec/src` | 28 | 20 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
-| `crates/fennec/src/agents` | 2 | 2 |  | Agent discovery: embedded defaults, then `~/.agents/agents`, then the project's `.agents/agents`, which overrides an agent of the same id. Each agent carries where it was found (`AgentOrigin`), and the human's CRUD writes the user ones. |
 | `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |
+| `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
 | `crates/fennec/src/worktree` | 2 | 2 |  | A session's own git worktree. |
-| `crates/fennec/src/store` | 8 | 8 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
+| `crates/fennec/src/agents` | 2 | 2 |  | Agent discovery: embedded defaults, then `~/.agents/agents`, then the project's `.agents/agents`, which overrides an agent of the same id. Each agent carries where it was found (`AgentOrigin`), and the human's CRUD writes the user ones. |
+| `crates/fennec/src/store` | 12 | 12 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
+| `crates/fennec/src/sandbox` | 3 | 3 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
+| `crates/fennec/src/agent` | 24 | 17 |  | The application layer: the agent loop, written against the ports in `ports` so that storage, model and tools stay replaceable. |
 | `crates/fennec/src/tools` | 11 | 9 |  | The host toolbox: `read_file`, `write_file`, `edit_file` and `run_command`, plus `load_skill`, run inside one working directory, and `web_search`, which queries the human's SearXNG instance: the model only chooses the query, and `web_fetch`, which saves a page in a cache and returns a pointer to it (the model reads the parts it needs with `read_file`). Commands run in the bwrap world when the human enabled it; the file tools keep the in-process path guard. Writes to protected paths are refused; commands see them read-only. A read-only agent's commands see the workdir read-only. `canvas` shows the human a document in fennec's canvas store, never the project, so read-only agents have it too. |
-| `crates/backlog/src` | 8 | 7 | yes | A fennec-free backlog of ideas. |
-| `crates/fennec/src/agent` | 23 | 17 |  | The application layer: the agent loop, written against the ports in `ports` so that storage, model and tools stay replaceable. |
-| `crates/canvas/src` | 6 | 5 | yes | Storage and model for canvas artifacts. |
+| `crates/fennec/src/agent/turn` | 2 | 2 |  | The multi-turn loop. Each round streams the model (`round`), then runs its tool calls, until it answers without one. |
 | `crates/fennec/src/domain/workflow` | 6 | 5 |  | The workflow domain: definitions, templates, validation, and the run state folded from events. |
-| `crates/fennec/src/domain` | 70 | 68 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/canvas/src` | 6 | 5 | yes | Storage and model for canvas artifacts. |
+| `crates/fennec/src/domain` | 79 | 77 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
+| `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
-| `crates/rules/src` | 7 | 6 | yes | Fennec's rule engine. |
+| `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
 | `crates/token-usage/src` | 5 | 5 | yes | Append-only SQLite ledger for LLM calls. |
+| `crates/backlog/src` | 9 | 8 | yes | A fennec-free backlog of ideas. |
 | `web/src` | 2 | 0 | yes |  |
-| `web/src/pages` | 9 | 0 |  |  |
+| `web/src/components/layout` | 10 | 0 |  |  |
+| `web/src/pages` | 12 | 0 |  |  |
 | `web/src/components/agents` | 2 | 0 |  |  |
-| `web/src/components/project` | 23 | 0 |  |  |
-| `web/src/components/project/ideas` | 11 | 0 |  |  |
-| `web/src/components/workflow` | 11 | 0 |  |  |
+| `web/src/components/editor` | 5 | 0 |  |  |
+| `web/src/components/project` | 24 | 0 |  |  |
+| `web/src/components/project/ideas` | 17 | 0 |  |  |
+| `web/src/components/workflow` | 12 | 0 |  |  |
+| `web/src/components/plugins` | 3 | 0 |  |  |
 | `web/src/components/rules` | 1 | 0 |  |  |
 | `web/src/components/workflow/fields` | 5 | 0 |  |  |
 | `web/src/components/workflow/nodes` | 2 | 0 |  |  |
-| `web/src/components` | 2 | 0 |  |  |
-| `web/src/components/layout` | 4 | 0 |  |  |
-| `web/src/components/plugins` | 2 | 0 |  |  |
-| `web/src/components/ui` | 17 | 0 |  |  |
-| `web/src/hooks` | 10 | 0 |  |  |
-| `web/src/components/workflow/session` | 6 | 0 |  |  |
-| `web/src/components/session` | 48 | 1 |  |  |
-| `web/src/components/preview` | 6 | 0 |  |  |
+| `web/src/components/ui` | 27 | 0 |  |  |
+| `web/src/hooks` | 35 | 1 |  |  |
+| `web/src/components/session` | 63 | 1 |  |  |
+| `web/src/components/workflow/session` | 8 | 0 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
-| `web/src/lib` | 28 | 9 |  |  |
-| `web/src/components/settings` | 22 | 0 |  |  |
-| `web/src/lib/api` | 16 | 0 |  |  |
+| `web/src/components/preview` | 6 | 0 |  |  |
+| `web/src/lib` | 49 | 18 |  |  |
+| `web/src/components/settings` | 26 | 0 |  |  |
+| `web/src/lib/api` | 21 | 0 |  |  |
 | `web/src/i18n` | 3 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
 | `crates/token-usage/tests` | 1 | 1 |  |  |
+| `docs/users/theme` | 2 | 0 |  |  |
 | `web` | 1 | 0 |  |  |
-| `web/scripts` | 1 | 0 |  |  |
+| `web/scripts` | 2 | 0 |  |  |

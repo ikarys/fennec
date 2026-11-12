@@ -3,7 +3,7 @@ import type { ThreadItem } from '../../../lib/fold';
 import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
 import { useLang, useT } from '../../../i18n';
-import { portTone } from '../../../lib/workflowRun';
+import { portTone } from '../../../lib/runView';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../ui/Icons';
 import { useNodeUsage } from '../../session/CallUsage';
 import { Badge } from '../../ui/Badge';
@@ -11,6 +11,11 @@ import { buttonClass } from '../../ui/Button';
 import { SectionLabel } from '../../ui/SectionLabel';
 
 type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
+
+/** The DOM id of a node run's divider (the fold's item id), so the run drawer can scroll the thread to it. */
+export function nodeAnchorId(runId: string, nodeId: string, pass: number): string {
+  return `wf-${runId}-${nodeId}-${pass}`;
+}
 
 function portBadgeTone(port: string): 'ok' | 'err' | 'accent' {
   const tone = portTone(port);
@@ -57,7 +62,7 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
   }, [running, finished, item.startedAt]);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div id={item.id} className="flex scroll-mt-4 flex-col gap-1.5">
       <div className="flex items-center gap-2 text-xs text-muted">
         <span className="h-px grow bg-border" />
         <span className="flex min-w-0 items-center gap-1.5">

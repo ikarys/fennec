@@ -3,7 +3,9 @@
  * data, never HTML. Every placement uses it; `compact` is the status bar's
  * inline, small form. The tones map onto the primitives' existing colours.
  */
+import { Fragment } from 'react';
 import { Badge, type BadgeTone } from '../ui/Badge';
+import { Divider } from '../ui/Divider';
 import type { PluginBlockElement, PluginTone } from '../../lib/api';
 
 /** A plugin's tint, mapped to the primitives' tones: no colour of its own. */
@@ -55,7 +57,10 @@ export function BlockElements({ elements, compact = false }: { elements: PluginB
   return (
     <div className={compact ? 'flex flex-wrap items-center gap-x-2.5 gap-y-0.5' : 'flex flex-col gap-1'}>
       {elements.map((element, index) => (
-        <Element key={index} element={element} compact={compact} />
+        <Fragment key={index}>
+          {compact && index > 0 ? <Divider className="h-4" /> : null}
+          <Element element={element} compact={compact} />
+        </Fragment>
       ))}
     </div>
   );

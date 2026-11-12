@@ -11,6 +11,7 @@ import {
   DecisionIcon,
   EyeIcon,
   FileIcon,
+  InsightIcon,
   ProjectIcon,
   ReviewIcon,
 } from '../ui/Icons';
@@ -36,7 +37,7 @@ const ICONS: Record<IndicatorId, ReactNode> = {
 export function IndicatorsSection({ projectId }: { projectId: string }) {
   const t = useT();
 
-  const { data, error, loading } = useLoaded(() => getProjectIndicators(projectId), [projectId]);
+  const { data, error, loading } = useLoaded(() => getProjectIndicators(projectId), [projectId], `indicators:${projectId}`);
 
   if (loading) return <p className="text-muted">{t('loading')}</p>;
   if (error) return <p className="text-err">{error}</p>;
@@ -44,6 +45,7 @@ export function IndicatorsSection({ projectId }: { projectId: string }) {
 
   return (
     <Section
+      Icon={InsightIcon}
       title={t('indicatorsTitle')}
       description={t('indicatorsHint')}
       actions={

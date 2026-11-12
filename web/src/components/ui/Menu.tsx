@@ -89,7 +89,7 @@ export function Menu({ label, icon, children }: { label: string; icon?: ReactNod
             ref={panelRef}
             role="menu"
             style={pos}
-            className="fixed z-50 flex max-h-80 min-w-40 flex-col gap-0.5 overflow-y-auto rounded-md border border-border bg-panel p-1 shadow-lg"
+            className="fixed z-50 flex max-h-80 min-w-52 flex-col gap-0.5 overflow-y-auto rounded-md border border-border bg-panel p-1 shadow-lg"
           >
             {children}
           </div>,
@@ -103,10 +103,12 @@ export function Menu({ label, icon, children }: { label: string; icon?: ReactNod
 export function MenuItem({
   onSelect,
   tone = 'neutral',
+  icon,
   children,
 }: {
   onSelect: () => void;
   tone?: 'neutral' | 'danger';
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   const menu = useContext(MenuContext);
@@ -114,7 +116,7 @@ export function MenuItem({
     <button
       type="button"
       role="menuitem"
-      className={`rounded-md px-2 py-1 text-left text-xs hover:bg-raised ${
+      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent-soft hover:text-accent focus-visible:bg-accent-soft focus-visible:outline-none ${
         tone === 'danger' ? 'text-err' : 'text-text'
       }`}
       onClick={() => {
@@ -122,7 +124,12 @@ export function MenuItem({
         onSelect();
       }}
     >
+      {icon}
       {children}
     </button>
   );
+}
+
+export function MenuLabel({ children }: { children: ReactNode }) {
+  return <div className="px-2 pt-1 pb-0.5 text-[11px] font-semibold tracking-wider text-faint uppercase">{children}</div>;
 }

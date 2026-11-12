@@ -4,13 +4,12 @@ use std::fmt;
 /// The ideas that can run from the queue, in queue order.
 ///
 /// Halted ideas are included because they still need to be shown in the queue.
+/// An idea readied from its sheet has no session yet: starting it opens one.
 pub fn queue_order(backlog: &Backlog) -> Vec<&Idea> {
     let eligible: Vec<&Idea> = backlog
         .ideas
         .iter()
-        .filter(|idea| {
-            idea.state == IdeaState::Ready && idea.session_id.is_some() && idea.plan.is_some()
-        })
+        .filter(|idea| idea.state == IdeaState::Ready && idea.plan.is_some())
         .collect();
 
     let mut result: Vec<&Idea> = Vec::new();
@@ -142,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn next_ready_picks_oldest_ready_and_skips_missing_session() {
+    fn next_ready_picks_oldest_ready_even_without_session() {
         let events = vec![
             ev(0, added("no_session", "no session")),
             ev(1, added("old", "old")),
@@ -158,7 +157,7 @@ mod tests {
 
         assert_eq!(
             next_ready(&backlog).map(|idea| idea.id.as_str()),
-            Some("old")
+            Some("no_session")
         );
     }
 

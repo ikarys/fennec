@@ -30,6 +30,8 @@ pub struct ContextView {
     pub line: String,
     /// The tooltip's first line: taken, left, total, threshold.
     pub title: String,
+    /// The Context section's collapsed summary: `31 % · 165,9k left`.
+    pub summary: String,
     pub composition: Option<CompositionView>,
 }
 
@@ -114,6 +116,16 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64, lang: Lang) 
         format!("{} tokens", tokens(current, lang.locale()))
     };
 
+    let summary = if max > 0 {
+        let left = tokens(max.saturating_sub(current), lang.locale());
+        match lang {
+            Lang::En => format!("{line} · {left} left"),
+            Lang::Fr => format!("{line} · {left} restants"),
+        }
+    } else {
+        line.clone()
+    };
+
     let title = if max > 0 {
         let mut title = match lang {
             Lang::En => format!(
@@ -152,6 +164,7 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64, lang: Lang) 
         compact_mark,
         line,
         title,
+        summary,
         composition,
     }
 }
@@ -296,6 +309,8 @@ mod tests {
         assert_eq!(view.tone, Tone::Err);
         assert_eq!(view.compact_mark, Some(90));
         assert_eq!(view.line, "85 %");
+        assert!(view.summary.starts_with("85 % · "), "{}", view.summary);
+        assert!(view.summary.ends_with(" restants"), "{}", view.summary);
     }
 
     #[test]
@@ -333,6 +348,7 @@ mod tests {
         let view = context_view(&events, 0, 0.85, Lang::Fr);
         assert_eq!(view.percent, 0);
         assert_eq!(view.line, "500 tokens");
+        assert_eq!(view.summary, "500 tokens");
     }
 
     #[test]

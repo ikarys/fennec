@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getContext, getThread, getVision, type ContextView, type ServedThread, getEventPage, getRunEventsBefore, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
+import { getContext, getThread, getVision, type ContextView, type ServedThread, getEventPage, getRunView, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
+import type { RunView } from '../lib/runView';
 import { useLang } from '../i18n';
 
 const PAGE_SIZE = 200;
@@ -56,17 +57,19 @@ export interface SessionThread {
   vision: SeenImage[];
   /** The pending approval, waiver, queue, criteria and decisions, folded server-side; empty until the first fetch. */
   served: ServedThread;
+  /** Asks the server for the blocks again, after a change outside the session's log (the backlog). */
+  refreshThread: () => void;
 }
 
-const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0 } };
+const EMPTY_SERVED: ServedThread = { pendingApproval: null, pendingWaiver: null, pendingPlan: null, handedPlan: null, queued: [], criteria: [], criteriaTally: { total: 0, passed: 0, failed: 0, indicative: 0, percent: 0 }, decisions: [], replayable: [], modifiedFiles: { count: 0, added: 0, removed: 0, files: [] } };
 
 /**
  * The live thread of a session: the last page of the log (at least 200 events,
  * from the start of a turn) is loaded as JSON, the rest follows on the SSE
  * stream, and older pages are fetched on demand. The raw events of the loaded
  * pages are kept so an older page can be prepended by re-folding; the unloaded
- * history costs no memory. A run that started before the loaded page keeps its
- * strip: its `workflow.*` events are fetched once and fed to the run fold only.
+ * history costs no memory. The run view is computed server-side and refetched
+ * on each workflow event; the thread renders it as it is.
  */
 export function useSessionThread(sessionId: string | null): SessionThread {
   const lang = useLang();
@@ -84,7 +87,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const foldRef = useRef<ThreadFold>(createThreadFold(lang));
   const firstSeqRef = useRef(0);
   const lastSeqRef = useRef(0);
-  const runPrefixRef = useRef<EventPageEntry[]>([]);
+  const runViewRef = useRef<RunView | null>(null);
   const loadSkillCallsRef = useRef(new Set<string>());
   // A counter: only the latest fetch may answer, so out-of-order responses
   // cannot regress the panel.
@@ -93,6 +96,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const contextReqRef = useRef(0);
   const visionReqRef = useRef(0);
   const threadReqRef = useRef(0);
+  const runViewReqRef = useRef(0);
 
   const refreshSkills = useCallback(() => {
     if (!sessionId) return;
@@ -162,33 +166,55 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       });
   }, [sessionId]);
 
+  const publish = useCallback(() => {
+    // The run view is served pre-calculated; the thread renders it as it is.
+    setView({ ...foldRef.current.view(), run: runViewRef.current ?? undefined });
+  }, []);
+
   const foldAll = useCallback(() => {
     const fresh = createThreadFold(lang);
-    const firstSeq = firstSeqRef.current;
-    for (const entry of runPrefixRef.current) {
-      if (entry.seq < firstSeq) {
-        fresh.applyRunOnly(entry.event);
-      }
-    }
     for (const event of eventsRef.current) {
       fresh.apply(event);
     }
+    // The run's definition may be older than the loaded page; the served view
+    // carries it, so the dividers read the real label and kind.
+    if (runViewRef.current) fresh.setWorkflow(runViewRef.current.workflow);
     foldRef.current = fresh;
-    setView(fresh.view());
-  }, [lang]);
+    publish();
+  }, [lang, publish]);
+
+  const refreshRunView = useCallback(() => {
+    if (!sessionId) return;
+    const request = ++runViewReqRef.current;
+    getRunView(sessionId)
+      .then((runView) => {
+        // Only the latest fetch may answer: a stale view must not regress the rail.
+        if (request === runViewReqRef.current) {
+          runViewRef.current = runView;
+          // The definition may be older than the loaded page: feed it to the
+          // fold so the dividers show the real label and kind.
+          foldRef.current.setWorkflow(runView.workflow);
+          publish();
+        }
+      })
+      .catch(() => {
+        // No run, or the fetch failed: the next workflow event refetches.
+      });
+  }, [sessionId, publish]);
 
   useEffect(() => {
     eventsRef.current = [];
     foldRef.current = createThreadFold(lang);
     firstSeqRef.current = 0;
     lastSeqRef.current = 0;
-    runPrefixRef.current = [];
+    runViewRef.current = null;
     loadSkillCallsRef.current = new Set();
     skillsReqRef.current += 1; // a fetch of the previous session may not answer
     usageReqRef.current += 1;
     contextReqRef.current += 1;
     visionReqRef.current += 1;
     threadReqRef.current += 1;
+    runViewReqRef.current += 1;
     setView(EMPTY);
     setHasMore(false);
     setSkills(null);
@@ -232,6 +258,8 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       // The pending blocks change on their own events, when a turn starts or
       // ends (an open call closed), and when the model's view is cut.
       if (PENDING_CUES.has(event.type)) refreshThread();
+      // The run view is served pre-calculated: any workflow event can change it.
+      if (event.type.startsWith('workflow.')) refreshRunView();
       if ((event.type === 'message.start' && data.role === 'user')
         || event.type === 'context.compacted'
         || event.type === 'session.rewound') {
@@ -245,7 +273,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       if (!frame) {
         frame = requestAnimationFrame(() => {
           frame = 0;
-          setView(foldRef.current.view());
+          publish();
         });
       }
     };
@@ -283,19 +311,9 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         refreshContext();
         refreshVision();
         refreshThread();
+        refreshRunView();
         setHasMore(page.length > 0 && page[0].seq > 1);
         openStream(lastSeqRef.current);
-        if (page.length > 0 && page[0].seq > 1) {
-          getRunEventsBefore(sessionId, page[0].seq)
-            .then((prefix) => {
-              if (cancelled) return;
-              runPrefixRef.current = prefix;
-              foldAll();
-            })
-            .catch(() => {
-              // The run rail is a convenience; the thread keeps working.
-            });
-        }
       })
       .catch(() => {
         // The page fetch failed: follow the stream from the start instead.
@@ -307,7 +325,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       source?.close();
       cancelAnimationFrame(frame);
     };
-  }, [sessionId, lang, foldAll, refreshSkills, refreshUsage, refreshContext, refreshVision, refreshThread]);
+  }, [sessionId, lang, foldAll, refreshSkills, refreshUsage, refreshContext, refreshVision, refreshThread, refreshRunView]);
 
   // Returns true when the view was updated, so the caller knows whether a
   // scroll restore is armed for the upcoming view change.
@@ -336,5 +354,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served, refreshThread };
 }

@@ -1,15 +1,32 @@
+/** Project page: section rail and content for one project. */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
-import { ExternalIcon, PlusIcon, TrashIcon } from '../components/ui/Icons';
+import {
+  ActivityIcon,
+  AlertIcon,
+  BulbIcon,
+  EditIcon,
+  DecisionIcon,
+  InsightIcon,
+  LayersIcon,
+  PlusIcon,
+  ProjectIcon,
+  SearchIcon,
+  TerminalIcon,
+  TrashIcon,
+  WandIcon,
+} from '../components/ui/Icons';
+import { withTask } from '../lib/route';
+import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
+import { ProjectOpenActions } from '../components/project/ProjectOpenActions';
 import { TasksSection } from '../components/project/ideas/TasksSection';
 import { MapSection } from '../components/project/MapSection';
-import { DocSection } from '../components/project/DocSection';
+import { DecisionsSection } from '../components/project/DecisionsSection';
 import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
-import { ContributionsSection } from '../components/project/ContributionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
 import { IndicatorsSection } from '../components/project/IndicatorsSection';
 import { CanvasSection } from '../components/project/CanvasSection';
@@ -20,19 +37,20 @@ import {
   type ProjectOverview,
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
+import { editorPath } from '../lib/route';
 import { useT } from '../i18n';
 
+
 const TABS = [
-  { id: 'overview', label: 'tasksTabOverview' },
-  { id: 'indicators', label: 'indicatorsTab' },
-  { id: 'tasks', label: 'tasks' },
-  { id: 'sessions', label: 'sessionsSectionTitle' },
-  { id: 'contributions', label: 'contributionsTitle' },
-  { id: 'map', label: 'moduleMapTitle' },
-  { id: 'risks', label: 'risksLabel' },
-  { id: 'doc', label: 'projectPageDoc' },
-  { id: 'canvas', label: 'canvasLibraryTab' },
-  { id: 'analyses', label: 'analysesTitle' },
+  { id: 'overview', label: 'tasksTabOverview', Icon: ActivityIcon },
+  { id: 'indicators', label: 'indicatorsTab', Icon: InsightIcon },
+  { id: 'tasks', label: 'tasks', Icon: BulbIcon },
+  { id: 'sessions', label: 'sessionsSectionTitle', Icon: TerminalIcon },
+  { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
+  { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
+  { id: 'decisions', label: 'projectPageDecisions', Icon: DecisionIcon },
+  { id: 'canvas', label: 'canvasLibraryTab', Icon: WandIcon },
+  { id: 'analyses', label: 'analysesTitle', Icon: SearchIcon },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -92,6 +110,7 @@ export default function ProjectPage({
   projectId,
   tab,
   sub,
+  task,
   onOpenSession,
   onNewSession,
   onDeleted,
@@ -101,6 +120,7 @@ export default function ProjectPage({
   projectId: string;
   tab: string | null;
   sub: string | null;
+  task: string | null;
   onOpenSession: (sessionId: string) => void;
   onNewSession: (projectId: string) => void;
   /** Home and project pages both show the list, so going home does not refresh it. */
@@ -149,52 +169,56 @@ export default function ProjectPage({
   }
 
   const header = (
-    <>
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">
-          {project.name}
-        </h1>
-        <Button variant="primary" size="sm" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
-          <PlusIcon className="h-4 w-4" />
-          {t('newSession')}
-        </Button>
-        <a
-          href={project.editorUrl}
-          title={t('openInVsCode')}
-          aria-label={t('openInVsCode')}
-          className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
-        >
-          <ExternalIcon className="h-4 w-4" />
-        </a>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          title={t('deleteProjectBtn')}
-          aria-label={t('deleteProjectBtn')}
-          onClick={() => setDeleting(true)}
-        >
-          <TrashIcon className="h-4 w-4" />
-        </Button>
-      </div>
-      <p className="mt-0.5 break-all font-mono text-xs text-muted">
-        {project.workdir} · ⎇ {project.branch ?? t('noBranch')}
-        {project.remote ? (
-          <>
-            {' · '}
-            <a
-              href={project.remote}
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent-strong underline"
-              title={project.remote}
-            >
-              {project.remote.replace(/^https?:\/\//, '')}
-            </a>
-          </>
-        ) : null}
-      </p>
-    </>
+    <PageHeader
+      Icon={ProjectIcon}
+      title={project.name}
+      subtitle={
+        <span className="break-all font-mono text-xs">
+          {project.workdir} · ⎇ {project.branch ?? t('noBranch')}
+          {project.remote ? (
+            <>
+              {' · '}
+              <a
+                href={project.remote}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent-strong underline"
+                title={project.remote}
+              >
+                {project.remote.replace(/^https?:\/\//, '')}
+              </a>
+            </>
+          ) : null}
+        </span>
+      }
+      actions={
+        <>
+          <a
+            href={editorPath(projectId, null)}
+            title={t('editorOpen')}
+            aria-label={t('editorOpen')}
+            className={buttonClass({ variant: 'outline', size: 'sm', iconOnly: true })}
+          >
+            <EditIcon className="h-4 w-4" />
+          </a>
+          <ProjectOpenActions projectId={projectId} editorUrl={project.editorUrl} />
+          <Button
+            variant="danger"
+            size="sm"
+            iconOnly
+            title={t('deleteProjectBtn')}
+            aria-label={t('deleteProjectBtn')}
+            onClick={() => setDeleting(true)}
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="primary" size="md" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
+            <PlusIcon className="h-4 w-4" />
+            {t('newSession')}
+          </Button>
+        </>
+      }
+    />
   );
 
   return shell(
@@ -227,6 +251,10 @@ export default function ProjectPage({
             <TasksSection
               projectId={projectId}
               sub={sub}
+              task={task}
+              onOpenTask={(ideaId) => {
+                window.location.hash = withTask(window.location.hash, ideaId);
+              }}
               onFrame={handleFrame}
               onOpenSession={onOpenSession}
               onSelectSub={(s) => {
@@ -235,10 +263,9 @@ export default function ProjectPage({
             />
           ) : null}
           {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
-          {activeTab === 'contributions' ? <ContributionsSection projectId={projectId} onOpenSession={onOpenSession} /> : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
           {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
-          {activeTab === 'doc' ? <DocSection projectId={projectId} /> : null}
+          {activeTab === 'decisions' ? <DecisionsSection projectId={projectId} /> : null}
           {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection

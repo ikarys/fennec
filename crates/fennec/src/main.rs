@@ -9,7 +9,6 @@ mod budget;
 mod chat;
 mod cli;
 mod config;
-mod doc;
 mod domain;
 mod folders;
 mod git;
@@ -22,7 +21,9 @@ mod metering;
 mod module_map;
 mod notifier;
 mod plugins;
+mod project_files;
 mod protected;
+mod resources;
 mod risk;
 mod sandbox;
 mod scanners;
@@ -46,7 +47,9 @@ use store::SqliteStore;
 const USAGE: &str = "usage:
   fennec [serve] [--port <n>]              web UI on http://127.0.0.1:7777 (or the port of
                                            ~/.config/fennec/settings.yaml, `port: <n>`)
-  fennec password                          set the remote-access password in settings.yaml
+  fennec remote <enable|disable|status>    open the server to the network (asks for a password
+                                           first) or keep it on 127.0.0.1
+  fennec password                          set or change the remote-access password
   fennec run [--session <id>] [--agent <id>] [--image <path>]... <prompt>
                                            run the agent loop in the current directory;
                                            agent: plan (default, read-only) or builder
@@ -55,7 +58,7 @@ const USAGE: &str = "usage:
   fennec sessions                          list sessions
   fennec log <session>                     replay a session from the event store
   fennec update [--check]                  install the latest release (--check: only report it)
-  fennec service <install|start|stop|restart>
+  fennec service <install|start|stop|restart|status|uninstall>
                                            keep the server running in the background
   fennec --version                         print the version
 
@@ -97,6 +100,7 @@ fn run(args: &[String]) -> Result<(), String> {
             web::serve(port, listen, password, Settings::from_env()?)
         }
         Some("password") => cli::password::run(),
+        Some("remote") => cli::remote::run(&args[1..]),
         Some("run") => {
             let mut session = None;
             let mut agent = None;

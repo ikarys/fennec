@@ -1,5 +1,6 @@
 import { request } from "./request";
 import type { ModelRef, SessionModel } from "./settings";
+import type { PlanProposal } from "../plan";
 
 export type SessionState =
   | "running"
@@ -26,6 +27,8 @@ export interface SessionSummary {
   parentId: string | null;
   /** The agent the session resolves to (analyze, audit-*, …), or null when it has none. */
   mode: string | null;
+  /** The project a chat is linked to, for grouping only; null otherwise. */
+  linkedProjectId: string | null;
   /** A workflow ended done and nothing integrated or discarded its work since. */
   awaitingIntegration: boolean;
 }
@@ -58,6 +61,8 @@ export interface SessionDetail {
   model: SessionModel;
   /** The agent id the session resolves to, or null when it has none. */
   mode: string | null;
+  /** The project a chat is linked to, for grouping only; null otherwise. */
+  linkedProjectId: string | null;
   /** The parent session id, or null for a top-level session. */
   parentId: string | null;
   /** The git worktree the session's agent works in, or null when it runs in place. */
@@ -77,9 +82,9 @@ export interface SessionDetail {
     chat?: boolean;
   };
   /** The idea this session frames, or null. */
-  idea: { id: string; state: "inbox" | "framing" | "ready" } | null;
-  /** The first message the human typed, verbatim, or null. */
-  request: string | null;
+  idea: { id: string; state: "inbox" | "framing" | "ready"; hasSheet: boolean } | null;
+  /** Opens the folder the agent works in (its worktree, else the project) in the chosen IDE. */
+  editorUrl: string;
   /** The last answer read as an audit report, or null. */
   audit: Audit | null;
   /** The tasks agents proposed in this session, in order. */
@@ -226,6 +231,8 @@ export interface ContextView {
   line: string;
   /** Taken, left, total, threshold. */
   title: string;
+  /** The Context section's collapsed summary: "31 % · 165,9k left". */
+  summary: string;
   /** Null while nothing is measured. */
   composition: ContextComposition | null;
 }
@@ -325,12 +332,26 @@ export interface CriteriaTally {
   passed: number;
   failed: number;
   indicative: number;
+  /** 0 to 100, the passes' share: the bar's width. */
+  percent: number;
+}
+
+/** A `plan.proposed` still waiting for the human, with the preflight of its turn. */
+export interface ServedPendingPlan {
+  callId: string;
+  plan: PlanProposal;
+  markdown: string;
+  preflight: { criterionId: string; command: string; verdict: 'fails' | 'passesAlready' | 'cannotRun'; exitCode: number | null; output: string; existenceOnly: boolean }[];
 }
 
 /** The session's blocks folded by the server: the UI computes none. */
 export interface ServedThread {
   pendingApproval: PendingApproval | null;
   pendingWaiver: PendingWaiver | null;
+  /** The plan waiting for the human's decision, served whole; null once built or left. */
+  pendingPlan: ServedPendingPlan | null;
+  /** The plan the session's idea carried to the backlog; undoable while the idea only waits. */
+  handedPlan: { ideaId: string; undoable: boolean } | null;
   /** Messages queued while a turn runs, in order. */
   queued: QueuedMessage[];
   /** The criteria in force: the last criteria.set and the updates since. */
@@ -344,10 +365,19 @@ export interface ServedThread {
   modifiedFiles: ModifiedFiles;
 }
 
+/** One file a session's tools changed, with its line counts. */
+export interface ModifiedFile {
+  path: string;
+  added: number;
+  removed: number;
+}
+
 export interface ModifiedFiles {
   count: number;
   added: number;
   removed: number;
+  /** The most-changed files, at most five, most lines first. */
+  files: ModifiedFile[];
 }
 
 export function getThread(id: string): Promise<ServedThread> {
@@ -355,6 +385,8 @@ export function getThread(id: string): Promise<ServedThread> {
     `/api/sessions/${encodeURIComponent(id)}/thread`,
   );
 }
+
+import type { ReasoningEffort } from './settings';
 
 export interface AttachmentInput {
   filename: string;
@@ -369,6 +401,7 @@ export function createSession(
   workflow?: { workflowId: string; stepByStep: boolean; worktree: boolean },
   model?: ModelRef,
   mcpDisabled?: string[],
+  effort?: ReasoningEffort,
 ): Promise<{ id: string }> {
   // `mode` is optional: omit it so the server applies its default resolution.
   const body: {
@@ -381,6 +414,7 @@ export function createSession(
     worktree?: boolean;
     model?: ModelRef;
     mcpDisabled?: string[];
+    effort?: ReasoningEffort;
   } = { projectId, prompt };
   if (mode != null) {
     body.mode = mode;
@@ -398,6 +432,9 @@ export function createSession(
   }
   if (mcpDisabled !== undefined) {
     body.mcpDisabled = mcpDisabled;
+  }
+  if (effort) {
+    body.effort = effort;
   }
   return request<{ id: string }>("/api/sessions", {
     method: "POST",
@@ -472,6 +509,13 @@ export function setSessionMode(id: string, mode: string): Promise<void> {
   return request<void>(`/api/sessions/${encodeURIComponent(id)}/mode`, {
     method: "POST",
     body: JSON.stringify({ mode }),
+  });
+}
+
+export function linkSession(id: string, projectId: string | null): Promise<{ linkedProjectId: string | null }> {
+  return request<{ linkedProjectId: string | null }>(`/api/sessions/${encodeURIComponent(id)}/link`, {
+    method: "POST",
+    body: JSON.stringify({ projectId }),
   });
 }
 

@@ -1,3 +1,5 @@
+//! The wall clock: with `id.rs`, the only impure leaf of the domain.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn now_ms() -> u64 {

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { SeenImage } from '../../lib/api';
-import { panelBlock } from '../../lib/panelBlocks';
 import { CloseIcon, EyeIcon, LocateIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -27,11 +26,11 @@ export function VisionSection({ images }: { images: SeenImage[] }) {
   return (
     <Panel
       id="vision"
-      title={t(panelBlock('vision').titleKey)}
+      title={t('panelVision')}
+      hint={t('visionImagesHint')}
       icon={<EyeIcon className="h-3.5 w-3.5" />}
       summary={images.length > 0 ? images.length : undefined}
     >
-      <p className="m-0 text-xs text-muted">{t('visionImagesHint')}</p>
       {images.length === 0 ? (
         <div className="text-xs text-muted">{t('visionNoImages')}</div>
       ) : (

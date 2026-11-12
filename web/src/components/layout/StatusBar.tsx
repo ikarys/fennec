@@ -1,11 +1,12 @@
 // The app's status bar: the blocks a plugin placed there, in the order the
-// server stacks the surfaces (global, project, session). A thin bar below
-// every page; nothing when no block is placed.
-import { useCallback, useEffect, useRef, useState } from 'react';
+// server stacks the surfaces (global, project, session). Shown only when a
+// plugin has placed a block; there is no header toggle.
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { getStatusBarPluginBlocks, type ServedPluginBlock } from '../../lib/api';
 import { usePluginsVersion } from '../../hooks/usePluginsVersion';
-import { Badge } from '../ui/Badge';
+import { Divider } from '../ui/Divider';
+import { PuzzleIcon } from '../ui/Icons';
 import { BlockElements } from '../plugins/BlockElements';
 
 export function StatusBar({ sessionId, projectId }: { sessionId: string | null; projectId: string | null }) {
@@ -35,18 +36,20 @@ export function StatusBar({ sessionId, projectId }: { sessionId: string | null; 
 
   return (
     <div
+      role="region"
       aria-label={t('statusBarLabel')}
-      className="flex items-center gap-x-3 overflow-x-auto border-t border-border bg-raised px-3 py-1"
+      className="flex shrink-0 items-center gap-x-3 overflow-x-auto border-t border-border bg-panel px-3 py-1"
     >
-      {blocks.map((block) => {
+      {blocks.map((block, index) => {
         const provenance = t('pluginProvenance', { name: block.plugin });
         return (
-          <span key={`${block.plugin}:${block.title}`} className="flex shrink-0 items-center gap-1.5">
-            <Badge tone="info" appearance="pill" title={provenance}>
-              {provenance}
-            </Badge>
-            <BlockElements elements={block.content.elements} compact />
-          </span>
+          <Fragment key={`${block.plugin}:${block.title}`}>
+            {index > 0 ? <Divider className="h-4" /> : null}
+            <span title={provenance} className="flex shrink-0 items-center gap-1.5">
+              <PuzzleIcon className="h-3.5 w-3.5 shrink-0 text-faint" />
+              <BlockElements elements={block.content.elements} compact />
+            </span>
+          </Fragment>
         );
       })}
     </div>

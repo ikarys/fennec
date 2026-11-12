@@ -83,11 +83,12 @@ export function BudgetTile({ projectId }: { projectId: string }) {
         {view.limitUsd != null ? (
           <Button
             variant="danger"
+            size="sm"
             iconOnly
             title={t('budgetRemove')}
             onClick={() => void save(null)}
           >
-            <TrashIcon />
+            <TrashIcon className="h-3.5 w-3.5" />
           </Button>
         ) : null}
         <Button

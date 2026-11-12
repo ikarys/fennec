@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Blocker, IntegrationPreview, IntegrationResult } from './api';
+import type { Blocker, IntegrationPreview, IntegrationResult, ReviewSignal } from './api';
 import {
   acknowledgedKinds,
   blockerSentence,
@@ -37,28 +37,17 @@ function blocker<T extends { kind: Blocker['kind'] }>(value: T): Blocker {
   return { ...value, acknowledgeable } as unknown as Blocker;
 }
 
+const file = (path: string, added: number, removed: number, signals: ReviewSignal[] = []) => ({ path, added, removed, protected: false, carried: false, signals });
+const TWO_FILES = [
+  file('a.rs', 3, 1, ['hot', 'untested']),
+  file('b.rs', 0, 2)
+];
+
 describe('narrative prompt', () => {
   it('names branch and base, lists files, and ends with diff instruction', () => {
     const prompt = narrativePrompt(
       preview({
-        files: [
-          {
-            path: 'a.rs',
-            added: 3,
-            removed: 1,
-            protected: false,
-            carried: false,
-            signals: ['hot', 'untested'],
-          },
-          {
-            path: 'b.rs',
-            added: 0,
-            removed: 2,
-            protected: false,
-            carried: false,
-            signals: [],
-          },
-        ],
+        files: TWO_FILES,
       }),
     );
 
@@ -75,24 +64,7 @@ describe('understanding prompt', () => {
   it('names branch and base, lists files in review order, and asks questions', () => {
     const prompt = understandingPrompt(
       preview({
-        files: [
-          {
-            path: 'a.rs',
-            added: 3,
-            removed: 1,
-            protected: false,
-            carried: false,
-            signals: ['hot', 'untested'],
-          },
-          {
-            path: 'b.rs',
-            added: 0,
-            removed: 2,
-            protected: false,
-            carried: false,
-            signals: [],
-          },
-        ],
+        files: TWO_FILES,
       }),
     );
 

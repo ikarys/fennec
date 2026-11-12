@@ -1,5 +1,4 @@
 import type { SessionSkills } from '../../lib/api';
-import { panelBlock } from '../../lib/panelBlocks';
 import { WandIcon } from '../ui/Icons';
 import { Panel } from '../ui/Panel';
 import { useT } from '../../i18n';
@@ -18,11 +17,11 @@ export function SkillsSection({ skills, hasSession }: SkillsSectionProps) {
   return (
     <Panel
       id="skills"
-      title={t(panelBlock('skills').titleKey)}
+      title={t('panelSkills')}
+      hint={t('skillsHint')}
       icon={<WandIcon className="h-3.5 w-3.5" />}
       summary={skills !== null && loadedCount > 0 ? `${activeCount}/${loadedCount}` : undefined}
     >
-      <p className="m-0 text-xs text-muted">{t('skillsHint')}</p>
       {(!hasSession || (skills !== null && skills.loaded.length === 0 && skills.alwaysOn.length === 0)) && (
         <div className="text-xs text-muted">{t('noSkillsLoaded')}</div>
       )}

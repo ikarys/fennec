@@ -1,388 +1,179 @@
+/**
+ * The session's right context rail: a SideRail of work, servers, canvas, session, and plugin panels.
+ */
+import { useState } from 'react';
+import type {
+  ContextView,
+  SeenImage,
+  ServedThread,
+  SessionDetail,
+  SessionSkills,
+  SessionUsage,
+  ServerView,
+  ServedPluginBlock,
+} from '../../lib/api';
 import type { ThreadView } from '../../lib/fold';
-import type { SeenImage, ServedThread, SessionDetail, SessionSkills, SessionUsage } from '../../lib/api';
-import { useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
-import { useDisplayPrefs } from '../../lib/display';
-import { pageBlocks, panelBlock, panelPages, type PanelBlockId } from '../../lib/panelBlocks';
-import { Button } from '../ui/Button';
-import { ChoiceMenu } from '../ui/ChoiceMenu';
-import { Segmented } from '../ui/Segmented';
-import {
-  BranchIcon,
-  CheckIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
-  CloseIcon,
-  DecisionIcon,
-  EyeIcon,
-  FileIcon,
-  PuzzleIcon,
-} from '../ui/Icons';
-import { AgentWorkspaceSection } from './AgentWorkspaceSection';
+import { useT } from '../../i18n';
+import { useSessionPluginBlocks } from '../../hooks/useSessionPluginBlocks';
+import { CheckIcon, CpuIcon, LayersIcon, PuzzleIcon, ServerIcon } from '../ui/Icons';
+import { SideRail, type RailPanel } from '../ui/SideRail';
+import { PLUGIN_ICONS } from '../plugins/pluginIcons';
+import { CanvasSection } from '../canvas/CanvasSection';
 import { CriteriaSection } from './CriteriaSection';
+import { ContextSection } from './ContextSection';
 import { DecisionsSection } from './DecisionsSection';
 import { ModifiedFilesSection } from './ModifiedFilesSection';
-import { PluginsSection } from './PluginsSection';
-import { RequestSection } from './RequestSection';
+import { PluginsSection, PluginOwnSection } from './PluginsSection';
 import { ServersSection } from './ServersSection';
 import { SkillsSection } from './SkillsSection';
 import { TokensSection } from './TokensSection';
 import { VisionSection } from './VisionSection';
-import { useLang, useT } from '../../i18n';
-
-const WIDTH_KEY = 'fennec.contextPanelWidth';
-const PAGE_KEY = 'fennec.contextPanel.page';
-const COLLAPSED_KEY = 'fennec.contextPanel.collapsed';
-const MIN_WIDTH = 240;
-const MAX_WIDTH = 560;
-const DEFAULT_WIDTH = 300;
-
-const RAIL_BLOCKS: readonly { id: PanelBlockId; icon: ReactNode }[] = [
-  { id: 'criteria', icon: <CheckIcon className="h-4 w-4" /> },
-  { id: 'modifiedFiles', icon: <FileIcon className="h-4 w-4" /> },
-  { id: 'workspace', icon: <BranchIcon className="h-4 w-4" /> },
-  { id: 'decisions', icon: <DecisionIcon className="h-4 w-4" /> },
-  { id: 'vision', icon: <EyeIcon className="h-4 w-4" /> },
-  { id: 'plugins', icon: <PuzzleIcon className="h-4 w-4" /> },
-];
-
-function railCount(id: PanelBlockId, served: ServedThread, vision: SeenImage[]): number | null {
-  switch (id) {
-    case 'criteria':
-      return served.criteria.length;
-    case 'modifiedFiles':
-      return served.modifiedFiles.count;
-    case 'decisions':
-      return served.decisions.length;
-    case 'vision':
-      return vision.length;
-    default:
-      return null;
-  }
-}
-
-/** The rail's count badge is tinted only when it signals a state worth seeing. */
-function railCountClass(id: PanelBlockId, served: ServedThread): string {
-  if (id === 'criteria' && served.criteriaTally.failed > 0) {
-    return 'text-err';
-  }
-  return 'text-muted';
-}
-
-function clampWidth(width: number): number {
-  return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
-}
-
-function loadWidth(): number {
-  try {
-    const stored = Number(localStorage.getItem(WIDTH_KEY));
-    return stored ? clampWidth(stored) : DEFAULT_WIDTH;
-  } catch {
-    return DEFAULT_WIDTH;
-  }
-}
-
-function loadPageName(): string {
-  try {
-    return localStorage.getItem(PAGE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function savePageName(name: string): void {
-  try {
-    localStorage.setItem(PAGE_KEY, name);
-  } catch {
-    // A blocked storage only loses the page on reload.
-  }
-}
-
-function loadCollapsed(): boolean {
-  try {
-    return localStorage.getItem(COLLAPSED_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function saveCollapsed(collapsed: boolean): void {
-  try {
-    localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
-  } catch {
-    // A blocked storage only loses the collapsed state on reload.
-  }
-}
+import { WorkplaceSection } from './WorkplaceSection';
 
 interface ContextPanelProps {
   view: ThreadView;
-  /** The session's skills, folded server-side; null while the first fetch is in flight. */
   skills: SessionSkills | null;
-  /** The session's token totals, computed server-side; null while the first fetch is in flight. */
   usage: SessionUsage | null;
-  /** The first message the human typed, verbatim; null while unknown or absent. */
-  request: string | null;
-  /** False on the « Nouvelle session » tab, where there is no log to fold. */
+  /** False on the new-session tab, where there is no log to fold: the panel is not shown. */
   hasSession: boolean;
-  /** Where the agent's work lands; null when the session runs in place. */
   worktree: SessionDetail['worktree'];
-  /** The session id, for the integration dialog; null on a new-session tab. */
+  /** Opens the folder the agent works in (worktree, else project) in the chosen IDE; null while unknown. */
+  editorUrl: string | null;
   sessionId: string | null;
-  /** Re-fetch the session detail after the worktree changed (discard). */
   onWorktreeChanged: () => void;
-  /** Bumped when the review dialog closes: the workspace block re-reads the preview. */
   integrationVersion: number;
-  /** The images the model received, computed server-side. */
   vision: SeenImage[];
-  /** The criteria and decisions, folded server-side. */
   served: ServedThread;
+  context: ContextView | null;
+  /** The rail panel to open: the header's gauge opens session, the worktree's try opens servers. */
+  reveal: { id: string; key: number };
+  onTry: () => void;
+  onOpenCanvas: (id: number) => void;
+  onNewCanvas: (id: number) => void;
 }
 
-export function ContextPanel({ view, skills, usage, request, hasSession, worktree, sessionId, onWorktreeChanged, integrationVersion, vision, served }: ContextPanelProps) {
+export function ContextPanel({
+  view,
+  skills,
+  usage,
+  hasSession,
+  worktree,
+  editorUrl,
+  sessionId,
+  onWorktreeChanged,
+  integrationVersion,
+  vision,
+  served,
+  context,
+  reveal,
+  onTry,
+  onOpenCanvas,
+  onNewCanvas,
+}: ContextPanelProps) {
   const t = useT();
-  const lang = useLang();
-  const [width, setWidth] = useState(loadWidth);
-  const [selectedPageName, setSelectedPageName] = useState(loadPageName);
-  const [collapsed, setCollapsed] = useState(loadCollapsed);
-  const [openBlock, setOpenBlock] = useState<PanelBlockId | null>(null);
-  const pages = panelPages(lang, useDisplayPrefs().panelPages);
-  const page = pages.find((candidate) => candidate.name === selectedPageName) ?? pages[0] ?? { name: '', blocks: [] };
+  const [runningServers, setRunningServers] = useState(0);
+  const [canvasCount, setCanvasCount] = useState(0);
+  const plugins = useSessionPluginBlocks(sessionId);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {
-      // A blocked storage only loses the width on reload.
-    }
-  }, [width]);
+  if (!hasSession || sessionId === null) return null;
 
-  useEffect(() => {
-    saveCollapsed(collapsed);
-  }, [collapsed]);
+  const blocks = plugins?.blocks ?? [];
+  const sharedBlocks = blocks.filter((block) => block.placement !== 'own_panel');
+  const panels: RailPanel[] = [];
 
-  useEffect(() => {
-    if (!openBlock) return;
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenBlock(null);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openBlock]);
+  const { passed, total, failed } = served.criteriaTally;
+  const criteriaAlert = failed > 0;
+  const criteriaClass = criteriaAlert ? 'text-err' : total > 0 && passed === total ? 'text-ok' : undefined;
 
-  useEffect(() => {
-    setOpenBlock(null);
-  }, [sessionId]);
-
-  const startResize = (event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = width;
-    // The panel is on the right: dragging left widens it.
-    const move = (moveEvent: globalThis.PointerEvent) => setWidth(clampWidth(startWidth + startX - moveEvent.clientX));
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), { once: true });
-  };
-
-  const resizeWithKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === 'ArrowLeft' ? 16 : event.key === 'ArrowRight' ? -16 : 0;
-    if (step !== 0) {
-      event.preventDefault();
-      setWidth((current) => clampWidth(current + step));
-    }
-  };
-
-  function selectPage(name: string) {
-    setSelectedPageName(name);
-    savePageName(name);
-  }
-
-  /**
-   * The panel's page, themed like the composer's agent pick: a segmented
-   * control up to three pages, a menu beyond (docs/ui.md: no native select).
-   */
-  function renderPageSwitch() {
-    if (pages.length > 3) {
-      return (
-        <ChoiceMenu
-          label={t('panelPageLabel')}
-          groups={[{ choices: pages.map((candidate) => ({ value: candidate.name, label: candidate.name })) }]}
-          value={page.name}
-          onChange={selectPage}
-          direction="down"
-          className="w-full"
-          trigger={
-            // The trigger fills the panel width so a long page name truncates instead of overflowing.
-            <span className="min-w-0 grow truncate text-left" title={page.name}>
-              {page.name}
-            </span>
-          }
+  panels.push({
+    id: 'work',
+    title: t('contextTabWork'),
+    label: t('contextTabWork'),
+    Icon: CheckIcon,
+    status: total > 0 ? `${passed}/${total}` : undefined,
+    statusClass: criteriaClass,
+    alert: criteriaAlert,
+    body: (
+      <>
+        <WorkplaceSection
+          sessionId={sessionId}
+          worktree={worktree ?? null}
+          editorUrl={editorUrl}
+          running={view.running}
+          onDiscarded={onWorktreeChanged}
+          integrationVersion={integrationVersion}
+          onTry={onTry}
         />
-      );
+        <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} planAwaitingBuild={served.pendingPlan !== null || served.handedPlan !== null} />
+        <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} hasDiff={Boolean(worktree?.commits)} />
+      </>
+    ),
+  });
+
+  panels.push({
+    id: 'servers',
+    title: t('contextTabServers'),
+    label: t('contextTabServers'),
+    Icon: ServerIcon,
+    status: runningServers > 0 ? `● ${runningServers}` : undefined,
+    statusClass: runningServers > 0 ? 'text-ok' : undefined,
+    body: <ServersSection sessionId={sessionId} onServers={(servers: ServerView[]) => setRunningServers(servers.filter((server) => server.running).length)} />,
+  });
+
+  panels.push({
+    id: 'canvas',
+    title: t('contextTabCanvas'),
+    label: t('contextTabCanvas'),
+    Icon: LayersIcon,
+    status: canvasCount > 0 ? String(canvasCount) : undefined,
+    body: <CanvasSection sessionId={sessionId} refreshKey={view} onOpen={onOpenCanvas} onNew={onNewCanvas} onCount={setCanvasCount} />,
+  });
+
+  panels.push({
+    id: 'session',
+    title: t('contextTabSession'),
+    label: t('contextTabSession'),
+    Icon: CpuIcon,
+    body: (
+      <>
+        <TokensSection usage={usage} />
+        <ContextSection context={context} revealKey={reveal.id === 'session' ? reveal.key : 0} />
+        <DecisionsSection decisions={served.decisions} />
+        <SkillsSection skills={skills} hasSession={hasSession} />
+        <VisionSection images={vision} />
+      </>
+    ),
+  });
+
+  for (const tab of plugins?.tabs ?? []) {
+    if (tab.kind === 'shared') {
+      panels.push({
+        id: 'plugins',
+        title: t('panelPlugins'),
+        label: t('panelPlugins'),
+        Icon: PuzzleIcon,
+        body: <PluginsSection blocks={sharedBlocks} />,
+      });
+    } else {
+      const pluginBlocks: ServedPluginBlock[] = blocks.filter((block) => block.placement === 'own_panel' && block.plugin === tab.plugin);
+      panels.push({
+        id: `plugin:${tab.plugin}`,
+        title: t('pluginProvenance', { name: tab.plugin }),
+        label: tab.plugin,
+        Icon: PLUGIN_ICONS[tab.icon],
+        body: <PluginOwnSection plugin={tab.plugin} blocks={pluginBlocks} />,
+      });
     }
-    return (
-      <Segmented
-        label={t('panelPageLabel')}
-        value={page.name}
-        onChange={selectPage}
-        segments={pages.map((candidate) => ({ value: candidate.name, label: candidate.name, title: candidate.name }))}
-      />
-    );
-  }
-
-  function renderBlock(id: PanelBlockId) {
-    switch (id) {
-      case 'request':
-        return <RequestSection key={id} request={request} />;
-      case 'criteria':
-        return <CriteriaSection key={id} criteria={served.criteria} tally={served.criteriaTally} />;
-      case 'modifiedFiles':
-        return <ModifiedFilesSection key={id} totals={served.modifiedFiles} sessionId={sessionId} />;
-      case 'workspace':
-        return sessionId ? (
-          <AgentWorkspaceSection key={id} sessionId={sessionId} worktree={worktree ?? null} running={view.running} onDiscarded={onWorktreeChanged} integrationVersion={integrationVersion} />
-        ) : null;
-      case 'servers':
-        return <ServersSection key={id} sessionId={sessionId} />;
-      case 'tokens':
-        return <TokensSection key={id} usage={usage} />;
-      case 'skills':
-        return <SkillsSection key={id} skills={skills} hasSession={hasSession} />;
-      case 'decisions':
-        return <DecisionsSection key={id} decisions={served.decisions} />;
-      case 'vision':
-        return <VisionSection key={id} images={vision} />;
-      case 'plugins':
-        return <PluginsSection key={id} sessionId={sessionId} />;
-      default: {
-        const exhaustive: never = id;
-        return exhaustive;
-      }
-    }
-  }
-
-  function renderRail(className: string) {
-    const openCount = openBlock ? railCount(openBlock, served, vision) : null;
-    return (
-      <aside
-        aria-label={t('sessionContextLabel')}
-        className={`${openBlock ? 'relative ' : ''}w-10 shrink-0 flex-col items-center gap-1 border-l border-border bg-bg py-1 ${className}`}
-      >
-        {openBlock ? (
-          <div
-            className="absolute inset-y-0 right-full z-20 flex w-[300px] flex-col border border-border bg-bg shadow-xl"
-            role="dialog"
-            aria-label={t(panelBlock(openBlock).titleKey)}
-          >
-            <div className="flex items-center gap-1 px-2 py-2">
-              <span className="min-w-0 truncate text-xs font-medium text-text">{t(panelBlock(openBlock).titleKey)}</span>
-              {openCount !== null ? <span className="font-mono text-xs text-muted tabular-nums">{openCount}</span> : null}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                iconOnly
-                aria-label={t('close')}
-                onClick={() => setOpenBlock(null)}
-                className="ml-auto"
-              >
-                <CloseIcon className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
-              {renderBlock(openBlock)}
-            </div>
-          </div>
-        ) : null}
-        <div className="hidden min-[1100px]:flex">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label={t('expand')}
-            onClick={() => setCollapsed(false)}
-          >
-            <ChevronsLeftIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        {RAIL_BLOCKS.filter((block) => block.id !== 'workspace' || sessionId).map((block) => {
-          const title = t(panelBlock(block.id).titleKey);
-          const count = railCount(block.id, served, vision);
-          return (
-            <Button
-              key={block.id}
-              type="button"
-              variant={openBlock === block.id ? 'secondary' : 'ghost'}
-              size="sm"
-              iconOnly
-              aria-label={title}
-              title={title}
-              aria-pressed={openBlock === block.id}
-              onClick={() => setOpenBlock((current) => (current === block.id ? null : block.id))}
-              className="relative"
-            >
-              {block.icon}
-              {count ? (
-                <span className={`absolute -top-1 -right-1 rounded-full border border-border bg-raised px-1 font-mono text-[9px] leading-3 tabular-nums ${railCountClass(block.id, served)}`}>
-                  {count}
-                </span>
-              ) : null}
-            </Button>
-          );
-        })}
-      </aside>
-    );
-  }
-
-  if (collapsed) {
-    return renderRail('flex');
   }
 
   return (
-    <>
-      {renderRail('flex min-[1100px]:hidden')}
-      <div className="relative hidden min-h-0 shrink-0 min-[1100px]:flex" style={{ width }}>
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={t('panelWidthLabel')}
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={MAX_WIDTH}
-        aria-valuenow={width}
-        tabIndex={0}
-        title={t('panelResizeTitle')}
-        onPointerDown={startResize}
-        onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
-        onKeyDown={resizeWithKeys}
-        className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
-      />
-      <aside
-        aria-label={t('sessionContextLabel')}
-        className="flex min-h-0 w-full flex-col border-l border-border bg-bg"
-      >
-        <div className="flex items-center gap-1 px-2 py-2">
-          <span className="min-w-0 truncate text-xs font-medium text-text" title={t('sessionContextLabel')}>
-            {t('panelPageContext')}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label={t('collapse')}
-            onClick={() => setCollapsed(true)}
-            className="ml-auto"
-          >
-            <ChevronsRightIcon className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        {pages.length > 1 && (
-          <div className="px-2 pb-2">{renderPageSwitch()}</div>
-        )}
-        <div className="min-h-0 grow overflow-y-auto [scrollbar-width:thin]">
-          {hasSession ? pageBlocks(page, page === pages[0]).map(renderBlock) : <p className="m-0 px-3 py-2 text-xs text-muted">{t('contextEmpty')}</p>}
-        </div>
-      </aside>
-      </div>
-    </>
+    <SideRail
+      side="right"
+      label={t('sessionContextLabel')}
+      storageKey="fennec.contextPanel"
+      defaultPinned
+      panels={panels}
+      reveal={reveal}
+    />
   );
 }

@@ -1,9 +1,14 @@
 //! Model choices for sessions: what the composer offers and what a session runs on.
 
 use crate::agent::ports::EventLog;
+use crate::agents;
+use crate::config::Settings;
+use crate::domain::agent::resolve;
 use crate::domain::event::Event;
-use crate::domain::model_choice::chosen_model;
-use crate::domain::preferences::{LOCAL_PROVIDER, ModelRef, Preferences};
+use crate::domain::model_choice::{chosen_effort, chosen_model, usable_effort};
+use crate::domain::preferences::{
+    LOCAL_PROVIDER, ModelPrefs, ModelRef, Preferences, ReasoningEffort,
+};
 use crate::store::SqliteStore;
 use crate::web::App;
 use crate::web::http::HttpError;
@@ -11,6 +16,7 @@ use crate::web::http::{Request, error, send_json};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::net::TcpStream;
+use std::path::Path;
 
 /// Where a session's model comes from, shown next to it.
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
@@ -43,6 +49,39 @@ pub(crate) fn session_choice(
     Ok((None, ChoiceSource::Default))
 }
 
+fn prefs_of<'a>(prefs: &'a Preferences, model: &ModelRef) -> Option<&'a ModelPrefs> {
+    prefs
+        .provider(&model.provider)
+        .and_then(|p| p.models.get(&model.model))
+}
+
+/// The session's effort (its own choice, else its parent's) and the efforts its
+/// model accepts. A choice the model does not accept falls back to auto (`None`).
+pub(crate) fn session_effort(
+    settings: &Settings,
+    store: &SqliteStore,
+    session_id: &str,
+) -> Result<(Option<ReasoningEffort>, Vec<ReasoningEffort>), String> {
+    let session = store
+        .session(session_id)?
+        .ok_or_else(|| format!("no such session {session_id}"))?;
+    let mut chosen = chosen_effort(&store.events(session_id)?);
+    if chosen.is_none()
+        && let Some(parent_id) = session.parent_id
+    {
+        chosen = chosen_effort(&store.events(&parent_id)?);
+    }
+    let (model, _) = session_choice(store, session_id)?;
+    let prefs = store.preferences()?;
+    let params = settings.llm.for_turn(&prefs, model.as_ref());
+    let resolved = ModelRef {
+        provider: params.provider.clone(),
+        model: params.model.clone(),
+    };
+    let accepted = ModelPrefs::accepted_efforts(prefs_of(&prefs, &resolved));
+    Ok((usable_effort(chosen, &accepted), accepted))
+}
+
 /// A stored non-empty name, else "Local" for the local provider, else the id.
 fn provider_name(prefs: &Preferences, provider: &str) -> String {
     match prefs.provider(provider) {
@@ -52,11 +91,13 @@ fn provider_name(prefs: &Preferences, provider: &str) -> String {
     }
 }
 
-fn choice_value(prefs: &Preferences, model: &ModelRef) -> Value {
+fn choice_value(settings: &Settings, prefs: &Preferences, model: &ModelRef) -> Value {
     json!({
         "provider": model.provider,
         "model": model.model,
         "providerName": provider_name(prefs, &model.provider),
+        "acceptedEfforts": ModelPrefs::accepted_efforts(prefs_of(prefs, model)),
+        "defaultEffort": settings.llm.for_turn(prefs, Some(model)).reasoning_effort,
     })
 }
 
@@ -69,12 +110,12 @@ pub(crate) fn choices(app: &App, stream: &mut TcpStream) -> Result<(), HttpError
     let favorites: Vec<Value> = prefs
         .favorites
         .iter()
-        .map(|m| choice_value(&prefs, m))
+        .map(|m| choice_value(&app.settings, &prefs, m))
         .collect();
     send_json(
         stream,
         200,
-        &json!({ "default": choice_value(&prefs, &default), "favorites": favorites }),
+        &json!({ "default": choice_value(&app.settings, &prefs, &default), "favorites": favorites }),
     )
 }
 
@@ -115,6 +156,34 @@ pub(crate) fn set_model(
     send_json(stream, 200, &json!({ "model": model }))
 }
 
+/// `POST /api/sessions/{id}/effort`: record the human's effort choice.
+pub(crate) fn set_effort(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    id: &str,
+) -> Result<(), HttpError> {
+    let body = req.json()?;
+    // Untrusted input: anything but a known effort or null is refused.
+    let Ok(effort) = serde_json::from_value::<Option<ReasoningEffort>>(body["effort"].clone())
+    else {
+        return error(stream, 400, "unknown effort");
+    };
+    let store = app.store()?;
+    let (_, _) = app.require_session(id)?;
+    if crate::web::routes::workflow_routes::waiting_for(app, id)?.is_some() {
+        return error(stream, 409, "a workflow is running in this session");
+    }
+    crate::web::routes::session_routes::append_human_event(
+        app,
+        &store,
+        id,
+        Some(Event::EffortChanged { effort }),
+    )?;
+    let model = session_model(app, &store, id)?;
+    send_json(stream, 200, &json!({ "model": model }))
+}
+
 /// The session's current model as JSON, for the composer and session view.
 pub(crate) fn session_model(
     app: &App,
@@ -124,6 +193,8 @@ pub(crate) fn session_model(
     let (chosen, source) = session_choice(store, session_id)?;
     let prefs = store.preferences()?;
     let params = app.settings.llm.for_turn(&prefs, chosen.as_ref());
+    let (effort, accepted) = session_effort(&app.settings, store, session_id)?;
+    let default_effort = agent_effort(store, session_id)?.or(params.reasoning_effort);
     Ok(json!({
         "provider": params.provider,
         "model": params.model,
@@ -131,7 +202,24 @@ pub(crate) fn session_model(
         "contextWindow": params.context_window,
         "compactAt": params.compact_at,
         "source": source,
+        "effort": effort,
+        "acceptedEfforts": accepted,
+        "defaultEffort": default_effort,
     }))
+}
+
+/// The effort of the agent the session runs as, when its definition sets one.
+fn agent_effort(store: &SqliteStore, session_id: &str) -> Result<Option<ReasoningEffort>, String> {
+    let Some(project) = store
+        .session(session_id)?
+        .and_then(|session| store.project(&session.project_id).transpose())
+        .transpose()?
+    else {
+        return Ok(None);
+    };
+    let agents = agents::discover(Path::new(&project.workdir));
+    let events = store.events(session_id)?;
+    Ok(resolve(&agents, &events).and_then(|agent| agent.reasoning_effort))
 }
 
 #[cfg(test)]

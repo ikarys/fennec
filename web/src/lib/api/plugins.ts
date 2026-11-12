@@ -29,6 +29,23 @@ export interface PluginBlockContent {
   elements: PluginBlockElement[];
 }
 
+export type PluginIcon =
+  | "activity"
+  | "alert"
+  | "bell"
+  | "branch"
+  | "check"
+  | "clock"
+  | "cpu"
+  | "eye"
+  | "file"
+  | "globe"
+  | "layers"
+  | "server"
+  | "terminal"
+  | "tokens"
+  | "puzzle";
+
 /** A block as served to the UI: the plugin's name is the provenance badge. */
 export interface ServedPluginBlock {
   plugin: string;
@@ -36,6 +53,8 @@ export interface ServedPluginBlock {
   scope: PluginScope;
   placement: PluginPlacement;
   content: PluginBlockContent;
+  /** The plugin's rail tab icon, from fennec's own set. */
+  icon: PluginIcon;
 }
 
 /** One plugin as defined in the global `~/.agents/plugins.json`. */
@@ -80,10 +99,13 @@ export function setGlobalPlugin(
 }
 
 /** `GET /api/sessions/{id}/plugins`: the session-scope blocks, for the right-hand panel. */
+export type PluginTab = { kind: "shared" } | { kind: "own"; plugin: string; icon: PluginIcon };
+export interface SessionPlugins { blocks: ServedPluginBlock[]; tabs: PluginTab[] }
+
 export function getSessionPluginBlocks(
   sessionId: string,
-): Promise<{ blocks: ServedPluginBlock[] }> {
-  return request<{ blocks: ServedPluginBlock[] }>(
+): Promise<SessionPlugins> {
+  return request<SessionPlugins>(
     `/api/sessions/${encodeURIComponent(sessionId)}/plugins`,
   );
 }

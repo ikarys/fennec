@@ -16,11 +16,10 @@ import { ToolCard } from './ToolCard';
 import { NodeDivider } from '../workflow/session/NodeDivider';
 import { RunEndCard } from '../workflow/session/RunEndCard';
 import { markdownComponents } from './markdownComponents';
+import { splitSources } from '../../lib/sources';
 import { attachmentAnchorId } from '../../lib/vision';
-import { usePlanActions } from './PlanActions';
+import { planAnchorId, usePendingPlan } from './PendingPlan';
 import { useT } from '../../i18n';
-
-
 
 // Memoised on their text: while one message streams, the others are not
 // parsed again on every frame.
@@ -49,15 +48,12 @@ const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: st
 
 const REMARK_PLUGINS = [remarkGfm];
 
-const TextSegment = memo(function TextSegment({ content, caret, id, preflight }: { content: string; caret: boolean; id?: string; preflight?: PreflightResultView[] }) {
-  const actions = usePlanActions();
+const TextSegment = memo(function TextSegment({ content, caret, preflight }: { content: string; caret: boolean; preflight?: PreflightResultView[] }) {
+  const t = useT();
   // Parsed only when settled: a half-written contract would flicker between the
   // two renderings while the message streams.
   const contract = useMemo(() => (caret ? null : splitContract(content)), [content, caret]);
-  const planActions =
-    actions && id !== undefined && actions.segmentId === id && contract?.contract.kind === 'plan'
-      ? actions
-      : null;
+  const split = useMemo(() => splitSources(content), [content]);
   // The model's words sit on a surface, like the plan card, so they are told
   // apart from the thread's chrome at a glance. A plan or report card is itself
   // a Card: it renders bare, the leading prose is surfaced.
@@ -73,26 +69,35 @@ const TextSegment = memo(function TextSegment({ content, caret, id, preflight }:
             </div>
           </Card>
         )}
-        {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} actions={planActions} preflight={preflight} /> : <ReportCard report={contract.contract} />}
+        {contract.contract.kind === 'plan' ? <PlanCard plan={contract.contract} preflight={preflight} /> : <ReportCard report={contract.contract} />}
       </>
     );
   }
+  const { body, sources } = split;
   return (
     <Card className="px-3.5 py-2.5">
       <div className="min-w-0 text-sm leading-relaxed [overflow-wrap:break-word]">
-        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{body}</ReactMarkdown>
         {caret && <span className="caret ml-0.5 inline-block h-4 w-2 bg-accent align-text-bottom" />}
+        {sources !== null && (
+          <details className="group mt-2 border-t border-border pt-2">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1.5 py-1 text-sm text-muted select-none hover:bg-accent-soft hover:text-text [&::-webkit-details-marker]:hidden">
+              <ChevronRightIcon className="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" />
+              {t('answerSources')}
+            </summary>
+            <div className="pl-5"><ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>{sources}</ReactMarkdown></div>
+          </details>
+        )}
       </div>
     </Card>
   );
 });
 
 // The plan a plan agent recorded with propose_plan: the same card a text
-// contract renders, the actions and preflight keyed on the segment's id.
+// contract renders. Its actions live in the decision bar; the card stays the record.
 const PlanSegment = memo(function PlanSegment({ id, plan, preflight }: { id: string; plan: Plan; preflight?: PreflightResultView[] }) {
-  const actions = usePlanActions();
-  const planActions = actions && actions.segmentId === id ? actions : null;
-  return <PlanCard plan={plan} actions={planActions} preflight={preflight} />;
+  const pending = usePendingPlan() === id;
+  return <PlanCard plan={plan} preflight={preflight} pending={pending} anchorId={planAnchorId(id)} />;
 });
 
 // The report a builder recorded with submit_report: the same card a text
@@ -149,7 +154,7 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
           return <ThinkingSegment key={segment.id} content={segment.content} />;
         }
         if (segment.kind === 'text') {
-          return <TextSegment key={segment.id} id={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
+          return <TextSegment key={segment.id} content={segment.content} caret={streaming && segment.id === lastTextId} preflight={segment.id === lastTextId ? item.preflight : undefined} />;
         }
         if (segment.kind === 'plan') {
           return <PlanSegment key={segment.id} id={segment.id} plan={segment.plan} preflight={item.preflight} />;
@@ -159,27 +164,35 @@ function AssistantItemView({ item, model, running, showHeader, pendingCallId }: 
         }
         return <ToolCard key={segment.id} tool={segment.tool} awaiting={segment.tool.id === pendingCallId} />;
       })}
-      {showCopy && showStats ? (
-        <div className="flex items-center justify-between gap-3">
+      {/* The copy button follows the stats line, so it stays by the answer whatever its width. */}
+      {(showStats || showCopy) && (
+        <div className="flex items-center gap-1">
           <MessageStatsLine item={item} streaming={streaming} />
-          <CopyButton text={copyText} />
+          {showCopy && <CopyButton text={copyText} />}
         </div>
-      ) : (
-        <>
-          <MessageStatsLine item={item} streaming={streaming} />
-          {showCopy && (
-            <div className="flex justify-end">
-              <CopyButton text={copyText} />
-            </div>
-          )}
-        </>
       )}
       {!streaming && call?.turnRecap && <div className="text-center text-xs text-muted tabular-nums">{call.turnRecap}</div>}
     </div>
   );
 }
 
-export function ThreadItemView({ item, model, running, showHeader, onReplay, pendingCallId }: { item: ThreadItem; model: string; running: boolean; showHeader: boolean; onReplay?: (messageId: string) => void; pendingCallId?: string }) {
+export function ThreadItemView({
+  item,
+  model,
+  running,
+  showHeader,
+  onReplay,
+  pendingCallId,
+  latest = false,
+}: {
+  item: ThreadItem;
+  model: string;
+  running: boolean;
+  showHeader: boolean;
+  onReplay?: (messageId: string) => void;
+  pendingCallId?: string;
+  latest?: boolean;
+}) {
   const t = useT();
   if (item.kind === 'mode') {
     // A mode change is a divider, not a message: the agent's color marks the
@@ -253,6 +266,6 @@ export function ThreadItemView({ item, model, running, showHeader, onReplay, pen
   }
 
   if (item.kind === 'workflow-end') {
-    return <RunEndCard item={item} />;
+    return <RunEndCard item={item} latest={latest} />;
   }
 }

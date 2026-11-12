@@ -19,16 +19,23 @@ import {
   changesPath,
   TABS_KEY,
   ACTIVE_TAB_KEY,
+  isRouteTab,
+  rememberEditorHash,
+  withTask,
 } from './route';
 
 describe('changes', () => {
   it('parses the changes page of a session', () => {
-    expect(parseRoute('#/s/abc-1/changes')).toEqual({ name: 'changes', id: 'abc-1' });
+    expect(parseRoute('#/s/abc-1/changes')).toEqual({ name: 'changes', id: 'abc-1', path: null });
   });
 
   it('round trips changesPath', () => {
     const sessionId = 'abc-1/slash';
-    expect(parseRoute(changesPath(sessionId))).toEqual({ name: 'changes', id: sessionId });
+    expect(parseRoute(changesPath(sessionId))).toEqual({ name: 'changes', id: sessionId, path: null });
+  });
+
+  it('parses a changes path with a file', () => {
+    expect(parseRoute(changesPath('s-1', 'src/a b.ts'))).toEqual({ name: 'changes', id: 's-1', path: 'src/a b.ts' });
   });
 
   it('keeps the session tab active on the changes page', () => {
@@ -96,6 +103,7 @@ describe('parseRoute', () => {
       projectId: 'a/b',
       tab: 'risks',
       sub: null,
+      task: null,
     });
   });
 
@@ -105,7 +113,50 @@ describe('parseRoute', () => {
       projectId: 'x',
       tab: 'map',
       sub: 'foo',
+      task: null,
     });
+  });
+
+  it('reads the task open in the drawer', () => {
+    expect(parseRoute('#/project/x/tasks/backlog?task=i%2F1')).toEqual({
+      name: 'project',
+      projectId: 'x',
+      tab: 'tasks',
+      sub: 'backlog',
+      task: 'i/1',
+    });
+    expect(withTask('#/project/x/tasks/backlog', 'i/1')).toBe('#/project/x/tasks/backlog?task=i%2F1');
+    expect(withTask('#/project/x/tasks/backlog?task=a', null)).toBe('#/project/x/tasks/backlog');
+  });
+
+  it('round-trips an editor file path with a session', async () => {
+    const { editorPath } = await import('./route');
+    expect(parseRoute(editorPath('p', 'docs/a b.md', 's-1'))).toEqual({
+      name: 'editor',
+      projectId: 'p',
+      path: 'docs/a b.md',
+      session: 's-1',
+    });
+  });
+
+  it('parses an editor route without a file', () => {
+    expect(parseRoute('#/edit/p')).toEqual({
+      name: 'editor',
+      projectId: 'p',
+      path: null,
+      session: null,
+    });
+  });
+
+  it('returns editor tab id for editor route', () => {
+    expect(
+      tabIdForRoute({
+        name: 'editor',
+        projectId: 'p',
+        path: null,
+        session: null,
+      }),
+    ).toBe('edit:p');
   });
 
   it('parses workflows route without ids', () => {
@@ -194,6 +245,15 @@ describe('tabPath', () => {
     expect(tabPath('abc')).toBe('#/s/abc');
   });
 
+  it('builds editor path before a hash is remembered', () => {
+    expect(tabPath('edit:p')).toBe('#/edit/p');
+  });
+
+  it('builds the remembered editor path', () => {
+    rememberEditorHash('p', '#/edit/p/a.ts');
+    expect(tabPath('edit:p')).toBe('#/edit/p/a.ts');
+  });
+
   it('builds new path', () => {
     expect(tabPath('new:p1')).toBe('#/new/p1');
   });
@@ -262,6 +322,7 @@ describe('tabIdForRoute', () => {
         projectId: 'p1',
         tab: null,
         sub: null,
+        task: null,
       }),
     ).toBeNull();
   });
@@ -274,6 +335,20 @@ describe('tabIdForRoute', () => {
         right: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe('isRouteTab', () => {
+  it('is true for page tabs', () => {
+    expect(isRouteTab('page:settings')).toBe(true);
+  });
+
+  it('is true for editor tabs', () => {
+    expect(isRouteTab('edit:p')).toBe(true);
+  });
+
+  it('is false for session ids', () => {
+    expect(isRouteTab('abc')).toBe(false);
   });
 });
 
@@ -346,5 +421,17 @@ describe('loadActiveTab', () => {
   it('returns null when local storage is missing', () => {
     vi.unstubAllGlobals();
     expect(loadActiveTab()).toBeNull();
+  });
+});
+
+describe('page routes', () => {
+  it('parses #/projects and maps it to its tab id', () => {
+    expect(parseRoute('#/projects')).toEqual({ name: 'projects' });
+    expect(tabIdForRoute({ name: 'projects' })).toBe('page:projects');
+  });
+
+  it('parses #/chats and maps it to its tab id', () => {
+    expect(parseRoute('#/chats')).toEqual({ name: 'chats' });
+    expect(tabIdForRoute({ name: 'chats' })).toBe('page:chats');
   });
 });

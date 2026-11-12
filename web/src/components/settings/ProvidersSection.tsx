@@ -1,12 +1,12 @@
+// The providers settings list: an optional add-provider draft and one card per provider.
 import { useState } from 'react';
-import type { ProviderListing } from '../../lib/api';
-import { Badge } from '../ui/Badge';
+import type { ModelRef, ProviderListing, SettingsDefaults } from '../../lib/api';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { Section, type SectionSave } from '../ui/Section';
-import { ChevronRightIcon, CloseIcon, PlusIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
-import { FieldRow, Select, TextInput } from '../ui/Field';
-import { formOnlyModels, type ModelForm } from './ModelPrefsSection';
+import { PlusIcon } from '../ui/Icons';
+import { FieldRow, TextInput } from '../ui/Field';
+import { type ModelForm } from '../../lib/settingsForm';
+import { ProviderCard } from './ProviderCard';
 import { useT } from '../../i18n';
 
 export interface ProviderForm {
@@ -19,20 +19,6 @@ export interface ProviderForm {
   sealed: string | null;
 }
 
-interface ProvidersSectionProps {
-  providers: ProviderForm[];
-  listings: ProviderListing[];
-  /** The form's per-model entries: those absent from a listing were added by hand. */
-  values: Record<string, ModelForm>;
-  onChange: (index: number, patch: Partial<ProviderForm>) => void;
-  onAdd: (provider: ProviderForm) => void;
-  onRemove: (index: number) => void;
-  onFetch: (provider: ProviderForm) => Promise<void>;
-  /** The group's own save: its dot and its "Save". */
-  save?: SectionSave;
-  onAddModel: (providerId: string, modelId: string) => void;
-}
-
 interface ProviderDraft {
   id: string;
   name: string;
@@ -41,23 +27,56 @@ interface ProviderDraft {
 
 const emptyDraft: ProviderDraft = { id: '', name: '', baseUrl: '' };
 
+interface ProvidersSectionProps {
+  providers: ProviderForm[];
+  listings: ProviderListing[];
+  /** The form's per-model entries: those absent from a listing were added by hand. */
+  values: Record<string, ModelForm>;
+  billing: Record<string, boolean>;
+  defaults: SettingsDefaults;
+  favorites: ModelRef[];
+  /** `provider/model` of the default model, '' when none is chosen. */
+  defaultModel: string;
+  adding: boolean;
+  onAddingChange: (adding: boolean) => void;
+  onChange: (index: number, patch: Partial<ProviderForm>) => void;
+  onAdd: (provider: ProviderForm) => void;
+  onRemove: (index: number) => void;
+  onFetch: (provider: ProviderForm) => Promise<void>;
+  /** The group's own save: its dot and its "Save". */
+  save?: SectionSave;
+  onAddModel: (providerId: string, modelId: string) => void;
+  onToggleFavorite: (ref: ModelRef) => void;
+  onToggleBilled: (key: string, billed: boolean) => void;
+  onSetDefault: (key: string) => void;
+  onChangeModel: (key: string, field: keyof ModelForm, value: string) => void;
+  onRemoveModel: (providerId: string, modelId: string) => void;
+}
+
 export function ProvidersSection({
   providers,
   listings,
   values,
+  billing,
+  defaults,
+  favorites,
+  defaultModel,
+  adding,
+  onAddingChange,
   onChange,
   onAdd,
   onRemove,
   onFetch,
   save,
-  onAddModel
+  onAddModel,
+  onToggleFavorite,
+  onToggleBilled,
+  onSetDefault,
+  onChangeModel,
+  onRemoveModel
 }: ProvidersSectionProps) {
   const t = useT();
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
-  const [fetchingId, setFetchingId] = useState<string | null>(null);
-  const [modelDrafts, setModelDrafts] = useState<Record<string, string>>({});
-  const [addingProvider, setAddingProvider] = useState(false);
-  const [addingModelFor, setAddingModelFor] = useState<string | null>(null);
   const draftId = draft.id.trim();
   const draftDisabled =
     draftId === '' || draftId.includes('/') || providers.some((provider) => provider.id === draftId);
@@ -74,41 +93,13 @@ export function ProvidersSection({
       sealed: null
     });
     setDraft(emptyDraft);
-    setAddingProvider(false);
-  }
-
-  function addModel(providerId: string) {
-    const modelId = (modelDrafts[providerId] ?? '').trim();
-    if (modelId === '') return;
-    onAddModel(providerId, modelId);
-    setModelDrafts((previous) => ({ ...previous, [providerId]: '' }));
-  }
-
-  /** Header buttons must not fold the provider they sit in. */
-  function keepOpen(event: React.MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
+    onAddingChange(false);
   }
 
   return (
-    <Section
-      title={t('providersSectionTitle')}
-      save={save}
-      actions={
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          aria-label={t('addProvider')}
-          title={t('addProvider')}
-          onClick={() => setAddingProvider((current) => !current)}
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-        </Button>
-      }
-    >
-      {addingProvider && (
-        <Card variant="inset">
+    <div className="flex flex-col gap-6">
+      {adding && (
+        <Section Icon={PlusIcon} title={t('addProvider')}>
           <div className="grid gap-2 md:grid-cols-3">
             <FieldRow label={t('idLabel')} hint={t('idHint')}>
               <TextInput
@@ -133,212 +124,40 @@ export function ProvidersSection({
             </FieldRow>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" disabled={draftDisabled} onClick={addProvider}>
+            <Button type="button" variant="secondary" size="sm" disabled={draftDisabled} onClick={addProvider}>
               {t('add')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setAddingProvider(false)}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onAddingChange(false)}>
               {t('cancel')}
             </Button>
             <p className="m-0 text-xs text-faint">{t('providerAddHint')}</p>
           </div>
-        </Card>
+        </Section>
       )}
 
-      <div className="flex flex-col">
-        {providers.map((provider, index) => {
-          const listing = listings.find((item) => item.provider === provider.id);
-          const isLocal = provider.id === 'local';
-          const error = listing?.error ?? null;
-          const added = formOnlyModels(values, provider.id, listing);
-          const count = (listing?.models.length ?? 0) + added.length;
-          const modelDraft = modelDrafts[provider.id] ?? '';
-
-          return (
-            <div key={provider.id} className="border-t border-border first:border-t-0">
-              <details
-                // A failed listing opens by itself: the error is why the human came here.
-                open={error ? true : undefined}
-                className="group"
-              >
-                <summary className="-mx-2 flex h-9 cursor-pointer list-none items-center gap-2 rounded-md px-2 select-none hover:bg-raised [&::-webkit-details-marker]:hidden">
-                  <ChevronRightIcon className="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" />
-                  <span className="min-w-0 truncate font-mono text-sm font-medium">
-                    {provider.name || provider.id}
-                  </span>
-                  {error ? (
-                    <Badge tone="err" title={error}>
-                      {t('providerError')}
-                    </Badge>
-                  ) : (
-                    <Badge tone="neutral">
-                      {count === 0 ? t('noModels') : t('modelCount', { count, s: count > 1 ? 's' : '' })}
-                    </Badge>
-                  )}
-                  <span className="ml-auto flex shrink-0 items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      aria-label={t('addModelTitle')}
-                      title={t('addModelHint')}
-                      onClick={(event) => {
-                        keepOpen(event);
-                        setAddingModelFor((current) => (current === provider.id ? null : provider.id));
-                      }}
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      disabled={fetchingId === provider.id}
-                      aria-label={t('fetchModels')}
-                      title={fetchingId === provider.id ? t('fetchingModels') : t('fetchModelsTitle')}
-                      onClick={(event) => {
-                        keepOpen(event);
-                        void (async () => {
-                          setFetchingId(provider.id);
-                          try {
-                            await onFetch(provider);
-                          } catch {
-                            // A failed fetch leaves the listing as it was.
-                          } finally {
-                            setFetchingId(null);
-                          }
-                        })();
-                      }}
-                    >
-                      {fetchingId === provider.id ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
-                    </Button>
-                    {!isLocal && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconOnly
-                        aria-label={t('removeProvider')}
-                        title={t('removeProviderTitle')}
-                        onClick={(event) => { keepOpen(event); onRemove(index); }}
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </span>
-                </summary>
-
-                <div className="flex flex-col gap-3 pb-4 pt-1">
-                  {error && <p className="m-0 text-xs text-err">{error}</p>}
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <FieldRow label={t('nameLabel')}>
-                      <TextInput
-                        value={provider.name}
-                        onChange={(event) => onChange(index, { name: event.target.value })}
-                        className="w-full"
-                      />
-                    </FieldRow>
-
-                    <FieldRow
-                      label={t('baseUrlLabel')}
-                      hint={isLocal ? t('baseUrlLocalHint') : undefined}
-                    >
-                      <TextInput
-                        value={provider.baseUrl}
-                        placeholder={isLocal ? listing?.baseUrl ?? '' : ''}
-                        onChange={(event) => onChange(index, { baseUrl: event.target.value })}
-                        className="w-full"
-                      />
-                    </FieldRow>
-
-                    <FieldRow label={t('apiKeyLabel')}>
-                      <Select
-                        value={provider.keyKind}
-                        onChange={(event) =>
-                          onChange(index, { keyKind: event.target.value as ProviderForm['keyKind'] })
-                        }
-                        className="w-full"
-                      >
-                        <option value="none">{t('apiKeyNone')}</option>
-                        <option value="env">{t('apiKeyEnv')}</option>
-                        <option value="stored">{t('apiKeyStored')}</option>
-                      </Select>
-                    </FieldRow>
-
-                    {provider.keyKind === 'env' && (
-                      <FieldRow label={t('apiKeyEnv')}>
-                        <TextInput
-                          value={provider.envVar}
-                          placeholder="OPENROUTER_API_KEY"
-                          onChange={(event) => onChange(index, { envVar: event.target.value })}
-                          className="w-full"
-                        />
-                      </FieldRow>
-                    )}
-
-                    {provider.keyKind === 'stored' && (
-                      <FieldRow label={t('newKeyLabel')}>
-                        <TextInput
-                          type="password"
-                          autoComplete="off"
-                          value={provider.newKey}
-                          placeholder={provider.sealed ? t('sealedKeyPlaceholder') : t('pasteKeyPlaceholder')}
-                          onChange={(event) => onChange(index, { newKey: event.target.value })}
-                          className="w-full"
-                        />
-                      </FieldRow>
-                    )}
-                  </div>
-
-                  {added.length > 0 && (
-                    <p className="m-0 text-xs text-muted">
-                      {t('addedModelsNote', { list: added.join(', '), s: added.length > 1 ? 's' : '' })}
-                    </p>
-                  )}
-                </div>
-              </details>
-              {/* Not a <form>: the Settings page is one, and a nested submit
-                  bubbles to it, saving the page before the model is added. */}
-              {addingModelFor === provider.id && (
-                <div className="flex items-center gap-2 pb-3 pl-5">
-                  <TextInput
-                    autoFocus
-                    value={modelDraft}
-                    onChange={(event) => setModelDrafts((previous) => ({ ...previous, [provider.id]: event.target.value }))}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter') return;
-                      event.preventDefault();
-                      addModel(provider.id);
-                    }}
-                    placeholder={t('modelIdPlaceholder')}
-                    className="w-full max-w-xs"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    iconOnly
-                    disabled={modelDraft.trim() === ''}
-                    aria-label={t('add')}
-                    title={t('addModelBtnTitle')}
-                    onClick={() => addModel(provider.id)}
-                  >
-                    <PlusIcon className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    aria-label={t('cancel')}
-                    title={t('cancel')}
-                    onClick={() => setAddingModelFor(null)}
-                  >
-                    <CloseIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Section>
+      {providers.map((provider, index) => (
+        <ProviderCard
+          key={provider.id}
+          provider={provider}
+          index={index}
+          listings={listings}
+          values={values}
+          billing={billing}
+          defaults={defaults}
+          favorites={favorites}
+          defaultModel={defaultModel}
+          save={save}
+          onChange={onChange}
+          onRemove={onRemove}
+          onFetch={onFetch}
+          onAddModel={onAddModel}
+          onToggleFavorite={onToggleFavorite}
+          onToggleBilled={onToggleBilled}
+          onSetDefault={onSetDefault}
+          onChangeModel={onChangeModel}
+          onRemoveModel={onRemoveModel}
+        />
+      ))}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
-import type { ModelChoice, ModelChoices, ModelRef } from '../lib/api';
-import { getModelChoices, setSessionModel, setSessionMode } from '../lib/api';
+import type { ModelChoice, ModelChoices, ModelRef, ReasoningEffort, SessionModel } from '../lib/api';
+import { getModelChoices, setSessionEffort, setSessionModel, setSessionMode } from '../lib/api';
 
 interface UseModeAndModelArgs {
   sessionId: string | null;
@@ -12,7 +12,7 @@ interface UseModeAndModelArgs {
   /** A new-session tab has no detail yet: the server lists its default agent first. */
   fallbackMode: string | null;
   /** The session's model resolved by the server, or null. */
-  detailModel: ModelChoice | null;
+  detailModel: SessionModel | null;
   /** The page's send-error state: selection failures are shown there. */
   onError: (message: string | null) => void;
   /** A model change was applied: the page re-reads the session detail. */
@@ -38,8 +38,10 @@ export function useModeAndModel({
   const [pendingMode, setPendingMode] = useState<string | null>(null);
   const [modelChoices, setModelChoices] = useState<ModelChoices | null>(null);
   const [pendingModel, setPendingModel] = useState<ModelRef | null>(null);
+  const [pendingEffort, setPendingEffort] = useState<{ value: ReasoningEffort | null } | null>(null);
   const modelRequestRef = useRef(0);
   const modeRequestRef = useRef(0);
+  const effortRequestRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -59,6 +61,7 @@ export function useModeAndModel({
   useEffect(() => {
     setPendingMode(null);
     setPendingModel(null);
+    setPendingEffort(null);
   }, [sessionId]);
 
   const serverMode = viewMode ?? detailMode ?? fallbackMode ?? null;
@@ -73,19 +76,27 @@ export function useModeAndModel({
   }, [pendingMode, serverMode]);
 
   const serverModel = detailModel ?? modelChoices?.default ?? null;
+  const pendingChoice = pendingModel
+    ? modelChoices?.favorites.find((favorite) => sameModelRef(favorite, pendingModel)) ??
+      (modelChoices && sameModelRef(modelChoices.default, pendingModel)
+        ? modelChoices.default
+        : undefined)
+    : undefined;
   const currentModel: ModelChoice | null = pendingModel
     ? {
         provider: pendingModel.provider,
         model: pendingModel.model,
-        providerName:
-          modelChoices?.favorites.find((favorite) =>
-            sameModelRef(favorite, pendingModel),
-          )?.providerName ??
-          (modelChoices && sameModelRef(modelChoices.default, pendingModel)
-            ? modelChoices.default.providerName
-            : pendingModel.provider),
+        providerName: pendingChoice?.providerName ?? pendingModel.provider,
+        acceptedEfforts: pendingChoice?.acceptedEfforts,
+        defaultEffort: pendingChoice?.defaultEffort,
       }
     : serverModel;
+
+  const acceptedEfforts: ReasoningEffort[] = currentModel?.acceptedEfforts ?? [];
+  const defaultEffort: ReasoningEffort | null = currentModel?.defaultEffort ?? null;
+  const effort: ReasoningEffort | null = pendingEffort
+    ? pendingEffort.value
+    : detailModel?.effort ?? null;
 
   useEffect(() => {
     if (
@@ -156,13 +167,48 @@ export function useModeAndModel({
     }
   }
 
+  async function handleEffortChange(effort: ReasoningEffort | null): Promise<boolean> {
+    // A not-yet-created session keeps the choice locally; `handleSend` passes
+    // it to `createSession`.
+    if (!sessionId) {
+      setPendingEffort({ value: effort });
+      return true;
+    }
+
+    const request = ++effortRequestRef.current;
+    setPendingEffort({ value: effort });
+    onError(null);
+
+    try {
+      await setSessionEffort(sessionId, effort);
+      onModelApplied();
+      setPendingEffort(null);
+      return true;
+    } catch (error) {
+      // A newer request supersedes this one; only the latest may revert.
+      if (request !== effortRequestRef.current) return true;
+      setPendingEffort(null);
+      onError(
+        error instanceof Error
+          ? error.message
+          : t('effortChangeError'),
+      );
+      return false;
+    }
+  }
+
   return {
     modelChoices,
     mode,
     currentModel,
     pendingModel,
+    pendingEffort,
+    effort,
+    acceptedEfforts,
+    defaultEffort,
     handleModeChange,
     handleModelChange,
+    handleEffortChange,
   };
 }
 

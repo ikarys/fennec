@@ -165,17 +165,17 @@ pub fn workflow_usage(
                     detail: match lang {
                         Lang::En => format!(
                             "Input {} tokens, {} cached · output {} tokens · {} call{}",
-                            t.prompt,
-                            t.cached,
-                            t.completion,
+                            display::tokens(t.prompt, lang.locale()),
+                            display::tokens(t.cached, lang.locale()),
+                            display::tokens(t.completion, lang.locale()),
                             t.calls,
                             if t.calls > 1 { "s" } else { "" }
                         ),
                         Lang::Fr => format!(
                             "Entrée {} tokens dont {} en cache · sortie {} tokens · {} appel{}",
-                            t.prompt,
-                            t.cached,
-                            t.completion,
+                            display::tokens(t.prompt, lang.locale()),
+                            display::tokens(t.cached, lang.locale()),
+                            display::tokens(t.completion, lang.locale()),
                             t.calls,
                             if t.calls > 1 { "s" } else { "" }
                         ),
@@ -312,7 +312,7 @@ mod tests {
         let view = workflow_usage("s", &events, &calls, Lang::En);
         assert_eq!(
             view.nodes[0].detail,
-            "Input 1000 tokens, 500 cached · output 100 tokens · 1 call"
+            "Input 1.0k tokens, 500 cached · output 100 tokens · 1 call"
         );
     }
 }

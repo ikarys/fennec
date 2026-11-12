@@ -30,8 +30,14 @@ pub(super) fn seatbelt_args(sandbox: &Sandbox, workdir: &Path) -> Vec<OsString> 
                 .map(canonicalize)
                 .collect::<Vec<_>>();
 
-            let profile =
-                build_profile(*network, &hidden_dirs, &hidden_files, &writable, &read_only);
+            let profile = build_profile(
+                *network,
+                &hidden_dirs,
+                &hidden_files,
+                &writable,
+                &read_only,
+                super::server_port(),
+            );
 
             let mut args = vec![OsString::from("-p"), profile.into()];
             args.push(OsString::from("-D"));
@@ -108,6 +114,7 @@ fn build_profile(
     hidden_files: &[PathBuf],
     writable: &[PathBuf],
     read_only: &[PathBuf],
+    server_port: Option<u16>,
 ) -> String {
     let mut profile = String::new();
 
@@ -153,6 +160,14 @@ fn build_profile(
     }
 
     if network {
+        // A sandboxed command with network access is not the human, so it may not talk to fennec.
+        if let Some(port) = server_port {
+            profile.push_str(&format!(
+                r#"(deny network-outbound (remote tcp "localhost:{port}"))"#
+            ));
+            profile.push('\n');
+        }
+
         for i in 0..hidden_files.len() {
             profile.push_str(&format!(
                 r#"(deny network-outbound (remote unix-socket (path-literal (param "HIDDEN_FILE_{i}"))))"#
@@ -251,6 +266,16 @@ mod tests {
             r#"(deny network-outbound (remote unix-socket (path-literal (param "HIDDEN_FILE_0"))))"#
         ));
         assert!(param_value(&args, "HIDDEN_FILE_0").is_some());
+    }
+
+    #[test]
+    fn online_world_denies_the_server_port() {
+        let online = build_profile(true, &[], &[], &[], &[], Some(7777));
+        assert!(online.contains(r#"(deny network-outbound (remote tcp "localhost:7777"))"#));
+        assert!(!online.contains("(deny network*)"));
+
+        let offline = build_profile(false, &[], &[], &[], &[], Some(7777));
+        assert!(offline.contains("(deny network*)"));
     }
 
     #[test]

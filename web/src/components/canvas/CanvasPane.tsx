@@ -278,7 +278,7 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
     <div className="fixed inset-y-0 right-0 z-40 flex w-[min(960px,92vw)] flex-col border-l border-border bg-bg shadow-xl">
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
         <span className="min-w-0 grow truncate text-sm font-medium">
-          {artifact?.title ?? t('canvasMenu')}
+          {artifact?.title ?? t('contextTabCanvas')}
         </span>
         {artifact ? <Badge tone="neutral" appearance="pill">{artifact.format}</Badge> : null}
         {artifact?.source.kind === 'file' ? (
@@ -356,7 +356,7 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
           aria-label={t('canvasDelete')}
           onClick={() => setConfirmOpen(true)}
         >
-          <TrashIcon className="h-4 w-4" />
+          <TrashIcon className="h-3.5 w-3.5" />
         </Button>
         <Button
           variant="ghost"

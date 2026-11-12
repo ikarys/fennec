@@ -1,6 +1,4 @@
-// Settings' Plugins tab: the human's global activations (enabled, network)
-// and the global-scope blocks the active plugins emitted, each with its
-// provenance badge. The core renders the blocks, never HTML.
+// Settings' Plugins tab: global plugin toggles and each plugin's emitted blocks.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import {
@@ -10,12 +8,13 @@ import {
   type ServedPluginBlock,
 } from '../../lib/api';
 import { usePluginsVersion } from '../../hooks/usePluginsVersion';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { filterPlugins, pluginStatusCounts, type PluginStatusFilter } from '../../lib/pluginFilter';
 import { Section } from '../ui/Section';
-import { GlobeIcon, PlayIcon, PuzzleIcon, StopIcon } from '../ui/Icons';
-import { PluginBlockCard } from '../plugins/PluginBlockCard';
+import { AlertIcon } from '../ui/Icons';
+import { InfoBar } from '../ui/InfoBar';
+import { TextInput } from '../ui/Field';
+import { Segmented } from '../ui/Segmented';
+import { PluginCard } from './PluginCard';
 
 export function PluginsSection() {
   const t = useT();
@@ -25,7 +24,12 @@ export function PluginsSection() {
   const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<PluginStatusFilter>('all');
   const fetchId = useRef(0);
+
+  const counts = plugins === null ? null : pluginStatusCounts(plugins);
+  const visiblePlugins = plugins === null ? [] : filterPlugins(plugins, query, status);
 
   const fetchAll = useCallback(async () => {
     const id = ++fetchId.current;
@@ -68,107 +72,61 @@ export function PluginsSection() {
   };
 
   return (
-    <div className="space-y-4">
-      <Section title={t('panelPlugins')} flush description={t('pluginsDescription')}>
-        {error ? <div className="px-4 pb-3 text-err text-xs">{error}</div> : null}
-        {plugins === null && !error && <div className="px-4 py-3 text-sm text-muted">{t('loading')}</div>}
-        {problems.length > 0 && (
-          <Card className="mx-4 mb-3 overflow-hidden">
-            <div className="border-b border-border bg-attention-soft px-3 py-1.5 text-xs font-medium text-attention">
-              {t('pluginProblems')}
-            </div>
-            <ul className="space-y-1 px-3 py-2">
+    <div className="flex flex-col gap-6">
+      <InfoBar>{t('pluginsDescription')}</InfoBar>
+      {plugins !== null && plugins.length > 0 && counts !== null ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <TextInput
+            className="min-w-0 flex-1"
+            value={query}
+            placeholder={t('filter')}
+            aria-label={t('filter')}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <Segmented
+            label={t('pluginStatusFilter')}
+            value={status}
+            onChange={setStatus}
+            segments={[
+              { value: 'all' as const, label: `${t('pluginFilterAll')} ${counts.all}` },
+              { value: 'enabled' as const, label: `${t('pluginFilterEnabled')} ${counts.enabled}` },
+              { value: 'disabled' as const, label: `${t('pluginFilterDisabled')} ${counts.disabled}` },
+            ]}
+          />
+        </div>
+      ) : null}
+      {error ? <p className="m-0 text-xs text-err">{error}</p> : null}
+      {plugins === null && !error && <p className="m-0 text-sm text-muted">{t('loading')}</p>}
+      {problems.length > 0 && (
+        <Section Icon={AlertIcon} title={t('pluginProblems')} flush>
+          <div className="px-4 py-3">
+            <ul className="m-0 space-y-1 p-0">
               {problems.map((problem) => (
                 <li key={problem} className="font-mono text-xs text-text">
                   {problem}
                 </li>
               ))}
             </ul>
-          </Card>
-        )}
-        {plugins !== null && plugins.length === 0 && problems.length === 0 && (
-          <div className="px-4 py-3 text-sm text-muted">{t('noPluginsDefined')}</div>
-        )}
-        {plugins !== null && plugins.length > 0 && (
-          <Card className="overflow-hidden">
-            {plugins.map((plugin, index) => (
-              <div
-                key={plugin.name}
-                className={`flex flex-wrap items-center gap-2 px-4 py-2.5 ${index > 0 ? 'border-t border-border' : ''}`}
-              >
-                <PuzzleIcon className={`h-4 w-4 shrink-0 ${plugin.active ? 'text-accent' : 'text-faint'}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-mono text-xs text-text">{plugin.name}</span>
-                    {plugin.active ? (
-                      <Badge tone="ok" appearance="pill" dot pulse={plugin.enabled}>
-                        {t('pluginEnabled')}
-                      </Badge>
-                    ) : plugin.enabled ? (
-                      <Badge tone="attention" appearance="pill" title={t('pluginCodeChanged')}>
-                        {t('pluginCodeChanged')}
-                      </Badge>
-                    ) : (
-                      <Badge tone="neutral" appearance="pill">
-                        {t('pluginDisabled')}
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="block truncate text-xs text-faint" title={`${plugin.command} ${plugin.args.join(' ')}`}>
-                    {plugin.command} {plugin.args.join(' ')}
-                  </span>
-                  {Object.keys(plugin.env).length > 0 ? (
-                    <span
-                      className="block truncate font-mono text-xs text-faint"
-                      title={Object.entries(plugin.env)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join(' ')}
-                    >
-                      {t('pluginEnv')}: {Object.entries(plugin.env)
-                        .map(([key, value]) => `${key}=${value}`)
-                        .join(' ')}
-                    </span>
-                  ) : null}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  aria-pressed={plugin.network}
-                  aria-label={t('pluginNetwork')}
-                  title={t('pluginNetwork')}
-                  disabled={busyName !== null}
-                  onClick={() => void toggle(plugin, { network: !plugin.network })}
-                  className={plugin.network ? 'text-accent-strong' : ''}
-                >
-                  <GlobeIcon className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant={plugin.enabled ? 'soft' : 'primary'}
-                  size="sm"
-                  disabled={busyName !== null}
-                  aria-label={plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
-                  onClick={() => void toggle(plugin, { enabled: !plugin.enabled })}
-                >
-                  {plugin.enabled ? <StopIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
-                  {plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
-                </Button>
-              </div>
-            ))}
-          </Card>
-        )}
-      </Section>
-      <Section title={t('pluginBlocksTitle')} flush>
-        {blocks.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-muted">{t('noProjectBlocks')}</div>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {blocks.map((block) => (
-              <PluginBlockCard key={`${block.plugin}:${block.title}`} block={block} />
-            ))}
           </div>
-        )}
-      </Section>
+        </Section>
+      )}
+      {plugins !== null && plugins.length === 0 && problems.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">
+          {t('noPluginsDefined')}
+        </div>
+      )}
+      {plugins !== null && plugins.length > 0 && visiblePlugins.length === 0 && (
+        <p className="m-0 text-sm text-muted">{t('noPluginsMatch')}</p>
+      )}
+      {visiblePlugins.map((plugin) => (
+        <PluginCard
+          key={plugin.name}
+          plugin={plugin}
+          blocks={blocks.filter((block) => block.plugin === plugin.name)}
+          busy={busyName !== null}
+          onToggle={(patch) => void toggle(plugin, patch)}
+        />
+      ))}
     </div>
   );
 }

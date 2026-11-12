@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getBacklog, type BacklogProject, type BacklogView } from '../lib/api';
 import { startQueue, stopQueue } from '../lib/ideas';
-import { Badge } from '../components/ui/Badge';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { MoonIcon, PlayIcon, StopIcon } from '../components/ui/Icons';
+import { BacklogIcon, MoonIcon, PlayIcon, StopIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
+import { PageHeader } from '../components/ui/PageHeader';
 import type { MsgKey } from '../i18n/messages';
 
 function headerSummary(
@@ -17,33 +18,32 @@ function headerSummary(
   if (view.total.yours > 0) parts.push(t('backlogYoursCount', { count: view.total.yours }));
   if (view.total.running > 0) parts.push(t('backlogRunningCount', { count: view.total.running }));
   if (view.total.ready > 0)
-    parts.push(t('backlogReadyCount', { count: view.total.ready, plural: view.total.ready > 1 ? 's' : '' }));
+    parts.push(t('backlogReadyCount', { count: view.total.ready }));
   if (view.total.done > 0)
-    parts.push(t('backlogDoneCount', { count: view.total.done, plural: view.total.done > 1 ? 's' : '' }));
+    parts.push(t('backlogDoneCount', { count: view.total.done }));
 
-  parts.push(t('backlogProjectsWithTasks', { count: view.total.projects, plural: view.total.projects > 1 ? 's' : '' }));
+  parts.push(t('backlogProjectsWithTasks', { count: view.total.projects }));
   return parts.join(' · ');
 }
 
 function Count({
   value,
   href,
-  attention = false,
+  tone,
 }: {
   value: number;
   href: string;
-  attention?: boolean;
+  tone: BadgeTone;
 }) {
   if (value === 0) {
     return <span className="text-faint">0</span>;
   }
 
   return (
-    <a
-      href={href}
-      className={`hover:underline ${attention ? 'font-semibold text-accent-strong' : 'text-text'}`}
-    >
-      {value}
+    <a href={href} className="inline-flex">
+      <Badge tone={tone} appearance="pill">
+        {value}
+      </Badge>
     </a>
   );
 }
@@ -72,49 +72,59 @@ function ProjectRow({
   };
 
   return (
-    <tr className={`hover:bg-raised ${first ? '' : 'border-t border-border'}`}>
-      <td className="px-3 py-2">
-        <a
-          href={`#/project/${encodeURIComponent(projectId)}/tasks`}
-          className="font-medium text-text hover:text-accent-strong"
-        >
-          {row.project.name}
-        </a>
-        {row.queue.next ? (
-          <span
-            className="block max-w-[22rem] truncate text-xs text-muted"
-            title={row.queue.next.text}
-          >
-            {t('nextLabel', { title: row.queue.next.title })}
+    <tr className={`transition-colors group hover:bg-accent-soft ${first ? '' : 'border-t border-border'}`}>
+      <td className="px-3 py-2 pl-4">
+        <div className="flex items-center gap-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+            <BacklogIcon className="h-4 w-4" />
           </span>
-        ) : null}
+          <div className="min-w-0">
+            <a
+              href={`#/project/${encodeURIComponent(projectId)}/tasks`}
+              className="font-medium text-text hover:text-accent-strong group-hover:text-accent"
+            >
+              {row.project.name}
+            </a>
+            {row.queue.next ? (
+              <span
+                className="block max-w-[22rem] truncate text-xs text-muted"
+                title={row.queue.next.text}
+              >
+                {t('nextLabel', { title: row.queue.next.title })}
+              </span>
+            ) : null}
+          </div>
+        </div>
       </td>
       <td className="px-3 py-2 text-right">
         <Count
           value={row.yours}
           href={`#/project/${encodeURIComponent(projectId)}/tasks/yours`}
-          attention
+          tone="attention"
         />
       </td>
       <td className="px-3 py-2 text-right">
         <Count
           value={row.running}
           href={`#/project/${encodeURIComponent(projectId)}/tasks`}
+          tone="accent"
         />
       </td>
       <td className="px-3 py-2 text-right">
         <Count
           value={row.ready}
           href={`#/project/${encodeURIComponent(projectId)}/tasks/ready`}
+          tone="info"
         />
       </td>
       <td className="px-3 py-2 text-right">
         <Count
           value={row.done}
           href={`#/project/${encodeURIComponent(projectId)}/tasks/done`}
+          tone="ok"
         />
       </td>
-      <td className="whitespace-nowrap px-3 py-2 text-right">
+      <td className="whitespace-nowrap px-3 py-2 text-right pr-4">
         <div className="flex items-center justify-end gap-1">
           {row.queue.running ? (
             <>
@@ -191,10 +201,7 @@ export default function BacklogPage() {
   return (
     <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto max-w-page">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('tasks')}</h1>
-          {view ? <p className="mt-0.5 text-sm text-muted">{headerSummary(view, t)}</p> : null}
-        </div>
+        <PageHeader Icon={BacklogIcon} title={t('tasks')} subtitle={view ? headerSummary(view, t) : undefined} />
 
         {error ? <p className="mt-4 text-err">{error}</p> : null}
         {!view && !error ? <div className="mt-4 text-muted">{t('loading')}</div> : null}
@@ -211,13 +218,13 @@ export default function BacklogPage() {
               <Card className="overflow-hidden">
                 <table className="w-full text-sm tabular-nums">
                   <thead>
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-muted">{t('homeProject')}</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('tasksTabYours')}</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('stageRunning')}</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('tasksTabReady')}</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('tasksTabDone')}</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-muted">{t('queue')}</th>
+                    <tr className="border-b border-border bg-raised">
+                      <th className="px-3 py-2 pl-4 text-xs font-medium uppercase tracking-wide text-faint text-left">{t('homeProject')}</th>
+                      <th className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-faint text-right">{t('tasksTabYours')}</th>
+                      <th className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-faint text-right">{t('stageRunning')}</th>
+                      <th className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-faint text-right">{t('tasksTabReady')}</th>
+                      <th className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-faint text-right">{t('tasksTabDone')}</th>
+                      <th className="px-3 py-2 pr-4 text-xs font-medium uppercase tracking-wide text-faint text-right">{t('queue')}</th>
                     </tr>
                   </thead>
                   <tbody>

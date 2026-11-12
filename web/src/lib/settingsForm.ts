@@ -1,6 +1,7 @@
 // The Settings page's form model: the stored preferences read into editable strings, and the
 // strings written back as preferences. Pure, so the round trip is tested without a browser.
 import type {
+  AgentStyle,
   ApiKey,
   AutonomyPrefs,
   DelegationPrefs,
@@ -17,8 +18,79 @@ import type {
   SettingsResponse,
 } from './api';
 import type { ProviderForm } from '../components/settings/ProvidersSection';
-import type { ModelForm } from '../components/settings/ModelPrefsSection';
 import type { SearchForm } from '../components/settings/SearchSection';
+
+/** A model's editable per-field overrides, kept as strings in the form. */
+export interface ModelForm {
+  maxTokens: string;
+  contextWindow: string;
+  compactionThreshold: string;
+  reasoningEffort: string;
+  /** The accepted efforts, comma-joined; '' when never probed. */
+  reasoningEfforts: string;
+  priceInput: string;
+  priceCached: string;
+  priceOutput: string;
+}
+
+type ListedModel = ProviderListing['models'][number];
+
+/** The model ids of `provider` edited in the form but absent from its listing: added by hand. */
+export function formOnlyModels(
+  values: Record<string, ModelForm>,
+  providerId: string,
+  listing: ProviderListing | undefined
+): string[] {
+  const listedIds = new Set(listing?.models.map((model) => model.id) ?? []);
+  const prefix = `${providerId}/`;
+  return Object.keys(values)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length))
+    .filter((modelId) => !listedIds.has(modelId))
+    .sort();
+}
+
+/** A token count as a pill shows it: `240000` → `240k`, `1234` → `1.2k`; anything else unchanged. */
+function compactTokens(text: string): string {
+  const value = Number(text);
+  if (!Number.isFinite(value) || value < 1000) return text;
+  return `${Number((value / 1000).toFixed(1))}k`;
+}
+
+/** Compact spec pills for a model row. */
+export function modelSpecs(
+  value: ModelForm,
+  model: ListedModel | null,
+  autoEffort: string
+): string[] {
+  const specs: string[] = [];
+
+  if (model === null) {
+    if (value.contextWindow !== '') {
+      specs.push(`ctx ${compactTokens(value.contextWindow)}`);
+    }
+  } else {
+    const window =
+      value.contextWindow !== '' ? value.contextWindow : String(model.resolved.contextWindow.value);
+    specs.push(`ctx ${compactTokens(window)}`);
+
+    const max =
+      value.maxTokens !== '' ? value.maxTokens : String(model.resolved.maxTokens.value);
+    specs.push(`max ${compactTokens(max)}`);
+
+    const effort =
+      value.reasoningEffort !== ''
+        ? value.reasoningEffort
+        : (model.resolved.reasoningEffort.value ?? autoEffort);
+    specs.push(`effort ${effort}`);
+  }
+
+  if (value.priceInput !== '' || value.priceOutput !== '') {
+    specs.push(`$${value.priceInput || '0'}/$${value.priceOutput || '0'}`);
+  }
+
+  return specs;
+}
 
 /** A fraction as the percentage the form shows (`0.85` → `85`). */
 export function percentFromFraction(fraction: number): string {
@@ -38,6 +110,7 @@ export interface SettingsForm {
   billing: Record<string, boolean>;
   display: DisplayPrefs;
   instructions: string;
+  agentStyle: AgentStyle;
   search: SearchForm;
   sandbox: SandboxPrefs;
   autonomy: AutonomyPrefs;
@@ -46,6 +119,7 @@ export interface SettingsForm {
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
   mcp: McpServer[];
+  shortcuts: Record<string, string>;
 }
 
 
@@ -63,7 +137,8 @@ export type SaveGroup =
   | 'skills'
   | 'workflows'
   | 'mcp'
-  | 'display';
+  | 'display'
+  | 'shortcuts';
 
 /**
  * What each group saves: its preference keys (stored on top of the others, so the other groups'
@@ -74,7 +149,7 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   model: { prefs: ['selected'], form: ['model'] },
   providers: { prefs: ['providers'], form: ['providers', 'models'] },
   modelPrefs: { prefs: ['providers', 'favorites', 'billing'], form: ['providers', 'models', 'favorites', 'billing'] },
-  instructions: { prefs: ['globalInstructions'], form: ['instructions'] },
+  instructions: { prefs: ['globalInstructions', 'agentStyle'], form: ['instructions', 'agentStyle'] },
   search: { prefs: ['search'], form: ['search'] },
   sandbox: { prefs: ['sandbox'], form: ['sandbox'] },
   autonomy: { prefs: ['autonomy'], form: ['autonomy'] },
@@ -83,7 +158,8 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   skills: { prefs: ['alwaysOnSkills'], form: ['alwaysOnSkills'] },
   workflows: { prefs: ['enabledWorkflows'], form: ['enabledWorkflows'] },
   mcp: { prefs: ['mcp'], form: ['mcp'] },
-  display: { prefs: ['display'], form: ['display'] }
+  display: { prefs: ['display'], form: ['display'] },
+  shortcuts: { prefs: ['shortcuts'], form: ['shortcuts'] }
 };
 
 export const emptyModelForm: ModelForm = {
@@ -91,6 +167,7 @@ export const emptyModelForm: ModelForm = {
   contextWindow: '',
   compactionThreshold: '',
   reasoningEffort: '',
+  reasoningEfforts: '',
   priceInput: '',
   priceCached: '',
   priceOutput: ''
@@ -178,6 +255,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
         compactionThreshold:
           prefs.compactionThreshold == null ? '' : percentFromFraction(prefs.compactionThreshold),
         reasoningEffort: prefs.reasoningEffort ?? '',
+        reasoningEfforts: (prefs.reasoningEfforts ?? []).join(','),
         priceInput: prefs.price ? String(prefs.price.inputPerM) : '',
         priceCached: prefs.price ? String(prefs.price.cachedPerM) : '',
         priceOutput: prefs.price ? String(prefs.price.outputPerM) : ''
@@ -192,6 +270,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     billing: preferences.billing ?? {},
     display: preferences.display,
     instructions: preferences.globalInstructions ?? '',
+    agentStyle: preferences.agentStyle ?? 'concise',
     search: {
       url: preferences.search?.searxngUrl ?? '',
       apiKey: preferences.search?.searxngApiKey ?? '',
@@ -203,7 +282,8 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     integration: preferences.integration ?? { modelTrailers: true },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? [],
-    mcp: preferences.mcp ?? []
+    mcp: preferences.mcp ?? [],
+    shortcuts: preferences.shortcuts ?? {}
   };
 }
 
@@ -255,6 +335,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
       if (contextWindow != null) prefs.contextWindow = contextWindow;
       if (compactionThreshold != null) prefs.compactionThreshold = compactionThreshold;
       if (entry.reasoningEffort !== '') prefs.reasoningEffort = entry.reasoningEffort as ReasoningEffort;
+      if (entry.reasoningEfforts !== '') prefs.reasoningEfforts = entry.reasoningEfforts.split(',') as ReasoningEffort[];
       if (entry.priceInput !== '' || entry.priceCached !== '' || entry.priceOutput !== '') {
         prefs.price = {
           inputPerM: priceInput ?? 0,
@@ -287,6 +368,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     billing: form.billing,
     display: form.display,
     globalInstructions: form.instructions.trim() === '' ? null : form.instructions,
+    agentStyle: form.agentStyle,
     search: {
       searxngUrl: searxngUrl === '' ? null : searxngUrl,
       searxngApiKey: searxngApiKey === '' ? null : searxngApiKey,
@@ -298,6 +380,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     integration: form.integration,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows,
-    mcp: form.mcp
+    mcp: form.mcp,
+    shortcuts: form.shortcuts
   };
 }

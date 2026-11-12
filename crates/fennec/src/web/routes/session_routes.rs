@@ -11,10 +11,10 @@ use crate::domain::agents_md;
 use crate::domain::attachment::{Attachment, from_data_url};
 use crate::domain::audit;
 use crate::domain::clock;
-use crate::domain::conversation::{first_request, last_assistant_text};
+use crate::domain::conversation::last_assistant_text;
 use crate::domain::event::{DoneReason, Event, QueueMode};
 use crate::domain::id::new_id;
-use crate::domain::preferences::ModelRef;
+use crate::domain::preferences::{ModelRef, ReasoningEffort};
 use crate::domain::project::SessionSummary;
 use crate::domain::queue;
 use crate::domain::replay::replayable;
@@ -138,6 +138,11 @@ pub(crate) fn create_session(
         None => None,
     };
     let mcp_disabled = crate::web::routes::mcp_routes::disabled_servers(&body["mcpDisabled"]);
+    // Untrusted input: anything but a known effort or null is refused.
+    let Ok(effort) = serde_json::from_value::<Option<ReasoningEffort>>(body["effort"].clone())
+    else {
+        return error(stream, 400, "unknown effort");
+    };
     let title: String = if prompt.is_empty() {
         attachments
             .first()
@@ -158,6 +163,16 @@ pub(crate) fn create_session(
     append_human_event(app, &store, &id, mode_event)?;
     if let Some(model) = model_ref {
         append_human_event(app, &store, &id, Some(Event::ModelChanged { model }))?;
+    }
+    if let Some(effort) = effort {
+        append_human_event(
+            app,
+            &store,
+            &id,
+            Some(Event::EffortChanged {
+                effort: Some(effort),
+            }),
+        )?;
     }
     if let Some(servers) = mcp_disabled {
         append_human_event(app, &store, &id, Some(Event::McpDisabled { servers }))?;
@@ -197,13 +212,14 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
     v["project"] = project_json(&p, store_dir(app));
     v["mode"] = json!(mode);
     v["model"] = model_routes::session_model(app, &store, &s.id)?;
-    // The idea this session frames, so its plan card can mark it ready.
+    // The idea this session frames, so its plan card can mark it ready (or, for a task, apply
+    // the plan to its sheet).
     v["idea"] = match idea_for_session(&store.ideas(&p.id)?, &s.id) {
-        Some(idea) => json!({ "id": idea.id, "state": idea.state }),
+        Some(idea) => {
+            json!({ "id": idea.id, "state": idea.state, "hasSheet": idea.sheet.is_some() })
+        }
         None => Value::Null,
     };
-    // The first human request, so the context panel can show what was asked.
-    v["request"] = json!(first_request(&events));
     // The audit report of the last answer, if it is one: the context panel lists its findings.
     let mut audit_json = json!(audit::parse(&last_assistant_text(&events)));
     if audit_json.is_object() {
@@ -245,17 +261,23 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
             }))
         })
         .unwrap_or(Value::Null);
-    v["worktree"] = match app.place(&store, &s, &p)?.worktree {
+    let place = app.place(&store, &s, &p)?;
+    let ide = store.preferences()?.display.editor;
+    let wsl_distro = std::env::var("WSL_DISTRO_NAME").ok();
+    // Opens the folder the agent works in (its worktree, else the project) in the chosen IDE.
+    v["editorUrl"] = json!(editor::link(
+        ide,
+        &place.workdir.to_string_lossy(),
+        wsl_distro.as_deref()
+    ));
+    v["worktree"] = match place.worktree {
         Some(wt) => json!({
             "path": wt.path, "branch": wt.branch, "base": wt.base,
             // What the integration would bring: none means nothing to review.
             "commits": wt.branch.strip_prefix("fennec/")
                 .and_then(|id| git::branch_stats(Path::new(&p.workdir), id))
                 .map_or(0, |stats| stats.commits),
-            "editorUrl": editor::vscode_link(
-                &wt.path.to_string_lossy(),
-                std::env::var("WSL_DISTRO_NAME").ok().as_deref(),
-            ),
+            "editorUrl": editor::link(ide, &wt.path.to_string_lossy(), wsl_distro.as_deref()),
         }),
         None => Value::Null,
     };
@@ -293,7 +315,8 @@ pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     let window = store.window(id)?;
     let session_events = store.events_of(id, thread_view::SESSION_KINDS)?;
     let workdir = app.place(&store, &session, &project)?.workdir;
-    let view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
+    let mut view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
+    view.hand_to_backlog(idea_for_session(&store.ideas(&project.id)?, id));
     send_json(
         stream,
         200,
@@ -662,27 +685,24 @@ pub(crate) fn serve_events_page(
     send_json(stream, 200, &Value::Array(out))
 }
 
-/// The `workflow.*` events of the latest run started before `before`
-/// (the log's end when omitted), ascending.
-/// `GET /api/sessions/{id}/workflow/run?before=<seq>`.
-pub(crate) fn serve_run_events(
+/// The run view, pre-calculated by the server: the run the UI renders as it is.
+pub(crate) fn serve_run_view(
     app: &App,
-    req: &Request,
+    _req: &Request,
     stream: &mut TcpStream,
     id: &str,
 ) -> Result<(), HttpError> {
-    let before = req
-        .query_param("before")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(u64::MAX);
     let store = app.store()?;
     require_session(&store, id)?;
-    let page = store.workflow_run_before(id, before)?;
-    let out: Vec<Value> = page
+    let events = store
+        .workflow_run_before(id, u64::MAX)?
         .into_iter()
-        .map(|(seq, event)| json!({ "seq": seq, "event": event }))
-        .collect();
-    send_json(stream, 200, &Value::Array(out))
+        .map(|(_, event)| event)
+        .collect::<Vec<_>>();
+    let Some(view) = crate::web::views::run_view::run_view(&events) else {
+        return error(stream, 404, "no run");
+    };
+    send_json(stream, 200, &serde_json::to_value(&view)?)
 }
 
 pub(crate) fn session_json(app: &App, s: &SessionSummary) -> Value {
@@ -690,10 +710,11 @@ pub(crate) fn session_json(app: &App, s: &SessionSummary) -> Value {
         "id": s.id, "title": s.title, "state": s.state(app.turns.is_running(&s.id)),
         "createdAt": s.created_at, "updatedAt": s.updated_at, "parentId": s.parent_id,
         "awaitingIntegration": s.awaiting_integration,
+        "linkedProjectId": s.linked_project_id,
     })
 }
 
-/// Appends a choice the human made (mode, model) and wakes the session's streams.
+/// Appends a choice the human made (mode, model, effort) and wakes the session's streams.
 pub(crate) fn append_human_event(
     app: &App,
     store: &SqliteStore,

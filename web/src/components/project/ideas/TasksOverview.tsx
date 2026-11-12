@@ -39,19 +39,20 @@ export function TasksOverview({
   if (summary.review > 0) attentionParts.push(t('attentionToReview', { count: summary.review }));
   if (summary.question > 0) {
     attentionParts.push(
-      t('attentionQuestions', { count: summary.question, s: summary.question > 1 ? 's' : '' })
+      t('attentionQuestions', { count: summary.question })
     );
   }
   const attentionCount = summary.halted + summary.failed;
   if (attentionCount > 0) {
     attentionParts.push(
-      t('attentionHalted', { count: attentionCount, s: attentionCount > 1 ? 's' : '' })
+      t('attentionHalted', { count: attentionCount })
     );
   }
   const yoursDetail = attentionParts.join(' · ');
 
   return (
     <div className="flex flex-col gap-4">
+      <QueueBar queue={board.queue} projectId={projectId} run={run} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile
           icon={<ReviewIcon />}
@@ -93,15 +94,12 @@ export function TasksOverview({
           label={t('tasksTabDone')}
           detail={t('integratedCount', {
             count: summary.integrated,
-            s: summary.integrated > 1 ? 's' : ''
           })}
           tone="ok"
           active={done.length > 0}
           onClick={() => onSelect('done')}
         />
       </div>
-
-      <QueueBar queue={board.queue} projectId={projectId} run={run} />
 
       {board.nightReport ? (
         <NightReport

@@ -1,8 +1,9 @@
+// Project page analyses tab: a question form and launchable project analyses.
 import { useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
-import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, WandIcon } from '../ui/Icons';
+import { AlertIcon, ExternalIcon, LayersIcon, PlayIcon, SearchIcon, WandIcon } from '../ui/Icons';
 import { type SessionSummary } from '../../lib/api';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { QuestionForm } from './QuestionForm';
@@ -70,9 +71,9 @@ export function AnalysesSection({
         onUnderstand={(topic) => onStart(understandTopicPrompt(topic), 'understand')}
       />
       <Section
+        Icon={SearchIcon}
         title={t('analysesTitle')}
         description={t('analysesDescription')}
-        flush
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {ANALYSES.map((analysis) => {

@@ -7,8 +7,21 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 // Each renderer is compiled everywhere so its pure tests run on any machine; only one is used.
+pub mod peer;
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod seatbelt;
+
+/// The port fennec's own server listens on, so a Seatbelt profile can deny it to commands.
+static SERVER_PORT: std::sync::OnceLock<u16> = std::sync::OnceLock::new();
+
+/// Record the server's port once it is bound; a second call is ignored.
+pub fn set_server_port(port: u16) {
+    let _ = SERVER_PORT.set(port);
+}
+
+fn server_port() -> Option<u16> {
+    SERVER_PORT.get().copied()
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sandbox {
@@ -899,11 +912,18 @@ mod tests {
         let _ = std::fs::remove_dir_all(&data_dir);
     }
 
+    /// Whether a real bwrap is here; locally its absence skips the end-to-end
+    /// tests, on CI it fails them, so CI never goes green without proving the sandbox.
     fn bwrap_available() -> bool {
-        Command::new("bwrap")
+        let available = Command::new("bwrap")
             .arg("--version")
             .output()
-            .is_ok_and(|output| output.status.success())
+            .is_ok_and(|output| output.status.success());
+        assert!(
+            available || std::env::var_os("CI").is_none(),
+            "bwrap is missing on CI: the sandbox tests would prove nothing"
+        );
+        available
     }
 
     #[test]
@@ -950,6 +970,14 @@ mod tests {
             network: false,
         };
         let sandbox = Sandbox::from_prefs(&prefs, None, &data_dir);
+        let control = sandbox
+            .command("true", &workdir, &workdir)
+            .output()
+            .unwrap();
+        assert!(
+            control.status.success(),
+            "the sandbox did not start: {control:?}"
+        );
         let output = sandbox
             .command(
                 "test -S /run/docker.sock || test -S /var/run/docker.sock",
@@ -981,6 +1009,14 @@ mod tests {
             mounts: vec![],
         };
 
+        let control = sandbox
+            .command("test -r /etc/passwd", &workdir, &workdir)
+            .output()
+            .unwrap();
+        assert!(
+            control.status.success(),
+            "the sandbox did not start: {control:?}"
+        );
         let output = sandbox
             .command("touch /etc/fennec-probe", &workdir, &workdir)
             .output()
@@ -1134,6 +1170,14 @@ mod tests {
             mounts: vec![],
         };
 
+        let control = sandbox
+            .command("echo ok > control.txt", &workdir, &workdir)
+            .output()
+            .unwrap();
+        assert!(
+            control.status.success(),
+            "the sandbox did not start: {control:?}"
+        );
         let output = sandbox
             .command(
                 "echo evil > .git/config; mkdir -p .git/hooks; echo x > .git/hooks/post-commit",

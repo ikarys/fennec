@@ -11,7 +11,7 @@ use crate::domain::clock;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::kernel_rules;
 use crate::domain::mcp;
-use crate::domain::preferences::{ModelRef, Preferences};
+use crate::domain::preferences::{ModelRef, Preferences, ReasoningEffort};
 use crate::domain::project::SessionSummary;
 use crate::domain::test_files;
 use crate::domain::waiver;
@@ -35,6 +35,8 @@ pub struct Options<'a> {
     /// The model the session runs on (a workflow child inherits its parent's
     /// choice); `None` uses the default.
     pub model_choice: Option<ModelRef>,
+    /// The session's effort chosen by the human, already checked against the model.
+    pub effort_choice: Option<ReasoningEffort>,
     /// The human is away (the ideas queue's night mode).
     pub autonomous: bool,
     /// The turn runs a `delegate` call's child, hidden from the human: its agents lose the tools that leave something for them.
@@ -92,6 +94,7 @@ pub fn with_turn<R>(
     // loaded per turn so a rule changed in the UI applies from the next turn.
     let rule_store = rules::RuleStore::open(&settings.rules_path()).map_err(|e| e.to_string())?;
     let session = store.session(session_id)?;
+    let task_sheet = task_sheet(store, session.as_ref())?;
     // The budget is a human decision the kernel enforces before any turn starts:
     // every path that starts a turn (web, CLI, the ideas queue, workflow children)
     // goes through `with_turn`.
@@ -121,14 +124,17 @@ pub fn with_turn<R>(
         tools: &tools,
         session_id,
         workdir,
+        task_sheet: task_sheet.as_deref(),
         instructions: &instructions,
         skills: &skills,
         always_on: &prefs.always_on_skills,
+        style: prefs.agent_style,
         agents: &agents,
         max_tokens: params.max_tokens,
         context_window: params.context_window,
         compact_at: params.compact_at,
         reasoning_effort: params.reasoning_effort,
+        session_effort: options.effort_choice,
         autonomous: options.autonomous,
         lang: prefs.display.language,
         preflight_sent_back: false,
@@ -137,6 +143,27 @@ pub fn with_turn<R>(
         children: options.children,
     };
     body(&mut turn, &tools)
+}
+
+/// The task sheet of the idea this session frames, as markdown.
+fn task_sheet(
+    store: &SqliteStore,
+    session: Option<&SessionSummary>,
+) -> Result<Option<String>, String> {
+    let Some(session) = session else {
+        return Ok(None);
+    };
+    let ideas = store
+        .backlog(&session.project_id)
+        .map_err(|e| e.to_string())?
+        .ideas;
+    let Some(idea) = backlog::idea_for_session(&ideas, &session.id) else {
+        return Ok(None);
+    };
+    let Some(sheet) = idea.sheet.as_ref() else {
+        return Ok(None);
+    };
+    Ok(Some(sheet.to_markdown(&backlog::title(&idea.text, None))))
 }
 
 /// Refuses the turn when the project's budget is spent: the refusal is logged as the turn's error.
@@ -297,6 +324,7 @@ mod tests {
         let mut options = Options {
             notifier: None,
             model_choice: None,
+            effort_choice: None,
             autonomous: true,
             delegated: false,
             on_event: &mut on_event,

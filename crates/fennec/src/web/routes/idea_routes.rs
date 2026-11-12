@@ -1,18 +1,23 @@
-//! The project page's ideas backlog (contract: `docs/api.md`): every write is
+//! The project page's ideas backlog (contract: `docs/devs/api.md`): every write is
 //! the human's click. `routes.rs` only dispatches here.
 
 use crate::web::http::HttpError;
 use std::net::TcpStream;
+use std::path::Path;
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
+use super::sheet_input;
+
+use crate::agent::ports::EventLog;
 use crate::domain::id::new_id;
+use crate::domain::plan;
 use crate::web::App;
 use crate::web::http::{Request, error, require_project, send_json};
-use crate::web::jobs::idea_queue;
+use crate::web::jobs::{idea_queue, sheet_suggest};
 use crate::web::views::idea_board::{Board, board_json};
-use backlog::{BacklogEvent, IdeaAttachment, IdeaState, Status, queue_order};
+use backlog::{BacklogEvent, IdeaAttachment, IdeaState, SheetField, Status, queue_order};
 
 /// An idea is a note, not a document: the plan holds the detail.
 const MAX_IDEA_CHARS: usize = 4_000;
@@ -128,7 +133,7 @@ pub fn add_idea(
     send_board(app, stream, project_id)
 }
 
-/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete}`.
+/// `POST /api/projects/{id}/ideas/{iid}/{framing,ready,edit,drop,complete,sheet,sheet-apply,turn-into-task}`.
 pub fn update_idea(
     app: &App,
     req: &Request,
@@ -139,17 +144,40 @@ pub fn update_idea(
 ) -> Result<(), HttpError> {
     let store = app.store()?;
     require_project(&store, project_id)?;
-    if !store
-        .backlog(project_id)?
-        .ideas
-        .iter()
-        .any(|idea| idea.id == idea_id)
-    {
+    let backlog = store.backlog(project_id)?;
+    let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
         return error(stream, 404, "no such idea");
-    }
+    };
     let body = req.json()?;
     let field = |name: &str| body[name].as_str().unwrap_or("").trim().to_string();
     let idea_id = idea_id.to_string();
+    // Only "Apply to the sheet" reads the framing session's log.
+    let pending = match (action, idea.session_id.as_deref()) {
+        ("sheet-apply", Some(session_id)) => {
+            plan::pending(&store.events(session_id)?).map(|pending| pending.plan)
+        }
+        _ => None,
+    };
+    if let Some(decided) =
+        sheet_input::sheet_event(idea, action, &body, MAX_IDEA_CHARS, pending.as_ref())
+    {
+        match decided {
+            Ok(event) => {
+                store.append_idea_event(project_id, &event)?;
+                return send_board(app, stream, project_id);
+            }
+            Err(refusal) if refusal.missing.is_empty() => {
+                return error(stream, refusal.status, &refusal.message);
+            }
+            Err(refusal) => {
+                return send_json(
+                    stream,
+                    refusal.status,
+                    &json!({ "error": refusal.message, "missing": refusal.missing }),
+                );
+            }
+        }
+    }
     let event = match action {
         "framing" => {
             let session_id = field("sessionId");
@@ -186,6 +214,40 @@ pub fn update_idea(
     };
     store.append_idea_event(project_id, &event)?;
     send_board(app, stream, project_id)
+}
+
+/// `POST /api/projects/{id}/ideas/{iid}/sheet/suggest` `{field}`: a model's draft for one sheet
+/// field, indicative; nothing is stored.
+pub fn suggest_sheet_field(
+    app: &App,
+    req: &Request,
+    stream: &mut TcpStream,
+    project_id: &str,
+    idea_id: &str,
+) -> Result<(), HttpError> {
+    let store = app.store()?;
+    let project = require_project(&store, project_id)?;
+    let backlog = store.backlog(project_id)?;
+    let Some(idea) = backlog.ideas.iter().find(|idea| idea.id == idea_id) else {
+        return error(stream, 404, "no such idea");
+    };
+    let Ok(field) = serde_json::from_value::<SheetField>(req.json()?["field"].clone()) else {
+        return error(stream, 400, "unknown field");
+    };
+    let lang = store.preferences()?.display.language;
+    match sheet_suggest::suggest(
+        &app.settings,
+        Path::new(&project.workdir),
+        idea,
+        field,
+        lang,
+    ) {
+        Ok(suggestion) => send_json(stream, 200, &json!(suggestion)),
+        Err(e) => {
+            eprintln!("fennec: idea {idea_id}: sheet suggest: {e}");
+            error(stream, 502, &e)
+        }
+    }
 }
 
 /// `POST /api/projects/{id}/ideas/{iid}/start`: builds this idea now, framed

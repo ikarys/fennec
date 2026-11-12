@@ -1,20 +1,24 @@
 // Routes and tabs: the hash read as a route, a tab's path, what localStorage keeps of the tabs.
 // Pure, so the parsing is tested without a browser.
 import type { MsgKey } from '../i18n/messages';
+import { readStored } from './storage';
 
 /** The fixed pages a tab can show. */
-export type PageId = 'settings' | 'insight' | 'workflows' | 'backlog';
+export type PageId = 'projects' | 'chats' | 'settings' | 'insight' | 'workflows' | 'backlog';
 
 export type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
-  | { name: 'changes'; id: string }
+  | { name: 'changes'; id: string; path: string | null }
   | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
   | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
   | { name: 'backlog' }
+  | { name: 'projects' }
+  | { name: 'chats' }
   | { name: 'split'; left: string | null; right: string | null }
-  | { name: 'project'; projectId: string; tab: string | null; sub: string | null }
+  | { name: 'project'; projectId: string; tab: string | null; sub: string | null; task: string | null }
+  | { name: 'editor'; projectId: string; path: string | null; session: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
 export const TABS_KEY = 'fennec.tabs';
@@ -22,6 +26,8 @@ export const ACTIVE_TAB_KEY = 'fennec.activeTab';
 
 /** The fixed pages that get a tab in the bar, in display order. */
 export const PAGE_TABS: { page: PageId; titleKey: MsgKey; path: string }[] = [
+  { page: 'projects', titleKey: 'paletteProjects', path: '#/projects' },
+  { page: 'chats', titleKey: 'homeChat', path: '#/chats' },
   { page: 'settings', titleKey: 'settings', path: '#/settings' },
   { page: 'insight', titleKey: 'insight', path: '#/insight' },
   { page: 'workflows', titleKey: 'workflows', path: '#/workflows' },
@@ -38,9 +44,28 @@ export function parseRoute(hash: string): Route {
   if (hash === '#/backlog') {
     return { name: 'backlog' };
   }
+  if (hash === '#/projects') {
+    return { name: 'projects' };
+  }
+  if (hash === '#/chats') {
+    return { name: 'chats' };
+  }
   if (hash.startsWith('#/project/')) {
-    const [rawId, tab, sub] = hash.slice('#/project/'.length).split('/');
-    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null };
+    const [pathPart, query] = hash.slice('#/project/'.length).split('?');
+    const [rawId, tab, sub] = (pathPart ?? '').split('/');
+    const task = query ? new URLSearchParams(query).get('task') : null;
+    return { name: 'project', projectId: decodeURIComponent(rawId), tab: tab ?? null, sub: sub ?? null, task };
+  }
+  if (hash.startsWith('#/edit/')) {
+    const [pathPart, query] = hash.slice('#/edit/'.length).split('?');
+    const [rawId, rawPath] = (pathPart ?? '').split('/');
+    const session = query ? new URLSearchParams(query).get('session') : null;
+    return {
+      name: 'editor',
+      projectId: decodeURIComponent(rawId ?? ''),
+      path: rawPath ? decodeURIComponent(rawPath) : null,
+      session,
+    };
   }
   if (hash.startsWith('#/workflows')) {
     const path = hash.slice(12); // Remove '#/workflows'
@@ -60,9 +85,9 @@ export function parseRoute(hash: string): Route {
     return { name: 'split', left: parsePaneToken(parts[0] ?? null), right: parsePaneToken(parts[1] ?? null) };
   }
   if (hash.startsWith('#/s/')) {
-    const [rawId, sub] = hash.slice('#/s/'.length).split('/');
+    const [rawId, sub, rawPath] = hash.slice('#/s/'.length).split('/');
     if (sub === 'changes') {
-      return { name: 'changes', id: decodeURIComponent(rawId) };
+      return { name: 'changes', id: decodeURIComponent(rawId), path: rawPath ? decodeURIComponent(rawPath) : null };
     }
     const id = decodeURIComponent(rawId);
     if (id.startsWith('new:')) {
@@ -80,7 +105,30 @@ export function parseRoute(hash: string): Route {
   return { name: 'home' };
 }
 
-/** The route of a tab: a pseudo `new:` tab opens the new-session page, a page tab its page. */
+/** A tab derived from the route (a page, a project's editor), never persisted nor split. */
+/** The same hash with its query replaced by the task open in the drawer, or none. */
+export function withTask(hash: string, ideaId: string | null): string {
+  const path = hash.split('?')[0];
+  return ideaId === null ? path : `${path}?task=${encodeURIComponent(ideaId)}`;
+}
+
+export function isRouteTab(id: string): boolean {
+  return id.startsWith('page:') || id.startsWith('edit:');
+}
+
+/** The tab of a project's editor. */
+export function editorTabId(projectId: string): string {
+  return `edit:${projectId}`;
+}
+
+const lastEditorHash = new Map<string, string>();
+
+/** Remembers where a project's editor is, so its tab returns there. */
+export function rememberEditorHash(projectId: string, hash: string): void {
+  lastEditorHash.set(projectId, hash);
+}
+
+/** The route of a tab: a pseudo `new:` tab opens the new-session page, a page tab its page, an editor tab its last file. */
 export function tabPath(tabId: string): string {
   if (tabId.startsWith('new:')) {
     return `#/new/${encodeURIComponent(tabId.slice(4))}`;
@@ -88,12 +136,24 @@ export function tabPath(tabId: string): string {
   if (tabId.startsWith('page:')) {
     return PAGE_TABS.find((page) => page.page === tabId.slice(5))?.path ?? '#/';
   }
+  if (tabId.startsWith('edit:')) {
+    return lastEditorHash.get(tabId.slice(5)) ?? editorPath(tabId.slice(5), null);
+  }
   return `#/s/${encodeURIComponent(tabId)}`;
 }
 
-/** The changes page of a session. */
-export function changesPath(sessionId: string): string {
-  return `#/s/${encodeURIComponent(sessionId)}/changes`;
+/** The changes page of a session, optionally focused on one file. */
+export function changesPath(sessionId: string, path: string | null = null): string {
+  return `#/s/${encodeURIComponent(sessionId)}/changes` + (path ? `/${encodeURIComponent(path)}` : '');
+}
+
+/** The editor page for a project's files; optional file path and session id. */
+export function editorPath(projectId: string, path: string | null, sessionId: string | null = null): string {
+  return (
+    `#/edit/${encodeURIComponent(projectId)}` +
+    (path ? `/${encodeURIComponent(path)}` : '') +
+    (sessionId ? `?session=${encodeURIComponent(sessionId)}` : '')
+  );
 }
 
 /** The tab id on screen, from the route; null on pages that have no tab (home, project, split). */
@@ -112,6 +172,12 @@ export function tabIdForRoute(route: Route): string | null {
       return 'page:backlog';
     case 'workflows':
       return 'page:workflows';
+    case 'projects':
+      return 'page:projects';
+    case 'chats':
+      return 'page:chats';
+    case 'editor':
+      return editorTabId(route.projectId);
     default:
       return null;
   }
@@ -133,11 +199,11 @@ export function parsePaneToken(raw: string | null | undefined): string | null {
 
 export function loadTabs(): string[] {
   try {
-    const raw = localStorage.getItem(TABS_KEY);
+    const raw = readStored(TABS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === 'string' && !value.startsWith('page:'))
+      ? parsed.filter((value): value is string => typeof value === 'string' && !isRouteTab(value))
       : [];
   } catch {
     return [];
@@ -145,11 +211,7 @@ export function loadTabs(): string[] {
 }
 
 export function loadActiveTab(): string | null {
-  try {
-    const id = localStorage.getItem(ACTIVE_TAB_KEY);
-    // A page tab persisted by an older build is not a real session.
-    return id && !id.startsWith('page:') ? id : null;
-  } catch {
-    return null;
-  }
+  const id = readStored(ACTIVE_TAB_KEY);
+  // A route tab persisted by an older build is not a real session.
+  return id && !isRouteTab(id) ? id : null;
 }

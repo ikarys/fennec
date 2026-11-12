@@ -1,5 +1,5 @@
 // Fails when a component outside src/components/ui hand-writes the look of a
-// primitive (docs/ui.md): the look must live in one place, or screens drift.
+// primitive (docs/devs/ui.md): the look must live in one place, or screens drift.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -42,6 +42,6 @@ for (const path of files(root)) {
 
 if (problems.length > 0) {
   console.error(problems.join('\n'));
-  console.error(`\n${problems.length} hand-styled primitive(s); see docs/ui.md.`);
+  console.error(`\n${problems.length} hand-styled primitive(s); see docs/devs/ui.md.`);
   process.exit(1);
 }

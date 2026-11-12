@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
-/* Nuit is the default theme. */
+/* Nuit is the default theme. Any element may carry data-theme: a theme preview renders in its own tokens. */
 :root,
-:root[data-theme="nuit"] {
+:root[data-theme="nuit"],
+[data-theme="nuit"] {
   color-scheme: dark;
   --bg: #0E1013;
   --panel: #15181D;
@@ -10,6 +11,7 @@
   --border: #272C34;
   --border-strong: #6E7989;
   --text: #E7E9EC;
+  --prose: #C5CAD2;
   --muted: #9AA2AE;
   --faint: #7D848F;
   --accent: #F08A4B;
@@ -28,7 +30,8 @@
   --float-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 }
 
-:root[data-theme="jour"] {
+:root[data-theme="jour"],
+[data-theme="jour"] {
   color-scheme: light;
   --bg: #F6F6F3;
   --panel: #FFFFFF;
@@ -36,6 +39,7 @@
   --border: #E1E1DB;
   --border-strong: #6E6E64;
   --text: #1A1B1E;
+  --prose: #2E3036;
   --muted: #5C6066;
   --faint: #6B6F76;
   --accent: #A8440F;
@@ -57,7 +61,8 @@
 /* Ardoise: a blue slate, lighter than Nuit, for long reading without glare.
    Its own hue family, so it never reads as a faded Nuit: periwinkle accent
    instead of orange, mint ok, rose err, all three far apart. */
-:root[data-theme="ardoise"] {
+:root[data-theme="ardoise"],
+[data-theme="ardoise"] {
   color-scheme: dark;
   --bg: #1E2332;
   --panel: #252B3C;
@@ -65,6 +70,7 @@
   --border: #343C50;
   --border-strong: #8290AC;
   --text: #DDE3EF;
+  --prose: #C3CAD8;
   --muted: #A6B0C5;
   --faint: #929DB5;
   --accent: #82AAFF;
@@ -85,7 +91,8 @@
 
 /* Cyber: hominfer's terminal green. `ok` is cyan, not green, so a done or
    integrated badge stays distinct from the accent of a running one. */
-:root[data-theme="cyber"] {
+:root[data-theme="cyber"],
+[data-theme="cyber"] {
   color-scheme: dark;
   --bg: #000300;
   --panel: #020A03;
@@ -93,6 +100,7 @@
   --border: #0F3D17;
   --border-strong: #2E9944;
   --text: #B6FFC4;
+  --prose: #9FE8AE;
   --muted: #3FBF5A;
   --faint: #2E9944;
   --accent: #00FF41;
@@ -126,6 +134,8 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text: var(--text);
+  /* Long-form reading text (Markdown): softer than --text, which near-white tires the eye. */
+  --color-prose: var(--prose);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-accent: var(--accent);

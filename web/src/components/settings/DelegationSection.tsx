@@ -1,6 +1,10 @@
+// Delegation settings section.
 import type { DelegationPrefs } from '../../lib/api';
 import { Section, type SectionSave } from '../ui/Section';
-import { FieldRow, TextInput } from '../ui/Field';
+import { TextInput } from '../ui/Field';
+import { SettingRow } from '../ui/SettingRow';
+import { SplitIcon } from '../ui/Icons';
+import { Switch } from '../ui/Switch';
 import { useT } from '../../i18n';
 
 interface DelegationSectionProps {
@@ -13,25 +17,32 @@ interface DelegationSectionProps {
 export function DelegationSection({ value, onChange, save }: DelegationSectionProps) {
   const t = useT();
   return (
-    <Section title={t('delegationTitle')} save={save}>
-      <p className="text-xs text-muted">{t('delegationHint')}</p>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
+    <Section
+      Icon={SplitIcon}
+      flush
+      title={t('delegationTitle')}
+      description={t('delegationHint')}
+      save={save}
+    >
+      <SettingRow label={t('allowDelegation')}>
+        <Switch
           checked={value.enabled}
-          onChange={(event) => onChange({ ...value, enabled: event.target.checked })}
+          onChange={(checked) => onChange({ ...value, enabled: checked })}
+          label={t('allowDelegation')}
         />
-        {t('allowDelegation')}
-      </label>
+      </SettingRow>
 
       {value.enabled && (
-        <FieldRow label={t('maxDelegationsPerTurnLabel')} hint={t('maxDelegationsPerTurnHint')}>
+        <SettingRow
+          label={t('maxDelegationsPerTurnLabel')}
+          hint={t('maxDelegationsPerTurnHint')}
+        >
           <TextInput
             type="number"
             min={0}
             step={1}
-            className="w-full"
+            className="w-24"
+            aria-label={t('maxDelegationsPerTurnLabel')}
             value={value.maxPerTurn}
             onChange={(event) =>
               onChange({
@@ -40,7 +51,7 @@ export function DelegationSection({ value, onChange, save }: DelegationSectionPr
               })
             }
           />
-        </FieldRow>
+        </SettingRow>
       )}
     </Section>
   );

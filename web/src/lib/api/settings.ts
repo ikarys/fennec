@@ -1,31 +1,38 @@
 import { request } from "./request";
+import type { ShortcutBinding } from "../shortcuts";
 
 /** `ReasoningEffort`: how much a model may think. */
 export type ReasoningEffort =
   "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+export const REASONING_EFFORTS: ReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 export interface ModelPrefs {
   maxTokens?: number;
   contextWindow?: number;
   compactionThreshold?: number;
   reasoningEffort?: ReasoningEffort | null;
+  /** The efforts a probe found the model accepts. */
+  reasoningEfforts?: ReasoningEffort[];
   price?: { inputPerM: number; cachedPerM: number; outputPerM: number } | null;
 }
 
-export interface PanelPage {
-  name: string;
-  blocks: string[];
-}
+export type EditorId = 'vscode' | 'vscode-insiders' | 'cursor' | 'windsurf' | 'vscodium';
+
+/** `AgentStyle`: how the agents write to the human. */
+export type AgentStyle = 'concise' | 'normal' | 'explanatory' | 'technical';
 
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
   /** The UI's base font size in pixels (server default 14, range 13..=16). */
   fontSize: number;
-  /** The context panel's pages; null means the UI's defaults (lib/panelBlocks). */
-  panelPages: PanelPage[] | null;
   /** The UI's display language (server default "en"). */
   language?: 'en' | 'fr';
+  /** The IDE the "open in editor" links open (server default "vscode"). */
+  editor?: EditorId;
+  /** Short sounds when something new needs attention (server default true). */
+  sounds?: boolean;
 }
 
 export interface SearchPrefs {
@@ -80,6 +87,10 @@ export interface ModelChoice {
   provider: string;
   model: string;
   providerName: string;
+  /** The efforts the model accepts; empty when unknown. */
+  acceptedEfforts?: ReasoningEffort[];
+  /** The effort used when the session chooses none: the agent's, else the model's setting. */
+  defaultEffort?: ReasoningEffort | null;
 }
 
 export interface ModelChoices {
@@ -94,6 +105,11 @@ export interface SessionModel {
   contextWindow: number;
   compactAt: number;
   source: "session" | "parent" | "default";
+  acceptedEfforts: ReasoningEffort[];
+  /** The effort the human chose for the session; null is auto. */
+  effort: ReasoningEffort | null;
+  /** The effort used while `effort` is null: the agent's, else the model's setting. */
+  defaultEffort: ReasoningEffort | null;
 }
 
 export interface Preferences {
@@ -106,6 +122,8 @@ export interface Preferences {
   favorites?: ModelRef[];
   /** `globalInstructions`: added to the system prompt of new sessions. */
   globalInstructions?: string | null;
+  /** `agentStyle`: how the agents write to the human, for new sessions. */
+  agentStyle?: AgentStyle;
   /** `search.*`: the web_search tool's SearXNG instance. */
   search?: SearchPrefs;
   /** fennec's bwrap world: how commands run. */
@@ -119,6 +137,8 @@ export interface Preferences {
   enabledWorkflows?: string[];
   /** MCP servers, configured on the Settings page. */
   mcp?: McpServer[];
+  /** The human's keyboard shortcut overrides, action → combo; an empty combo disables. */
+  shortcuts?: Record<string, string>;
 }
 
 /** One tool of an MCP server, as listed by `tools/list`. */
@@ -192,6 +212,8 @@ export interface SettingsModel {
   id: string;
   contextWindow: number | null;
   resolved: ResolvedParams;
+  /** The efforts the model accepts (as probed); empty when never probed. */
+  acceptedEfforts: ReasoningEffort[];
   /** Added by hand: stored with no listing (the endpoint has no /models route). */
   manual?: boolean;
 }
@@ -253,6 +275,8 @@ export interface SettingsResponse {
   sandboxHealth: SandboxHealth;
   /** Per server, each cached tool's access and estimated token cost. */
   mcpTools: Record<string, McpToolSummary[]>;
+  /** Every keyboard shortcut, the stored override applied, in the Settings page's order. */
+  shortcuts: ShortcutBinding[];
 }
 
 export function getSettings(): Promise<SettingsResponse> {
@@ -296,17 +320,12 @@ export function listProvider(body: {
   });
 }
 
-/** Where a probed limit comes from: the endpoint's own words, or the model family's catalog entry. */
-export type LimitSource = "endpoint" | "catalog";
-
 /** What a probe of one model learned (indicative); null where nothing said it. */
 export interface ProbedModel {
   contextWindow: number | null;
-  contextSource: LimitSource | null;
   maxTokens: number | null;
-  /** The distinct efforts accepted; empty when neither the endpoint nor the catalog says. */
+  /** The distinct efforts accepted; empty when the endpoint refused every probe. */
   reasoningEfforts: ReasoningEffort[];
-  effortsSource: LimitSource | null;
   defaultReasoningEffort: ReasoningEffort | null;
 }
 
@@ -334,6 +353,19 @@ export function setSessionModel(
     {
       method: "POST",
       body: JSON.stringify(ref),
+    },
+  );
+}
+
+export function setSessionEffort(
+  id: string,
+  effort: ReasoningEffort | null,
+): Promise<{ model: SessionModel }> {
+  return request<{ model: SessionModel }>(
+    `/api/sessions/${encodeURIComponent(id)}/effort`,
+    {
+      method: "POST",
+      body: JSON.stringify({ effort }),
     },
   );
 }

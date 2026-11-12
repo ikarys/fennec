@@ -350,6 +350,7 @@ main() {
 
     printf 'fennec %s installed to %s\n' "$VERSION" "$INSTALL_DIR/fennec"
     "$INSTALL_DIR/fennec" --version
+    printf 'on a machine without a screen (a NAS, a server): fennec remote enable\n'
 }
 
 main "$@"

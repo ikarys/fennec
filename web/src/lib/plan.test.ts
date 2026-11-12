@@ -3,12 +3,14 @@ import {
   planFromProposal,
   reportFromSubmission,
   splitContract,
-  planSourceOf,
+  pendingPlanOf,
   lastHumanMessage,
+  pathParts,
   type Plan,
   type Report
 } from './plan';
 import type { ThreadItem } from './threadView';
+import { SHIP_PROPOSAL, SHIP_PLAN, SHIP_SUBMISSION, SHIP_REPORT } from './contract.fixtures';
 
 const split = (text: string) => splitContract(text);
 
@@ -67,7 +69,7 @@ describe('splitContract', () => {
     expect(out.contract.steps[1].title).toBe('Update docs');
     expect(out.contract.steps[1].files).toEqual(['docs.md (new)']);
 
-    expect(out.contract.doneWhen).toEqual(['tests pass', 'docs updated']);
+    expect(out.contract.doneWhen).toEqual([{ text: 'tests pass', check: '' }, { text: 'docs updated', check: '' }]);
     expect(out.contract.risks).toEqual([]);
   });
 
@@ -111,15 +113,15 @@ describe('splitContract', () => {
     });
 
     expect(out.contract.doneWhen).toEqual([
-      { checked: true, text: 'tests pass', detail: '' },
-      { checked: false, text: 'docs updated', detail: '' },
+      { number: 2, checked: false, text: 'docs updated', detail: '' },
+      { number: 1, checked: true, text: 'tests pass', detail: '' },
     ]);
     expect(out.contract.changed).toEqual([
       { path: 'a.ts', what: 'added' },
       { path: 'b.ts', what: 'edited' },
     ]);
-    expect(out.contract.test).toBe('run npm test');
-    expect(out.contract.todo).toBe('follow up');
+    expect(out.contract.test).toEqual(['run npm test']);
+    expect(out.contract.todo).toEqual(['follow up']);
   });
 
   it('returns null when there is no contract heading', () => {
@@ -129,6 +131,13 @@ describe('splitContract', () => {
 
   it('returns null for a plan heading with no steps', () => {
     expect(split('## Plan: X\nGoal: y')).toBeNull();
+  });
+
+  it('keeps a legacy criterion check apart from its text', () => {
+    const out = split('## Plan: P\n### Step 1: Do\n### Done when\n- [ ] tests pass — check: `cargo test`\n- [ ] docs updated');
+    expect(out?.contract.kind).toBe('plan');
+    if (out?.contract.kind !== 'plan') return;
+    expect(out.contract.doneWhen).toEqual([{ text: 'tests pass', check: 'cargo test' }, { text: 'docs updated', check: '' }]);
   });
 
   it('returns null for a report heading with no steps or done when', () => {
@@ -180,8 +189,8 @@ describe('splitContract', () => {
 
   it('treats Nothing and Rien as empty next actions in reports', () => {
     const out = report('## Report: R\n## Steps\n- [x] Step 1: Done\n### Next\n- Test: Nothing.\n- To do: Rien.');
-    expect(out.contract.test).toBe('');
-    expect(out.contract.todo).toBe('');
+    expect(out.contract.test).toEqual([]);
+    expect(out.contract.todo).toEqual([]);
   });
 
   it('parses report steps without checkboxes as unchecked', () => {
@@ -203,31 +212,9 @@ describe('splitContract', () => {
 });
 
 describe('planFromProposal', () => {
-  it('builds the recorded plan, numbering the steps and formatting the checks', () => {
-    const plan = planFromProposal({
-      title: 'Ship',
-      goal: 'Goal',
-      steps: [
-        { title: 'Add code', files: ['a.ts'], change: 'implement' },
-        { title: 'Docs', files: [], change: 'update' }
-      ],
-      doneWhen: [
-        { text: 'tests pass', check: 'cargo test' },
-        { text: 'docs updated' }
-      ],
-      risks: ['Risk one']
-    });
-    expect(plan).toEqual({
-      kind: 'plan',
-      title: 'Ship',
-      goal: 'Goal',
-      steps: [
-        { number: 1, title: 'Add code', files: ['a.ts'], change: 'implement', verify: '' },
-        { number: 2, title: 'Docs', files: [], change: 'update', verify: '' }
-      ],
-      doneWhen: ['tests pass — check: `cargo test`', 'docs updated'],
-      risks: ['Risk one']
-    });
+  it('builds the recorded plan, numbering the steps and keeping each check apart', () => {
+    const plan = planFromProposal(SHIP_PROPOSAL);
+    expect(plan).toEqual(SHIP_PLAN);
   });
 
   it('keeps empty arrays when the optional fields are absent', () => {
@@ -241,37 +228,8 @@ describe('planFromProposal', () => {
 
 describe('reportFromSubmission', () => {
   it('builds the recorded report, numbering the steps and keeping the checks', () => {
-    const report = reportFromSubmission({
-      title: 'Ship',
-      summary: 'What changed',
-      steps: [
-        { title: 'Add code', done: true, note: 'implemented' },
-        { title: 'Docs', done: false }
-      ],
-      doneWhen: [
-        { text: 'tests pass', met: true, how: 'cargo test' },
-        { text: 'docs updated', met: false }
-      ],
-      changed: [{ path: 'a.ts', what: 'the code' }],
-      test: 'Open the UI',
-      todo: ''
-    });
-    expect(report).toEqual({
-      kind: 'report',
-      title: 'Ship',
-      summary: 'What changed',
-      steps: [
-        { number: 1, checked: true, text: 'Add code', detail: 'implemented' },
-        { number: 2, checked: false, text: 'Docs', detail: '' }
-      ],
-      doneWhen: [
-        { checked: true, text: 'tests pass', detail: 'cargo test' },
-        { checked: false, text: 'docs updated', detail: '' }
-      ],
-      changed: [{ path: 'a.ts', what: 'the code' }],
-      test: 'Open the UI',
-      todo: ''
-    });
+    const report = reportFromSubmission(SHIP_SUBMISSION);
+    expect(report).toEqual(SHIP_REPORT);
   });
 
   it('keeps empty values when the optional fields are absent', () => {
@@ -280,57 +238,42 @@ describe('reportFromSubmission', () => {
     expect(report.steps).toEqual([]);
     expect(report.doneWhen).toEqual([]);
     expect(report.changed).toEqual([]);
-    expect(report.test).toBe('');
-    expect(report.todo).toBe('');
+    expect(report.test).toEqual([]);
+    expect(report.todo).toEqual([]);
+  });
+
+  it('lists the free text by line, or by sentence on one line', () => {
+    const report = reportFromSubmission({ title: 'R', test: 'Open Tasks. Check the button on each tab. Create an idea.', todo: '- rerun vitest\n- update docs' });
+    expect(report.test).toEqual(['Open Tasks.', 'Check the button on each tab.', 'Create an idea.']);
+    expect(report.todo).toEqual(['rerun vitest', 'update docs']);
+  });
+
+  it('splits a path into its folder and file name', () => {
+    expect(pathParts('web/src/a.tsx')).toEqual({ dir: 'web/src/', name: 'a.tsx' });
+    expect(pathParts('README.md')).toEqual({ dir: '', name: 'README.md' });
   });
 });
 
-describe('planSourceOf', () => {
-  it('returns null when there is no assistant', () => {
-    const items: ThreadItem[] = [
-      { kind: 'user', id: 'u1', content: 'hello', isSystemGenerated: false, attachments: [] },
-    ];
-    expect(planSourceOf(items)).toBeNull();
+describe('pendingPlanOf', () => {
+  it('returns null when no plan waits', () => {
+    expect(pendingPlanOf(null)).toBeNull();
   });
 
-  it('lets a plan segment win over a text plan contract', () => {
-    const planObject: Plan = {
-      kind: 'plan',
-      title: 'P',
-      goal: 'G',
-      steps: [],
-      doneWhen: [],
-      risks: []
-    };
-    const items: ThreadItem[] = [
-      {
-        kind: 'assistant',
-        id: 'a1',
-        done: true,
-        segments: [
-          { kind: 'text', id: 't1', content: '## Plan: Text\n## Step 1: A\n- Change: a' },
-          { kind: 'plan', id: 'p1', plan: planObject, markdown: 'plan markdown' }
-        ],
-      },
-    ];
-    expect(planSourceOf(items)).toEqual({ id: 'p1', content: 'plan markdown' });
-  });
-
-  it('uses the text segment id and content for a text-only plan contract', () => {
-    const items: ThreadItem[] = [
-      {
-        kind: 'assistant',
-        id: 'a1',
-        done: true,
-        segments: [
-          { kind: 'text', id: 't1', content: '## Plan: Text\n## Step 1: A\n- Change: a' },
-        ],
-      },
-    ];
-    expect(planSourceOf(items)).toEqual({
-      id: 't1',
-      content: '## Plan: Text\n## Step 1: A\n- Change: a',
+  it('turns the served plan into the card plan and its preflight into views', () => {
+    const found = pendingPlanOf({
+      callId: 'call-1',
+      plan: { title: 'Add feature', goal: 'Goal', steps: [{ title: 'Do' }], doneWhen: [{ text: 'tests pass', check: 'npm test' }], risks: [] },
+      markdown: 'plan markdown',
+      preflight: [
+        { criterionId: 'c1', command: 'npm test', verdict: 'fails', exitCode: 1, output: 'fail', existenceOnly: false },
+        { criterionId: 'c2', command: 'rg x', verdict: 'cannotRun', exitCode: null, output: '', existenceOnly: true }
+      ]
     });
+    expect(found?.id).toBe('call-1');
+    expect(found?.plan.title).toBe('Add feature');
+    expect(found?.plan.steps[0]?.number).toBe(1);
+    expect(found?.markdown).toBe('plan markdown');
+    expect(found?.preflight.map((result) => result.exitCode)).toEqual([1, undefined]);
   });
 });
 

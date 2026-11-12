@@ -12,7 +12,8 @@ mod query;
 pub use call::{Call, Usage};
 pub use ledger::{Error, Ledger};
 pub use query::{
-    CallRecord, CallRow, Filter, GroupBy, LatestCall, Row, Summary, group_rows, summary_from_rows,
+    CallRecord, CallRow, Filter, Group, GroupBy, LatestCall, Row, Summary, group_rows,
+    summary_from_rows,
 };
 
 #[cfg(test)]

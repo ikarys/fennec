@@ -1,4 +1,4 @@
-//! A session's audit report turned into backlog ideas (contract: docs/api.md), on the
+//! A session's audit report turned into backlog ideas (contract: docs/devs/api.md), on the
 //! human's click only: the client names finding numbers, the server writes the ideas'
 //! text from the report in the log, and records the creation in the session's log.
 

@@ -1,4 +1,4 @@
-import type { RunView } from '../lib/workflowRun';
+import type { RunView } from '../lib/runView';
 import {
   answerWorkflow,
   continueWorkflow,

@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { Section } from '../ui/Section';
 import { Tile } from '../ui/Tile';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { listRowClass } from '../ui/ListCard';
 import { CopyButton } from '../session/CopyButton';
-import { EraserIcon, HardDriveIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
+import { BranchIcon, EraserIcon, HardDriveIcon, RefreshIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
 import {
   cleanWorktree,
   getProjectWorktrees,
@@ -18,7 +18,6 @@ import {
 import { discardWorktree } from '../../lib/api';
 import { formatBytes, formatRelative } from '../../lib/format';
 import { useLang, useT } from '../../i18n';
-import { TableHeader } from '../ui/TableHeader';
 
 export function DiskSection({
   projectId,
@@ -170,6 +169,7 @@ export function DiskSection({
       {loadError ? <div className="px-4 pb-2 text-err text-xs">{loadError}</div> : null}
 
       <Section
+        Icon={BranchIcon}
         title={t('sessionWorktrees')}
         flush
         actions={
@@ -190,55 +190,42 @@ export function DiskSection({
         }
       >
         {sessions.length === 0 ? (
-          <Card className="px-4 py-6 text-center text-sm text-muted">{t('noWorktrees')}</Card>
+          <p className="m-0 px-4 py-6 text-center text-sm text-muted">{t('noWorktrees')}</p>
         ) : (
-          <Card className="overflow-hidden">
-            <TableHeader>
-              <span className="min-w-0 grow">{t('worktreeCol')}</span>
-              <span className="w-32 shrink-0 text-right">{t('sizeCol')}</span>
-              <span className="w-16 shrink-0" />
-            </TableHeader>
-            <ul className="divide-y divide-border">
-              {sessions.map((entry) => (
-                <SessionRow
-                  key={entry.name}
-                  entry={entry}
-                  busy={Boolean(busy[entry.name])}
-                  error={errors[entry.name]}
-                  onOpenSession={onOpenSession}
-                  onClean={() => void runAction(entry.name, () => cleanWorktree(entry.name))}
-                  onTrash={() => setConfirm(entry)}
-                />
-              ))}
-            </ul>
-          </Card>
+          <ul className="divide-y divide-border">
+            {sessions.map((entry) => (
+              <SessionRow
+                key={entry.name}
+                entry={entry}
+                busy={Boolean(busy[entry.name])}
+                error={errors[entry.name]}
+                onOpenSession={onOpenSession}
+                onClean={() => void runAction(entry.name, () => cleanWorktree(entry.name))}
+                onTrash={() => setConfirm(entry)}
+              />
+            ))}
+          </ul>
         )}
       </Section>
 
       {orphans.length > 0 ? (
         <Section
+          Icon={HardDriveIcon}
           title={t('orphans')}
           description={t('orphansDescription')}
           flush
         >
-          <Card className="overflow-hidden">
-            <TableHeader>
-              <span className="min-w-0 grow">{t('folderCol')}</span>
-              <span className="w-32 shrink-0 text-right">{t('sizeCol')}</span>
-              <span className="w-16 shrink-0" />
-            </TableHeader>
-            <ul className="divide-y divide-border">
-              {orphans.map((entry) => (
-                <OrphanRow
-                  key={entry.name}
-                  entry={entry}
-                  busy={Boolean(busy[entry.name])}
-                  error={errors[entry.name]}
-                  onTrash={() => setConfirm(entry)}
-                />
-              ))}
-            </ul>
-          </Card>
+          <ul className="divide-y divide-border">
+            {orphans.map((entry) => (
+              <OrphanRow
+                key={entry.name}
+                entry={entry}
+                busy={Boolean(busy[entry.name])}
+                error={errors[entry.name]}
+                onTrash={() => setConfirm(entry)}
+              />
+            ))}
+          </ul>
         </Section>
       ) : null}
 
@@ -272,7 +259,7 @@ function SessionRow({
   const lang = useLang();
   const t = useT();
   return (
-    <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
+    <li className={listRowClass({ bar: true }, 'group text-sm')}>
       <div className="min-w-0 grow">
         <button
           type="button"
@@ -345,7 +332,7 @@ function OrphanRow({
   const lang = useLang();
   const t = useT();
   return (
-    <li className="group relative flex items-center gap-3 px-4 py-3 text-sm transition-colors before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent before:transition-opacity hover:bg-accent-soft hover:before:opacity-100 before:opacity-0">
+    <li className={listRowClass({ bar: true }, 'group text-sm')}>
       <div className="min-w-0 grow">
         <div className="font-mono text-xs">{entry.name}</div>
         <div className="mt-1 text-xs text-muted">

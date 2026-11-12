@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
+  AgentStyle,
   AutonomyPrefs,
   DelegationPrefs,
   IntegrationPrefs,
@@ -18,29 +19,27 @@ import {
   emptyModelForm,
   providerFormToApiKey,
   toForm,
+  type ModelForm,
   type SaveGroup,
   type SettingsForm,
 } from '../lib/settingsForm';
 import { type ThemeId } from '../lib/theme';
-import { Tabs } from '../components/ui/Tabs';
-import { GroupJumps } from '../components/settings/GroupJumps';
-import { Card } from '../components/ui/Card';
+import { resolveSettingsPage } from '../lib/settingsPages';
 import type { SectionSave } from '../components/ui/Section';
 import { ModelSection } from '../components/settings/ModelSection';
 import { ProvidersSection, type ProviderForm } from '../components/settings/ProvidersSection';
-import { ModelPrefsSection, type ModelForm } from '../components/settings/ModelPrefsSection';
 import { DisplaySection } from '../components/settings/DisplaySection';
-import { PanelPagesSection } from '../components/settings/PanelPagesSection';
 import { InstructionsSection } from '../components/settings/InstructionsSection';
 import { NetworkSection } from '../components/settings/NetworkSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
-import { McpSection } from '../components/settings/McpSection';
+import { McpSection, emptyServer } from '../components/settings/McpSection';
 import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
 import { DelegationSection } from '../components/settings/DelegationSection';
 import { IntegrationSection } from '../components/settings/IntegrationSection';
+import { ShortcutsSection } from '../components/settings/ShortcutsSection';
 import { ScannersSection } from '../components/settings/ScannersSection';
 import { PluginsSection } from '../components/settings/PluginsSection';
 import { SkillsSection } from '../components/settings/SkillsSection';
@@ -49,14 +48,17 @@ import { VersionSection } from '../components/settings/VersionSection';
 import { WhatsNewSection } from '../components/settings/WhatsNewSection';
 import { AboutBrand } from '../components/settings/AboutBrand';
 import { useT } from '../i18n';
-import type { MsgKey } from '../i18n/messages';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Button } from '../components/ui/Button';
+import { PlusIcon } from '../components/ui/Icons';
+import { SETTINGS_PAGE_META, SettingsNav } from '../components/settings/SettingsNav';
 
 /** The pause after the last edit before the page stores it. */
 const AUTOSAVE_DELAY_MS = 800;
 
 interface SettingsPageProps {
-  /** The tab named in the address (`#/settings/security`), when it names one. */
-  initialTab?: string | null;
+  /** The sub-page named in the address (`#/settings/sandbox`); an old or unknown one resolves to a page. */
+  page?: string | null;
   settings: SettingsResponse | null;
   theme: ThemeId;
   onThemeChange: (theme: ThemeId) => void;
@@ -64,49 +66,37 @@ interface SettingsPageProps {
   onListing: (listing: ProviderListing) => void;
 }
 
-type SettingsTab = 'models' | 'behaviour' | 'security' | 'agents' | 'extensions' | 'display' | 'about';
-
-// Six groups, not twelve tabs: what tunes the model, how an agent behaves, what it is allowed to touch
-// (sandbox, scanners, the human's rules), the agents and what they load (skills, workflows), what plugs into fennec
-// (plugins, MCP servers) and the display.
-const TABS: { id: SettingsTab; labelKey: MsgKey }[] = [
-  { id: 'models', labelKey: 'settingsTabModels' },
-  { id: 'behaviour', labelKey: 'settingsTabBehaviour' },
-  { id: 'security', labelKey: 'settingsTabSecurity' },
-  { id: 'agents', labelKey: 'settingsTabAgents' },
-  { id: 'extensions', labelKey: 'settingsTabExtensions' },
-  { id: 'display', labelKey: 'settingsTabDisplay' },
-  { id: 'about', labelKey: 'settingsTabAbout' }
-];
-
-/** The old per-section addresses (`#/settings/skills`) still open the group that holds the section. */
-const LEGACY_TABS: Record<string, SettingsTab> = {
-  instructions: 'behaviour',
-  search: 'behaviour',
-  sandbox: 'security',
-  security: 'security',
-  rules: 'security',
-  autonomy: 'behaviour',
-  skills: 'agents',
-  workflows: 'agents',
-  library: 'agents',
-  plugins: 'extensions',
-  mcp: 'extensions'
-};
-
-export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
+export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, onListing }: SettingsPageProps) {
   const t = useT();
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const [autoSave, setAutoSave] = useState<{ saving: boolean; error: string | null }>({ saving: false, error: null });
+  const [addingProvider, setAddingProvider] = useState(false);
   const latestForm = useRef(form);
   latestForm.current = form;
-  const [tab, setTab] = useState<SettingsTab>(
-    () => TABS.find((item) => item.id === initialTab)?.id ?? (initialTab ? LEGACY_TABS[initialTab] : undefined) ?? 'models'
+  const active = resolveSettingsPage(page);
+  const meta = SETTINGS_PAGE_META[active];
+  const header = (
+    <PageHeader
+      Icon={meta.Icon}
+      title={t(meta.labelKey)}
+      subtitle={t(meta.hintKey)}
+      actions={
+        active === 'providers' ? (
+          <Button variant="primary" size="md" onClick={() => setAddingProvider(true)}>
+            <PlusIcon className="h-[15px] w-[15px]" />
+            {t('addProvider')}
+          </Button>
+        ) : active === 'mcp' ? (
+          <Button variant="primary" size="md" onClick={() => form && updateMcp([...form.mcp, emptyServer()])}>
+            <PlusIcon className="h-[15px] w-[15px]" />
+            {t('newServer')}
+          </Button>
+        ) : null
+      }
+    />
   );
-  const tabs = TABS.map((item) => ({ id: item.id, label: t(item.labelKey) }));
 
   useEffect(() => {
     if (settings && form === null) {
@@ -250,6 +240,10 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
     setForm((previous) => (previous ? { ...previous, instructions } : previous));
   }
 
+  function updateAgentStyle(style: AgentStyle) {
+    setForm((previous) => (previous ? { ...previous, agentStyle: style } : previous));
+  }
+
   function updateSearch(search: SearchForm) {
     setForm((previous) => (previous ? { ...previous, search } : previous));
   }
@@ -272,6 +266,10 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
 
   function updateIntegration(integration: IntegrationPrefs) {
     setForm((previous) => (previous ? { ...previous, integration } : previous));
+  }
+
+  function updateShortcuts(shortcuts: Record<string, string>) {
+    setForm((previous) => (previous ? { ...previous, shortcuts } : previous));
   }
 
   function updateAlwaysOnSkills(alwaysOnSkills: string[]) {
@@ -382,11 +380,13 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
 
   if (!settings || !form) {
     return (
-      <main className="grow overflow-y-auto px-4 pt-6 md:px-6 md:pt-8">
-        <div className="mx-auto max-w-page">
-          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
-          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
-          <div className="mt-6 text-sm text-muted">{t('loading')}</div>
+      <main className="grow overflow-y-auto px-4 md:px-6">
+        <div className="mx-auto flex max-w-[1180px] flex-col gap-6 py-6 md:flex-row md:items-start md:py-8">
+          <SettingsNav active={active} />
+          <div className="flex min-w-0 grow flex-col gap-6">
+            {header}
+            <div className="text-sm text-muted">{t('loading')}</div>
+          </div>
         </div>
       </main>
     );
@@ -394,144 +394,160 @@ export function SettingsPage({ initialTab, settings, theme, onThemeChange, onSav
 
   return (
     <main className="grow overflow-y-auto px-4 md:px-6">
-      {/* The top padding sits inside the scroller, so the jump bar sticks at its very top. */}
-      <div className="mx-auto flex max-w-page flex-col gap-6 pt-6 md:pt-8">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('settingsTitle')}</h1>
-          <p className="mt-0.5 text-muted">{t('settingsSubtle')}</p>
-        </div>
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-6 py-6 md:flex-row md:items-start md:py-8">
+        <SettingsNav active={active} />
+        {/* One form across the sub-pages: an edit is kept when moving to another one. */}
+        <form onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-6">
+          {header}
+          {error && <p className="m-0 text-xs text-err">{error}</p>}
 
-        <Card className="flex flex-col md:flex-row">
-          {/* One form across the tabs: an edit on one tab is kept when switching. */}
-          <div className="shrink-0 border-b border-border p-2 md:border-r md:border-b-0">
-            <Tabs label={t('settingsSectionsLabel')} tabs={tabs} active={tab} onSelect={setTab} />
-          </div>
+          {active === 'providers' && (
+            <>
+              {!form.model && !settings.defaults.model && (
+                <p className="m-0 text-sm text-attention">{t('modelSetupNotice')}</p>
+              )}
+              <ModelSection
+                save={groupSave('model')}
+                value={form.model}
+                listings={settings.listings}
+                stored={settings.preferences.selected}
+                defaultModel={settings.defaults.model}
+                onChange={updateModel}
+              />
+              <ProvidersSection
+                save={{
+                  dirty: isDirty('providers') || isDirty('modelPrefs'),
+                  onSave: () => saveGroups(['providers', 'modelPrefs']),
+                  auto: autoSave
+                }}
+                providers={form.providers}
+                listings={settings.listings}
+                values={form.models}
+                billing={form.billing}
+                defaults={settings.defaults}
+                favorites={form.favorites}
+                defaultModel={form.model}
+                adding={addingProvider}
+                onAddingChange={setAddingProvider}
+                onChange={updateProvider}
+                onAdd={addProvider}
+                onRemove={removeProvider}
+                onFetch={handleFetch}
+                onAddModel={addModel}
+                onToggleFavorite={toggleFavorite}
+                onToggleBilled={toggleBilled}
+                onSetDefault={setDefaultModel}
+                onChangeModel={updateModelField}
+                onRemoveModel={removeModel}
+              />
+            </>
+          )}
 
-          <form ref={formRef} onSubmit={handleSubmit} className="flex min-w-0 grow flex-col gap-8 p-5">
-            <GroupJumps container={formRef} deps={tab} />
-            {error && <p className="m-0 text-xs text-err">{error}</p>}
-            {tab === 'models' && (
-              <>
-                {!form.model && !settings.defaults.model && (
-                  <p className="m-0 text-sm text-attention">{t('modelSetupNotice')}</p>
-                )}
-                <ModelSection
-                  save={groupSave('model')}
-                  value={form.model}
-                  listings={settings.listings}
-                  stored={settings.preferences.selected}
-                  defaultModel={settings.defaults.model}
-                  onChange={updateModel}
-                />
-                <ProvidersSection
-                  save={groupSave('providers')}
-                  providers={form.providers}
-                  listings={settings.listings}
-                  values={form.models}
-                  onChange={updateProvider}
-                  onAdd={addProvider}
-                  onRemove={removeProvider}
-                  onFetch={handleFetch}
-                  onAddModel={addModel}
-                />
-                <ModelPrefsSection
-                  save={groupSave('modelPrefs')}
-                  listings={settings.listings}
-                  values={form.models}
-                  billing={form.billing}
-                  defaults={settings.defaults}
-                  favorites={form.favorites}
-                  onToggleFavorite={toggleFavorite}
-                  onToggleBilled={toggleBilled}
-                  defaultModel={form.model}
-                  onSetDefault={setDefaultModel}
-                  onChange={updateModelField}
-                  onRemoveModel={removeModel}
-                />
-              </>
-            )}
+          {active === 'display' && (
+            <DisplaySection
+              save={groupSave('display')}
+              value={form.display}
+              onChange={updateDisplay}
+              theme={theme}
+              onThemeChange={onThemeChange}
+            />
+          )}
 
-            {tab === 'behaviour' && (
-              <>
-                <InstructionsSection save={groupSave('instructions')} value={form.instructions} onChange={updateInstructions} />
-                <SearchSection save={groupSave('search')} value={form.search} onChange={updateSearch} />
-                <AutonomySection save={groupSave('autonomy')} value={form.autonomy} onChange={updateAutonomy} />
-                <IntegrationSection save={groupSave('integration')} value={form.integration} onChange={updateIntegration} />
-              </>
-            )}
+          {active === 'shortcuts' && (
+            <ShortcutsSection
+              save={groupSave('shortcuts')}
+              bindings={settings.shortcuts ?? []}
+              value={form.shortcuts}
+              onChange={updateShortcuts}
+            />
+          )}
 
-            {tab === 'security' && (
-              <>
-                <SandboxSection save={groupSave('sandbox')} value={form.sandbox} onChange={updateSandbox} health={settings?.sandboxHealth} />
-                <ScannersSection scanners={settings.scanners ?? []} />
-                <RulesSection />
-                <NetworkSection />
-              </>
-            )}
+          {active === 'instructions' && (
+            <InstructionsSection
+              save={groupSave('instructions')}
+              value={form.instructions}
+              onChange={updateInstructions}
+              style={form.agentStyle}
+              onStyleChange={updateAgentStyle}
+            />
+          )}
 
-            {tab === 'agents' && (
-              <>
-                <AgentsSection />
-                <DelegationSection
-                  save={groupSave('delegation')}
-                  value={form.delegation}
-                  onChange={updateDelegation}
-                />
-                <SkillsSection
-                  save={groupSave('skills')}
-                  skills={settings.skills}
-                  value={form.alwaysOnSkills}
-                  onChange={updateAlwaysOnSkills}
-                />
-                <WorkflowsSection
-                  save={groupSave('workflows')}
-                  workflows={settings.optInWorkflows}
-                  value={form.enabledWorkflows}
-                  onChange={updateEnabledWorkflows}
-                />
-              </>
-            )}
+          {active === 'agents' && (
+            <>
+              <AgentsSection />
+              <DelegationSection
+                save={groupSave('delegation')}
+                value={form.delegation}
+                onChange={updateDelegation}
+              />
+            </>
+          )}
 
-            {tab === 'extensions' && (
-              <>
-                <PluginsSection />
-                <McpSection
-                  save={groupSave('mcp')}
-                  value={form.mcp}
-                  onChange={updateMcp}
-                  toolViews={settings.mcpTools ?? {}}
-                  onConnected={reloadMcp}
-                />
-              </>
-            )}
+          {active === 'skills' && (
+            <SkillsSection
+              save={groupSave('skills')}
+              skills={settings.skills}
+              value={form.alwaysOnSkills}
+              onChange={updateAlwaysOnSkills}
+            />
+          )}
 
-            {tab === 'display' && (
-              <>
-                <DisplaySection
-                  save={groupSave('display')}
-                  value={form.display}
-                  onChange={updateDisplay}
-                  theme={theme}
-                  onThemeChange={onThemeChange}
-                />
-                <PanelPagesSection
-                  save={groupSave('display')}
-                  value={form.display.panelPages ?? null}
-                  onChange={(panelPages) => updateDisplay({ ...form.display, panelPages })}
-                />
-              </>
-            )}
+          {active === 'workflows' && (
+            <WorkflowsSection
+              save={groupSave('workflows')}
+              workflows={settings.optInWorkflows}
+              value={form.enabledWorkflows}
+              onChange={updateEnabledWorkflows}
+            />
+          )}
 
-            {tab === 'about' && (
-              <>
-                <AboutBrand />
-                <VersionSection />
-                <WhatsNewSection />
-              </>
-            )}
+          {active === 'autonomy' && (
+            <>
+              <AutonomySection save={groupSave('autonomy')} value={form.autonomy} onChange={updateAutonomy} />
+              <IntegrationSection save={groupSave('integration')} value={form.integration} onChange={updateIntegration} />
+            </>
+          )}
 
-          </form>
-        </Card>
+          {active === 'sandbox' && (
+            <>
+              <SandboxSection
+                save={groupSave('sandbox')}
+                value={form.sandbox}
+                onChange={updateSandbox}
+                health={settings?.sandboxHealth}
+              />
+              <NetworkSection />
+            </>
+          )}
+
+          {active === 'rules' && <RulesSection />}
+
+          {active === 'scanners' && <ScannersSection scanners={settings.scanners ?? []} />}
+
+          {active === 'plugins' && <PluginsSection />}
+
+          {active === 'mcp' && (
+            <McpSection
+              save={groupSave('mcp')}
+              value={form.mcp}
+              onChange={updateMcp}
+              toolViews={settings.mcpTools ?? {}}
+              onConnected={reloadMcp}
+            />
+          )}
+
+          {active === 'search' && (
+            <SearchSection save={groupSave('search')} value={form.search} onChange={updateSearch} />
+          )}
+
+          {active === 'about' && (
+            <>
+              <AboutBrand />
+              <VersionSection />
+              <WhatsNewSection />
+            </>
+          )}
+        </form>
       </div>
     </main>
   );

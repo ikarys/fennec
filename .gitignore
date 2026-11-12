@@ -7,6 +7,8 @@ web/node_modules
 web/dist/
 *.tsbuildinfo
 .playwright-cli/
+# Web UI test harness (vitest/vite cache and sources).
+.webtest/
 .impeccable/
 # Stray SQLite stores (usage.db, fennec.db) left by local runs.
 *.db
@@ -15,3 +17,4 @@ web/dist/
 
 # The user guide, built into the site by `just site` and the Pages workflow
 site/docs/
+__pycache__/

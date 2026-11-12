@@ -5,3 +5,4 @@ mod idea_assets;
 pub(super) mod idea_queue;
 pub(super) mod run_stats_backfill;
 pub(super) mod session_name;
+pub(super) mod sheet_suggest;

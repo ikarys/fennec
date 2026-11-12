@@ -1,7 +1,7 @@
 import { formatTokens, stateLabel } from './format';
 import type { SessionState } from './api';
 import { t, type Lang } from '../i18n/messages';
-import { createRunFold } from './workflowRun';
+import type { WorkflowDef } from './workflow';
 import { planFromProposal, reportFromSubmission } from './plan';
 import type {
   FennecEvent,
@@ -117,10 +117,11 @@ function updateToolStats(tool: ToolCallView): void {
 export interface ThreadFold {
   apply(event: FennecEvent): void;
   /**
-   * The events of a run older than the loaded page: they feed the run,
-   * not the thread.
+   * The run's definition, when `workflow.started` is older than the loaded
+   * page: stores it and patches the dividers it already created (label, kind,
+   * and the structural nodes the normal flow skips).
    */
-  applyRunOnly(event: FennecEvent): void;
+  setWorkflow(workflow: WorkflowDef): void;
   /** A new view object per call, for React; the items inside are shared. */
   view(): ThreadView;
 }
@@ -142,7 +143,9 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
   // Null means "no live change yet": the session detail owns the mode.
   let mode: string | null = null;
   let name: string | undefined;
-  const runFold = createRunFold();
+  // The latest run's definition, from workflow.started: the thread items read
+  // their node label and kind from it. The run itself is served pre-calculated.
+  let workflow: WorkflowDef | null = null;
   type WorkflowNodeItem = Extract<ThreadItem, { kind: 'workflow-node' }>;
   const openWorkflowItems = new Map<string, WorkflowNodeItem>();
   let pendingPromptFor: WorkflowNodeItem | null = null;
@@ -179,7 +182,6 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
   const apply = (event: FennecEvent) => {
     index += 1;
     const data = event.data ?? {};
-    runFold.apply(event);
 
     switch (event.type) {
       case 'message.start': {
@@ -538,7 +540,7 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
       }
 
       case 'workflow.started': {
-        const workflow = runFold.view()?.workflow;
+        workflow = data.workflow as WorkflowDef;
         if (workflow) {
           pushItem({ kind: 'note', id: `workflow-started-${index}`, text: `Workflow « ${workflow.name} »` });
         }
@@ -556,7 +558,7 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
         const runId = String(data.runId ?? '');
         const nodeId = String(data.nodeId ?? '');
         const pass = typeof data.pass === 'number' ? data.pass : 1;
-        const node = runFold.view()?.workflow.nodes.find((n) => n.id === nodeId);
+        const node = workflow?.nodes.find((n) => n.id === nodeId);
         const kind = node?.kind ?? 'agent';
         if (kind === 'parallel' || kind === 'join' || kind === 'start') {
           break;
@@ -625,8 +627,32 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
     }
   };
 
-  const applyRunOnly = (event: FennecEvent): void => {
-    runFold.apply(event);
+  const setWorkflow = (def: WorkflowDef): void => {
+    workflow = def;
+    const nodeOf = (nodeId: string) => def.nodes.find((node) => node.id === nodeId);
+    const structural = (kind: string) => kind === 'parallel' || kind === 'join' || kind === 'start';
+    // Patch every divider created before the definition arrived; drop the
+    // structural nodes (parallel/join/start) the normal flow skips.
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      const item = items[i];
+      if (!item || item.kind !== 'workflow-node') continue;
+      const node = nodeOf(item.nodeId);
+      if (!node) continue;
+      if (structural(node.kind)) {
+        items.splice(i, 1);
+        for (const [key, open] of openWorkflowItems) {
+          if (open === item) openWorkflowItems.delete(key);
+        }
+      } else {
+        item.label = node.name ?? item.nodeId;
+        item.nodeKind = node.kind;
+      }
+    }
+    // pendingPromptFor is only for agent nodes; clear it if the node is not one.
+    if (pendingPromptFor) {
+      const node = nodeOf(pendingPromptFor.nodeId);
+      if (node && node.kind !== 'agent') pendingPromptFor = null;
+    }
   };
 
   const view = (): ThreadView => ({
@@ -635,9 +661,8 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
     lastDone,
     pendingQuestion,
     mode,
-    name,
-    run: runFold.view()
+    name
   });
 
-  return { apply, view, applyRunOnly };
+  return { apply, setWorkflow, view };
 }

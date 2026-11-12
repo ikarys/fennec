@@ -1,10 +1,12 @@
+// Network settings for the fennec server.
 import { useEffect, useRef, useState } from 'react';
 import { Section, type SectionSave } from '../ui/Section';
-import { FieldRow, TextInput } from '../ui/Field';
+import { SettingRow } from '../ui/SettingRow';
+import { TextInput } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Switch } from '../ui/Switch';
-import { CheckIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
+import { CheckIcon, GlobeIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
 import { getServer, getVersion, setServer, setServerPassword, restartServer, type ServerSettings } from '../../lib/api';
 
@@ -100,6 +102,7 @@ export function NetworkSection() {
       tries += 1;
       try {
         if (servedByFennec && target !== view.runningPort) {
+          // Not lib/api/request: it probes the new port, another origin, without CORS.
           await fetch(`${window.location.protocol}//${window.location.hostname}:${target}/api/version`, {
             mode: 'no-cors',
           });
@@ -149,6 +152,8 @@ export function NetworkSection() {
 
   return (
     <Section
+      Icon={GlobeIcon}
+      flush
       title={t('networkTitle')}
       description={t('networkDescription')}
       actions={
@@ -166,17 +171,18 @@ export function NetworkSection() {
       }
       save={save}
     >
-      <FieldRow label={t('serverPortLabel')} hint={t('serverPortHint', { path: view.path })}>
+      <SettingRow label={t('serverPortLabel')} hint={t('serverPortHint', { path: view.path })}>
         <TextInput
           type="number"
           min={1024}
           max={65535}
           className="w-32"
+          aria-label={t('serverPortLabel')}
           value={portDraft}
           onChange={(event) => setPortDraft(event.currentTarget.value)}
         />
-      </FieldRow>
-      <FieldRow
+      </SettingRow>
+      <SettingRow
         label={t('networkRemoteLabel')}
         hint={remoteDisabled ? t('networkRemoteNeedsPassword') : t('networkRemoteHint')}
       >
@@ -186,8 +192,8 @@ export function NetworkSection() {
           label={t('networkRemoteLabel')}
           disabled={remoteDisabled}
         />
-      </FieldRow>
-      <FieldRow
+      </SettingRow>
+      <SettingRow
         label={t('networkPasswordLabel')}
         hint={
           view.passwordSet ? (
@@ -201,6 +207,7 @@ export function NetworkSection() {
           <TextInput
             type="password"
             className="w-48"
+            aria-label={t('networkPasswordLabel')}
             value={passwordDraft}
             onChange={(event) => setPasswordDraft(event.currentTarget.value)}
           />
@@ -220,15 +227,15 @@ export function NetworkSection() {
             )}
           </Button>
         </div>
-      </FieldRow>
-      {passwordError ? <p className="m-0 text-xs text-danger">{passwordError}</p> : null}
-      <div className="flex items-center gap-2 text-xs text-muted">
+      </SettingRow>
+      {passwordError ? <p className="m-0 px-4 py-2 text-xs text-danger">{passwordError}</p> : null}
+      <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2.5 text-xs text-muted">
         {t('serverRunningOn')}
         <Badge tone="accent">{view.runningPort}</Badge>
         {view.runningRemote ? <Badge tone="info">{t('networkRemoteOn')}</Badge> : null}
         {view.restartNeeded ? <Badge tone="attention">{t('serverRestartNeeded')}</Badge> : null}
       </div>
-      {view.fromFlag ? <p className="m-0 text-xs text-faint">{t('serverFromFlag')}</p> : null}
+      {view.fromFlag ? <p className="m-0 px-4 pb-2.5 text-xs text-faint">{t('serverFromFlag')}</p> : null}
     </Section>
   );
 }

@@ -113,7 +113,7 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 ### Budgets and billed models
 
 - A project can have a monthly cost budget, set from a tile on its project page.
-- The month's spend is the usage ledger priced at each model's price (Settings, Models; per million tokens: input, cached, output).
+- The month's spend is the usage ledger priced at each model's price (Settings, Providers; per million tokens: input, cached, output).
 - At 80 % an alert shows, once exceeded a new turn is refused until the budget is raised or removed.
 - Only billed models count: a model on the local provider is not billed by default (its price is an estimate, kept for comparison), a paid provider's model is; the Billed checkbox of each model overrides it. Every price stays displayed either way.
 
@@ -136,7 +136,7 @@ checking its checksum; `FENNEC_VERSION` picks a tag, `FENNEC_INSTALL_DIR` the di
 [mise](https://mise.jdx.dev): `mise use -g github:ikarys/fennec`. Or download a tarball from the
 [releases](../../releases) by hand.
 
-Linux requirements: glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer) and `bwrap` (package `bubblewrap`) for the command sandbox. On Ubuntu 23.10 and later, AppArmor forbids the user namespaces bwrap needs; the Settings page says so and [docs/releasing.md](docs/releasing.md#installing-a-binary) gives the fix.
+Linux requirements: glibc 2.35 or later (Ubuntu 22.04, Debian 12 and newer) and `bwrap` (package `bubblewrap`) for the command sandbox. On Ubuntu 23.10 and later, AppArmor forbids the user namespaces bwrap needs; the Settings page says so and [docs/devs/releasing.md](docs/devs/releasing.md#installing-a-binary) gives the fix.
 
 ### From source
 
@@ -189,9 +189,8 @@ fennec listens on 127.0.0.1 only, and needs no password there. To use it from an
 then restart from there. Or, from a shell:
 
 ```bash
-fennec password                                       # stores a PBKDF2 hash in ~/.config/fennec/settings.yaml
-echo "listen: 0.0.0.0" >> ~/.config/fennec/settings.yaml
-fennec                                                # refuses a non-local address without a password
+fennec remote enable      # asks for a password if none is set, then listens on 0.0.0.0
+fennec service restart    # or start fennec again; `fennec remote disable` goes back to 127.0.0.1
 ```
 
 A remote browser gets a login page, then a session cookie (30 days, lost when fennec restarts).
@@ -226,27 +225,27 @@ These are defaults: the Settings page adds providers and overrides parameters pe
 
 - The human owns the CLI/UI and configuration; fennec never blocks them.
 - The code that decides, such as integration, never runs what a model wrote.
-- The server answers local pages only (`Host`/`Origin` checked, JSON bodies); a remote caller needs the password set with `fennec password` (see "Remote access").
+- The server answers local pages only (`Host`/`Origin` checked, JSON bodies); a remote caller needs the password set with `fennec remote enable` (see "Remote access").
 - **Git hooks do not run on fennec's own git commands.** Every git command fennec runs itself (the commit that saves each turn's work in its worktree, the integration's cherry-pick and commit, status and diffs) passes `-c core.hooksPath=/dev/null -c core.fsmonitor=false`: a hook or fsmonitor in a repository may have been written by a model, and fennec's kernel never executes one. Your hooks still run on your own `git commit`; if a check matters (a commit-message format, a linter), run it in your own workflow after integrating, or make it a criterion's `check:` command.
 - Git's metadata (`.git`) is read-only inside the command sandbox and refused to the file tools, with no waiver: an agent cannot change the repository's config, hooks or refs through them.
-- Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox. **What the sandbox blocks, and how to run the app, add a dependency or see the agent's work anyway: [docs/sandbox.md](docs/sandbox.md).**
+- Model output is untrusted. Commands run in a sandbox (bubblewrap on Linux, Seatbelt on macOS) unless the human turns it off; protected files are refused to file tools and read-only in the sandbox. **What the sandbox blocks, and how to run the app, add a dependency or see the agent's work anyway: [docs/devs/sandbox.md](docs/devs/sandbox.md).**
 - The server only answers local pages: `Host` and `Origin` must be `127.0.0.1` or `localhost` and POST bodies must be JSON, so no web page can drive the agent.
 - Known gap: the file tools run in fennec's process behind a working-directory guard, and a command can create a new file matching a protected pattern where none existed; the review gate is there to catch it.
 - Every claim, the test that proves it, what is not protected and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-- [User guide](https://ikarys.github.io/fennec/docs/) (source in [docs/guide](docs/guide)): install, sessions, plans, the review gate, workflows, the sandbox, settings, CLI
-- [docs/sandbox.md](docs/sandbox.md): the command sandbox: what it blocks, how to run, test and see the agent's work
+- [User guide](https://ikarys.github.io/fennec/docs/) (source in [docs/users](docs/users)): install, sessions, plans, the review gate, workflows, the sandbox, settings, CLI
+- [docs/devs/sandbox.md](docs/devs/sandbox.md): the command sandbox: what it blocks, how to run, test and see the agent's work
 - [SECURITY.md](SECURITY.md): threat model, what is and is not protected, reporting a vulnerability
 - [VERIFICATION.md](VERIFICATION.md): how fennec is built and verified, and how to re-run the checks
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute, licence of contributions
 - [AGENTS.md](AGENTS.md): architecture, conventions
-- [docs/api.md](docs/api.md): HTTP API and event format
-- [docs/workflows.md](docs/workflows.md): workflow format and run semantics
-- [docs/ui.md](docs/ui.md): UI design rules
-- [docs/releasing.md](docs/releasing.md): branches, versions, binaries
-- [docs/dogfooding.md](docs/dogfooding.md): what fennec building fennec taught us
+- [docs/devs/api.md](docs/devs/api.md): HTTP API and event format
+- [docs/devs/workflows.md](docs/devs/workflows.md): workflow format and run semantics
+- [docs/devs/ui.md](docs/devs/ui.md): UI design rules
+- [docs/devs/releasing.md](docs/devs/releasing.md): branches, versions, binaries
+- [docs/devs/dogfooding.md](docs/devs/dogfooding.md): what fennec building fennec taught us
 
 ## How fennec is written
 

@@ -1,9 +1,10 @@
-//! The Settings routes (contract: docs/api.md): the stored preferences and what each provider lists.
+//! The Settings routes (contract: docs/devs/api.md): the stored preferences and what each provider lists.
 //! `routes.rs` only dispatches here.
 
 use crate::domain::mcp;
 use crate::domain::preferences::{LOCAL_PROVIDER, Preferences, Provider};
 use crate::domain::scanner::SCANNERS;
+use crate::domain::shortcut;
 use crate::sandbox::{SandboxHealth, probe};
 use crate::scanners;
 use crate::skills;
@@ -94,6 +95,7 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> 
         "scanners": scanners,
         "sandboxHealth": sandbox_health(),
         "mcpTools": mcp_tools(&prefs),
+        "shortcuts": shortcut::resolve(&prefs.shortcuts),
     });
     send_json(stream, 200, &body)
 }
@@ -175,6 +177,7 @@ fn model_entries(
                 "id": model.id,
                 "contextWindow": model.context_window,
                 "resolved": model_view::resolved(defaults, prefs, listed),
+                "acceptedEfforts": ModelPrefs::accepted_efforts(prefs),
             })
         })
         .collect();
@@ -190,6 +193,7 @@ fn model_entries(
                 "id": id,
                 "contextWindow": null,
                 "resolved": model_view::resolved(defaults, Some(prefs), None),
+                "acceptedEfforts": ModelPrefs::accepted_efforts(Some(prefs)),
                 "manual": true,
             }));
         }
@@ -307,8 +311,13 @@ fn reuse_stored_key(requested: &str, stored: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{model_entries, reuse_stored_key};
+    use super::{model_entries, reuse_stored_key, save_settings};
+    use crate::domain::id::new_id;
+    use crate::web::http::Request;
+    use crate::web::test_support::{app, response};
+    use llm_providers_connector::ApiKey;
     use llm_providers_connector::{ListedModel, ModelParams, ModelPrefs};
+    use serde_json::json;
     use std::collections::BTreeMap;
 
     fn defaults() -> ModelParams {
@@ -416,5 +425,33 @@ mod tests {
         let entries = model_entries(&[], &defaults(), Some(&stored), false);
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["id"], "hand-added");
+    }
+
+    #[test]
+    fn a_plain_key_is_stored_sealed() {
+        let base = std::env::temp_dir().join(format!("fennec-settings-route-{}", new_id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let app = app(base.join("fennec.db"));
+        let req = Request {
+            method: "PUT".into(),
+            path: "/api/settings".into(),
+            query: String::new(),
+            headers: Vec::new(),
+            body: json!({"providers": [{"id": "cloud", "baseUrl": "https://api.example.com/v1", "apiKey": {"plain": "sk-plain-secret"}}]})
+                .to_string()
+                .into_bytes(),
+        };
+
+        let response = response(|stream| save_settings(&app, &req, stream).unwrap());
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+
+        let stored = app.store().unwrap().preferences().unwrap();
+        let key = stored.provider("cloud").and_then(|p| p.api_key.clone());
+        assert!(matches!(key, Some(ApiKey::Sealed(_))), "{key:?}");
+        let stored_json = serde_json::to_string(&stored).unwrap();
+        assert!(!stored_json.contains("sk-plain-secret"), "{stored_json}");
+        assert!(!response.contains("sk-plain-secret"), "{response}");
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

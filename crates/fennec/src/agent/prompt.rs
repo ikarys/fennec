@@ -7,6 +7,7 @@
 //! user message, so one prompt serves every agent and its prefix stays
 //! cached when the agent changes.
 
+use crate::domain::agent_style::AgentStyle;
 use crate::domain::clock;
 use crate::domain::skill::{Skill, always_active_section};
 use std::path::Path;
@@ -21,6 +22,7 @@ pub fn system_prompt(
     instructions: &str,
     skills: &[Skill],
     always_on: &[String],
+    style: AgentStyle,
 ) -> String {
     let (y, m, d) = clock::today();
     let mut prompt = format!(
@@ -54,11 +56,13 @@ Your context is finite and every tool result stays in it: spend it on what the t
 - Report faithfully: what failed, what you skipped, what you did not verify. Never claim a check you did not run.
 
 ## Style
-Concise and direct: the answer first, then what matters. Markdown, rendered in fennec's web UI; a ```html or ```md block is shown as a live preview. No preamble, no recap of what you just did unless asked, no emoji unless asked. Talk to the human in the language they write in, but write in English what lands in the repository (code, comments, commit messages, docs, ADRs, criteria) unless the project's instructions say otherwise, and keep the headings of the formats fennec gives you exactly as given, never translated.
+{style}
+Markdown, rendered in fennec's web UI; a ```html or ```md block is shown as a live preview. No preamble, no recap of what you just did unless asked, no emoji unless asked. Talk to the human in the language they write in, but write in English what lands in the repository (code, comments, commit messages, docs, ADRs, criteria) unless the project's instructions say otherwise, and keep the headings of the formats fennec gives you exactly as given, never translated.
 ",
         workdir = workdir.display(),
         os = std::env::consts::OS,
         arch = std::env::consts::ARCH,
+        style = style.prompt(),
     );
 
     if !instructions.is_empty() {
@@ -101,6 +105,7 @@ fn skills_section(skills: &[&Skill]) -> String {
 #[cfg(test)]
 mod tests {
     use super::system_prompt;
+    use crate::domain::agent_style::AgentStyle;
     use crate::domain::skill::Skill;
     use std::path::{Path, PathBuf};
 
@@ -115,26 +120,40 @@ mod tests {
 
     #[test]
     fn empty_instructions_add_no_custom_section() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[]);
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[], AgentStyle::Concise);
         assert!(!prompt.contains("CUSTOM INSTRUCTIONS"));
     }
 
     #[test]
     fn non_empty_instructions_are_appended_at_the_end() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "Be terse.", &[], &[]);
+        let prompt = system_prompt(
+            Path::new("/tmp"),
+            "m",
+            "Be terse.",
+            &[],
+            &[],
+            AgentStyle::Concise,
+        );
         assert!(prompt.ends_with("## CUSTOM INSTRUCTIONS\n\nBe terse.\n"));
     }
 
     #[test]
     fn no_skills_add_no_skills_section() {
-        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[]);
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[], AgentStyle::Concise);
         assert!(!prompt.contains("AVAILABLE SKILLS"));
     }
 
     #[test]
     fn two_skills_add_numbered_listing_after_custom_instructions() {
         let skills = vec![skill("alpha", "A"), skill("beta", "B")];
-        let prompt = system_prompt(Path::new("/tmp"), "m", "Custom.", &skills, &[]);
+        let prompt = system_prompt(
+            Path::new("/tmp"),
+            "m",
+            "Custom.",
+            &skills,
+            &[],
+            AgentStyle::Concise,
+        );
 
         assert!(prompt.contains("## CUSTOM INSTRUCTIONS\n\nCustom.\n\n## AVAILABLE SKILLS"));
         assert!(prompt.contains("1. **alpha** - A\n2. **beta** - B"));
@@ -148,12 +167,26 @@ mod tests {
     #[test]
     fn an_always_on_skill_is_loaded_and_not_listed() {
         let skills = vec![skill("alpha", "A"), skill("beta", "B")];
-        let prompt = system_prompt(Path::new("/tmp"), "m", "", &skills, &["alpha".to_string()]);
+        let prompt = system_prompt(
+            Path::new("/tmp"),
+            "m",
+            "",
+            &skills,
+            &["alpha".to_string()],
+            AgentStyle::Concise,
+        );
 
         assert!(prompt.contains("ALWAYS-ACTIVE SKILLS"));
         assert!(prompt.contains("<skill id=\"alpha\">"));
         assert!(prompt.contains("## AVAILABLE SKILLS"));
         assert!(!prompt.contains("**alpha**"));
         assert!(prompt.contains("1. **beta** - B"));
+    }
+
+    #[test]
+    fn technical_style_replaces_the_style_opening() {
+        let prompt = system_prompt(Path::new("/tmp"), "m", "", &[], &[], AgentStyle::Technical);
+        assert!(prompt.contains(AgentStyle::Technical.prompt()));
+        assert!(prompt.contains("keep the headings of the formats"));
     }
 }
