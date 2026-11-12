@@ -470,6 +470,7 @@ export const fr: Record<MsgKey, string> = {
   modelParams: 'Paramètres du modèle',
   editConnection: 'Modifier la connexion',
   envDefaultOption: "Défaut de l'environnement ({model})",
+  envDefaultOptionUnnamed: "Défaut de l'environnement",
   unlistedModelOption: '{model} — {provider} (non listé)',
   modelSectionHint: "Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Le modèle par défaut est marqué ★ ; les favoris (♥) sont proposés dans le composer.",
   probeContextFound: 'contexte {window}',

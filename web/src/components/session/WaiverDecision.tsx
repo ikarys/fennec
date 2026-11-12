@@ -89,6 +89,7 @@ export function WaiverDecision({
       {waiver.reason ? (
         <div className="mt-1.5 text-xs text-muted">{t('waiverReason', { reason: waiver.reason })}</div>
       ) : null}
+      <div className="mt-1.5 text-xs text-faint">{t('waiverGrantTitle')}</div>
     </DecisionRow>
   );
 }

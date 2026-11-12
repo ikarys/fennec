@@ -35,7 +35,7 @@ export function ModelSection({ value, listings, stored, defaultModel, onChange, 
     <Section Icon={StarIcon} flush title={t('defaultModelLabel')} save={save}>
       <SettingRow label={t('defaultModelLabel')} hint={t('modelSectionHint')}>
         <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-72 max-w-full">
-          <option value="">{t('envDefaultOption', { model: defaultModel })}</option>
+          <option value="">{defaultModel ? t('envDefaultOption', { model: defaultModel }) : t('envDefaultOptionUnnamed')}</option>
           {listings.map((listing) => (
             <optgroup key={listing.provider} label={listing.name}>
               {listing.models.map((model) => (

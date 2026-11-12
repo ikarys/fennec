@@ -83,7 +83,7 @@ Set the caps first: click ③.
 
 ## In the morning: the night report
 
-On **Overview**, the **Night report** lists each task the queue ran: its duration, its tokens, the criteria passed, the step it reached, why it stopped, and each decision (title and choice), including the steps night mode answered for you. Badges count the tasks **to review**, the **questions**, the **halted**, the **failed** and the **integrated**. Read the decisions first, then review the work. The report integrates nothing. Click **Review** on a task to open its session. Click **Mark as read** to hide the report.
+On **Overview**, the **Night report** lists each task the queue ran: its duration, its tokens, the criteria passed, the step it reached, why it stopped, and each decision (title and choice), including the steps night mode answered for you. Badges count the tasks **to review**, the **questions**, the **halted**, the **failed** and the **integrated**. Read the decisions first, then review the work. The report integrates nothing. Click **View the session** on a task to open it. Click **Mark as read** to hide the report.
 
 ## Manage a task
 

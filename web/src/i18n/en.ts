@@ -439,6 +439,7 @@ export const en = {
   modelParams: 'Model parameters',
   editConnection: 'Edit the connection',
   envDefaultOption: 'Environment default ({model})',
+  envDefaultOptionUnnamed: 'Environment default',
   unlistedModelOption: '{model} — {provider} (not listed)',
   modelSectionHint: 'New sessions use it; the composer changes a session\'s. The default model is marked ★; favorites (♥) are offered in the composer.',
   probeContextFound: 'context {window}',
