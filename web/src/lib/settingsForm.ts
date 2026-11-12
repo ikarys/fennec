@@ -176,7 +176,7 @@ export const emptyModelForm: ModelForm = {
 export function localProviderForm(): ProviderForm {
   return {
     id: 'local',
-    name: '',
+    name: 'local',
     baseUrl: '',
     keyKind: 'none',
     envVar: '',

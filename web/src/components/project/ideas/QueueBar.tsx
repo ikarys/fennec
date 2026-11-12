@@ -135,7 +135,8 @@ export function QueueBar({
       {queue.ready === 0 ? (
         <p className="m-0 flex items-center gap-1 text-xs text-muted">
           {t('nothingReadyPrefix')}
-          <EditIcon className="h-3.5 w-3.5" />
+          <EditIcon className="h-3.5 w-3.5" aria-hidden />
+          <strong className="font-medium text-text">{t('turnIntoTask')}</strong>
           {t('nothingReadySuffix')}
         </p>
       ) : autonomous ? (

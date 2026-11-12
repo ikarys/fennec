@@ -22,12 +22,11 @@ export function TextArea({ className = '', ...props }: TextareaHTMLAttributes<HT
 /** A label above its field, with an optional hint below. */
 export function FieldRow({ label, hint, htmlFor, children }: { label: string; hint?: React.ReactNode; htmlFor?: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-muted">
-        {label}
-      </label>
+    // The label wraps its control: the control is named even without an `htmlFor`.
+    <label htmlFor={htmlFor} className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted">{label}</span>
       {children}
-      {hint && <p className="m-0 text-xs text-faint">{hint}</p>}
-    </div>
+      {hint && <span className="text-xs text-faint">{hint}</span>}
+    </label>
   );
 }
