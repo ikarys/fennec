@@ -33,6 +33,7 @@ The table lists the main protections, each naming the claim, mechanism, and test
 | Kernel block rules stop `git push` and branch moves. | The kernel refuses `git push`, `update-ref`, `branch -D`, `worktree`, and `gh pr merge` before they run. | `crates/fennec/src/domain/kernel_rules.rs::blocks_push_variants`; `crates/fennec/src/domain/kernel_rules.rs::blocks_branch_and_ref_changes`; `crates/fennec/src/domain/kernel_rules.rs::allows_read_only_and_local_git_commands` |
 | Kernel git never runs repository hooks or fsmonitor. | Every kernel git command sets `core.hooksPath=/dev/null` and `core.fsmonitor=false`. | `crates/fennec/src/git.rs::host_git_does_not_run_model_written_hooks_or_fsmonitor` |
 | Integration is a human decision behind a review gate. | The review gate blocks on protected files, suppressions, and weakened tests. The human decides integration. | `crates/fennec/src/domain/integration.rs::architecture_violations_block_after_protected_files`; `crates/fennec/src/domain/integration.rs::suppressions_and_weakened_tests_block_after_architecture`; `crates/fennec/src/domain/bypass.rs::suppressions_flag_the_marker_families`; `crates/fennec/src/domain/bypass.rs::an_assertion_removed_with_code_added_elsewhere_blocks` |
+| Night mode never lets a model answer for the human. | With the human away, the kernel answers a workflow's human step with its forward choice and records it as a decision to review; a task naming a risky action is not started. Integration still waits for the human. | `crates/fennec/src/agent/workflow/tests.rs::night_mode_answers_a_human_node_with_its_first_choice`; `crates/fennec/src/agent/workflow/tests.rs::night_mode_validates_the_tests_like_a_click`; `crates/backlog/src/risk.rs::delete_tests_and_publish` |
 | The human's rules decide with block over allow over ask. | The rule engine applies block, then allow, then ask. | `crates/rules/src/decide.rs::block_beats_allow_beats_ask`; `crates/rules/src/decide.rs::allow_beats_ask` |
 | Plugins require the sandbox. | A plugin is not active without the sandbox. | `crates/fennec/src/plugins/host.rs::plugin_requires_sandbox`; `crates/fennec/src/plugins/host.rs::plugin_sandbox` |
 | Stored API keys are sealed at rest with `secret.key`. | The config loads or creates a master key at the `secret.key` path. | `crates/fennec/src/config.rs::a_sealed_key_opens_with_the_master_key`; `crates/fennec/src/web/routes/settings_routes.rs::a_plain_key_is_stored_sealed` (the sealing itself is tested in llm-providers-connector's `secret.rs`) |
@@ -42,8 +43,9 @@ The table lists the main protections, each naming the claim, mechanism, and test
 ### Commands and the sandbox
 
 - Command rules match parsed tokens, so `eval`, a variable, or a script can slip past them.
-- The sandbox does not read the rules.
+- The sandbox does not read the rules: a path rule guards the file tools only, and a command can still write a blocked path inside the work folder.
 - A session's worktree shares its refs with the human's repository.
+- Night mode spots a risky task by phrase matching on its text, plan and sheet: a task that words a risky action otherwise is started, and runs in the sandbox like any other.
 - With the network on, `git push` reaches the remote, and the kernel refuses `git push` only by token matching.
 - The human can turn the sandbox off.
 - The rest of the home directory stays readable to commands, except the secrets fennec hides; `~/.cargo/registry`, `~/.cargo/git`, `~/.cache`, and `~/.npm` stay writable, and a command can leave a tampered file there that a later build reuses.

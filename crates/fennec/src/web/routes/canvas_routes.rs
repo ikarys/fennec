@@ -1,4 +1,4 @@
-//! Canvas routes (contract `docs/api.md`).
+//! Canvas routes (contract `docs/devs/api.md`).
 //!
 //! The `canvas` crate owns the artifacts; this module only translates HTTP to
 //! its calls and reads the pinned files from the session's working directory.

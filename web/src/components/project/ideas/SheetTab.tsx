@@ -3,7 +3,7 @@
  * field, saved on blur, with a model suggestion to accept or reject per field.
  * Completeness and provenance come from the board.
  */
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { TextArea } from '../../ui/Field';
 import { CriteriaEditor } from './CriteriaEditor';
 import { FIELD_HELP, SheetSection } from './SheetSection';
@@ -39,6 +39,19 @@ export function SheetTab({
   const [drafts, setDrafts] = useState<Partial<Record<SheetField, SheetSuggestion>>>({});
   const [suggesting, setSuggesting] = useState<SheetField | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Edits merge into the latest sheet, not the one of the last render: two fields
+  // blurred before the board comes back must not overwrite each other.
+  const latest = useRef(sheet);
+  const seen = useRef(sheet);
+  if (seen.current !== sheet) {
+    seen.current = sheet;
+    latest.current = sheet;
+  }
+  const save = (change: Partial<TaskSheet>, by?: 'agent') => {
+    latest.current = { ...latest.current, ...change };
+    const next = latest.current;
+    void run(() => saveSheet(projectId, idea.id, next, by));
+  };
 
   const suggest = async (field: SheetField) => {
     setSuggesting(field);
@@ -62,15 +75,14 @@ export function SheetTab({
   const accept = (field: SheetField) => {
     const s = drafts[field];
     if (!s) return;
-    const next: TaskSheet =
-      'text' in s
-        ? { ...sheet, [field]: s.text }
-        : {
-            ...sheet,
-            doneWhen: [...sheet.doneWhen.filter((c) => c.text.trim()), ...s.criteria.map((text) => ({ text }))],
-          };
+    const current = latest.current;
     clear(field);
-    void run(() => saveSheet(projectId, idea.id, next, 'agent'));
+    save(
+      'text' in s
+        ? { [field]: s.text }
+        : { doneWhen: [...current.doneWhen.filter((c) => c.text.trim()), ...s.criteria.map((text) => ({ text }))] },
+      'agent',
+    );
   };
 
   const draftView = (field: SheetField) => {
@@ -123,9 +135,7 @@ export function SheetTab({
             disabled={!editable}
             className="w-full"
             onBlur={(e) => {
-              if (e.target.value !== sheet[field]) {
-                void run(() => saveSheet(projectId, idea.id, { ...sheet, [field]: e.target.value }));
-              }
+              if (e.target.value !== latest.current[field]) save({ [field]: e.target.value });
             }}
           />,
         ),
@@ -136,7 +146,7 @@ export function SheetTab({
         <CriteriaEditor
           criteria={sheet.doneWhen}
           editable={editable}
-          onSave={(doneWhen) => void run(() => saveSheet(projectId, idea.id, { ...sheet, doneWhen }))}
+          onSave={(doneWhen) => save({ doneWhen })}
         />,
       )}
     </div>

@@ -5,19 +5,23 @@ use std::io::{BufRead, IsTerminal, Write};
 
 /// `fennec password`: asks for the remote-access password twice and stores its hash.
 pub fn run() -> Result<(), String> {
+    let hash = ask_new_hash()?;
+    server_config::set_password(&hash)?;
+
+    println!("wrote password to {}", server_config::path().display());
+    println!("open fennec to the network with: fennec remote enable");
+    Ok(())
+}
+
+/// Asks for a new password twice and returns its hash.
+pub fn ask_new_hash() -> Result<String, String> {
     let first = read_password_line("New password: ")?;
     let second = read_password_line("Again: ")?;
     if first != second {
         return Err("passwords do not match".into());
     }
 
-    server_config::set_password(&server_config::new_hash(&first)?)?;
-
-    println!("wrote password to {}", server_config::path().display());
-    println!(
-        "allow remote connections in Settings → Network, or set `listen: 0.0.0.0` in that file"
-    );
-    Ok(())
+    server_config::new_hash(&first)
 }
 
 fn read_password_line(prompt: &str) -> Result<String, String> {
@@ -38,6 +42,8 @@ fn read_password_line(prompt: &str) -> Result<String, String> {
 
     if interactive {
         let _ = std::process::Command::new("stty").arg("echo").status();
+        // The newline the user typed was not echoed either.
+        eprintln!();
     }
 
     if read == 0 {

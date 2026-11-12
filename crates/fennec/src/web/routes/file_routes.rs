@@ -1,4 +1,4 @@
-//! The project file explorer's routes (contract: `docs/api.md`): the tree, a file,
+//! The project file explorer's routes (contract: `docs/devs/api.md`): the tree, a file,
 //! an image's raw bytes, the changed tracked files, a file saved to disk, and one
 //! commit of the ticked files. `session` in a reply says whether the session's
 //! branch was read, or the working tree once that branch is gone.

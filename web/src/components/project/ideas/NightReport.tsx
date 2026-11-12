@@ -124,31 +124,49 @@ export function NightReport({
             return (
               <div
                 key={idea.id}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-1 py-2 ${
+                className={`flex flex-col gap-1 py-2 ${
                   i > 0 ? 'border-t border-border' : ''
                 }`}
               >
-                <span className="shrink-0">
-                  <IdeaStatusBadge status={idea.status} />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-text" title={idea.text}>
-                  {idea.title}
-                </span>
-                <div className="flex flex-wrap items-center gap-1">
-                  <IdeaMeta idea={idea} caps={caps} />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="shrink-0">
+                    <IdeaStatusBadge status={idea.status} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-text" title={idea.text}>
+                    {idea.title}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <IdeaMeta idea={idea} caps={caps} />
+                  </div>
+                  {sid ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      title={t('actionReview')}
+                      aria-label={t('actionReview')}
+                      onClick={() => onOpenSession(sid)}
+                    >
+                      <ReviewIcon className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
-                {sid ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    title={t('reread')}
-                    aria-label={t('reread')}
-                    onClick={() => onOpenSession(sid)}
-                  >
-                    <ReviewIcon className="h-4 w-4" />
-                  </Button>
-                ) : null}
+                {(idea.halted || idea.step || idea.runEnd || idea.decisions.length > 0) && (
+                  <div className="flex flex-col gap-0.5 pl-1 text-xs text-muted">
+                    {idea.halted ? <span className="text-err">{idea.halted}</span> : null}
+                    {idea.runEnd ? <span className="text-err">{idea.runEnd}</span> : null}
+                    {idea.step ? <span>{t('reportStep', { step: idea.step })}</span> : null}
+                    {idea.decisions.length > 0 ? (
+                      <ul className="m-0 list-none p-0">
+                        {idea.decisions.map((decision, j) => (
+                          <li key={j}>
+                            <span className="text-text">{decision.title}</span> → {decision.choice}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                )}
               </div>
             );
           })}

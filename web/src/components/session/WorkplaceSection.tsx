@@ -165,7 +165,7 @@ export function WorkplaceSection({
 
   const terminalButton = (
     <Button
-      variant="ghost"
+      variant="terminal"
       size="sm"
       iconOnly
       onClick={handleOpenTerminal}
@@ -181,7 +181,7 @@ export function WorkplaceSection({
       href={href}
       title={openInEditor}
       aria-label={openInEditor}
-      className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+      className={buttonClass({ variant: 'outline', size: 'sm', iconOnly: true })}
     >
       <ExternalIcon className="h-3.5 w-3.5" />
     </a>
@@ -266,12 +266,11 @@ export function WorkplaceSection({
               {terminalButton}
               {worktree.editorUrl !== null && editorLink(worktree.editorUrl)}
               <Button
-                variant="ghost"
+                variant="danger"
                 size="sm"
                 iconOnly
                 onClick={openDiscard}
                 disabled={running || discarding}
-                className="hover:text-err"
                 title={t('discardWork')}
                 aria-label={t('discardWork')}
               >

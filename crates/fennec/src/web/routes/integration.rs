@@ -1,4 +1,4 @@
-//! The integration routes (contract: `docs/api.md`): preview the session's
+//! The integration routes (contract: `docs/devs/api.md`): preview the session's
 //! branch, integrate it on the human's confirmation, or discard it.
 //! `routes.rs` only dispatches here.
 

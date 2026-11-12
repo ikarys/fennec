@@ -830,7 +830,7 @@
                 </div>
                 <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/ikarys/fennec/main/install.sh | sh">Copy</button>
               </div>
-              <p class="install-note">Linux or macOS, one Rust binary. Windows through WSL2. Then open <code>http://127.0.0.1:7777</code> and follow the <a href="docs/first-run.html">first run guide</a>.</p>
+              <p class="install-note">Linux or macOS, one Rust binary. Windows through WSL2. Then open <code>http://127.0.0.1:7777</code> and follow the <a href="docs/install.html">install guide</a>.</p>
             </div>
           </div>
 
@@ -927,7 +927,9 @@
         <article class="feature">
           <div class="feature-text">
             <h2 id="feature-a-title">The plan is the contract.</h2>
-            <p>The approved plan is a contract. Its "Done when" criteria are checked by commands fennec runs, then fresh agents that did not write the code review it. Findings go back to the builder. Integration stays the human's click after a review gate.</p>
+            <p>Turn an idea into a task and frame it with a sheet you edit like a ticket: objective, context, constraints, out of scope, deliverable, and "Done when" criteria with optional checks. A model can suggest a field or a framing session can draft the plan; each field it wrote stays marked, and you accept or reject.</p>
+            <p>Once approved, the "Done when" criteria are checked by commands fennec runs, then fresh agents that did not write the code review the diff. Integration stays your click after a review gate.</p>
+            <p><a href="docs/tasks.html">Tasks in the guide</a></p>
           </div>
           <div class="feature-media">
             <figure class="window">
@@ -936,7 +938,26 @@
                 <span class="dot"></span>
                 <span class="dot"></span>
               </div>
-              <img src="images/overview.png" alt="The project overview: sessions, tokens, cost, module map and docs" width="1600" height="1000" loading="lazy">
+              <img src="images/task-sheet.png" alt="A task open in the drawer: its sheet with objective, context, constraints and Done when criteria" width="1600" height="1000" loading="lazy">
+            </figure>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature-text">
+            <h2>Read the code, commit what you choose.</h2>
+            <p>Each project has its own editor tab: a file explorer, syntax highlighting, images, and a file that opens for reading until you choose to edit it, then saves itself as you type. The changes panel lists what differs from your last commit; tick files, new ones included, and make one commit on your branch.</p>
+            <p>A terminal and your IDE open from the project and editor pages. They are your tools, outside the sandbox.</p>
+            <p><a href="docs/files.html">Files and the editor in the guide</a></p>
+          </div>
+          <div class="feature-media">
+            <figure class="window">
+              <div class="window-bar" aria-hidden="true">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <img src="images/editor.png" alt="The editor page: the file tree, a Rust file with syntax highlighting, and the changes panel" width="1600" height="1000" loading="lazy">
             </figure>
           </div>
         </article>
@@ -945,6 +966,7 @@
           <div class="feature-text">
             <h2>See where the risk is.</h2>
             <p>Risk zones from git: lines from AI commits never reviewed, files with no test of their own, files changed often. Verified, computed by fennec, not a model.</p>
+            <p><a href="docs/understanding.html">Understanding a project in the guide</a></p>
           </div>
           <div class="feature-media">
             <figure class="window">
@@ -962,6 +984,7 @@
           <div class="feature-text">
             <h2>Ideas run at night, you decide in the morning.</h2>
             <p>Night mode runs your ready ideas unattended, within per-idea caps on time and tokens. ask_user answers itself, the agent records each decision with its reason, and changing the acceptance criteria is refused. In the morning a report lists each idea with its duration, tokens, criteria passed and files changed. Integrating stays your click, one idea at a time.</p>
+            <p><a href="docs/tasks.html">The queue and night mode in the guide</a></p>
           </div>
           <div class="feature-media">
             <figure class="window">
@@ -970,7 +993,7 @@
                 <span class="dot"></span>
                 <span class="dot"></span>
               </div>
-              <img src="images/night-report.png" alt="The Tasks tab after a night: the board, the queue bar and the night report" loading="lazy">
+              <img src="images/night-report.png" alt="The Tasks tab after a night: the board, the queue bar and the night report" width="1600" height="1000" loading="lazy">
             </figure>
           </div>
         </article>
@@ -979,6 +1002,7 @@
           <div class="feature-text">
             <h2>Frugal with tokens.</h2>
             <p>The prompt only grows, so the inference cache is reused turn after turn. Any OpenAI-compatible endpoint works, a local model included. A usage ledger tracks calls and tokens, and budgets cap the month's spend.</p>
+            <p><a href="docs/insight.html">Insight in the guide</a></p>
           </div>
           <div class="feature-media">
             <figure class="window">
@@ -1036,6 +1060,14 @@
           <div>
             <dt>Project understanding</dt>
             <dd>A module map read from imports, written to docs/map.md, plus the ADRs in docs/adr/.</dd>
+          </div>
+          <div>
+            <dt>Decisions at hand</dt>
+            <dd>The plan waiting for you, the model's question, a rule approval or a protected-file waiver sit in one bar above the composer, each with its primary action.</dd>
+          </div>
+          <div>
+            <dt>Remote access, opt-in</dt>
+            <dd>Local by default with no password. <code>fennec remote enable</code> opens it to your network, and never without a password.</dd>
           </div>
           <div>
             <dt>Skills and agents</dt>

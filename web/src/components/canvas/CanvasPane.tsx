@@ -356,7 +356,7 @@ export function CanvasPane({ artifactId, refreshKey, onClose, onAnnotate, onDele
           aria-label={t('canvasDelete')}
           onClick={() => setConfirmOpen(true)}
         >
-          <TrashIcon className="h-4 w-4" />
+          <TrashIcon className="h-3.5 w-3.5" />
         </Button>
         <Button
           variant="ghost"

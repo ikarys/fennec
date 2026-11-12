@@ -1,5 +1,5 @@
-import { Fragment, type ReactNode } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Fragment, useEffect, useRef, type ReactNode } from 'react';
+import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import type { WorkflowEdge, WorkflowNode } from '../../../lib/workflow';
 import { hasInput, outputPorts } from '../../../lib/workflow';
 
@@ -14,6 +14,16 @@ interface NodeFrameProps {
 export function NodeFrame({ node, edges, selected, hasError, children }: NodeFrameProps) {
   const ports = outputPorts(node, edges);
   const input = hasInput(node.kind);
+  // A port that appears (exhausted, a new choice) must be measured, or edges keep the old positions.
+  // Only on a change: measuring at mount would race the editor's first fitView.
+  const updateNodeInternals = useUpdateNodeInternals();
+  const portKey = ports.join('\n');
+  const measuredPorts = useRef(portKey);
+  useEffect(() => {
+    if (measuredPorts.current === portKey) return;
+    measuredPorts.current = portKey;
+    updateNodeInternals(node.id);
+  }, [portKey, node.id, updateNodeInternals]);
   const ring = hasError ? 'ring-2 ring-err' : selected ? 'ring-2 ring-accent' : '';
 
   return (

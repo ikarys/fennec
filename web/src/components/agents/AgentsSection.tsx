@@ -127,8 +127,8 @@ function AgentRow({
         </Button>
       )}
       {agent.editable ? (
-        <Button variant="ghost" iconOnly title={t('delete')} aria-label={t('delete')} disabled={busy} onClick={onDelete}>
-          <TrashIcon className="h-4 w-4" />
+        <Button variant="danger" size="sm" iconOnly title={t('delete')} aria-label={t('delete')} disabled={busy} onClick={onDelete}>
+          <TrashIcon className="h-3.5 w-3.5" />
         </Button>
       ) : (
         <span className="w-7 shrink-0" />
@@ -320,7 +320,8 @@ export function AgentsSection() {
                 <span className="font-mono text-sm">{file.id}</span>
                 <span className="text-xs text-err">{file.error}</span>
                 <Button
-                  variant="ghost"
+                  variant="danger"
+                  size="sm"
                   iconOnly
                   className="ml-auto"
                   title={t('delete')}
@@ -343,7 +344,7 @@ export function AgentsSection() {
                     })
                   }
                 >
-                  <TrashIcon className="h-4 w-4" />
+                  <TrashIcon className="h-3.5 w-3.5" />
                 </Button>
               </li>
             ))}

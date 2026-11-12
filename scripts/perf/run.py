@@ -96,13 +96,13 @@ def main() -> int:
             fake_model.snapshot()[0],
         )
 
-        history_path = REPO_ROOT / "docs" / "perf" / "history.jsonl"
+        history_path = REPO_ROOT / "docs" / "devs" / "perf" / "history.jsonl"
         prev = report_module.previous(history_path, record["machine"], record["mode"])
         report_module.print_terminal(record, prev)
 
         if not args.no_record:
             report_module.append_history(history_path, record)
-            report_module.write_markdown(REPO_ROOT / "docs" / "perf" / "latest.md", record, prev)
+            report_module.write_markdown(REPO_ROOT / "docs" / "devs" / "perf" / "latest.md", record, prev)
 
         return 0
     finally:

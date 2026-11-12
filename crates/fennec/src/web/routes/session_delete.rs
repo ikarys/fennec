@@ -1,4 +1,4 @@
-//! Deleting sessions on the human's request (contract: docs/api.md): the log, the child sessions and the worktree with its branch. The usage ledger keeps the calls. The session's rules go with the session.
+//! Deleting sessions on the human's request (contract: docs/devs/api.md): the log, the child sessions and the worktree with its branch. The usage ledger keeps the calls. The session's rules go with the session.
 
 use crate::chat;
 use crate::domain::project::SessionSummary;

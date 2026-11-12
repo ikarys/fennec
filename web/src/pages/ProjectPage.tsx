@@ -197,20 +197,20 @@ export default function ProjectPage({
             href={editorPath(projectId, null)}
             title={t('editorOpen')}
             aria-label={t('editorOpen')}
-            className={buttonClass({ variant: 'ghost', size: 'sm', iconOnly: true })}
+            className={buttonClass({ variant: 'outline', size: 'sm', iconOnly: true })}
           >
             <EditIcon className="h-4 w-4" />
           </a>
           <ProjectOpenActions projectId={projectId} editorUrl={project.editorUrl} />
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
             iconOnly
             title={t('deleteProjectBtn')}
             aria-label={t('deleteProjectBtn')}
             onClick={() => setDeleting(true)}
           >
-            <TrashIcon className="h-4 w-4" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </Button>
           <Button variant="primary" size="md" onClick={() => onNewSession(projectId)} title={t('newSessionInProject')}>
             <PlusIcon className="h-4 w-4" />

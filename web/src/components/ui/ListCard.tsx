@@ -1,5 +1,5 @@
 /**
- * A list on a surface (docs/ui.md, "Never dull"): a Card whose tinted header row
+ * A list on a surface (docs/devs/ui.md, "Never dull"): a Card whose tinted header row
  * names the list (an optional accent icon tile), says what it holds and counts it. `folded` turns the header
  * into the toggle of a list closed by default (content the human rarely opens).
  * Callers give the rows, styled with `listRowClass`.

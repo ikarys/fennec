@@ -31,7 +31,7 @@ export interface Checked {
   detail: string;
 }
 
-/** The `plan` payload of a `plan.proposed` event (docs/api.md). */
+/** The `plan` payload of a `plan.proposed` event (docs/devs/api.md). */
 export interface PlanProposal {
   title?: string;
   goal?: string;
@@ -40,7 +40,7 @@ export interface PlanProposal {
   risks?: string[];
 }
 
-/** The `report` payload of a `report.submitted` event (docs/api.md). */
+/** The `report` payload of a `report.submitted` event (docs/devs/api.md). */
 export interface ReportProposal {
   title?: string;
   summary?: string;

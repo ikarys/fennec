@@ -40,5 +40,5 @@ in `scripts/licenses.py`. Say why the dependency is needed in the commit body (s
   updated, with the commands you ran and their result), and why any test was deleted, skipped or weakened.
 - Open the pull request against `develop`, with a [Conventional Commits](https://www.conventionalcommits.org)
   title (`feat:`, `fix:`, `docs:`…), in English. It is squashed under that title.
-- Read [AGENTS.md](AGENTS.md) for the architecture, layers and style; [docs/releasing.md](docs/releasing.md)
+- Read [AGENTS.md](AGENTS.md) for the architecture, layers and style; [docs/devs/releasing.md](docs/devs/releasing.md)
   for branches and versions.

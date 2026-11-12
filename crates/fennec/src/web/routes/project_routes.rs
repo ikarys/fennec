@@ -1,4 +1,4 @@
-//! The project page's routes (contract: `docs/api.md`): what fennec reads of a
+//! The project page's routes (contract: `docs/devs/api.md`): what fennec reads of a
 //! project (its map, its ADRs) and the map written to `docs/map.md`.
 //! `routes.rs` only dispatches here.
 

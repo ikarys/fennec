@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { REASONING_EFFORTS, type ModelRef, type ParamSource, type ProviderListing, type ReasoningEffort, type SettingsDefaults } from '../../lib/api';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ChevronDownIcon, CloseIcon, HeartIcon, InfoIcon, PinIcon, StarIcon } from '../ui/Icons';
+import { ChevronDownIcon, HeartIcon, InfoIcon, PinIcon, StarIcon, TrashIcon } from '../ui/Icons';
 import { FieldRow, Select, TextInput } from '../ui/Field';
 import { ModelProbe } from './ModelProbe';
 import {
@@ -157,14 +157,14 @@ export function ModelRow({
         {model === null && (
           <Button
             type="button"
-            variant="ghost"
+            variant="danger"
             size="sm"
             iconOnly
             aria-label={t('removeModel')}
             title={t('removeManualModel')}
             onClick={() => onRemoveModel(providerId, modelId)}
           >
-            <CloseIcon className="h-3 w-3" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </Button>
         )}
 

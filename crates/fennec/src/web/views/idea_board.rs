@@ -1,4 +1,4 @@
-//! A project's ideas board, read side (contract: `docs/api.md`): each idea's
+//! A project's ideas board, read side (contract: `docs/devs/api.md`): each idea's
 //! status from its live session, the queue, the night report. Served by
 //! `idea_routes.rs` per project and gathered by `backlog_routes.rs` across them.
 
@@ -12,6 +12,7 @@ use crate::domain::criteria::CriterionStatus;
 use crate::domain::decision::decisions_in_force;
 use crate::domain::event::Event;
 use crate::domain::project::{Project, SessionState};
+use crate::domain::workflow::definition::NodeKind;
 use crate::domain::workflow::run;
 use crate::store::SqliteStore;
 use crate::web::App;
@@ -113,6 +114,8 @@ fn queue_json(board: &Board) -> Result<Value, String> {
     Ok(json!({
         "running": running,
         "autonomous": autonomous,
+        // The night checkbox starts as the last run left it.
+        "lastAutonomous": board.backlog.last_run.as_ref().is_some_and(|run| run.autonomous),
         "ready": ready,
         "next": next,
         "caps": {
@@ -204,6 +207,8 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         criteria: None,
         decisions: Vec::new(),
         ran_workflow: false,
+        step: None,
+        run_end: None,
     };
     let mut running = false;
     let mut session_state = None;
@@ -307,6 +312,7 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         report.criteria
     };
     let decisions = report.decisions;
+    let (step, run_end) = (report.step, report.run_end);
 
     let (commits, files) = if matches!(status, Status::Review | Status::Halted | Status::Failed)
         && let Some(session_id) = idea.session_id.as_deref()
@@ -348,6 +354,8 @@ fn idea_view(board: &Board, idea: &Idea) -> Result<(Status, Value), String> {
         "tokens": tokens,
         "criteria": criteria,
         "decisions": decisions,
+        "step": step,
+        "runEnd": run_end,
         "commits": commits,
         "files": files,
     });
@@ -417,12 +425,35 @@ pub(crate) struct IdeaReport {
     criteria: Option<CriteriaCounts>,
     decisions: Vec<DecisionView>,
     ran_workflow: bool,
+    step: Option<String>,
+    run_end: Option<String>,
 }
 
 pub(crate) fn idea_report(events: &[Event]) -> IdeaReport {
-    let criteria = run::current_run(events)
-        .map(|state| state.criteria)
+    let state = run::current_run(events);
+    let criteria = state
+        .as_ref()
+        .map(|state| state.criteria.clone())
         .unwrap_or_default();
+    // The last step the run entered, for the morning report.
+    let step = state.as_ref().and_then(|state| {
+        events
+            .iter()
+            .rev()
+            .filter_map(|event| match event {
+                Event::WorkflowNodeStarted {
+                    run_id, node_id, ..
+                } if *run_id == state.run_id => state.workflow.node(node_id),
+                _ => None,
+            })
+            .find(|node| !matches!(node.kind, NodeKind::Start | NodeKind::End { .. }))
+            .map(|node| node.label().to_owned())
+    });
+    let run_end = state
+        .as_ref()
+        .and_then(|state| state.finished.as_ref())
+        .filter(|(outcome, _)| !matches!(outcome, run::RunOutcome::Done))
+        .and_then(|(_, reason)| reason.clone());
     let decisions = decisions_in_force(events);
 
     let mut passed = 0;
@@ -465,6 +496,8 @@ pub(crate) fn idea_report(events: &[Event]) -> IdeaReport {
         },
         decisions,
         ran_workflow,
+        step,
+        run_end,
     }
 }
 

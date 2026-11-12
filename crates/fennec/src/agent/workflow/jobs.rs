@@ -7,7 +7,7 @@ use crate::domain::attachment::Attachment;
 use crate::domain::clock::now_ms;
 use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
-use crate::domain::workflow::definition::{NodeKind, Workflow};
+use crate::domain::workflow::definition::{Node, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, RunOutcome, Via};
 use crate::domain::workflow::validate;
 
@@ -94,7 +94,29 @@ pub(super) fn start_from_plan(
         return Err("the workflow does not start with its plan node".into());
     }
 
-    start_run(turn, workflow, task, false, attachments)?;
+    // A task readied from its sheet starts in an empty session: nothing above
+    // holds the plan the session-context nodes ("Execute the plan above") read.
+    let empty = !turn
+        .log
+        .events(turn.session_id)?
+        .iter()
+        .any(|event| matches!(event, Event::MessageStart { .. }));
+    if empty {
+        turn.append_user(
+            &format!("{task}\n\n{plan}"),
+            false,
+            None,
+            attachments.to_vec(),
+        )?;
+        start_run(turn, workflow, task, false, &[])?;
+    } else {
+        start_run(turn, workflow, task, false, attachments)?;
+    }
+    // Night mode: nobody answers until morning, so every reading the agents
+    // choose must be on record.
+    if turn.autonomous {
+        turn.append_user(NIGHT_NOTE, true, None, vec![])?;
+    }
     let events = turn.log.events(turn.session_id)?;
     let run_id = run::current_run(&events)
         .ok_or("no active workflow run")?
@@ -239,6 +261,28 @@ pub(super) fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Resu
         from: open.node_id.clone(),
         port: choice.to_string(),
     })
+}
+
+const NIGHT_REASON: &str =
+    "The human was away: night mode took the forward choice. Review it before integrating.";
+const NIGHT_NOTE: &str = "Night mode: the human is away until morning and answers nothing. When the task or the plan can be read more than one way, take the safest reading that stays within the plan, record it with record_decision before acting, and go on. The human reviews every decision in the morning.";
+
+/// Night mode's answer to a human node: its first choice, recorded as a
+/// decision so the morning review shows what was validated without the human.
+pub(super) fn answer_by_night(
+    turn: &mut Turn,
+    node: &Node,
+    choices: &[String],
+) -> Result<Cursor, String> {
+    let choice = choices.first().ok_or("the human node has no choice")?;
+    turn.append(Event::DecisionRecorded {
+        call_id: new_id(),
+        title: format!("Night mode answered \"{}\"", node.label()),
+        choice: choice.clone(),
+        reason: NIGHT_REASON.into(),
+        alternatives: choices[1..].to_vec(),
+    })?;
+    answer_human(turn, choice, "")
 }
 
 /// Whether `node_id` is fed by the `done` edge of the `tests` agent node: the

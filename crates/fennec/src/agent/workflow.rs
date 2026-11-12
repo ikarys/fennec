@@ -1,4 +1,4 @@
-//! The workflow engine: walks a run through its graph (docs/workflows.md).
+//! The workflow engine: walks a run through its graph (docs/devs/workflows.md).
 //! The path is decided by domain/workflow/run.rs; this file runs the nodes
 //! and records everything in the session's log.
 
@@ -273,7 +273,7 @@ fn run_node(
     };
     let started = Instant::now();
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
-    if let NodeKind::Human { question, .. } = &node.kind {
+    if let NodeKind::Human { question, choices } = &node.kind {
         let (state, files) = folded_after_start(turn)?;
         turn.append(Event::WorkflowHumanAsked {
             run_id: state.run_id.clone(),
@@ -284,6 +284,11 @@ fn run_node(
                 false,
             ),
         })?;
+        // Night mode: the kernel, never the model, takes the forward choice
+        // and records it as a decision the human reviews in the morning.
+        if turn.autonomous {
+            return jobs::answer_by_night(turn, node, choices).map(Step::Go);
+        }
         return Ok(Step::Exit(DoneReason::WaitingForUser));
     }
 

@@ -139,7 +139,7 @@ export function ProviderCard({
           {!isLocal && (
             <Button
               type="button"
-              variant="ghost"
+              variant="danger"
               size="sm"
               iconOnly
               aria-label={t('removeProvider')}

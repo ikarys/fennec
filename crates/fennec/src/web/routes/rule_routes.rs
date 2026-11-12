@@ -1,4 +1,4 @@
-//! The rules routes (contract: `docs/api.md`): the human manages rules here; no
+//! The rules routes (contract: `docs/devs/api.md`): the human manages rules here; no
 //! agent tool reaches them. The `rules` crate owns the rules; this module only
 //! translates HTTP to its calls.
 

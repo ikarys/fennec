@@ -27,6 +27,7 @@ export function EditorPane({
   editing,
   onEditingChange,
   onSaved,
+  onDirtyChange,
 }: {
   projectId: string;
   path: string;
@@ -34,6 +35,8 @@ export function EditorPane({
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
   onSaved: (path: string) => void;
+  /** The tab's dirty indicator; on unmount it stays on only when a conflict paused the auto-save. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const t = useT();
   const [file, setFile] = useState<ProjectFileView | null>(null);
@@ -74,6 +77,13 @@ export function EditorPane({
   useEffect(() => {
     savingRef.current = saving;
   }, [saving]);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    // On unmount the draft is saved, unless a conflict paused the saves: then
+    // the unsaved changes stay signalled on the tab.
+    return () => onDirtyChange?.(latestRef.current.paused);
+  }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,7 +175,9 @@ export function EditorPane({
       base: latestFile.blob ?? '',
     })
       .then(() => onSaved(path))
-      .catch(() => {});
+      // The pane is gone by the time this settles; the unmount cleanup already
+      // cleared the dot, so a failed save must turn it back on.
+      .catch(() => onDirtyChange?.(true));
   };
 
   useEffect(() => () => unmountRef.current(), []);

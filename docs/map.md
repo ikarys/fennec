@@ -63,8 +63,9 @@ graph LR
   m55["web/src/i18n"]
   m56["crates/fennec"]
   m57["crates/token-usage/tests"]
-  m58["web"]
-  m59["web/scripts"]
+  m58["docs/users/theme"]
+  m59["web"]
+  m60["web/scripts"]
   m14 -->|1| m33
   m14 -->|3| m22
   m14 -->|1| m24
@@ -102,11 +103,11 @@ graph LR
   m13 -->|4| m31
   m13 -->|4| m25
   m19 -->|2| m27
-  m1 -->|5| m14
+  m1 -->|6| m14
   m1 -->|1| m22
   m1 -->|1| m24
   m1 -->|1| m19
-  m1 -->|4| m27
+  m1 -->|5| m27
   m1 -->|2| m31
   m1 -->|2| m20
   m27 -->|2| m33
@@ -248,8 +249,8 @@ graph LR
   m50 -->|2| m52
   m50 -->|3| m54
   m38 -->|1| m48
-  m38 -->|3| m46
-  m38 -->|3| m55
+  m38 -->|4| m46
+  m38 -->|4| m55
   m38 -->|3| m52
   m35 -->|1| m42
   m35 -->|2| m48
@@ -302,16 +303,16 @@ graph LR
   m53 -->|23| m52
   m53 -->|1| m54
   m46 -->|2| m47
-  m46 -->|4| m55
+  m46 -->|5| m55
   m46 -->|2| m52
   m41 -->|7| m46
   m41 -->|1| m44
   m41 -->|1| m45
-  m41 -->|9| m55
+  m41 -->|10| m55
   m41 -->|9| m52
   m44 -->|5| m46
   m44 -->|4| m41
-  m44 -->|4| m55
+  m44 -->|5| m55
   m44 -->|5| m52
   m45 -->|2| m52
   m49 -->|4| m48
@@ -350,19 +351,19 @@ graph LR
 | Module | Files | Tests | Entry point | What it is |
 |---|---|---|---|---|
 | `crates/fennec/src/agent/tool_calls` | 2 | 2 |  | Runs the model's tool calls and records their results. `ask_user` is special: it pauses the turn, so the calls after it in the batch are not run, and the turn ends waiting for the human. `propose_plan` and `submit_report` end the turn the same way: the plan or report is recorded, the calls after it in the batch are not run, and the turn ends complete. |
-| `crates/fennec/src/cli` | 6 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
+| `crates/fennec/src/cli` | 7 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
 | `crates/fennec/src/tools/run_command` | 3 | 2 |  | `run_command`: a shell command run in the working directory, in the sandbox when the human enabled it; what the model reads back is `report`. |
 | `crates/fennec/src/tools/web_fetch` | 5 | 5 |  | `web_fetch`: a web page fetched for the model, by pointer, not by copy: - the page is saved as a file in a cache and the model gets a short, deterministic pointer (path, size, outline, first lines), not the page: it reads the parts it needs with `read_file` or `rg`; - no `format` or `timeout` argument: always Markdown, fixed 30 s timeout; - private, loopback and link-local addresses are refused (SSRF), redirects are followed by hand so each hop is checked. |
-| `crates/fennec/src/web/routes/integration` | 2 | 2 |  | The integration routes (contract: `docs/api.md`): preview the session's branch, integrate it on the human's confirmation, or discard it. `routes.rs` only dispatches here. |
+| `crates/fennec/src/web/routes/integration` | 2 | 2 |  | The integration routes (contract: `docs/devs/api.md`): preview the session's branch, integrate it on the human's confirmation, or discard it. `routes.rs` only dispatches here. |
 | `crates/fennec/src/web` | 9 | 6 |  | Web adapter: the server behind the UI. std only, one thread per connection, bound to the configured address. |
-| `crates/fennec/src/web/routes` | 37 | 19 |  | The JSON API (contract: `docs/api.md`) and the UI's pages. |
+| `crates/fennec/src/web/routes` | 37 | 19 |  | The JSON API (contract: `docs/devs/api.md`) and the UI's pages. |
 | `crates/fennec/src/plugins` | 4 | 4 |  | The plugin manager: one sandboxed host per activated plugin, for the server's lifetime. Plugins are global: a host sees every session of every project. It starts hosts on demand, feeds them events, and serves the block data they emit. The core renders those blocks; a plugin never writes a session log and nothing of it runs in fennec's process. |
 | `crates/fennec/src/web/os` | 5 | 1 |  | The human's own tools opened from the UI, and the project's dev servers. |
 | `crates/fennec/src/web/streams` | 3 | 1 |  | Server-Sent Event streams: a session's events and the human's notices. |
 | `crates/fennec/src/web/views/run_view` | 2 | 2 |  | The server-side run view: the run the server serves pre-calculated, so the UI renders it as it is. |
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
 | `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
-| `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
+| `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
 | `crates/fennec/src` | 28 | 20 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
 | `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |
@@ -382,12 +383,12 @@ graph LR
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
 | `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
 | `crates/token-usage/src` | 5 | 5 | yes | Append-only SQLite ledger for LLM calls. |
-| `crates/backlog/src` | 9 | 8 | yes | A fennec-free backlog of ideas. |
+| `crates/backlog/src` | 10 | 9 | yes | A fennec-free backlog of ideas. |
 | `web/src` | 2 | 0 | yes |  |
 | `web/src/components/layout` | 10 | 0 |  |  |
 | `web/src/pages` | 12 | 0 |  |  |
 | `web/src/components/agents` | 2 | 0 |  |  |
-| `web/src/components/editor` | 4 | 0 |  |  |
+| `web/src/components/editor` | 5 | 0 |  |  |
 | `web/src/components/project` | 24 | 0 |  |  |
 | `web/src/components/project/ideas` | 17 | 0 |  |  |
 | `web/src/components/workflow` | 12 | 0 |  |  |
@@ -401,11 +402,12 @@ graph LR
 | `web/src/components/workflow/session` | 8 | 0 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
-| `web/src/lib` | 47 | 17 |  |  |
+| `web/src/lib` | 49 | 18 |  |  |
 | `web/src/components/settings` | 26 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
 | `web/src/i18n` | 3 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
 | `crates/token-usage/tests` | 1 | 1 |  |  |
+| `docs/users/theme` | 2 | 0 |  |  |
 | `web` | 1 | 0 |  |  |
-| `web/scripts` | 1 | 0 |  |  |
+| `web/scripts` | 2 | 0 |  |  |

@@ -104,12 +104,16 @@ evidence:
 
 # The project site and its user guide, as GitHub Pages serves them, on :8080 (needs mdbook)
 site:
-    mdbook build docs/guide -d ../../site/docs
+    mdbook build docs/users -d ../../site/docs
     python3 -m http.server -d site 8080
 
 # The user guide alone, rebuilt on save, on :3000
 guide:
-    mdbook serve docs/guide
+    mdbook serve docs/users
+
+# The user guide's annotated screenshots, from a blank fennec (needs a release build and a model endpoint: DOC_SHOTS_MODEL_URL)
+shots:
+    cd web && node scripts/doc-shots.mjs
 
 # Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
 setup:

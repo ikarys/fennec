@@ -1,5 +1,109 @@
 # Changelog
 
+## [0.3.0](https://github.com/ikarys/fennec/compare/v0.2.3...v0.3.0) (2026-11-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* settings sub-pages, framed pages, split tabs and clearer plan/report cards ([#319](https://github.com/ikarys/fennec/issues/319))
+
+### Features
+
+* a click on a run step scrolls the thread to it ([#304](https://github.com/ikarys/fennec/issues/304)) ([46c009a](https://github.com/ikarys/fennec/commit/46c009a6b72c99b732b0b57d52499840dc7fc81b))
+* a decision bar above the composer for the pending plan ([#287](https://github.com/ikarys/fennec/issues/287)) ([3932e92](https://github.com/ikarys/fennec/commit/3932e92d8e2ae2049da9d7a2b1622878e1af7806))
+* a file explorer on the project page, linked from the report card and the right panel ([#320](https://github.com/ikarys/fennec/issues/320)) ([32bef09](https://github.com/ikarys/fennec/commit/32bef091e3a73aef0781d332ce6d48acaeac2e76))
+* a short sound when something new needs the human ([#332](https://github.com/ikarys/fennec/issues/332)) ([b95d86d](https://github.com/ikarys/fennec/commit/b95d86db9cb337d72e8568d597d5ed7370948b49))
+* add header tab to file editor ([225b7e2](https://github.com/ikarys/fennec/commit/225b7e29ef526e4ed3c8d946a24f25b5ab6a116e))
+* add header tab to file editor; enlarge the About emblem ([392c025](https://github.com/ikarys/fennec/commit/392c02569371df603b8d33a27ddbeb4be63c9d6b))
+* **backlog:** add the task sheet and fold its edits ([#359](https://github.com/ikarys/fennec/issues/359)) ([a2a11c4](https://github.com/ikarys/fennec/commit/a2a11c47fe3e62a2b5563f075e0febcce7bbf9d5))
+* blocking decisions join the decision bar ([#289](https://github.com/ikarys/fennec/issues/289)) ([d6709b2](https://github.com/ikarys/fennec/commit/d6709b2cf9b002c3a4f704ad1086a58a20ce9e5e))
+* choose the IDE the open-in-editor links target ([#293](https://github.com/ikarys/fennec/issues/293)) ([4ae1b41](https://github.com/ikarys/fennec/commit/4ae1b41d2c4861dd27d6bc64d6ddea09610ffd57))
+* **cli:** open the server to the network with `fennec remote` ([#379](https://github.com/ikarys/fennec/issues/379)) ([be2723c](https://github.com/ikarys/fennec/commit/be2723c9f7fda920ee022bc8474fd77730b817a9))
+* commit new files from the editor's changes panel ([#356](https://github.com/ikarys/fennec/issues/356)) ([a8855bd](https://github.com/ikarys/fennec/commit/a8855bdab9b9bcf3cb42d34c9c83c91253d4a6f8))
+* configurable keyboard shortcuts for the main pages and agents ([#333](https://github.com/ikarys/fennec/issues/333)) ([496a897](https://github.com/ikarys/fennec/commit/496a89792c4c0e85c5fb2c62e9eec49180c5f9f3))
+* edit a task sheet in a drawer from the board ([#362](https://github.com/ikarys/fennec/issues/362)) ([5c877fa](https://github.com/ikarys/fennec/commit/5c877fa37061c8ad9e5728563e29f137d696c0df))
+* editor reads by default, autosaves while editing, resets a file; session files open their diff ([#322](https://github.com/ikarys/fennec/issues/322)) ([252888f](https://github.com/ikarys/fennec/commit/252888fcd04e5d7ec7a5bb8a934285f885b91f01))
+* every page opens on the same header, and counts pluralise themselves ([#309](https://github.com/ikarys/fennec/issues/309)) ([906e751](https://github.com/ikarys/fennec/commit/906e751f87dc79c9fa4f9e7ff230aa5419fde127))
+* fennec service status and uninstall ([#284](https://github.com/ikarys/fennec/issues/284)) ([6f08a16](https://github.com/ikarys/fennec/commit/6f08a16df869ccc38ea96d0431044e8d5c00b188))
+* frame a task with its sheet: plan sections, apply to the sheet, sheet notices ([#361](https://github.com/ikarys/fennec/issues/361)) ([2b4da76](https://github.com/ikarys/fennec/commit/2b4da76cfbfe5ddb557eb26dbc7fb71c8eaa2fe5))
+* just perf measures fennec on a scripted session workload ([#329](https://github.com/ikarys/fennec/issues/329)) ([0cf3702](https://github.com/ikarys/fennec/commit/0cf3702906f9528d8dfb66b44b714f9f12c74d24))
+* let the human pick how the agents write (agent style) ([#374](https://github.com/ikarys/fennec/issues/374)) ([8c1749c](https://github.com/ikarys/fennec/commit/8c1749c2c4f200a752a51f27fb56d009c30912db))
+* make turn into a task the draft's primary action, frame in the menu ([#364](https://github.com/ikarys/fennec/issues/364)) ([c733457](https://github.com/ikarys/fennec/commit/c733457c2fe16114eee644f2299016b2d6f9dea4))
+* open a terminal and the IDE from the project and editor pages ([#357](https://github.com/ikarys/fennec/issues/357)) ([7ddfc24](https://github.com/ikarys/fennec/commit/7ddfc2497e5b2ad383ceca7896e1cd020299b94f))
+* pick the reasoning effort per session, among the efforts the model accepts ([#334](https://github.com/ikarys/fennec/issues/334)) ([f39e160](https://github.com/ikarys/fennec/commit/f39e1608ff37f9cc952d314043e8a1db7cc00acb))
+* plugins can show fennec's own RAM and CPU in a footer the human toggles ([#308](https://github.com/ikarys/fennec/issues/308)) ([e15daf2](https://github.com/ikarys/fennec/commit/e15daf220c35b823d0c6ff5595a7bcf6a7195a9d))
+* plugins get rail tabs of their own ([#297](https://github.com/ikarys/fennec/issues/297)) ([d76d43e](https://github.com/ikarys/fennec/commit/d76d43e85245687a43c43ecf2aef679469dd4bf6))
+* Question answers keep their sources folded away ([#283](https://github.com/ikarys/fennec/issues/283)) ([469b660](https://github.com/ikarys/fennec/commit/469b66062f51b953557ce6e3a138b84e311a947d))
+* save, ready and suggest a task sheet from the API ([#360](https://github.com/ikarys/fennec/issues/360)) ([7eb301c](https://github.com/ikarys/fennec/commit/7eb301c38999618af282d67652d279351a9ffaf8))
+* settings sub-pages, framed pages, split tabs and clearer plan/report cards ([#319](https://github.com/ikarys/fennec/issues/319)) ([08c73ef](https://github.com/ikarys/fennec/commit/08c73ef5c88def818862619319c375b6b76f898e))
+* the "New idea" button shows on every Tasks sub-tab ([#285](https://github.com/ikarys/fennec/issues/285)) ([0984ebd](https://github.com/ikarys/fennec/commit/0984ebdba27a2b3ddec7086919caf09cde01611d))
+* the agent's proposals join the decision bar ([#291](https://github.com/ikarys/fennec/issues/291)) ([e6f2bb0](https://github.com/ikarys/fennec/commit/e6f2bb00cd85d8d6a499b24d287c66aae22c9d5f))
+* the changes page greets an empty diff with a state, not a blank header ([#312](https://github.com/ikarys/fennec/issues/312)) ([dd95571](https://github.com/ikarys/fennec/commit/dd955719a8de3d12377fef2c5da8344dbbb886ba))
+* the composer shows the effort a turn will use, not "auto" ([#337](https://github.com/ikarys/fennec/issues/337)) ([6a32d7e](https://github.com/ikarys/fennec/commit/6a32d7e934b54e8cec51f3e82b256b0dbfc591cb))
+* the context detail moves into the Session drawer ([#298](https://github.com/ikarys/fennec/issues/298)) ([db6a8fb](https://github.com/ikarys/fennec/commit/db6a8fba1675149196a71a7c4b99c206b1b7b537))
+* the context panel becomes a rail of three drawers ([#294](https://github.com/ikarys/fennec/issues/294)) ([968c538](https://github.com/ikarys/fennec/commit/968c5387fb6cbbbb2b149a0c48486b304b0145cc))
+* the display tab aligns its settings in two columns and uses switches ([#315](https://github.com/ikarys/fennec/issues/315)) ([cac96a0](https://github.com/ikarys/fennec/commit/cac96a0dc34da1fb01c65c26ddb10115660a5567))
+* the drawer sections explain themselves behind an info icon ([#296](https://github.com/ikarys/fennec/issues/296)) ([4cb2ecc](https://github.com/ikarys/fennec/commit/4cb2eccbcaa38a027412fc36140c6ec286619626))
+* the editor shows images and gets a tab per project ([#325](https://github.com/ikarys/fennec/issues/325)) ([7f3bd47](https://github.com/ikarys/fennec/commit/7f3bd475e070397a109afdd5bf9a2e7023789790))
+* the extensions tab aligns its lists and turns row actions into icons ([#313](https://github.com/ikarys/fennec/issues/313)) ([fa3c04d](https://github.com/ikarys/fennec/commit/fa3c04d89ebc8b337cc917dabc81c4f5d663c3ab))
+* the file editor gets its own page, with syntax highlighting and one commit for many files ([#321](https://github.com/ikarys/fennec/issues/321)) ([3b48ce8](https://github.com/ikarys/fennec/commit/3b48ce815b8a71474c5d4d16e54b8c8443fbabd7))
+* the header groups its actions and splits into one file per part ([#307](https://github.com/ikarys/fennec/issues/307)) ([bc2f27f](https://github.com/ikarys/fennec/commit/bc2f27fdd95aad56971bf93c273302feeef40370))
+* the model probe button reads "Auto config" ([#336](https://github.com/ikarys/fennec/issues/336)) ([6b4820e](https://github.com/ikarys/fennec/commit/6b4820e635b798ed819742b81b63edb06f688ca1))
+* the models tab marks providers with a tile and counts their models in pills ([#314](https://github.com/ikarys/fennec/issues/314)) ([e35e77f](https://github.com/ikarys/fennec/commit/e35e77f69aaaf22603ddffd41f11dbffc98f5bae))
+* the plugin rail tabs follow what the active plugins declare ([#302](https://github.com/ikarys/fennec/issues/302)) ([e2bde26](https://github.com/ikarys/fennec/commit/e2bde26102e2cb8cce68d01c20b36ff71d2aa2d0))
+* the project page opens on the shared page header ([#316](https://github.com/ikarys/fennec/issues/316)) ([3fad75d](https://github.com/ikarys/fennec/commit/3fad75de3a54d5c4a5ab3e4968fa674f6c062179))
+* the run bar becomes a side rail with a run drawer, like the context bar ([#303](https://github.com/ikarys/fennec/issues/303)) ([e757e00](https://github.com/ikarys/fennec/commit/e757e002312ca357d65de605c10385f078d3a28c))
+* the session header groups its actions and binds compaction to the context gauge ([#327](https://github.com/ikarys/fennec/issues/327)) ([e715878](https://github.com/ikarys/fennec/commit/e7158780989411c00f7d09279f15058bca37e7f4))
+* the tasks page tints its table and colours its counts ([#311](https://github.com/ikarys/fennec/issues/311)) ([9329fce](https://github.com/ikarys/fennec/commit/9329fced8f3b0f262fdd1a112e764d869e31d079))
+* the UI shows a connection-lost page when the server goes away ([#330](https://github.com/ikarys/fennec/issues/330)) ([117c84a](https://github.com/ikarys/fennec/commit/117c84ac7011fa043f1b7dc3b931bbc87b810a05))
+* the waiting workflow and the retry join the decision bar ([#290](https://github.com/ikarys/fennec/issues/290)) ([99acea3](https://github.com/ikarys/fennec/commit/99acea3ac4997df6101fd3062d3ffe6e25b3473e))
+* the workflows page lists its graphs on a tinted card ([#310](https://github.com/ikarys/fennec/issues/310)) ([e03a920](https://github.com/ikarys/fennec/commit/e03a9209431414dd157c3207650b662aa9e9155e))
+* **web:** move Try and canvases to the side rail ([#368](https://github.com/ikarys/fennec/issues/368)) ([49227e4](https://github.com/ikarys/fennec/commit/49227e42ee49326e8147c659f0d1a61d0a6328f5))
+
+
+### Bug Fixes
+
+* a divider separates the brand from the session tabs in the header ([#318](https://github.com/ikarys/fennec/issues/318)) ([5b9a75c](https://github.com/ikarys/fennec/commit/5b9a75c6ac0a3475a08ebcd245136d65fca84c6b))
+* a plan proposed inside a run never waits in the decision bar ([#292](https://github.com/ikarys/fennec/issues/292)) ([a4d7817](https://github.com/ikarys/fennec/commit/a4d7817d44ecd91c094fd24abc26b0ba64c5b893))
+* a session's modified files open where they can be read, not an empty diff ([#323](https://github.com/ikarys/fennec/issues/323)) ([3308517](https://github.com/ikarys/fennec/commit/33085175cad5d05cfed2d332c5f3851bf41d6d20))
+* make the model's answers easier to read ([#282](https://github.com/ikarys/fennec/issues/282)) ([20a587f](https://github.com/ikarys/fennec/commit/20a587f53ff759d3e9696eec1bdb01ec577c5099))
+* remote access always needs a password, and the sandbox CSP is tested ([#342](https://github.com/ikarys/fennec/issues/342)) ([17c1a9b](https://github.com/ikarys/fennec/commit/17c1a9b4b71798a94b3326d4daddf22199fbd60b))
+* serve the criteria bar's percentage from the server ([#351](https://github.com/ikarys/fennec/issues/351)) ([a2d70f7](https://github.com/ikarys/fennec/commit/a2d70f71cffe1b1d15f4ce5b0072d1cc6b221134))
+* start readied tasks without a session and rework the docs for 0.3.0 ([#380](https://github.com/ikarys/fennec/issues/380)) ([ea5b504](https://github.com/ikarys/fennec/commit/ea5b5047d233d02fc0ec97b18656ae99ab8cd292))
+* the connection-lost page shows its fennec once the server is gone ([#331](https://github.com/ikarys/fennec/issues/331)) ([374d148](https://github.com/ikarys/fennec/commit/374d148c6b9d39ade8d7f0f6cc1225712cf49527))
+* the context rail is pinned by default ([#306](https://github.com/ikarys/fennec/issues/306)) ([03129ee](https://github.com/ikarys/fennec/commit/03129ee73179b260adc63e87550713425d1f2d5e))
+* the Contributions tab leaves out branches already squashed in ([#286](https://github.com/ikarys/fennec/issues/286)) ([cf26582](https://github.com/ikarys/fennec/commit/cf265821fcc5ee24b2f99df769ad9a1d408502da))
+* the copy button follows the answer's stats line ([#300](https://github.com/ikarys/fennec/issues/300)) ([5d6ea28](https://github.com/ikarys/fennec/commit/5d6ea283cf8a5160d7b37e32fb70889b25e9a292))
+* the editor colours justfiles as shell ([#324](https://github.com/ikarys/fennec/issues/324)) ([c2c85a4](https://github.com/ikarys/fennec/commit/c2c85a4bd507f7c3c9c971410ce9d76fd8679f07))
+* the footer shows itself when a plugin places a block, the version is back by the brand ([#317](https://github.com/ikarys/fennec/issues/317)) ([a097f82](https://github.com/ikarys/fennec/commit/a097f82dd23152bbb6d0aaf476c38e4c435db1e2))
+* the model's answers take the thread column's full width ([#301](https://github.com/ikarys/fennec/issues/301)) ([832f26c](https://github.com/ikarys/fennec/commit/832f26c13fd1de3d4c13c4961fa2f7ae8eecde2a))
+* the run rail drops its step dots ([#305](https://github.com/ikarys/fennec/issues/305)) ([10a266c](https://github.com/ikarys/fennec/commit/10a266c78f723defc88133992c69c7a4f845d931))
+* the server never takes a sandboxed command for the human ([#340](https://github.com/ikarys/fennec/issues/340)) ([5d828ce](https://github.com/ikarys/fennec/commit/5d828ce81c1cf92b1f31d3496e75a8a057955657))
+* the servers' terminal joins the toolbar above the list ([#295](https://github.com/ikarys/fennec/issues/295)) ([2dbc933](https://github.com/ikarys/fennec/commit/2dbc933367f444a1fbb8f08eedcfd7e8ceab4184))
+* the thread's scrollbar sits beside its column ([#299](https://github.com/ikarys/fennec/issues/299)) ([221ff8c](https://github.com/ikarys/fennec/commit/221ff8cf64e437702032a0a3c2edfb319f9174e4))
+* **web:** fold a report row's explanation by default ([#367](https://github.com/ikarys/fennec/issues/367)) ([bdcf40b](https://github.com/ikarys/fennec/commit/bdcf40b26909f6c14af6dc80c7802804c99e9500))
+* **web:** give the server editor labels, a header and Enter to save ([#369](https://github.com/ikarys/fennec/issues/369)) ([4f9ac3b](https://github.com/ikarys/fennec/commit/4f9ac3b41fc5a87bbce46a542b2d587b6d2af056))
+* **web:** let a chat switch agents like any session ([#366](https://github.com/ikarys/fennec/issues/366)) ([70d8f63](https://github.com/ikarys/fennec/commit/70d8f6374ae1444464626cd992b7e6f604ed263b))
+* **web:** make notice sounds audible and playable from settings ([6dad5c6](https://github.com/ikarys/fennec/commit/6dad5c6ebe373ae685d3c2b64bbbdc85c8671d6c))
+* **web:** make notice sounds audible and playable from settings ([#371](https://github.com/ikarys/fennec/issues/371)) ([601345a](https://github.com/ikarys/fennec/commit/601345ad004cbdfd816fa53ca8a4dc866d09a077))
+* **web:** offer to resolve a conflict from the integration dialog ([#370](https://github.com/ikarys/fennec/issues/370)) ([2fa10b2](https://github.com/ikarys/fennec/commit/2fa10b298c579d8f942d4fbf6d88913682742672))
+* **web:** show a turn-into-task button on a board row ([#363](https://github.com/ikarys/fennec/issues/363)) ([504e9b4](https://github.com/ikarys/fennec/commit/504e9b4b2a029985e57c4f3a20a3f5d8878ca4f5))
+* **web:** spin the suggest button while the model writes ([#365](https://github.com/ikarys/fennec/issues/365)) ([83ced18](https://github.com/ikarys/fennec/commit/83ced18ebaa58ba5e5823594b69de42565477254))
+* **workflow:** keep the run going after an approval inside an agent node ([#373](https://github.com/ikarys/fennec/issues/373)) ([6911dbc](https://github.com/ikarys/fennec/commit/6911dbc97fa6562a8b2bf909466c2cee5dfa742c))
+
+
+### Performance
+
+* faster pages, a lighter insight query, a state pill and compact token tooltips ([#328](https://github.com/ikarys/fennec/issues/328)) ([3f4c385](https://github.com/ikarys/fennec/commit/3f4c385d0f9184b6ff82ea80a771502008ed870c))
+* the home page shows its last figures at once instead of flashing "Loading" ([9a793c6](https://github.com/ikarys/fennec/commit/9a793c6f3d4253974223e944aede5df35c411633))
+* the home page shows its last figures at once instead of flashing Loading ([#326](https://github.com/ikarys/fennec/issues/326)) ([9a793c6](https://github.com/ikarys/fennec/commit/9a793c6f3d4253974223e944aede5df35c411633))
+
+
+### Reverts
+
+* split [#371](https://github.com/ikarys/fennec/issues/371) back into its two changes ([6d0a7dd](https://github.com/ikarys/fennec/commit/6d0a7dd29d2f56d364e01e1ea507414bcb0d6a67))
+* split [#371](https://github.com/ikarys/fennec/issues/371) back into its two changes ([496be5e](https://github.com/ikarys/fennec/commit/496be5e6079af44ea76e454a453af3ef0e3e8096))
+
 ## [0.2.3](https://github.com/ikarys/fennec/compare/v0.2.2...v0.2.3) (2026-11-09)
 
 

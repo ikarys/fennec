@@ -20,10 +20,17 @@ export function CriteriaEditor({
 }) {
   const t = useT();
   const [rows, setRows] = useState(criteria);
-  useEffect(() => setRows(criteria), [criteria]);
+  // Resync on a content change only: a board refreshed by an earlier save of another field
+  // brings the same criteria again and must not drop a row being typed.
+  const incoming = JSON.stringify(criteria);
+  useEffect(() => setRows(JSON.parse(incoming) as SheetCriterion[]), [incoming]);
 
+  // The rows update at once, so the next blur builds on this edit, not on the last board.
   // A row added but never typed is not saved.
-  const save = (next: SheetCriterion[]) => onSave(next.filter((row) => row.text.trim()));
+  const save = (next: SheetCriterion[]) => {
+    setRows(next);
+    onSave(next.filter((row) => row.text.trim()));
+  };
   const change = (index: number, next: SheetCriterion) => save(rows.map((row, i) => (i === index ? next : row)));
 
   return (
@@ -52,7 +59,7 @@ export function CriteriaEditor({
             }}
           />
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
             iconOnly
             title={t('criterionRemove')}
@@ -60,7 +67,7 @@ export function CriteriaEditor({
             disabled={!editable}
             onClick={() => save(rows.filter((_, j) => j !== i))}
           >
-            <TrashIcon className="h-4 w-4" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
       ))}
