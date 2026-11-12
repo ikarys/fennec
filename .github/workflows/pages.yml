@@ -30,9 +30,9 @@ jobs:
           echo "9ef07fd288ba58ff3b99d1c94e6d414d431c9a61fdb20348e5beb74b823d546b  mdbook.tar.gz" | sha256sum -c -
           tar -xzf mdbook.tar.gz
           ./mdbook build docs/users -d ../../site/docs
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
