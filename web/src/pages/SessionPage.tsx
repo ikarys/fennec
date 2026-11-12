@@ -115,6 +115,7 @@ export function SessionPage({
       testWorkflowId,
       frameIdeaId,
       framingIdea,
+      mode: sessionId ? detail?.mode : null,
     });
   // A chat has no folder: it starts in `builder` (talk, act on request), not
   // in the project's framing agent, and the header shows "Chat".

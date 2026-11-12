@@ -1,5 +1,6 @@
 import { ChoiceMenu } from '../../ui/ChoiceMenu';
 import { useT } from '../../../i18n';
+import type { Agent } from '../../../lib/api';
 import type { WorkflowSummary } from '../../../lib/workflow';
 
 export interface WorkflowSelection {
@@ -13,11 +14,18 @@ export const DEFAULT_WORKFLOW_ID = 'plan-build-verify';
 /** 'No workflow' is a value of its own, so the menu can select it. */
 const NONE = '';
 
-export function defaultWorkflowSelection(workflows: WorkflowSummary[]): WorkflowSelection {
+/**
+ * The workflow the next message starts unless the human picks another: the
+ * agent's own default (none for an agent that only talks), the project's
+ * default while the agent is unknown.
+ */
+export function defaultWorkflowSelection(
+  workflows: WorkflowSummary[],
+  agent?: Agent,
+): WorkflowSelection {
+  const wanted = agent ? agent.workflow : DEFAULT_WORKFLOW_ID;
   return {
-    workflowId: workflows.some((workflow) => workflow.id === DEFAULT_WORKFLOW_ID)
-      ? DEFAULT_WORKFLOW_ID
-      : null,
+    workflowId: wanted && workflows.some((workflow) => workflow.id === wanted) ? wanted : null,
     stepByStep: false,
     worktree: true
   };

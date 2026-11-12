@@ -137,6 +137,15 @@ impl McpTool {
 }
 
 impl McpServer {
+    /// The access the server declared for one of its tools when it listed
+    /// them; `Undeclared` for a tool it did not list.
+    pub fn tool_access(&self, tool: &str) -> ToolAccess {
+        self.cached_tools
+            .iter()
+            .find(|cached| cached.name == tool)
+            .map_or(ToolAccess::Undeclared, McpTool::access)
+    }
+
     /// The problems with this server's config, empty when it is usable.
     pub fn problems(&self) -> Vec<String> {
         let mut out = Vec::new();
