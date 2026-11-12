@@ -81,6 +81,7 @@ lands, add its paragraph to `docs/devs/components.md`.
 ```bash
 just dev      # server + Vite dev server on :5173
 just check    # the gate before any commit: fmt, clippy -D warnings, tests, UI lint, UI tests, UI build
+just test     # the Rust tests of every crate (UI tests: `just test-web`)
 just secrets  # gitleaks over the history
 just setup    # once per clone: the git hooks
 ```

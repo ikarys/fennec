@@ -28,7 +28,9 @@ a compaction, not cut by a replay), folded from the log.
 Workflows, done (`docs/devs/workflows.md`): graphs of agent, shell, human,
 condition, parallel/join nodes wired by named ports, drawn in a React Flow
 editor; loops capped per edge, pauses on edges or step by step; the run is
-folded from `workflow.*` events; fresh agents and branches in child sessions.
+folded from `workflow.*` events; fresh agents and branches in child sessions;
+a fresh agent's question is answered in its child, and the parent run resumes
+on its own once the child completes.
 The default workflow runs the criteria checks, verifies in a fresh context
 (`verify`, `review` sub-agents) and sends the findings back to the builder.
 Preview: ```html and ```md blocks of a message, and the .html/.md files an
@@ -86,7 +88,10 @@ integrating stays the human's click.
 Night mode, done: an "autonome" box runs the queue with the human away (`Turn::autonomous`): `ask_user` answers
 itself (the agent decides and records it), `propose_criteria` is refused; per-idea caps on duration and tokens
 (Settings, "Mode nuit") stop an idea and the queue goes on (`idea.halted`); each started idea shows its criteria
-and the decisions taken, for the morning. Each queue run is recorded (`idea.queue_started`, `idea.queue_finished`, a
+and the decisions taken, for the morning. A workflow human node is answered by the kernel with its first
+(forward) choice through `answer_human` (criteria and test freeze as on a click) and recorded as a decision; a task
+whose text, plan or sheet names a risk (`backlog::risks`: delete tests, publish, delete data, push, credentials) is
+halted unstarted; the report shows each idea's reached step, run end and decisions. Each queue run is recorded (`idea.queue_started`, `idea.queue_finished`, a
 restart closes it); the board (groups by stage, one next action per idea, the night report until read) is computed by
 the server.
 Risk zones, done (C11): a "Risques" tab on the project page lists the source files that churn, have

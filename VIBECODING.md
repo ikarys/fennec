@@ -15,7 +15,7 @@ convention:
   status: active
   tools:
     - "Claude Code:claude-opus-5-5"
-    - "Claude Code:claude-fable-5-1"
+    - "Claude Code:claude-sonnet-5-5"
     - "local:qwen3.8-27b"
     - "fennec:qwen3.8-27b"
   attribution_trailers: [Assisted-by]
@@ -47,7 +47,7 @@ version 0.1 at level 2. How each quality claim is checked is in
 ## AI assistance
 
 Most of fennec's code and text is AI-written. The maintainer frames each change,
-reads it and decides; Claude Code (Opus, Fable) reviews and fixes; a local model
+reads it and decides; Claude Code (Opus, Sonnet) reviews and fixes; a local model
 (qwen3.8-27b) writes bulk code, called from Claude Code (`local:`) or from fennec
 itself (`fennec:`). Every AI-written commit carries an `Assisted-by: <tool>:<model>`
 trailer.

@@ -17,6 +17,10 @@ use std::time::Duration;
 struct FakeChildren {
     calls: Mutex<Vec<String>>,
     replies: Mutex<Vec<String>>,
+    /// The end reason of each `send`, popped from the back; Complete when empty.
+    reasons: Mutex<Vec<DoneReason>>,
+    /// The answers to `last_run`, popped from the back; a completed "last" when empty.
+    last_runs: Mutex<Vec<AgentRun>>,
 }
 
 impl ChildSessions for FakeChildren {
@@ -38,10 +42,21 @@ impl ChildSessions for FakeChildren {
             .unwrap()
             .push(format!("send:{child}:{agent}:{prompt}"));
         let text = self.replies.lock().unwrap().pop().unwrap_or_default();
-        Ok(AgentRun {
+        let reason = self
+            .reasons
+            .lock()
+            .unwrap()
+            .pop()
+            .unwrap_or(DoneReason::Complete);
+        Ok(AgentRun { reason, text })
+    }
+
+    fn last_run(&self, child: &str) -> Result<AgentRun, String> {
+        self.calls.lock().unwrap().push(format!("last_run:{child}"));
+        Ok(self.last_runs.lock().unwrap().pop().unwrap_or(AgentRun {
             reason: DoneReason::Complete,
-            text,
-        })
+            text: "last".into(),
+        }))
     }
 }
 
@@ -726,73 +741,7 @@ fn shell_success_and_failure() {
 
 #[test]
 fn human_node() {
-    let workflow = Workflow {
-        id: "w".into(),
-        name: "w".into(),
-        description: String::new(),
-        max_steps: 50,
-        nodes: vec![
-            Node {
-                id: "start".into(),
-                name: None,
-                position: Position::default(),
-                kind: NodeKind::Start,
-            },
-            Node {
-                id: "approve".into(),
-                name: Some("Approve".into()),
-                position: Position::default(),
-                kind: NodeKind::Human {
-                    question: "Go on {{task}}?".into(),
-                    choices: vec!["Go".into()],
-                },
-            },
-            Node {
-                id: "a".into(),
-                name: Some("Agent".into()),
-                position: Position::default(),
-                kind: NodeKind::Agent {
-                    agent: "plan".into(),
-                    prompt: "do it".into(),
-                    retry_prompt: None,
-                    outputs: vec!["done".into()],
-                    context: AgentContext::Session,
-                    verdicts: false,
-                },
-            },
-            Node {
-                id: "end".into(),
-                name: None,
-                position: Position::default(),
-                kind: NodeKind::End {
-                    outcome: EndOutcome::Done,
-                },
-            },
-        ],
-        edges: vec![
-            Edge {
-                from: "start".into(),
-                port: "next".into(),
-                to: "approve".into(),
-                max_passes: None,
-                pause: false,
-            },
-            Edge {
-                from: "approve".into(),
-                port: "Go".into(),
-                to: "a".into(),
-                max_passes: None,
-                pause: false,
-            },
-            Edge {
-                from: "a".into(),
-                port: "done".into(),
-                to: "end".into(),
-                max_passes: None,
-                pause: false,
-            },
-        ],
-    };
+    let workflow = approval_workflow(vec!["Go".into()]);
 
     let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
     let stop = AtomicBool::new(false);
@@ -852,6 +801,140 @@ fn human_node() {
             is_system_generated: true,
             ..
         } if content.ends_with("Human comment: careful"))));
+}
+
+fn approval_workflow(choices: Vec<String>) -> Workflow {
+    let first = choices.first().expect("a choice");
+    let mut edges = vec![
+        Edge {
+            from: "start".into(),
+            port: "next".into(),
+            to: "approve".into(),
+            max_passes: None,
+            pause: false,
+        },
+        Edge {
+            from: "approve".into(),
+            port: first.clone(),
+            to: "a".into(),
+            max_passes: None,
+            pause: false,
+        },
+        Edge {
+            from: "a".into(),
+            port: "done".into(),
+            to: "end".into(),
+            max_passes: None,
+            pause: false,
+        },
+    ];
+    for choice in choices.iter().skip(1) {
+        edges.push(Edge {
+            from: "approve".into(),
+            port: choice.clone(),
+            to: "end".into(),
+            max_passes: None,
+            pause: false,
+        });
+    }
+    Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "approve".into(),
+                name: Some("Approve".into()),
+                position: Position::default(),
+                kind: NodeKind::Human {
+                    question: "Go on {{task}}?".into(),
+                    choices,
+                },
+            },
+            Node {
+                id: "a".into(),
+                name: Some("Agent".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "do it".into(),
+                    retry_prompt: None,
+                    outputs: vec!["done".into()],
+                    context: AgentContext::Session,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges,
+    }
+}
+
+#[test]
+fn night_mode_answers_a_human_node_with_its_first_choice() {
+    let workflow = approval_workflow(vec!["Go".into(), "Revise".into()]);
+
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let reason = run_workflow(
+        &mut h.turn_autonomous(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "go".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            Event::WorkflowNodeFinished {
+                node_id,
+                port,
+                comment,
+                ..
+            } if node_id == "approve" && port == "Go" && comment.is_none()
+        )
+    }));
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            Event::DecisionRecorded {
+                title,
+                choice,
+                alternatives,
+                ..
+            } if title.contains("Approve")
+                && choice == "Go"
+                && alternatives == &vec!["Revise".to_string()]
+        )
+    }));
 }
 
 #[test]
@@ -1345,6 +1428,7 @@ fn parallel_branches() {
     let children = FakeChildren {
         calls: Mutex::new(Vec::new()),
         replies: Mutex::new(vec!["result a".into(), "result b".into()]),
+        ..FakeChildren::default()
     };
     let commands = FakeCommands::default();
     let env = WorkflowEnv {
@@ -2089,6 +2173,41 @@ fn validating_the_tests_records_the_written_test_files() {
 }
 
 #[test]
+fn night_mode_validates_the_tests_like_a_click() {
+    let stop = AtomicBool::new(false);
+    let mut h = Harness::new(
+        Box::new(Scripted(RefCell::new(vec![]))),
+        PathBuf::from("/tmp"),
+        &stop,
+    );
+    for event in events_with_open_tests_gate("r") {
+        EventLog::append(&h.log, "s", &event).unwrap();
+    }
+    let choices = ["Validate".to_string(), "Rework".to_string()];
+    let node = Node {
+        id: "approve-tests".into(),
+        name: Some("Validate the tests".into()),
+        position: Position::default(),
+        kind: NodeKind::Human {
+            question: "Validate?".into(),
+            choices: choices.to_vec(),
+        },
+    };
+    super::jobs::answer_by_night(&mut h.turn_autonomous(), &node, &choices).unwrap();
+
+    let events = EventLog::events(&h.log, "s").unwrap();
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::DecisionRecorded { choice, .. } if choice == "Validate"
+    )));
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, Event::TestsApproved { .. }))
+    );
+}
+
+#[test]
 fn reworking_the_tests_records_nothing() {
     let events = answer_test_gate("Rework");
     assert!(
@@ -2189,4 +2308,240 @@ fn approval_in_a_session_agent_node_finishes_the_node_and_walks_on() {
 
     let _ = std::fs::remove_dir_all(&workdir);
     let _ = std::fs::remove_dir_all(&outside);
+}
+
+fn fresh_workflow(outputs: Vec<String>, loops: bool) -> Workflow {
+    let mut edges = vec![
+        Edge {
+            from: "start".into(),
+            port: "next".into(),
+            to: "verify".into(),
+            max_passes: None,
+            pause: false,
+        },
+        Edge {
+            from: "verify".into(),
+            port: outputs[0].clone(),
+            to: "end".into(),
+            max_passes: None,
+            pause: false,
+        },
+    ];
+    if loops {
+        edges.push(Edge {
+            from: "verify".into(),
+            port: outputs[1].clone(),
+            to: "verify".into(),
+            max_passes: Some(3),
+            pause: false,
+        });
+    }
+    Workflow {
+        id: "wf".into(),
+        name: "wf".into(),
+        description: String::new(),
+        max_steps: 10,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "verify".into(),
+                name: Some("Verify".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "verify".into(),
+                    retry_prompt: None,
+                    outputs,
+                    context: AgentContext::Fresh,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges,
+    }
+}
+
+#[test]
+fn a_fresh_child_that_asks_keeps_the_run_open_and_resumes_on_the_same_child() {
+    let stop = AtomicBool::new(false);
+    let model = Scripted(RefCell::new(vec![reply("unused", vec![])]));
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let children = FakeChildren {
+        replies: Mutex::new(vec!["asked".into()]),
+        reasons: Mutex::new(vec![DoneReason::WaitingForUser]),
+        last_runs: Mutex::new(vec![AgentRun {
+            reason: DoneReason::Complete,
+            text: "verified".into(),
+        }]),
+        ..FakeChildren::default()
+    };
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let workflow = fresh_workflow(vec!["ok".into()], false);
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: workflow.clone(),
+            task: "go".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+    let events = h.log.0.borrow().clone();
+    let state = run::current_run(&events).unwrap();
+    assert!(state.finished.is_none());
+    let open = state
+        .open
+        .iter()
+        .find(|open| open.node_id == "verify")
+        .unwrap();
+    let child_id = open.child_session_id.clone().unwrap();
+    assert_eq!(
+        run::waiting(&state, &events),
+        Some(run::Waiting::ChildQuestion)
+    );
+    assert!(run::waits_on_child(&events, &child_id));
+
+    let reason = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+    let calls = children.calls.lock().unwrap();
+    assert!(calls.contains(&format!("last_run:{child_id}")));
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.starts_with("create:"))
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.starts_with("send:"))
+            .count(),
+        1
+    );
+    let events = h.log.0.borrow().clone();
+    let finished = events
+        .iter()
+        .find(|event| matches!(event, Event::WorkflowNodeFinished { node_id, .. } if node_id == "verify"))
+        .unwrap();
+    let Event::WorkflowNodeFinished { output, .. } = finished else {
+        panic!("expected node finished");
+    };
+    assert!(output.contains("verified"));
+}
+
+#[test]
+fn a_new_pass_of_a_fresh_node_gets_a_new_child() {
+    let stop = AtomicBool::new(false);
+    let model = Scripted(RefCell::new(vec![reply("unused", vec![])]));
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let children = FakeChildren {
+        replies: Mutex::new(vec![
+            "work\nOutcome: done".into(),
+            "work\nOutcome: again".into(),
+        ]),
+        ..FakeChildren::default()
+    };
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let workflow = fresh_workflow(vec!["done".into(), "again".into()], true);
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "go".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+    let calls = children.calls.lock().unwrap();
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.starts_with("create:"))
+            .count(),
+        2
+    );
+    assert!(!calls.iter().any(|call| call.starts_with("last_run:")));
+}
+
+#[test]
+fn a_failed_fresh_child_is_not_reused_on_resume() {
+    let stop = AtomicBool::new(false);
+    let model = Scripted(RefCell::new(vec![reply("unused", vec![])]));
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let children = FakeChildren {
+        replies: Mutex::new(vec!["fixed".into(), "broken".into()]),
+        reasons: Mutex::new(vec![DoneReason::Complete, DoneReason::Error]),
+        last_runs: Mutex::new(vec![AgentRun {
+            reason: DoneReason::Error,
+            text: String::new(),
+        }]),
+        ..FakeChildren::default()
+    };
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let workflow = fresh_workflow(vec!["ok".into()], false);
+    run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: workflow.clone(),
+            task: "go".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    let reason = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+    let calls = children.calls.lock().unwrap();
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|call| call.starts_with("create:"))
+            .count(),
+        2
+    );
+    let events = h.log.0.borrow().clone();
+    let finished = events
+        .iter()
+        .find(|event| matches!(event, Event::WorkflowNodeFinished { node_id, .. } if node_id == "verify"))
+        .unwrap();
+    let Event::WorkflowNodeFinished { port, .. } = finished else {
+        panic!("expected node finished");
+    };
+    assert_eq!(port, "ok");
 }

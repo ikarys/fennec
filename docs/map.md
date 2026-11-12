@@ -98,6 +98,7 @@ graph LR
   m24 -->|1| m27
   m24 -->|1| m31
   m24 -->|1| m29
+  m13 -->|1| m22
   m13 -->|3| m24
   m13 -->|3| m27
   m13 -->|4| m31
@@ -153,8 +154,9 @@ graph LR
   m5 -->|2| m24
   m5 -->|1| m13
   m5 -->|4| m27
-  m5 -->|1| m31
+  m5 -->|2| m31
   m5 -->|1| m29
+  m5 -->|1| m25
   m5 -->|1| m7
   m5 -->|1| m21
   m5 -->|3| m20
@@ -383,7 +385,7 @@ graph LR
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
 | `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
 | `crates/token-usage/src` | 5 | 5 | yes | Append-only SQLite ledger for LLM calls. |
-| `crates/backlog/src` | 9 | 8 | yes | A fennec-free backlog of ideas. |
+| `crates/backlog/src` | 10 | 9 | yes | A fennec-free backlog of ideas. |
 | `web/src` | 2 | 0 | yes |  |
 | `web/src/components/layout` | 10 | 0 |  |  |
 | `web/src/pages` | 12 | 0 |  |  |
@@ -405,7 +407,7 @@ graph LR
 | `web/src/lib` | 49 | 18 |  |  |
 | `web/src/components/settings` | 26 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
-| `web/src/i18n` | 3 | 1 |  |  |
+| `web/src/i18n` | 5 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
 | `crates/token-usage/tests` | 1 | 1 |  |  |
 | `docs/users/theme` | 2 | 0 |  |  |

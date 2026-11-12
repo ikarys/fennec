@@ -15,7 +15,7 @@ use crate::store::SqliteStore;
 use crate::web::App;
 use crate::web::turns::Job;
 use crate::workflows::find;
-use backlog::{Backlog, BacklogEvent, Caps, Idea, IdeaState, next_ready};
+use backlog::{Backlog, BacklogEvent, Caps, Idea, IdeaState, next_ready, risks};
 use token_usage::{Filter, Ledger};
 
 /// The workflow an idea is built with: the plan card's "Construire" default.
@@ -196,6 +196,29 @@ fn run_queue_loop(
         let Some(idea) = next_ready(&backlog) else {
             return Ok("no idea ready");
         };
+
+        // Night mode never starts what nobody should run unattended: the human
+        // reads why in the morning and restarts it while there.
+        if autonomous {
+            let found = risks(idea);
+            if !found.is_empty() {
+                let asks = found
+                    .iter()
+                    .map(|risk| risk.label())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                store.append_idea_event(
+                    project_id,
+                    &BacklogEvent::Halted {
+                        idea_id: idea.id.clone(),
+                        reason: format!(
+                            "not started in night mode: the task asks to {asks}; restart it while you are here",
+                        ),
+                    },
+                )?;
+                continue;
+            }
+        }
 
         let session_id = match start_idea(app, &store, &project, idea, autonomous, false) {
             Ok(session_id) => session_id,

@@ -6,7 +6,7 @@ import { useT } from '../../../i18n';
 import type { RunWaiting } from '../../../lib/runView';
 import { DecisionRow } from '../../session/DecisionBar';
 import { PauseIcon, StopIcon } from '../../ui/Icons';
-import { Button } from '../../ui/Button';
+import { Button, buttonClass } from '../../ui/Button';
 import { TextArea } from '../../ui/Field';
 import { splitTitle } from '../../../lib/titleLine';
 
@@ -63,9 +63,11 @@ export function RunDecision({
       ? humanTitle
       : waiting.kind === 'pause'
         ? t('runActionCardPausedBefore', { toLabel: waiting.toLabel })
-        : waiting.kind === 'interrupted'
-          ? t('runActionCardInterruptedQuestion')
-          : t('runActionCardRelaunchQuestion');
+        : waiting.kind === 'child'
+          ? t('runActionCardChildAsked', { label: waiting.label })
+          : waiting.kind === 'interrupted'
+            ? t('runActionCardInterruptedQuestion')
+            : t('runActionCardRelaunchQuestion');
 
   const firstChoiceButton = firstChoice !== undefined ? (
     <Button
@@ -130,14 +132,25 @@ export function RunDecision({
     </Button>
   );
 
+  const childButton = waiting.kind === 'child' ? (
+    <a
+      href={`#/s/${waiting.childSessionId}`}
+      className={buttonClass({ variant: 'primary', size: 'sm' }, 'shrink-0')}
+    >
+      {t('runActionCardOpenChild')}
+    </a>
+  ) : null;
+
   const primary: ReactNode =
     waiting.kind === 'human'
       ? firstChoiceButton
       : waiting.kind === 'pause'
         ? continueButton
-        : waiting.kind === 'interrupted'
-          ? resumeButton
-          : relaunchButton;
+        : waiting.kind === 'child'
+          ? childButton
+          : waiting.kind === 'interrupted'
+            ? resumeButton
+            : relaunchButton;
 
   const commentField = (
     <TextArea
@@ -171,8 +184,8 @@ export function RunDecision({
   const footer: ReactNode =
     waiting.kind === 'human' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {humanChoices
           .slice()
           .reverse()
@@ -194,14 +207,20 @@ export function RunDecision({
       </>
     ) : waiting.kind === 'pause' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {continueButton}
+      </>
+    ) : waiting.kind === 'child' ? (
+      <>
+        <span className="flex-1" />
+        {stopButton}
+        {childButton}
       </>
     ) : waiting.kind === 'interrupted' ? (
       <>
-        {stopButton}
         <span className="flex-1" />
+        {stopButton}
         {resumeButton}
       </>
     ) : (

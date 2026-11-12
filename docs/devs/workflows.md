@@ -132,7 +132,12 @@ sends `retryPrompt` when set, else `prompt` again.
 button per choice and a comment field. While a run waits at a human node
 or a pause, a typed message is refused: the human answers, or stops the
 run. An ask_user inside an agent node is answered as usual, then the run
-goes on.
+goes on. In a fresh node, the question stays in the child session: the node
+stays open, the parent waits (a message typed there gets 409), and the human
+answers in the child. When the child's turn then completes, the parent's run
+resumes on its own on the same child and walks on with its answer. Only a
+child whose last turn completed or asked is reused; a failed or stopped
+child, or a new pass of the node, gets a new child.
 
 **Criteria node.** No model. It reads the "Done when" list of the plan
 node's latest output: each bullet is a criterion (`C1`, `C2`…), and one that

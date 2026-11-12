@@ -11,7 +11,7 @@ mod outcome;
 #[cfg(test)]
 mod tests;
 
-use super::ports::{ChildSessions, Commands};
+use super::ports::{AgentRun, ChildSessions, Commands};
 use super::turn::{self, Turn};
 use crate::domain::attachment::Attachment;
 use crate::domain::clock::now_ms;
@@ -242,6 +242,32 @@ fn continue_agent_node(
     }
 }
 
+/// The child a fresh agent node resumes on, with the turn it ended on: the
+/// node was interrupted in a child whose last turn completed (the human
+/// answered its question) or still waits for the human. A child that failed
+/// or was stopped is not reused: the node starts over in a new one, as does
+/// any new pass.
+fn resumed_child(
+    env: &WorkflowEnv,
+    state: &RunState,
+    node_id: &str,
+) -> Result<Option<(String, AgentRun)>, String> {
+    let Some(child) = state
+        .interrupted
+        .iter()
+        .find(|open| open.node_id == node_id)
+        .and_then(|open| open.child_session_id.clone())
+    else {
+        return Ok(None);
+    };
+    let run = env.children.last_run(&child)?;
+    Ok(matches!(
+        run.reason,
+        DoneReason::Complete | DoneReason::WaitingForUser
+    )
+    .then_some((child, run)))
+}
+
 fn run_node(
     turn: &mut Turn,
     env: &WorkflowEnv,
@@ -260,12 +286,16 @@ fn run_node(
         .find(|open| open.node_id == node_id)
         .map(|open| open.pass)
         .unwrap_or_else(|| state.node_passes.get(node_id).copied().unwrap_or(0) + 1);
-    // A fresh agent's child is created first, so its start names it.
-    let child = match &node.kind {
-        NodeKind::Agent {
-            context: AgentContext::Fresh,
-            ..
-        } => Some(
+    let mut resumed = resumed_child(env, state, node_id)?;
+    let child = match (&node.kind, &resumed) {
+        (_, Some((child, _))) => Some(child.clone()),
+        (
+            NodeKind::Agent {
+                context: AgentContext::Fresh,
+                ..
+            },
+            None,
+        ) => Some(
             env.children
                 .create(turn.session_id, &nodes::child_title(state, node))?,
         ),
@@ -273,7 +303,7 @@ fn run_node(
     };
     let started = Instant::now();
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
-    if let NodeKind::Human { question, .. } = &node.kind {
+    if let NodeKind::Human { question, choices } = &node.kind {
         let (state, files) = folded_after_start(turn)?;
         turn.append(Event::WorkflowHumanAsked {
             run_id: state.run_id.clone(),
@@ -284,6 +314,11 @@ fn run_node(
                 false,
             ),
         })?;
+        // Night mode: the kernel, never the model, takes the forward choice
+        // and records it as a decision the human reviews in the morning.
+        if turn.autonomous {
+            return jobs::answer_by_night(turn, node, choices).map(Step::Go);
+        }
         return Ok(Step::Exit(DoneReason::WaitingForUser));
     }
 
@@ -303,7 +338,11 @@ fn run_node(
     };
     let end = match (&node.kind, child.as_deref()) {
         (NodeKind::Agent { agent, outputs, .. }, Some(child)) => {
-            nodes::fresh_agent(env, &input, agent, outputs, child)?
+            if let Some((_, run)) = resumed.take() {
+                nodes::child_end(env, &input, agent, outputs, child, run)?
+            } else {
+                nodes::fresh_agent(env, &input, agent, outputs, child)?
+            }
         }
         (NodeKind::Agent { agent, outputs, .. }, None) => {
             session_agent(turn, &input, agent, outputs)?
