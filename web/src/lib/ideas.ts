@@ -1,6 +1,6 @@
 /**
  * Project ideas backlog.
- * Contract: docs/api.md.
+ * Contract: docs/devs/api.md.
  */
 import { request } from './api';
 import type { FileAttachmentInput } from './attachments';

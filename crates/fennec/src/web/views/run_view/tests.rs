@@ -675,7 +675,7 @@ mod route {
 }
 
 // The plan's contract on the UI side: the client-side run fold is deleted,
-// the run components render the server's view as it is, and docs/api.md
+// the run components render the server's view as it is, and docs/devs/api.md
 // documents the server-side run view.
 mod ui_contract {
     use std::path::{Path, PathBuf};
@@ -751,22 +751,22 @@ mod ui_contract {
 
     #[test]
     fn the_api_docs_describe_the_server_side_run_view() {
-        let api = read("docs/api.md");
+        let api = read("docs/devs/api.md");
         assert!(
             api.contains("workflow/run/view"),
-            "docs/api.md must name the run view route"
+            "docs/devs/api.md must name the run view route"
         );
         assert!(
             api.contains("rounds"),
-            "docs/api.md must document the rounds field"
+            "docs/devs/api.md must document the rounds field"
         );
         assert!(
             api.contains("upcoming"),
-            "docs/api.md must document the upcoming field"
+            "docs/devs/api.md must document the upcoming field"
         );
         assert!(
             api.contains("counts"),
-            "docs/api.md must document the counts field"
+            "docs/devs/api.md must document the counts field"
         );
     }
 }

@@ -302,16 +302,16 @@ graph LR
   m53 -->|23| m52
   m53 -->|1| m54
   m46 -->|2| m47
-  m46 -->|4| m55
+  m46 -->|5| m55
   m46 -->|2| m52
   m41 -->|7| m46
   m41 -->|1| m44
   m41 -->|1| m45
-  m41 -->|9| m55
+  m41 -->|10| m55
   m41 -->|9| m52
   m44 -->|5| m46
   m44 -->|4| m41
-  m44 -->|4| m55
+  m44 -->|5| m55
   m44 -->|5| m52
   m45 -->|2| m52
   m49 -->|4| m48
@@ -353,16 +353,16 @@ graph LR
 | `crates/fennec/src/cli` | 7 | 1 |  | Terminal adapter: run a turn in the current directory, list sessions, replay one, compact one. |
 | `crates/fennec/src/tools/run_command` | 3 | 2 |  | `run_command`: a shell command run in the working directory, in the sandbox when the human enabled it; what the model reads back is `report`. |
 | `crates/fennec/src/tools/web_fetch` | 5 | 5 |  | `web_fetch`: a web page fetched for the model, by pointer, not by copy: - the page is saved as a file in a cache and the model gets a short, deterministic pointer (path, size, outline, first lines), not the page: it reads the parts it needs with `read_file` or `rg`; - no `format` or `timeout` argument: always Markdown, fixed 30 s timeout; - private, loopback and link-local addresses are refused (SSRF), redirects are followed by hand so each hop is checked. |
-| `crates/fennec/src/web/routes/integration` | 2 | 2 |  | The integration routes (contract: `docs/api.md`): preview the session's branch, integrate it on the human's confirmation, or discard it. `routes.rs` only dispatches here. |
+| `crates/fennec/src/web/routes/integration` | 2 | 2 |  | The integration routes (contract: `docs/devs/api.md`): preview the session's branch, integrate it on the human's confirmation, or discard it. `routes.rs` only dispatches here. |
 | `crates/fennec/src/web` | 9 | 6 |  | Web adapter: the server behind the UI. std only, one thread per connection, bound to the configured address. |
-| `crates/fennec/src/web/routes` | 37 | 19 |  | The JSON API (contract: `docs/api.md`) and the UI's pages. |
+| `crates/fennec/src/web/routes` | 37 | 19 |  | The JSON API (contract: `docs/devs/api.md`) and the UI's pages. |
 | `crates/fennec/src/plugins` | 4 | 4 |  | The plugin manager: one sandboxed host per activated plugin, for the server's lifetime. Plugins are global: a host sees every session of every project. It starts hosts on demand, feeds them events, and serves the block data they emit. The core renders those blocks; a plugin never writes a session log and nothing of it runs in fennec's process. |
 | `crates/fennec/src/web/os` | 5 | 1 |  | The human's own tools opened from the UI, and the project's dev servers. |
 | `crates/fennec/src/web/streams` | 3 | 1 |  | Server-Sent Event streams: a session's events and the human's notices. |
 | `crates/fennec/src/web/views/run_view` | 2 | 2 |  | The server-side run view: the run the server serves pre-calculated, so the UI renders it as it is. |
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
 | `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
-| `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
+| `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
 | `crates/fennec/src` | 28 | 20 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
 | `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |

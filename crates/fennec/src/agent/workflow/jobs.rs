@@ -94,7 +94,24 @@ pub(super) fn start_from_plan(
         return Err("the workflow does not start with its plan node".into());
     }
 
-    start_run(turn, workflow, task, false, attachments)?;
+    // A task readied from its sheet starts in an empty session: nothing above
+    // holds the plan the session-context nodes ("Execute the plan above") read.
+    let empty = !turn
+        .log
+        .events(turn.session_id)?
+        .iter()
+        .any(|event| matches!(event, Event::MessageStart { .. }));
+    if empty {
+        turn.append_user(
+            &format!("{task}\n\n{plan}"),
+            false,
+            None,
+            attachments.to_vec(),
+        )?;
+        start_run(turn, workflow, task, false, &[])?;
+    } else {
+        start_run(turn, workflow, task, false, attachments)?;
+    }
     let events = turn.log.events(turn.session_id)?;
     let run_id = run::current_run(&events)
         .ok_or("no active workflow run")?

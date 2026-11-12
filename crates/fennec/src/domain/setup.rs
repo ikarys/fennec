@@ -49,11 +49,20 @@ pub enum SandboxFact {
     Off,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitFact {
+    Ready,
+    Missing,
+    /// No user.name / user.email: fennec commits the agent's work under the
+    /// human's identity, so every commit would fail.
+    NoIdentity,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Facts {
     pub model: ModelFact,
     pub sandbox: SandboxFact,
-    pub git: bool,
+    pub git: GitFact,
     pub projects: usize,
     pub scanners_found: usize,
     pub scanners_known: usize,
@@ -116,18 +125,24 @@ pub fn checks(facts: &Facts) -> Vec<Check> {
         },
     };
 
-    let git = if facts.git {
-        Check {
+    let git = match facts.git {
+        GitFact::Ready => Check {
             id: CheckId::Git,
             status: CheckStatus::Ok,
             detail: None,
-        }
-    } else {
-        Check {
+        },
+        GitFact::Missing => Check {
             id: CheckId::Git,
             status: CheckStatus::Todo,
             detail: Some("git is not on PATH".to_owned()),
-        }
+        },
+        GitFact::NoIdentity => Check {
+            id: CheckId::Git,
+            status: CheckStatus::Todo,
+            detail: Some(
+                "git has no identity: run git config --global user.name \"Your Name\" and git config --global user.email you@example.com".to_owned(),
+            ),
+        },
     };
 
     let project = if facts.projects == 0 {
@@ -181,7 +196,7 @@ mod tests {
                 base_url: "http://localhost".into(),
             },
             sandbox: SandboxFact::Ready,
-            git: true,
+            git: GitFact::Ready,
             projects: 1,
             scanners_found: 4,
             scanners_known: 4,
@@ -263,6 +278,16 @@ mod tests {
         let checks = checks(&facts);
         assert_eq!(checks[3].status, CheckStatus::Todo);
         assert_eq!(checks[3].detail.as_deref(), Some("no project opened yet"));
+        assert!(!complete(&checks));
+    }
+
+    #[test]
+    fn git_without_identity_is_todo() {
+        let mut facts = good();
+        facts.git = GitFact::NoIdentity;
+        let checks = checks(&facts);
+        assert_eq!(checks[2].status, CheckStatus::Todo);
+        assert!(checks[2].detail.as_deref().unwrap().contains("user.email"));
         assert!(!complete(&checks));
     }
 

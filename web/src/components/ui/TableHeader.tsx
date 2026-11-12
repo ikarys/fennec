@@ -1,5 +1,5 @@
 /**
- * The column headings above a list's rows (docs/ui.md, "Never dull"): the tinted
+ * The column headings above a list's rows (docs/devs/ui.md, "Never dull"): the tinted
  * row a table-like Card opens with. Callers give the cells, sized like the rows'.
  */
 import type { ReactNode } from 'react';

@@ -82,7 +82,7 @@ export default function App() {
     document.documentElement.style.fontSize = `${(16 * displayPrefs.fontSize) / defaultDisplayPrefs.fontSize}px`;
   }, [displayPrefs.fontSize]);
 
-  const projectDialog = useProjectDialog(language, refreshProjects);
+  const projectDialog = useProjectDialog(language, refreshProjects, navigate);
   const { openProjectDialog } = projectDialog;
   const { tabInfos, tabInfo, closeTab, pickTab, handleSessionsDeleted, adoptSession } = useTabNavigation(
     tabState,

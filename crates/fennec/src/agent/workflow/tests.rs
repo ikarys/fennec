@@ -1512,6 +1512,12 @@ fn start_from_plan_records_the_plan_and_runs_the_criteria() {
     assert_eq!(reason, DoneReason::Complete);
 
     let events = h.log.0.into_inner();
+    // The session was empty: the plan lands in the thread for the builder.
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::MessageStart { role: crate::domain::event::Role::User, content: Some(content), .. }
+            if content.starts_with("do it") && content.contains("C1 — check")
+    )));
     assert!(events.iter().any(|e| matches!(
         e,
         Event::WorkflowNodeFinished {

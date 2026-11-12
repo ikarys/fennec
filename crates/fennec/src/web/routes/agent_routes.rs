@@ -1,4 +1,4 @@
-//! The agent routes (contract: `docs/api.md`): the human manages their own
+//! The agent routes (contract: `docs/devs/api.md`): the human manages their own
 //! agents here; no agent tool reaches them. `crate::agents` owns discovery and
 //! the CRUD, this module only translates HTTP to its calls.
 //!

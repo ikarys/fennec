@@ -1,4 +1,4 @@
-//! The Settings routes (contract: docs/api.md): the stored preferences and what each provider lists.
+//! The Settings routes (contract: docs/devs/api.md): the stored preferences and what each provider lists.
 //! `routes.rs` only dispatches here.
 
 use crate::domain::mcp;

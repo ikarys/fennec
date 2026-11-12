@@ -1,7 +1,7 @@
-//! The first-run checklist's facts, read from the machine: the default model's endpoint, the sandbox, PATH, the store.
+//! The first-run checklist's facts, read from the machine: the default model's endpoint, the sandbox, git and its identity, the store.
 
 use crate::config::Settings;
-use crate::domain::setup::{Facts, ModelFact, SandboxFact};
+use crate::domain::setup::{Facts, GitFact, ModelFact, SandboxFact};
 use crate::sandbox::{SandboxHealth, probe};
 use crate::store::SqliteStore;
 use llm_providers_connector::list_models;
@@ -36,8 +36,21 @@ pub fn facts(settings: &Settings, store: &SqliteStore) -> Result<Facts, String> 
         }
     };
 
-    let git = crate::scanners::find("git").is_some();
-    let projects = store.projects()?.len();
+    let git = if crate::scanners::find("git").is_none() {
+        GitFact::Missing
+    } else if crate::git::run(&std::env::temp_dir(), &["var", "GIT_COMMITTER_IDENT"], None).is_err()
+    {
+        // The very check `git commit` makes before it refuses an empty identity.
+        GitFact::NoIdentity
+    } else {
+        GitFact::Ready
+    };
+    // The chat's scratch project is not one the human opened.
+    let projects = store
+        .projects()?
+        .iter()
+        .filter(|project| !crate::chat::is_chat(project))
+        .count();
     let scanners_found = crate::domain::scanner::SCANNERS
         .iter()
         .filter(|scanner| crate::scanners::find(scanner.binary).is_some())

@@ -112,7 +112,7 @@ export function QueueBar({
             title={t('nightCapsTitle')}
             aria-label={t('nightCapsTitle')}
             onClick={() => {
-              window.location.hash = '#/settings';
+              window.location.hash = '#/settings/autonomy';
             }}
           >
             <SettingsIcon className="h-4 w-4" />

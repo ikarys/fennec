@@ -1,13 +1,14 @@
 import { Fragment, type CSSProperties } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import type { WorkflowEdge } from '../../lib/workflow';
+import { useT } from '../../i18n';
 import { EDGE_COLORS, edgeDash, type FlowEdge } from './flow';
 
 // The port is already labelled on its node: the edge only shows what it adds.
-function edgeLabel(edge: WorkflowEdge): string {
+function edgeLabel(edge: WorkflowEdge, t: ReturnType<typeof useT>): string {
   const parts = [];
-  if (edge.maxPasses != null) parts.push(`≤ ${edge.maxPasses} passages`);
-  if (edge.pause) parts.push('pause');
+  if (edge.maxPasses != null) parts.push(t('edgeMaxPassesBadge', { count: edge.maxPasses }));
+  if (edge.pause) parts.push(t('edgePauseBadge'));
   return parts.join(' · ');
 }
 
@@ -47,7 +48,8 @@ function WorkflowEdgeBase({
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected, markerEnd } = props;
   const edge = data?.edge;
   const style = data?.style ?? 'forward';
-  const label = edge ? edgeLabel(edge) : '';
+  const t = useT();
+  const label = edge ? edgeLabel(edge, t) : '';
   const pathParams = { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition };
   const [path, labelX, labelY] =
     pathType === 'loop'
