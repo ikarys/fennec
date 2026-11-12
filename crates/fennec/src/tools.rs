@@ -215,7 +215,14 @@ impl Toolbox for LocalTools {
     fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_> {
         let redirected = self.redirected(name, args);
         let args = redirected.as_ref().map_or(args, |(a, _, _)| a);
-        rule_request::check(&self.rules, &self.workdir, self.home.as_deref(), name, args)
+        rule_request::check(
+            &self.rules,
+            &self.workdir,
+            self.home.as_deref(),
+            &self.protection,
+            name,
+            args,
+        )
     }
 
     fn mcp_tool_names(&self) -> Vec<String> {

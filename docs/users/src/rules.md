@@ -59,7 +59,7 @@ Protected files are refused to the file tools and mounted read-only in the sandb
 
 You can add paths to `.agents/protected`. In the integration dialog, **Protect the integrated tests ({count})** appends the integrated test files to `.agents/protected`.
 
-If an agent needs a protected file, it can request a waiver. The **Waiver** card shows the reason and asks you to **Grant** or **Refuse**. A grant exempts exactly that path, in that session, for 1, 8, or 24 hours, and writes a MADR file to the session's `docs/adr/`.
+If an agent needs a protected file, it can request a waiver. The **Waiver** card shows the reason and asks you to **Grant** or **Refuse**. A grant exempts exactly that path, in that session, for 1, 8, or 24 hours, and writes a MADR file to the session's `docs/adr/`. It also overrides a path rule that blocks that path, for the file tools. When a Block write rule covers the whole project folder, commands still cannot write it.
 
 ## Limits
 
