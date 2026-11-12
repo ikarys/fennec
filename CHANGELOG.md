@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/ikarys/fennec/compare/v0.4.0...v0.4.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* question mode keeps its workflow and reads HTTP MCP tools declared read-only ([#390](https://github.com/ikarys/fennec/issues/390)) ([cc53c6c](https://github.com/ikarys/fennec/commit/cc53c6c63f1c2e07e35f404e4637b77c5c27270a))
+
 ## [0.4.0](https://github.com/ikarys/fennec/compare/v0.3.0...v0.4.0) (2026-11-12)
 
 
