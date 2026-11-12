@@ -12,6 +12,7 @@ A sandboxed command can:
 - Write its working folder: the session's worktree, or the project folder for a session without one.
 - Run builds and tests offline, such as `cargo test`, `npm test`, and `pytest`.
 - Use the checkout's `node_modules` or `.venv` read-only, and share the project's Cargo build folder.
+- Read your checkout from a worktree, so git and a `.venv`'s scripts work even when the project lives under `/tmp` (the sandbox's own `/tmp` is empty).
 
 A sandboxed command cannot:
 
