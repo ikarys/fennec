@@ -753,6 +753,8 @@ export const en = {
   // Project: doc, question, module map (components/project)
   docVerifiedTitle: 'Read from the file',
   noAdrs: 'No ADR in docs/adr/.',
+  adrsNotRecorded:
+    'The ADRs bind the project. The decisions an agent records while it works are listed in its session (Session tab) and in the night report.',
   filesPickOne: 'Pick a file in the tree.',
   filesTruncated: 'Only the first 20,000 files are listed.',
   filesUntracked: 'Not tracked by git: read-only',

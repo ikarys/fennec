@@ -90,7 +90,7 @@ When rules are violated, the **Drift since docs/map.md** section lists **Forbidd
 
 ### Decisions (ADRs)
 
-The **Decisions** tab lists the project's ADRs, the MADR files in `docs/adr/`, in a navigation on the left (number, title, status); the selected one renders on the right. If none exist, it shows **No ADR in docs/adr/.** ADRs are protected from agent writes. They bind the project; they are not the same as decisions an agent records in a session.
+The **Decisions** tab lists the project's ADRs, the MADR files in `docs/adr/`, in a navigation on the left (number, title, status); the selected one renders on the right. If none exist, it shows **No ADR in docs/adr/.** ADRs are protected from agent writes. They bind the project; they are not the same as decisions an agent records in a session. A line at the top of the tab says where those are: the session's **Session** tab, and the night report for a night run.
 
 ### Risk zones
 

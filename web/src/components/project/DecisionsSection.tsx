@@ -155,6 +155,7 @@ export function DecisionsSection({ projectId }: { projectId: string }) {
 
   return (
     <section>
+      <p className="mb-4 text-xs text-muted">{t('adrsNotRecorded')}</p>
       {loading ? (
         <p className="text-muted">{t('loading')}</p>
       ) : error ? (
