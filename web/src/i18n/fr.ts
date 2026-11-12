@@ -362,6 +362,7 @@ export const fr: Record<MsgKey, string> = {
   stepNotDone: 'Étape {number} non faite',
   criteriaAwaitBuild: 'Les critères du plan s’appliquent dans le run qui le construit.',
   reportBadge: 'Rapport',
+  reportFindings: 'Résultats',
   reportIndicativeTitle: 'Coches déclarées par le modèle, non vérifiées par fennec',
   stepsLabel: 'Étapes',
   toTest: 'À tester',
@@ -1282,6 +1283,8 @@ export const fr: Record<MsgKey, string> = {
   runEndReadTokens: 'Tokens lus',
   runEndCriteriaDetail: '{verified} vérifié{verifiedPlural} · {indicative} indicatif{indicativePlural}',
   runEndTimeDetail: 'Détail du temps',
+  runEndShowStats: 'Afficher les chiffres du run',
+  runEndHideStats: 'Masquer les chiffres du run',
   runEndNodesSummary: '{duration} · {count} nœud{plural}',
   runEndWorkReady: 'Le travail est prêt dans l\'espace de l\'agent.',
   // components/session/AgentsMdCard.tsx

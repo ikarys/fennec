@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 pub struct Report {
     pub title: String,
     pub summary: String,
+    /// What the work found or measured that the human asked to know; empty
+    /// when the task asked for no result.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub findings: String,
     pub steps: Vec<ReportStep>,
     pub done_when: Vec<ReportCriterion>,
     pub changed: Vec<ChangedFile>,
@@ -56,8 +60,13 @@ impl Report {
             String::new(),
             format!("Summary: {}", self.summary),
             String::new(),
-            "### Steps".to_string(),
         ];
+        if !self.findings.is_empty() {
+            lines.push("### Findings".to_string());
+            lines.push(self.findings.clone());
+            lines.push(String::new());
+        }
+        lines.push("### Steps".to_string());
         for (index, step) in self.steps.iter().enumerate() {
             let box_ = if step.done { "x" } else { " " };
             match &step.note {
@@ -108,6 +117,7 @@ mod tests {
         Report {
             title: "Add the report tool".into(),
             summary: "The builder ends its turn with a submit_report call".into(),
+            findings: String::new(),
             steps: vec![
                 ReportStep {
                     title: "Write the domain".into(),
@@ -171,6 +181,20 @@ mod tests {
              - Test: Nothing\n\
              - To do: Nothing"
         );
+    }
+
+    #[test]
+    fn findings_render_before_steps_when_present() {
+        let mut r = report();
+        r.findings = "p50 12 ms\np99 40 ms".into();
+        let markdown = r.to_markdown();
+        assert!(markdown.contains("### Findings\np50 12 ms\np99 40 ms\n\n### Steps"));
+    }
+
+    #[test]
+    fn an_empty_findings_field_renders_no_findings_section() {
+        let markdown = report().to_markdown();
+        assert!(!markdown.contains("### Findings"));
     }
 
     #[test]

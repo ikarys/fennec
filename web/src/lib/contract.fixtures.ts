@@ -45,6 +45,7 @@ export const SHIP_REPORT = {
   kind: 'report',
   title: 'Ship',
   summary: 'What changed',
+  findings: '',
   steps: [
     { number: 1, checked: true, text: 'Add code', detail: 'implemented' },
     { number: 2, checked: false, text: 'Docs', detail: '' }

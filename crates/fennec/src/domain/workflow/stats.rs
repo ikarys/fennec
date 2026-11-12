@@ -166,6 +166,23 @@ pub fn fill_missing_spans(stats: &mut RunStats, run: &[Event]) {
     }
 }
 
+/// A session node's working time: its agent turns' durations since its last
+/// start, so the waits for the human's replies between them do not count.
+pub fn node_turns_ms(events: &[Event], node_id: &str) -> u64 {
+    let Some(start) = events.iter().rposition(
+        |event| matches!(event, Event::WorkflowNodeStarted { node_id: id, .. } if id == node_id),
+    ) else {
+        return 0;
+    };
+    events[start + 1..]
+        .iter()
+        .filter_map(|event| match event {
+            Event::ChatDone { duration_ms, .. } => *duration_ms,
+            _ => None,
+        })
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,5 +522,33 @@ mod tests {
         fill_missing_spans(&mut old, &run);
 
         assert_eq!(old.nodes[0].spans, vec![existing]);
+    }
+
+    #[test]
+    fn node_turns_ms_sums_the_chat_turns_after_the_last_node_start() {
+        let events = vec![
+            chat_done(Some(999)),
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: None,
+                child_session_id: None,
+                started_at: None,
+            },
+            chat_done(Some(100)),
+            chat_done(Some(50)),
+            chat_done(None),
+        ];
+        assert_eq!(node_turns_ms(&events, "a"), 150);
+        assert_eq!(node_turns_ms(&events, "b"), 0);
+    }
+
+    fn chat_done(duration_ms: Option<u64>) -> Event {
+        Event::ChatDone {
+            message_id: String::new(),
+            reason: crate::domain::event::DoneReason::Complete,
+            duration_ms,
+        }
     }
 }

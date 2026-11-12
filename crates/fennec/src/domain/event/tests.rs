@@ -117,6 +117,7 @@ fn report_submitted_round_trips() {
             report: Report {
                 title: "Add the report tool".into(),
                 summary: "The builder ends its turn with submit_report".into(),
+                findings: String::new(),
                 steps: vec![
                     ReportStep {
                         title: "Write the domain".into(),
