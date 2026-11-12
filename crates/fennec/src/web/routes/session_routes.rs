@@ -320,8 +320,22 @@ pub(crate) fn serve_thread(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     // Targeted reads: the thread is refetched at each tool call, the whole log need not be decoded.
     let window = store.window(id)?;
     let session_events = store.events_of(id, thread_view::SESSION_KINDS)?;
-    let workdir = app.place(&store, &session, &project)?.workdir;
-    let mut view = thread_view::thread_view(&window, &session_events, &workdir.to_string_lossy());
+    let place = app.place(&store, &session, &project)?;
+    let workdir = place.workdir.to_string_lossy().into_owned();
+    // A removed worktree's paths still name it: they read relative to it too.
+    let old_worktree = app
+        .worktrees()
+        .join(app.root_id(&store, &session)?)
+        .to_string_lossy()
+        .into_owned();
+    let mut view = thread_view::thread_view(&window, &session_events, &[&workdir, &old_worktree]);
+    // A live worktree is counted by git, like the integration gate; the calls' tally is the fallback.
+    if let Some(wt) = &place.worktree
+        && let Some((top, _)) = crate::worktree::top(std::path::Path::new(&project.workdir))
+        && let Ok(files) = crate::modified_files::in_worktree(&top, wt)
+    {
+        view.modified_files = files;
+    }
     view.hand_to_backlog(idea_for_session(&store.ideas(&project.id)?, id));
     send_json(
         stream,

@@ -2,6 +2,7 @@
 import type { RefObject, UIEventHandler } from 'react';
 import type { ServedThread } from '../../lib/api';
 import type { ThreadView } from '../../lib/fold';
+import type { SessionStatus } from '../../lib/sessionStatus';
 import { useT } from '../../i18n';
 import { Button } from '../ui/Button';
 import { ThreadItemView } from './Thread';
@@ -19,6 +20,8 @@ interface SessionThreadPaneProps {
   /** The model's short name shown on its messages. */
   model: string;
   running: boolean;
+  runId: string | undefined;
+  status: SessionStatus;
   /** Ids of the items that can be replayed. */
   replayable: ServedThread['replayable'];
   onReplay: (id: string) => void;
@@ -36,6 +39,8 @@ export function SessionThreadPane({
   pendingCallId,
   model,
   running,
+  runId,
+  status,
   replayable,
   onReplay,
 }: SessionThreadPaneProps) {
@@ -88,6 +93,7 @@ export function SessionThreadPane({
               }
               onReplay={sessionId && replayable.includes(item.id) ? onReplay : undefined}
               latest={item.id === lastRunEndId}
+              waitingStatus={runId && item.kind === 'workflow-node' && item.id.startsWith(`wf-${runId}-`) ? status : undefined}
             />
           ))}
         </div>

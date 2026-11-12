@@ -4,6 +4,7 @@ import { formatClock, formatDuration } from '../../../lib/format';
 import type { NodeKind } from '../../../lib/workflow';
 import { useLang, useT } from '../../../i18n';
 import { portTone } from '../../../lib/runView';
+import type { SessionStatus } from '../../../lib/sessionStatus';
 import { CheckIcon, ChevronRightIcon, CloseIcon, ExternalIcon, SpinnerIcon } from '../../ui/Icons';
 import { useNodeUsage } from '../../session/CallUsage';
 import { Badge } from '../../ui/Badge';
@@ -38,13 +39,13 @@ function nodeKindTone(kind: NodeKind): string {
   }
 }
 
-export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running: boolean }) {
+export function NodeDivider({ item, running, waitingStatus }: { item: WorkflowNodeItem; running: boolean; waitingStatus?: SessionStatus }) {
   const lang = useLang();
   const t = useT();
   const finished = item.port !== undefined;
   const usage = useNodeUsage(item.id);
   const badge = finished ? { port: item.port!, tone: portBadgeTone(item.port!) } : null;
-  const hasDetails = Boolean(item.prompt || item.output || item.childSessionId);
+  const hasDetails = Boolean(item.prompt || item.output || item.childSessionId || (item.nodeKind === 'shell' && finished));
   const [open, setOpen] = useState(false);
   // Elapsed since the node started; logs written before startedAt was carried
   // fall back to the mount time.
@@ -99,7 +100,11 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
               <span className="tabular-nums">{formatClock(elapsedMs)}</span>
             </span>
           )}
-          {!finished && !running && <span>{t('nodeDividerInterrupted')}</span>}
+          {!finished && !running && (waitingStatus ? (
+            <Badge tone={waitingStatus.tone}>{waitingStatus.label}</Badge>
+          ) : (
+            <span>{t('nodeDividerInterrupted')}</span>
+          ))}
         </span>
         {hasDetails ? (
           <button
@@ -124,21 +129,33 @@ export function NodeDivider({ item, running }: { item: WorkflowNodeItem; running
                 <div className="max-h-48 overflow-y-auto whitespace-pre-wrap text-muted">{item.prompt}</div>
               </div>
             )}
-            {item.output && (
+            {item.nodeKind === 'shell' && item.command && (
+              <div className="flex flex-col gap-1">
+                <SectionLabel>{t('nodeDividerCommand')}</SectionLabel>
+                <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-code p-2 font-mono text-xs text-muted">
+                  {item.command}
+                </pre>
+              </div>
+            )}
+            {(item.output || (item.nodeKind === 'shell' && finished)) && (
               <div className="flex flex-col gap-1">
                 <SectionLabel>{t('outputLabel')}</SectionLabel>
-                {item.nodeKind === 'shell' || item.nodeKind === 'criteria' ? (
-                  <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-code p-2 font-mono text-xs text-muted">
-                    {item.output}
-                  </pre>
+                {item.output ? (
+                  item.nodeKind === 'shell' || item.nodeKind === 'criteria' ? (
+                    <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-code p-2 font-mono text-xs text-muted">
+                      {item.output}
+                    </pre>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto whitespace-pre-wrap text-text">{item.output}</div>
+                  )
                 ) : (
-                  <div className="max-h-48 overflow-y-auto whitespace-pre-wrap text-text">{item.output}</div>
+                  <div className="text-muted">{t('nodeDividerNoOutput')}</div>
                 )}
-                {item.nodeKind === 'shell' && item.exitCode !== undefined && (
-                  <div className="flex justify-end">
-                    <Badge tone={item.exitCode === 0 ? 'ok' : 'err'}>{t('nodeDividerExitCode', { code: item.exitCode })}</Badge>
-                  </div>
-                )}
+              </div>
+            )}
+            {item.nodeKind === 'shell' && item.exitCode !== undefined && (
+              <div className="flex justify-end">
+                <Badge tone={item.exitCode === 0 ? 'ok' : 'err'}>{t('nodeDividerExitCode', { code: item.exitCode })}</Badge>
               </div>
             )}
             {item.childSessionId && (

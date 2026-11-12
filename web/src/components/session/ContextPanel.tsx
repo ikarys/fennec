@@ -104,7 +104,7 @@ export function ContextPanel({
           integrationVersion={integrationVersion}
           onTry={onTry}
         />
-        <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} planAwaitingBuild={served.pendingPlan !== null || served.handedPlan !== null} />
+        <CriteriaSection criteria={served.criteria} tally={served.criteriaTally} planAwaitingBuild={served.planAwaitingBuild} />
         <ModifiedFilesSection totals={served.modifiedFiles} sessionId={sessionId} hasDiff={Boolean(worktree?.commits)} />
       </>
     ),

@@ -1,6 +1,7 @@
 // The workflow run's drawer body: a summary and a vertical step timeline.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { nodeKindOf, portTone, type NodeRun, type RunView } from '../../../lib/runView';
+import type { SessionStatus } from '../../../lib/sessionStatus';
 import { formatClock, formatDuration } from '../../../lib/format';
 import { useLang, useT } from '../../../i18n';
 import { NODE_KIND_LABELS, type WorkflowDef } from '../../../lib/workflow';
@@ -186,7 +187,7 @@ function RoundRow({
   );
 }
 
-export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: string, nodeId: string, pass: number) => void }) {
+export function RunTimeline({ run, status, onJump }: { run: RunView; status: SessionStatus; onJump: (runId: string, nodeId: string, pass: number) => void }) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
@@ -216,7 +217,7 @@ export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: str
   const total = run.counts.total;
   const outcome = run.finished?.outcome;
 
-  const stateTone = outcome === 'done' ? 'ok' : outcome === 'blocked' || outcome === 'error' ? 'err' : outcome === 'stopped' ? 'neutral' : 'accent';
+  const stateTone = outcome === 'done' ? 'ok' : outcome === 'blocked' || outcome === 'error' ? 'err' : outcome === 'stopped' ? 'neutral' : status.tone;
   const stateLabel =
     outcome === 'done'
       ? t('runRailStateDone')
@@ -224,7 +225,7 @@ export function RunTimeline({ run, onJump }: { run: RunView; onJump: (runId: str
         ? t('runRailStateFailed')
         : outcome === 'stopped'
           ? t('runRailStateStopped')
-          : t('runRailStateRunning');
+          : status.label;
 
   type TimelineRow = { key: string; render: (isLast: boolean) => ReactNode };
   const rows: TimelineRow[] = [];

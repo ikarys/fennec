@@ -354,6 +354,8 @@ export interface ServedThread {
   pendingPlan: ServedPendingPlan | null;
   /** The plan the session's idea carried to the backlog; undoable while the idea only waits. */
   handedPlan: { ideaId: string; undoable: boolean } | null;
+  /** True while the last plan.proposed carries criteria and no criteria.set or workflow.finished followed it. */
+  planAwaitingBuild: boolean;
   /** Messages queued while a turn runs, in order. */
   queued: QueuedMessage[];
   /** The criteria in force: the last criteria.set and the updates since. */

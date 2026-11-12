@@ -178,9 +178,15 @@ export function RunEndCard({
             {outcome.icon}
             {outcome.text}
           </span>
-          <Badge tone="ok" title={t("verifiedFromLog")}>
-            {t("verified")}
-          </Badge>
+          {stats && stats.criteriaTotal === 0 ? (
+            <Badge tone="neutral" title={t("noCriteria")}>
+              {t("nothingVerified")}
+            </Badge>
+          ) : (
+            <Badge tone="ok" title={t("verifiedFromLog")}>
+              {t("verified")}
+            </Badge>
+          )}
           {stats && (
             <Button
               variant="icon"
