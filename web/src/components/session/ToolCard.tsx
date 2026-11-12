@@ -48,6 +48,9 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
     if (tool.name === 'run_command' && tool.status === 'running') {
       setOpen(true);
     }
+    if ((tool.name === 'propose_plan' || tool.name === 'submit_report') && tool.status === 'error') {
+      setOpen(true);
+    }
   }, [tool.name, tool.status]);
 
   const arg =
@@ -212,6 +215,12 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
           {tool.name === 'ask_user' && (
             <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
               {tool.output || tool.error || t('awaitingAnswer')}
+            </pre>
+          )}
+
+          {(tool.name === 'propose_plan' || tool.name === 'submit_report') && (
+            <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
+              {tool.output || tool.error || t('noOutput')}
             </pre>
           )}
         </div>

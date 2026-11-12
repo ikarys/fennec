@@ -43,6 +43,16 @@ export const SIGNAL_KEYS: Record<Exclude<ReviewSignal, 'protected'>, { label: Ms
     tone: 'err',
     title: 'signalTestsTitle'
   },
+  validatedTests: {
+    label: 'signalValidatedTestsLabel',
+    tone: 'ok',
+    title: 'signalValidatedTestsTitle'
+  },
+  artifact: {
+    label: 'signalArtifactLabel',
+    tone: 'attention',
+    title: 'signalArtifactTitle'
+  },
   hot: {
     label: 'signalHotLabel',
     tone: 'accent',
