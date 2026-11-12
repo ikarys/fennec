@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project, SessionState } from "../lib/api";
+import type { LaunchWorkflow } from '../lib/route';
 import { runWaiting } from "../lib/runView";
 import { sessionStatus } from "../lib/sessionStatus";
 import { useLang, useT } from "../i18n";
@@ -37,8 +38,8 @@ import { RunRail } from "../components/workflow/session/RunRail";
 interface SessionPageProps {
   sessionId: string | null;
   projectId: string | null;
-  /** A workflow opened from the editor's test button: preselected, step by step. */
-  testWorkflowId: string | null;
+  /** A workflow opened from the editor's run or test button: preselected, step by step for a test. */
+  launchWorkflow: LaunchWorkflow | null;
   /** A backlog idea framed from the project page: its text prefills the composer, the first send links the session to it. */
   frameIdeaId: string | null;
   /** A session whose agent suggested this one: its brief prefills the composer and its agent is preselected. */
@@ -57,7 +58,7 @@ interface SessionPageProps {
 export function SessionPage({
   sessionId,
   projectId,
-  testWorkflowId,
+  launchWorkflow,
   frameIdeaId,
   fromSessionId,
   pseudoTabId,
@@ -112,7 +113,7 @@ export function SessionPage({
   const { commands, agents, workflows, workflowSelection, setWorkflowSelection } =
     useProjectOptions({
       projectId: detail?.project.id ?? projectId,
-      testWorkflowId,
+      launchWorkflow,
       runWorkflowId: run?.workflow.id,
       frameIdeaId,
       framingIdea,

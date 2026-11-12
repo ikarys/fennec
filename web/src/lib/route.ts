@@ -6,11 +6,14 @@ import { readStored } from './storage';
 /** The fixed pages a tab can show. */
 export type PageId = 'projects' | 'chats' | 'settings' | 'insight' | 'workflows' | 'backlog';
 
+/** A workflow opened from the editor: preselected in the new session, step by step (test) or not (run). */
+export interface LaunchWorkflow { id: string; stepByStep: boolean }
+
 export type Route =
   | { name: 'home' }
   | { name: 'session'; id: string }
   | { name: 'changes'; id: string; path: string | null }
-  | { name: 'new'; id: string; testWorkflowId: string | null; frameIdeaId: string | null; fromSessionId: string | null }
+  | { name: 'new'; id: string; launchWorkflow: LaunchWorkflow | null; frameIdeaId: string | null; fromSessionId: string | null }
   | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
   | { name: 'backlog' }
@@ -91,16 +94,23 @@ export function parseRoute(hash: string): Route {
     }
     const id = decodeURIComponent(rawId);
     if (id.startsWith('new:')) {
-      return { name: 'new', id: id.slice(4), testWorkflowId: null, frameIdeaId: null, fromSessionId: null };
+      return { name: 'new', id: id.slice(4), launchWorkflow: null, frameIdeaId: null, fromSessionId: null };
     }
     return { name: 'session', id };
   }
   if (hash.startsWith('#/new/')) {
     const [rawId, query] = hash.slice(6).split('?');
-    const testWorkflowId = query ? new URLSearchParams(query).get('test') : null;
-    const frameIdeaId = query ? new URLSearchParams(query).get('frame') : null;
-    const fromSessionId = query ? new URLSearchParams(query).get('from') : null;
-    return { name: 'new', id: decodeURIComponent(rawId), testWorkflowId, frameIdeaId, fromSessionId };
+    const params = query ? new URLSearchParams(query) : null;
+    const testWorkflowId = params?.get('test') || null;
+    const runWorkflowId = params?.get('run') || null;
+    const launchWorkflow = testWorkflowId
+      ? { id: testWorkflowId, stepByStep: true }
+      : runWorkflowId
+        ? { id: runWorkflowId, stepByStep: false }
+        : null;
+    const frameIdeaId = params?.get('frame') || null;
+    const fromSessionId = params?.get('from') || null;
+    return { name: 'new', id: decodeURIComponent(rawId), launchWorkflow, frameIdeaId, fromSessionId };
   }
   return { name: 'home' };
 }

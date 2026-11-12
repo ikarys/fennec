@@ -1440,6 +1440,8 @@ export const en = {
   workflowEditorIssueCount: '{count} issue(s)',
   workflowEditorTestAria: 'Test step by step',
   workflowEditorTestTitle: 'Opens a new session with this workflow, step by step.',
+  workflowEditorRunAria: 'Run',
+  workflowEditorRunTitle: 'Opens a new session with this workflow selected.',
   workflowEditorTestSaveTitle: 'Save the workflow before testing it.',
   // pages/ProjectPage.tsx
   projectPageDecisions: 'Decisions',

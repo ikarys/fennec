@@ -54,17 +54,30 @@ export function PluginCard({ plugin, blocks, busy, onToggle }: PluginCardProps) 
           >
             <GlobeIcon className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            variant={plugin.enabled ? 'soft' : 'secondary'}
-            size="sm"
-            iconOnly
-            disabled={busy}
-            aria-label={plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
-            title={plugin.enabled ? t('pluginDisable') : t('pluginEnable')}
-            onClick={() => onToggle({ enabled: !plugin.enabled })}
-          >
-            {plugin.enabled ? <StopIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-          </Button>
+          {plugin.enabled ? (
+            <Button
+              variant="soft"
+              size="sm"
+              iconOnly
+              disabled={busy}
+              aria-label={t('pluginDisable')}
+              title={t('pluginDisable')}
+              onClick={() => onToggle({ enabled: false })}
+            >
+              <StopIcon className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busy}
+              title={t('pluginEnable')}
+              onClick={() => onToggle({ enabled: true })}
+            >
+              <PlayIcon className="h-4 w-4" />
+              {t('pluginEnable')}
+            </Button>
+          )}
         </>
       }
     >

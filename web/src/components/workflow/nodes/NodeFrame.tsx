@@ -38,6 +38,7 @@ export function NodeFrame({ node, edges, selected, hasError, children }: NodeFra
       {children}
       {ports.map((port, index) => {
         const percent = ((index + 1) / (ports.length + 1)) * 100;
+        // Stagger odd labels when there are many ports so they do not overlap.
         return (
           <Fragment key={port}>
             <Handle
@@ -49,7 +50,7 @@ export function NodeFrame({ node, edges, selected, hasError, children }: NodeFra
             />
             <span
               className="absolute top-full text-xs whitespace-nowrap text-muted"
-              style={{ left: `${percent}%`, transform: 'translateX(-50%)', marginTop: '4px' }}
+              style={{ left: `${percent}%`, transform: 'translateX(-50%)', marginTop: ports.length > 2 && index % 2 === 1 ? '18px' : '4px' }}
             >
               {port}
             </span>
