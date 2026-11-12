@@ -16,7 +16,7 @@ pub use answer::{Proposal, broader_folders, proposal};
 pub use command::{CommandPattern, PatternError};
 pub use decide::{Decision, PathRequest, Request};
 pub use rule::{
-    Access, Action, NO_RULES, Origin, PathPattern, Rule, Rules, Scope, Target, TargetKind,
+    Access, Action, NO_RULES, Origin, PathPattern, Rule, Rules, Scope, Target, TargetKind, Under,
 };
 pub use shell::segments;
 pub use store::{NewRule, RuleStore, StoreError};

@@ -126,6 +126,15 @@ pub struct PathPattern {
     text: String,
 }
 
+/// Where a pattern falls relative to a work folder root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Under {
+    /// The pattern covers the whole work folder.
+    Root,
+    /// The pattern rebased to a root-relative path for the sandbox mounts.
+    Pattern(String),
+}
+
 impl PathPattern {
     /// Parses a path pattern.
     ///
@@ -186,6 +195,43 @@ impl PathPattern {
     /// the host's project-relative matchers (protected files) can take.
     pub fn is_relative(&self) -> bool {
         !self.text.starts_with('/') && !self.text.starts_with('~')
+    }
+
+    /// Where this pattern falls relative to `root` (an absolute, normalized directory):
+    /// the whole root, a root-relative pattern, or nothing.
+    pub fn under(&self, root: &str, home: Option<&str>) -> Option<Under> {
+        if self.is_relative() {
+            return Some(Under::Pattern(self.text.clone()));
+        }
+
+        let expanded = if self.text == "~" || self.text.starts_with("~/") {
+            let home = home?;
+            if self.text == "~" {
+                home.to_string()
+            } else {
+                format!("{}{}", home, &self.text[1..])
+            }
+        } else {
+            self.text.clone()
+        };
+        let normalized = path::normalize(&expanded)?;
+
+        let root = root.trim_end_matches('/');
+        let root = if root.is_empty() { "/" } else { root };
+        if !normalized.starts_with('/') {
+            return None;
+        }
+
+        if (normalized == root || root.starts_with(&format!("{normalized}/")))
+            && !normalized.contains(['*', '?', '['])
+        {
+            return Some(Under::Root);
+        }
+        if let Some(rest) = normalized.strip_prefix(&format!("{root}/")) {
+            return Some(Under::Pattern(format!("/{rest}")));
+        }
+        // ponytail: a glob above the work folder is not rebased, the file tools still refuse it.
+        None
     }
 
     /// Human-readable description for rules pages and refusals.
@@ -383,5 +429,57 @@ mod tests {
         assert!(PathPattern::parse("a/../b").is_err());
         assert!(PathPattern::parse("..").is_err());
         assert!(PathPattern::parse("a..b").is_ok());
+    }
+
+    #[test]
+    fn under_rebases_path_rules_to_the_work_folder() {
+        assert_eq!(
+            PathPattern::parse("todo/cli.py")
+                .unwrap()
+                .under("/tmp/wt/s1", None),
+            Some(Under::Pattern("todo/cli.py".into()))
+        );
+        assert_eq!(
+            PathPattern::parse("/tmp/wt/s1/todo/cli.py")
+                .unwrap()
+                .under("/tmp/wt/s1", None),
+            Some(Under::Pattern("/todo/cli.py".into()))
+        );
+        assert_eq!(
+            PathPattern::parse("~/proj/a.py")
+                .unwrap()
+                .under("/home/u/proj", Some("/home/u")),
+            Some(Under::Pattern("/a.py".into()))
+        );
+        assert_eq!(
+            PathPattern::parse("/tmp/")
+                .unwrap()
+                .under("/tmp/wt/s1", None),
+            Some(Under::Root)
+        );
+        assert_eq!(
+            PathPattern::parse("/tmp/wt/s1")
+                .unwrap()
+                .under("/tmp/wt/s1", None),
+            Some(Under::Root)
+        );
+        assert_eq!(
+            PathPattern::parse("/tmp/*/")
+                .unwrap()
+                .under("/tmp/wt", None),
+            None
+        );
+        assert_eq!(
+            PathPattern::parse("/etc/x")
+                .unwrap()
+                .under("/tmp/wt/s1", None),
+            None
+        );
+        assert_eq!(
+            PathPattern::parse("/home/u/project2/x")
+                .unwrap()
+                .under("/home/u/project", None),
+            None
+        );
     }
 }

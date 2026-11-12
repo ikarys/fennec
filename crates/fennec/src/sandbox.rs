@@ -491,7 +491,7 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::tools::test_support::temp_dir;
     use std::os::unix::process::ExitStatusExt;
@@ -914,7 +914,7 @@ mod tests {
 
     /// Whether a real bwrap is here; locally its absence skips the end-to-end
     /// tests, on CI it fails them, so CI never goes green without proving the sandbox.
-    fn bwrap_available() -> bool {
+    pub(crate) fn bwrap_available() -> bool {
         let available = Command::new("bwrap")
             .arg("--version")
             .output()
