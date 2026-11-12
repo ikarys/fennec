@@ -1022,6 +1022,10 @@ impl crate::agent::ports::ChildSessions for FakeChildren {
             text: "found it in store.rs:12".into(),
         })
     }
+
+    fn last_run(&self, _child: &str) -> Result<crate::agent::ports::AgentRun, String> {
+        Err("unused".into())
+    }
 }
 
 #[test]

@@ -65,6 +65,8 @@ export interface SessionDetail {
   linkedProjectId: string | null;
   /** The parent session id, or null for a top-level session. */
   parentId: string | null;
+  /** A workflow step's child whose question the parent run waits on: the human answers here. */
+  workflowAsks: boolean;
   /** The git worktree the session's agent works in, or null when it runs in place. */
   worktree: {
     path: string;

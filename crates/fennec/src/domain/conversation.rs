@@ -1,7 +1,7 @@
 //! The event log read back as the chat messages sent to the model.
 
 use super::compaction::model_view;
-use super::event::{Event, Role, ToolResult};
+use super::event::{DoneReason, Event, Role, ToolResult};
 use super::vision::first_kept_image;
 use serde_json::{Value, json};
 
@@ -79,6 +79,14 @@ pub fn since_last_answer(events: &[Event], matches: impl Fn(&Event) -> bool) -> 
         )
     });
     last.is_some_and(|start| events[start + 1..].iter().any(matches))
+}
+
+/// The end reason of the last turn among `events`, `None` before any.
+pub fn last_done(events: &[Event]) -> Option<DoneReason> {
+    events.iter().rev().find_map(|event| match event {
+        Event::ChatDone { reason, .. } => Some(*reason),
+        _ => None,
+    })
 }
 
 /// The text of the last assistant message that has any, among `events`

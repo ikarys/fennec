@@ -1452,6 +1452,10 @@ export const en = {
   runActionCardInterruptedQuestion: 'The workflow was interrupted: resume where it left off?',
   runActionCardResume: 'Resume',
   runActionCardRelaunchQuestion: 'The workflow ended in an error: relaunch the failed node?',
+  runActionCardChildAsked: '{label} asked you a question in its session',
+  runActionCardOpenChild: 'Answer it',
+  sessionPageWorkflowNodeAsks: 'This step asked you a question',
+  sessionPageWorkflowNodeAsksHint: 'Answer below: the workflow resumes on its own once the step completes.',
   runActionCardRelaunch: 'Relaunch',
   // components/workflow/WorkflowPalette.tsx
   workflowPaletteNodes: 'Nodes',
@@ -3089,6 +3093,10 @@ export const fr: Record<MsgKey, string> = {
   runActionCardInterruptedQuestion: 'Le workflow s\'est interrompu : reprendre là où il en était ?',
   runActionCardResume: 'Reprendre',
   runActionCardRelaunchQuestion: 'Le workflow s\'est terminé en erreur : relancer le nœud qui a échoué ?',
+  runActionCardChildAsked: '{label} vous pose une question dans sa session',
+  runActionCardOpenChild: 'Y répondre',
+  sessionPageWorkflowNodeAsks: 'Cette étape vous pose une question',
+  sessionPageWorkflowNodeAsksHint: 'Répondez ci-dessous : le workflow reprend seul une fois l\'étape terminée.',
   runActionCardRelaunch: 'Relancer',
   // components/workflow/WorkflowPalette.tsx
   workflowPaletteNodes: 'Nœuds',

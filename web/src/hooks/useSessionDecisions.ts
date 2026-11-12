@@ -35,8 +35,8 @@ export function useSessionDecisions({
   // The decision bar opens one row at a time; the id is the decision's (a plan's call id).
   const [openDecision, setOpenDecision] = useState<string | null>(null);
 
-  // What blocks the agent until the human answers; a node's session is answered in its parent.
-  const answerable = !running && !waiting && !detail?.parentId;
+  // What blocks the agent until the human answers; a node's session is answered in its parent, unless its step asked the human.
+  const answerable = !running && !waiting && (!detail?.parentId || !!detail.workflowAsks);
   const blocking = {
     approval: answerable ? served.pendingApproval : null,
     waiver: answerable ? served.pendingWaiver : null,

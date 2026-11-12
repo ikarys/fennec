@@ -150,6 +150,7 @@ A comment you type there is added to the next agent's prompt.
 
 - A strip above the thread shows the steps and where the run is.
 - A human step shows its question, one button per choice, and a comment field. While it waits, answer it or stop the run; a typed message is refused.
+- An agent step that runs in its own session (fresh context) may ask you a question there. The run shows **Answer it**: open the step's session and reply. Once the step finishes, the run goes on by itself. In a parallel branch, a question still ends the branch **blocked**.
 - An interrupted run can be **Resumed**. It re-runs the step that was running, and it can be stopped.
 - Workflow runs need the browser for their stops. The `fennec` command line does not run them.
 

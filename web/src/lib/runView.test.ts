@@ -104,6 +104,15 @@ describe("runWaiting", () => {
     expect(runWaiting(view, false, "waiting_for_user")).toBeUndefined();
   });
 
+  it("points to the child session when a fresh step asked there", () => {
+    const view = viewOf({
+      workflow: def([node("a", "agent", { name: "A" })], [edge("start", "next", "a")]),
+      open: ["a"],
+      runs: [{ nodeId: "a", label: "A", kind: "agent", pass: 1, state: "running", childSessionId: "c1" }]
+    });
+    expect(runWaiting(view, false, "waiting_for_user")).toEqual({ kind: "child", label: "A", childSessionId: "c1" });
+  });
+
   it("returns interrupted for other open nodes", () => {
     const view = viewOf({
       workflow: def([node("a", "agent", { name: "A" })], [edge("start", "next", "a")]),
