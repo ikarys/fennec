@@ -343,6 +343,16 @@ export function PlayIcon({ className }: IconProps) {
   );
 }
 
+/** Play triangle with a bar: tests a workflow step by step. */
+export function StepIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M5 5v14l9-7z" />
+      <line x1="17" y1="5" x2="17" y2="19" />
+    </Svg>
+  );
+}
+
 /** Curved left arrow: answers a question. */
 export function ReplyIcon({ className }: IconProps) {
   return (

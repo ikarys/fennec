@@ -1475,6 +1475,8 @@ export const fr: Record<MsgKey, string> = {
   workflowEditorIssueCount: '{count} problème(s)',
   workflowEditorTestAria: 'Tester pas à pas',
   workflowEditorTestTitle: 'Ouvre une nouvelle session avec ce workflow, en pas à pas.',
+  workflowEditorRunAria: 'Lancer',
+  workflowEditorRunTitle: 'Ouvre une nouvelle session avec ce workflow sélectionné.',
   workflowEditorTestSaveTitle: 'Enregistre le workflow avant de le tester.',
   // pages/ProjectPage.tsx
   projectPageDecisions: 'Décisions',

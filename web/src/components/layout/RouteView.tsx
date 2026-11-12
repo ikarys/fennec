@@ -179,7 +179,7 @@ export function RouteView(props: RouteViewProps) {
         <SessionPage
           sessionId={route.name === 'session' ? route.id : null}
           projectId={route.name === 'new' ? route.id : null}
-          testWorkflowId={route.name === 'new' ? route.testWorkflowId : null}
+          launchWorkflow={route.name === 'new' ? route.launchWorkflow : null}
           frameIdeaId={route.name === 'new' ? route.frameIdeaId : null}
           fromSessionId={route.name === 'new' ? route.fromSessionId : null}
           pseudoTabId={props.pseudoTabId}

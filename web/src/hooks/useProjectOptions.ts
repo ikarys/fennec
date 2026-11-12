@@ -1,4 +1,5 @@
 import type { WorkflowSummary } from '../lib/workflow';
+import type { LaunchWorkflow } from '../lib/route';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Agent, SlashCommand } from '../lib/api';
 import { listAgents, listCommands, listWorkflows } from '../lib/api';
@@ -10,8 +11,8 @@ import {
 interface UseProjectOptionsArgs {
   /** The project the options belong to: the session's, or the one the new session targets. */
   projectId: string | null;
-  /** A workflow opened from the editor's test button: preselected, step by step. */
-  testWorkflowId: string | null;
+  /** A workflow opened from the editor's run or test button: preselected, step by step for a test. */
+  launchWorkflow: LaunchWorkflow | null;
   /** The workflow of the session's latest run: the chip shows what the session runs. */
   runWorkflowId: string | null | undefined;
   /** A backlog idea framed from the project page: no workflow for a framing session. */
@@ -31,7 +32,7 @@ interface UseProjectOptionsArgs {
  */
 export function useProjectOptions({
   projectId,
-  testWorkflowId,
+  launchWorkflow,
   runWorkflowId,
   frameIdeaId,
   framingIdea,
@@ -106,12 +107,15 @@ export function useProjectOptions({
     };
   }, [projectId]);
 
+  // Primitives, not the route's object: a later hash change must not reset the selection.
+  const launchId = launchWorkflow?.id ?? null;
+  const launchStepByStep = launchWorkflow?.stepByStep ?? false;
   // The selection follows the session's agent: a session in an agent that
   // only talks (ask) must not start a workflow because the page reloaded.
   useEffect(() => {
     if (mode === undefined || workflows.length === 0 || agents.length === 0) return;
-    if (testWorkflowId && workflows.some((workflow) => workflow.id === testWorkflowId)) {
-      setWorkflowSelection({ workflowId: testWorkflowId, stepByStep: true, worktree: true });
+    if (launchId && workflows.some((workflow) => workflow.id === launchId)) {
+      setWorkflowSelection({ workflowId: launchId, stepByStep: launchStepByStep, worktree: true });
       return;
     }
     const agent = agents.find((candidate) => candidate.id === mode) ?? agents[0];
@@ -120,7 +124,7 @@ export function useProjectOptions({
     // an agent that only talks still starts none.
     const ran = selection.workflowId && runWorkflowId && workflows.some((workflow) => workflow.id === runWorkflowId) ? runWorkflowId : selection.workflowId;
     setWorkflowSelection({ ...selection, workflowId: frameIdeaId ? null : ran });
-  }, [workflows, agents, mode, testWorkflowId, runWorkflowId, frameIdeaId]);
+  }, [workflows, agents, mode, launchId, launchStepByStep, runWorkflowId, frameIdeaId]);
 
   // A session framing a backlog idea only talks: its messages must not start
   // the default build workflow (a 'go on' there once ran a whole build).

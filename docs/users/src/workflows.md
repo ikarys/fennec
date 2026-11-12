@@ -94,7 +94,7 @@ A step has exits at its bottom. They are small dots with a name. Drag from an ex
 5. Wire the shell's **success** to **done**.
 6. Wire the shell's **failure** back to the agent.
 
-The loop shows orange. The right panel lists the **Issues** left. The **Test** button stays off until there are none. Here, the command is empty and the loop has no cap.
+The loop shows orange. The right panel lists the **Issues** left. The **Run** and **Test** buttons stay off until there are none. Here, the command is empty and the loop has no cap.
 
 ### Step 3: fill in the steps
 
@@ -130,7 +130,7 @@ Now, after 3 failed rounds, the run stops as blocked. It does not loop.
 
 ① chooses where the file goes. **Project** saves it in this project, as `.agents/workflows/build-and-test.workflow.json`; commit it to share it with your team. **Global** saves it for all your projects.
 
-Click **Save** ②. The play button ③, **Test step by step**, turns on.
+Click **Save** ②. The buttons ③ turn on: **Run**, then **Test step by step**.
 
 ### Step 6: try it step by step
 
@@ -142,7 +142,7 @@ Clicking ③ (**Test step by step**) opens a new session. ① **build-and-test**
 2. Press Enter.
 3. At each stop, click **Continue** or **Stop**.
 
-To run without stops, click the ✕ of **Step by step** before you press Enter.
+To run without stops, use **Run** in the editor instead, or click the ✕ of **Step by step** before you press Enter.
 
 A comment you type there is added to the next agent's prompt.
 
