@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/ikarys/fennec/compare/v0.3.0...v0.4.0) (2026-11-12)
+
+
+### Features
+
+* **night:** answer workflow gates, halt risky tasks, detail the report ([#385](https://github.com/ikarys/fennec/issues/385)) ([0cafb6a](https://github.com/ikarys/fennec/commit/0cafb6a5e4e96148f55747ec28031625a26ea925))
+
+
+### Bug Fixes
+
+* **workflow:** let a fresh step's question be answered in its child ([#386](https://github.com/ikarys/fennec/issues/386)) ([f35eae0](https://github.com/ikarys/fennec/commit/f35eae0560cd6d662fcce8e2e2da6e78d99aa690))
+
 ## [0.3.0](https://github.com/ikarys/fennec/compare/v0.2.3...v0.3.0) (2026-11-12)
 
 
