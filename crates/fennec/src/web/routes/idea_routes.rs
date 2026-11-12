@@ -1,4 +1,4 @@
-//! The project page's ideas backlog (contract: `docs/api.md`): every write is
+//! The project page's ideas backlog (contract: `docs/devs/api.md`): every write is
 //! the human's click. `routes.rs` only dispatches here.
 
 use crate::web::http::HttpError;

@@ -1,4 +1,4 @@
-//! The workflow engine: walks a run through its graph (docs/workflows.md).
+//! The workflow engine: walks a run through its graph (docs/devs/workflows.md).
 //! The path is decided by domain/workflow/run.rs; this file runs the nodes
 //! and records everything in the session's log.
 

@@ -4,6 +4,7 @@
  * confirm().
  */
 import type { ReactNode } from 'react';
+import { useT } from '../../i18n';
 import { Button, type ButtonVariant } from './Button';
 import { Card } from './Card';
 import { Modal } from './Modal';
@@ -25,6 +26,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   return (
     <Modal open={open} onClose={onCancel} label={title}>
       <Card className="flex flex-col gap-3 p-4">
@@ -32,7 +34,7 @@ export function ConfirmDialog({
         <div className="m-0 text-sm text-muted">{body}</div>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" autoFocus onClick={onCancel}>
-            Annuler
+            {t('cancel')}
           </Button>
           <Button variant={variant} onClick={onConfirm}>
             {confirmLabel}

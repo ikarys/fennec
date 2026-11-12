@@ -9,15 +9,15 @@ what is rare: the human frames the work, the agent loop runs the steps, then wai
 review. Nothing is integrated without a human decision. Every change serves that.
 
 fennec is built one component at a time, each one working end to end before the next. When one
-lands, add its paragraph to `docs/components.md`.
+lands, add its paragraph to `docs/devs/components.md`.
 
 ## Where things are
 
 - `docs/map.md`: the modules and their dependencies, generated from the imports (regenerate it,
   never edit it). Each file's leading comment says what it is for.
-- `docs/components.md` what fennec already does; `docs/api.md` the HTTP API and event wire format;
-  `docs/ui.md` the UI's design rules; `SECURITY.md` the threat model and the known gaps;
-  `docs/releasing.md` branches, versions, binaries.
+- `docs/devs/components.md` what fennec already does; `docs/devs/api.md` the HTTP API and event wire format;
+  `docs/devs/ui.md` the UI's design rules; `SECURITY.md` the threat model and the known gaps;
+  `docs/devs/releasing.md` branches, versions, binaries.
 
 ## Architecture rules
 
@@ -35,7 +35,7 @@ lands, add its paragraph to `docs/components.md`.
 - The UI holds no logic: the server folds and computes, the UI renders. One exception: the UI
   folds the live event stream into the thread's messages (`web/src/lib/fold.ts`) so a streamed
   token needs no round trip; pending decisions, numbers and provenance still come folded from the
-  server. It uses the primitives of `web/src/components/ui` and is never dull (`docs/ui.md`).
+  server. It uses the primitives of `web/src/components/ui` and is never dull (`docs/devs/ui.md`).
 
 ## Non-negotiable rules
 

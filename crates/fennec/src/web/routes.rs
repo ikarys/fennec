@@ -1,4 +1,4 @@
-//! The JSON API (contract: `docs/api.md`) and the UI's pages.
+//! The JSON API (contract: `docs/devs/api.md`) and the UI's pages.
 //!
 //! A thin dispatcher: each route points at the module that owns it. The
 //! session, project and folder handlers live in `session_routes`.

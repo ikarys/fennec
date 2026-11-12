@@ -11,7 +11,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { useLang, useT } from '../../i18n';
 
-/** The action family's hue, per docs/ui.md's thread tone map: blue reads, orange writes, amber executes. */
+/** The action family's hue, per docs/devs/ui.md's thread tone map: blue reads, orange writes, amber executes. */
 function toolTone(name: string): string {
   if (name === 'read_file' || name === 'web_search') return 'text-info';
   if (name === 'write_file' || name === 'edit_file') return 'text-accent';

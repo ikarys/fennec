@@ -113,7 +113,7 @@ export function RouteView(props: RouteViewProps) {
     case 'workflows':
       return (
         <Lazy>
-          <WorkflowsPage projects={projects} projectId={route.projectId} workflowId={route.workflowId} isNew={route.isNew} />
+          <WorkflowsPage projects={projects.filter((project) => !project.chat)} projectId={route.projectId} workflowId={route.workflowId} isNew={route.isNew} />
         </Lazy>
       );
     case 'project':

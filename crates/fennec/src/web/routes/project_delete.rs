@@ -1,4 +1,4 @@
-//! Deleting a project on the human's request (contract: docs/api.md): its sessions, rules, ideas
+//! Deleting a project on the human's request (contract: docs/devs/api.md): its sessions, rules, ideas
 //! backlog, and, on request, its source folder.
 
 use crate::web::App;

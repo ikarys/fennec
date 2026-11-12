@@ -1,4 +1,4 @@
-//! A project's ideas board, read side (contract: `docs/api.md`): each idea's
+//! A project's ideas board, read side (contract: `docs/devs/api.md`): each idea's
 //! status from its live session, the queue, the night report. Served by
 //! `idea_routes.rs` per project and gathered by `backlog_routes.rs` across them.
 

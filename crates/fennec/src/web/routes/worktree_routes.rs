@@ -1,4 +1,4 @@
-//! The worktrees' disk usage (contract: docs/api.md): measured on demand, freed on the human's click.
+//! The worktrees' disk usage (contract: docs/devs/api.md): measured on demand, freed on the human's click.
 //! A scan walks gigabytes: the home page's total reuses one for ten minutes; the project tab and
 //! the human's actions measure again.
 

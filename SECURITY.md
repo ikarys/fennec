@@ -42,7 +42,7 @@ The table lists the main protections, each naming the claim, mechanism, and test
 ### Commands and the sandbox
 
 - Command rules match parsed tokens, so `eval`, a variable, or a script can slip past them.
-- The sandbox does not read the rules.
+- The sandbox does not read the rules: a path rule guards the file tools only, and a command can still write a blocked path inside the work folder.
 - A session's worktree shares its refs with the human's repository.
 - With the network on, `git push` reaches the remote, and the kernel refuses `git push` only by token matching.
 - The human can turn the sandbox off.

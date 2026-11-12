@@ -2,6 +2,7 @@ import type { WorkflowNode } from '../../../lib/workflow';
 import { PortListEditor } from '../PortListEditor';
 import { TemplateChips } from '../TemplateChips';
 import { FieldRow, TextArea } from '../../ui/Field';
+import { useT } from '../../../i18n';
 
 interface HumanFieldsProps {
   node: WorkflowNode;
@@ -10,6 +11,7 @@ interface HumanFieldsProps {
 }
 
 export function HumanFields({ node, names, onChange }: HumanFieldsProps) {
+  const t = useT();
   const insertTemplate = (name: string) => {
     const current = (node.question as string) ?? '';
     onChange('question', current + `{{${name}}}`);
@@ -27,7 +29,7 @@ export function HumanFields({ node, names, onChange }: HumanFieldsProps) {
         <TemplateChips names={names} onInsert={insertTemplate} />
       </FieldRow>
       <PortListEditor
-        label="Choix"
+        label={t('humanChoicesLabel')}
         values={(node.choices as string[]) ?? []}
         onChange={(values) => onChange('choices', values)}
         onRename={(oldValue, newValue) => {
