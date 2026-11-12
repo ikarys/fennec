@@ -21,7 +21,7 @@ pub fn definition() -> Value {
         "type": "function",
         "function": {
             "name": NAME,
-            "description": "Propose your plan: this is how a plan ends. Once the goal is clear, call it with the complete plan instead of writing the plan as text, and end your turn right after. The human reviews it before anything is built.",
+            "description": "Propose your plan: this is how a plan ends. Once the human agreed on the approach, call it with the complete plan instead of writing the plan as text, and end your turn right after. The human reviews it before anything is built.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -66,7 +66,7 @@ pub fn definition() -> Value {
                                 },
                                 "change": {
                                     "type": "string",
-                                    "description": "What to change and why, in one or two lines"
+                                    "description": "What changes in behaviour and why, in one or two lines; no function signatures or field lists"
                                 }
                             },
                             "required": ["title", "change"]
@@ -84,7 +84,7 @@ pub fn definition() -> Value {
                                 },
                                 "check": {
                                     "type": "string",
-                                    "description": "A read-only command that exits 0 once the criterion holds; it must hold for any correct implementation, and run in the sandbox with no network. Omit it for a criterion only a reader can judge"
+                                    "description": "One short read-only command that exits 0 once the criterion holds, never an inline script: run a test the plan adds by name. It must hold for any correct implementation, and run in the sandbox with no network. Omit it for a criterion only a reader can judge"
                                 }
                             },
                             "required": ["text"]
@@ -93,7 +93,7 @@ pub fn definition() -> Value {
                     "risks": {
                         "type": "array",
                         "items": { "type": "string" },
-                        "description": "Risks and open questions; empty when there are none"
+                        "description": "Risks, open questions and the assumptions you made, one line each; empty when there are none, never a \"None\" item"
                     }
                 },
                 "required": ["title", "goal", "steps", "doneWhen"]
