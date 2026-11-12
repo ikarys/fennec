@@ -396,7 +396,7 @@ export const fr: Record<MsgKey, string> = {
   sessionTitle: 'Pour cette session : {scope}',
   alwaysTitle: 'Règle du projet, visible et supprimable dans Réglages › Règles',
   always: 'Toujours',
-  neverTitle: 'Refuser et créer une règle du projet (Réglages › Règles)',
+  neverTitle: 'Refuser et bloquer {scope} dans une règle du projet (Réglages › Règles)',
   never: 'Jamais',
   // Settings page and model sections (pages/SettingsPage.tsx, components/settings)
   settingsTitle: 'Réglages',

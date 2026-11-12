@@ -2,7 +2,7 @@
 //! then run the recorded call in a turn.
 
 use crate::agent::ports::EventLog;
-use crate::domain::rule_approval::{Choice, pending};
+use crate::domain::rule_approval::{Choice, pending, stored_pattern};
 use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{Request, error, send_json};
@@ -44,7 +44,7 @@ pub(crate) fn answer_rule_approval(
             return error(stream, 400, "pattern is not a folder above the asked path");
         }
     }
-    let pattern = chosen_pattern.unwrap_or_else(|| pending.pattern.clone());
+    let pattern = stored_pattern(&pending, choice, chosen_pattern);
 
     // What the answer stores: nothing for "once", a session grant, or a project rule.
     let stored = match choice {

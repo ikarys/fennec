@@ -365,7 +365,7 @@ export const en = {
   sessionTitle: 'For this session: {scope}',
   alwaysTitle: 'Project rule, visible and removable in Settings › Rules',
   always: 'Always',
-  neverTitle: 'Refuse and create a project rule (Settings › Rules)',
+  neverTitle: 'Refuse and block {scope} in a project rule (Settings › Rules)',
   never: 'Never',
   // Settings page and model sections (pages/SettingsPage.tsx, components/settings)
   settingsTitle: 'Settings',
