@@ -29,7 +29,7 @@ pub use canvas::CanvasTarget;
 use crate::agent::ports::{CommandRun, Commands, RuleCheck, Toolbox};
 use crate::domain::agent::CommandAccess;
 use crate::domain::event::{OutputStream, ToolResult};
-use crate::domain::mcp::{self, McpServer, McpTransport};
+use crate::domain::mcp::{self, McpServer, McpTransport, ToolAccess};
 use crate::domain::preferences::SearchPrefs;
 use crate::domain::protection::Protection;
 use crate::sandbox::Sandbox;
@@ -243,16 +243,23 @@ impl LocalTools {
         // in the read-only sandbox, as `run_command` does.
         if let Some((server, tool)) = self.mcp_target(name) {
             // An HTTP MCP call is a direct request the sandbox never touches, so
-            // in plan mode (read-only by construction) it is refused: a remote
-            // side-effect is not a read.
-            if access == CommandAccess::ReadOnly && server.transport == McpTransport::Http {
+            // a read-only mode only lets through the tools the server declares
+            // read-only: a remote side-effect is not a read. The declaration is
+            // the server's, which the human installed, never the model's.
+            let http = server.transport == McpTransport::Http;
+            if access == CommandAccess::ReadOnly
+                && http
+                && server.tool_access(&tool) != ToolAccess::Read
+            {
                 return ToolResult::failure(
-                    "MCP over HTTP is refused in this read-only mode: it can trigger a remote side-effect. Use a builder session to call it.".to_string(),
+                    "MCP over HTTP is refused in this read-only mode unless the server declares the tool read-only: it can trigger a remote side-effect. Use a builder session to call it.".to_string(),
                 );
             }
             let read_only = self.sandbox.read_only(workdir);
             let sandbox = match access {
                 CommandAccess::ReadWrite => &self.sandbox,
+                // The HTTP transport spawns nothing: the sandbox is not used.
+                CommandAccess::ReadOnly if http => &self.sandbox,
                 CommandAccess::ReadOnly => match &read_only {
                     Some(sandbox) => sandbox,
                     None => {
@@ -491,7 +498,7 @@ mod mcp_dispatch_tests {
     use crate::agent::ports::Toolbox;
     use crate::domain::agent::CommandAccess;
     use crate::domain::event::OutputStream;
-    use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+    use crate::domain::mcp::{McpServer, McpTool, McpToolAnnotations, McpTransport};
     use serde_json::json;
     use std::path::PathBuf;
     use std::sync::atomic::AtomicBool;
@@ -531,6 +538,41 @@ mod mcp_dispatch_tests {
         let tools = LocalTools::new(PathBuf::from("/wt/1")).with_mcp(vec![http_server()]);
         let result = run(&tools, CommandAccess::ReadOnly);
         assert!(!result.success);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .is_some_and(|e| e.contains("refused in this read-only mode"))
+        );
+    }
+
+    #[test]
+    fn an_http_mcp_tool_declared_read_only_is_not_refused_in_read_only_mode() {
+        let mut server = http_server();
+        server.cached_tools[0].annotations = Some(McpToolAnnotations {
+            read_only_hint: Some(true),
+            destructive_hint: None,
+        });
+        let tools = LocalTools::new(PathBuf::from("/wt/1")).with_mcp(vec![server]);
+        // No server listens: the call fails on the connection, not the mode.
+        let result = run(&tools, CommandAccess::ReadOnly);
+        assert!(
+            !result
+                .error
+                .as_deref()
+                .is_some_and(|e| e.contains("refused in this read-only mode"))
+        );
+    }
+
+    #[test]
+    fn an_http_mcp_tool_declared_write_is_refused_in_read_only_mode() {
+        let mut server = http_server();
+        server.cached_tools[0].annotations = Some(McpToolAnnotations {
+            read_only_hint: Some(false),
+            destructive_hint: Some(false),
+        });
+        let tools = LocalTools::new(PathBuf::from("/wt/1")).with_mcp(vec![server]);
+        let result = run(&tools, CommandAccess::ReadOnly);
         assert!(
             result
                 .error
