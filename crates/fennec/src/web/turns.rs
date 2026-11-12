@@ -174,7 +174,8 @@ impl Turns {
                 if let Some(wt) = &place.worktree {
                     let message = format!("fennec: agent work in session {session_id}");
                     if let Err(e) = worktree::commit(wt, &message) {
-                        eprintln!("fennec: session {session_id}: commit: {e}");
+                        report_commit_failure(&settings.db_path, &session_id, &e);
+                        notifier.notify();
                     }
                 }
                 let mut running = crate::locks::lock(&running);
@@ -391,5 +392,67 @@ fn next_job(
             let input = resolve(&q.content, &skills::discover(workdir));
             Ok(Some(Job::Input(input, Vec::new())))
         }
+    }
+}
+
+/// A failed commit leaves the agent's work out of its branch, so nothing is
+/// offered for integration: the human reads why in the session, not on stderr.
+fn report_commit_failure(db_path: &Path, session_id: &str, error: &str) {
+    eprintln!("fennec: session {session_id}: commit: {error}");
+    let event = Event::ChatError {
+        error: format!(
+            "fennec could not commit the agent's work, so nothing can be integrated yet. Fix the cause (often a missing git user.name or user.email), then send a message: the work is committed when the next turn ends. git said: {error}"
+        ),
+        recoverable: false,
+    };
+    let logged = SqliteStore::open(db_path)
+        .map_err(|e| e.to_string())
+        .and_then(|store| store.append(session_id, &event));
+    if let Err(e) = logged {
+        eprintln!("fennec: session {session_id}: logging the commit failure: {e}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::id::new_id;
+
+    #[test]
+    fn a_failed_commit_without_a_git_identity_is_shown_in_the_session() {
+        let base = std::env::temp_dir().join(format!("fennec-commit-{}", new_id()));
+        let repo = base.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        let git = |args: &[&str]| crate::git::run(&repo, args, None).unwrap();
+        git(&["init", "-q"]);
+        // An empty identity fails like a missing one, whatever the machine's global config.
+        git(&["config", "user.name", ""]);
+        git(&["config", "user.email", ""]);
+        std::fs::write(repo.join("work.txt"), "agent work").unwrap();
+        let worktree = Worktree {
+            workdir: repo.clone(),
+            path: repo.clone(),
+            branch: "fennec/s".to_string(),
+            base: "refs/fennec/base/s".to_string(),
+            origin: "refs/fennec/origin/s".to_string(),
+        };
+        let error = worktree::commit(&worktree, "agent work").unwrap_err();
+
+        let db_path = base.join("fennec.db");
+        let store = SqliteStore::open(&db_path).unwrap();
+        let project = store.project_for(&repo.to_string_lossy()).unwrap();
+        let session = store.create_session(&project, "t").unwrap();
+        report_commit_failure(&db_path, &session, &error);
+        let events = store.events(&session).unwrap();
+        assert!(
+            events.iter().any(|event| matches!(
+                event,
+                Event::ChatError { error: shown, recoverable: false }
+                    if shown.contains("could not commit") && shown.contains(&error)
+            )),
+            "{events:?}"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

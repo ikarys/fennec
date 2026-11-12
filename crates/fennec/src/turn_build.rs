@@ -284,7 +284,12 @@ fn build_tools(
         &protection,
         whole,
     )
-    .with_mounts(worktree::dependency_mounts(workdir))
+    .with_mounts(
+        worktree::main_view(workdir)
+            .into_iter()
+            .chain(worktree::dependency_mounts(workdir))
+            .collect(),
+    )
     .writing(shared_target.iter().cloned().collect());
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())

@@ -220,22 +220,26 @@ pub fn dependency_mounts(workdir: &Path) -> Vec<(PathBuf, PathBuf)> {
     mounts
 }
 
+/// The main checkout's repository, read-only, for a linked worktree: its
+/// `.git` holds the worktree's git metadata, and tools installed there (a
+/// `.venv`'s scripts) name it in absolute paths. The sandbox's `/tmp` is empty,
+/// so a project under it would otherwise be invisible there.
+pub fn main_view(workdir: &Path) -> Option<(PathBuf, PathBuf)> {
+    main_repository(workdir).map(|top| (top.clone(), top))
+}
+
 /// One shared Cargo target directory for every worktree of a project.
 ///
 /// Worktrees are many and short-lived, while a target directory is large;
 /// sharing it per project avoids one target per session.
 pub fn shared_target(root: &Path, workdir: &Path) -> Option<PathBuf> {
     // ponytail: sessions of one project share build outputs, so one session's build can affect another's; per-session overlays if that matters.
-    let (top, prefix) = repository(workdir)?;
+    let (top, _) = repository(workdir)?;
     if !top.join("Cargo.toml").is_file() {
         return None;
     }
-    let main = main_checkout(workdir)?;
-    // `main` is the main checkout's copy of `workdir`; dropping the worktree's
-    // prefix leaves the main checkout's repository top, the project key.
-    let main_top = main
-        .ancestors()
-        .nth(Path::new(&prefix).components().count())?;
+    // The main checkout's repository top is the project key.
+    let main_top = main_repository(workdir)?;
     let key = main_top
         .to_string_lossy()
         .trim_start_matches('/')
@@ -277,6 +281,11 @@ pub fn link_dependencies(workdir: &Path) -> Result<(), String> {
 /// linked worktree; `None` in the main checkout or outside a repository.
 fn main_checkout(workdir: &Path) -> Option<PathBuf> {
     let (_, prefix) = repository(workdir)?;
+    Some(main_repository(workdir)?.join(prefix))
+}
+
+/// The main checkout's repository top when `workdir` is in a linked worktree.
+fn main_repository(workdir: &Path) -> Option<PathBuf> {
     // `--path-format` applies to the options after it.
     let out = git::run(
         workdir,
@@ -295,7 +304,7 @@ fn main_checkout(workdir: &Path) -> Option<PathBuf> {
     if git_dir == common_dir {
         return None;
     }
-    Some(Path::new(common_dir).parent()?.join(prefix))
+    Some(Path::new(common_dir).parent()?.to_path_buf())
 }
 
 fn collect_dependency_mounts(
@@ -412,6 +421,40 @@ mod tests {
         git(&repo, &["add", "-A"], None).unwrap();
         git(&repo, &["commit", "-q", "-m", "init"], None).unwrap();
         (base, repo)
+    }
+
+    #[test]
+    fn e2e_git_and_the_main_checkout_work_from_a_worktree_under_tmp() {
+        if !crate::sandbox::tests::bwrap_available() || !std::env::temp_dir().starts_with("/tmp") {
+            return;
+        }
+        // The sandbox's /tmp is empty: without the main view, the worktree's
+        // gitdir and the main checkout's files are missing there.
+        let (base, repo) = setup();
+        let linked = base.join("linked");
+        git(
+            &repo,
+            &["worktree", "add", "-q", &linked.to_string_lossy()],
+            None,
+        )
+        .unwrap();
+        let sandbox = crate::sandbox::Sandbox::On {
+            network: false,
+            hidden_dirs: vec![],
+            hidden_files: vec![],
+            writable: vec![],
+            read_only: vec![],
+            mounts: vec![],
+        }
+        .with_mounts(main_view(&linked).into_iter().collect());
+        let command = format!("git status --porcelain && cat {}/a.txt", repo.display());
+        let output = sandbox
+            .command(&command, &linked, &linked)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
