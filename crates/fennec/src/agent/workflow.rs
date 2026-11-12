@@ -596,16 +596,25 @@ fn run_node(
         .find(|open| open.node_id == node_id)
         .map(|open| open.pass)
         .unwrap_or_else(|| state.node_passes.get(node_id).copied().unwrap_or(0) + 1);
-    // A fresh agent's child is created first, so its start names it.
-    let child = match &node.kind {
+    // A fresh agent's child is created on first entry; a node re-entered after
+    // its child was answered reuses that child and reads its output, not a new
+    // one. The start that named the child is in the log.
+    let events = turn.log.events(turn.session_id)?;
+    let (child, resumed) = match &node.kind {
         NodeKind::Agent {
             context: AgentContext::Fresh,
             ..
-        } => Some(
-            env.children
-                .create(turn.session_id, &nodes::child_title(state, node))?,
-        ),
-        _ => None,
+        } => match existing_child(&events, &state.run_id, node_id) {
+            Some(id) => (Some(id), true),
+            None => (
+                Some(
+                    env.children
+                        .create(turn.session_id, &nodes::child_title(state, node))?,
+                ),
+                false,
+            ),
+        },
+        _ => (None, false),
     };
     let started = Instant::now();
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
@@ -637,16 +646,19 @@ fn run_node(
         } => (agent.clone(), *verdicts),
         _ => (String::new(), false),
     };
-    let end = match (&node.kind, child.as_deref()) {
-        (NodeKind::Agent { agent, outputs, .. }, Some(child)) => {
+    let end = match (&node.kind, child.as_deref(), resumed) {
+        (NodeKind::Agent { agent, outputs, .. }, Some(child), true) => {
+            nodes::resumed_child(env, &input, agent, outputs, child)?
+        }
+        (NodeKind::Agent { agent, outputs, .. }, Some(child), false) => {
             nodes::fresh_agent(env, &input, agent, outputs, child)?
         }
-        (NodeKind::Agent { agent, outputs, .. }, None) => {
+        (NodeKind::Agent { agent, outputs, .. }, None, _) => {
             session_agent(turn, &input, agent, outputs)?
         }
-        (NodeKind::Criteria { plan }, _) => criteria::run(turn, env, &input, plan)?,
-        (NodeKind::Shell { .. }, _) => nodes::shell(env, &input),
-        (NodeKind::Condition { .. }, _) => nodes::condition(&input),
+        (NodeKind::Criteria { plan }, _, _) => criteria::run(turn, env, &input, plan)?,
+        (NodeKind::Shell { .. }, _, _) => nodes::shell(env, &input),
+        (NodeKind::Condition { .. }, _, _) => nodes::condition(&input),
         _ => return Err(format!("{node_id}: cannot run as a node")),
     };
     if verdicts && let nodes::NodeEnd::Finished { output, .. } = &end {
@@ -696,6 +708,20 @@ fn folded_after_start(turn: &mut Turn) -> Result<(RunState, Vec<String>), String
     let state = run::current_run(&events).ok_or("no active run")?;
     let files = files_changed(run::current_run_events(&events));
     Ok((state, files))
+}
+
+/// The child session a fresh agent node already ran in this run, if it was
+/// started before: its `node.started` named it.
+fn existing_child(events: &[Event], run_id: &str, node_id: &str) -> Option<String> {
+    events.iter().rev().find_map(|event| match event {
+        Event::WorkflowNodeStarted {
+            run_id: r,
+            node_id: n,
+            child_session_id: Some(child),
+            ..
+        } if r == run_id && n == node_id => Some(child.clone()),
+        _ => None,
+    })
 }
 
 fn append_node_started(

@@ -2,10 +2,11 @@
 //! sessions with a parent, run on their own turn.
 
 use super::turns::with_turn;
-use crate::agent::ports::{AgentRun, ChildSessions};
+use crate::agent::ports::{AgentRun, ChildSessions, EventLog};
 use crate::agent::turn::run_child_agent_node;
 use crate::config::Settings;
 use crate::domain::conversation::node_output;
+use crate::domain::event::{DoneReason, Event};
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
 use std::path::Path;
@@ -49,5 +50,22 @@ impl ChildSessions for Children<'_> {
                 Ok(AgentRun { reason, text })
             },
         )
+    }
+
+    fn last_run(&self, child_session_id: &str) -> Result<AgentRun, String> {
+        let store = SqliteStore::open(&self.settings.db_path)?;
+        let events = store.events(child_session_id)?;
+        let reason = events
+            .iter()
+            .rev()
+            .find_map(|event| match event {
+                Event::ChatDone { reason, .. } => Some(*reason),
+                _ => None,
+            })
+            .unwrap_or(DoneReason::Complete);
+        Ok(AgentRun {
+            reason,
+            text: node_output(&events),
+        })
     }
 }

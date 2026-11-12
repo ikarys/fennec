@@ -154,6 +154,13 @@ export function SessionPage({
   const running = view.running;
   const pendingCallId =
     served.pendingApproval?.callId ?? served.pendingWaiver?.callId;
+  // A child's agent can ask for an approval, an answer or a waiver; the human
+  // answers here and the workflow resumes on its own once the node completes.
+  const childWaiting = !!(
+    served.pendingApproval ||
+    served.pendingWaiver ||
+    view.pendingQuestion
+  );
   const run = view.run;
   const waiting = runWaiting(run, running, view.lastDone);
   // The detail is fetched once; the event stream says how a turn ended.
@@ -826,8 +833,7 @@ export function SessionPage({
 
                     {served.pendingApproval &&
                       !running &&
-                      !waiting &&
-                      !detail?.parentId && (
+                      !waiting && (
                         <RuleApprovalCard
                           approval={served.pendingApproval}
                           onAnswer={handleApproval}
@@ -836,8 +842,7 @@ export function SessionPage({
                       )}
                     {served.pendingWaiver &&
                       !running &&
-                      !waiting &&
-                      !detail?.parentId && (
+                      !waiting && (
                         <WaiverCard
                           waiver={served.pendingWaiver}
                           onAnswer={handleWaiver}
@@ -846,8 +851,7 @@ export function SessionPage({
                       )}
                     {view.pendingQuestion &&
                       !running &&
-                      !waiting &&
-                      !detail?.parentId && (
+                      !waiting && (
                         <QuestionCard
                           question={view.pendingQuestion}
                           onAnswer={(answer) => handleSend(answer)}
@@ -873,20 +877,28 @@ export function SessionPage({
                       !detail?.parentId && (
                         <RetryCard onRetry={handleRetry} disabled={running} />
                       )}
-                    {/* A node's session is driven by its workflow: the human answers in the parent. */}
+                    {/* A node's session is driven by its workflow. When its agent asks for
+                        an approval, an answer or a waiver the human answers here; the
+                        workflow resumes on its own once the node completes. */}
                     {detail?.parentId && (
                       <div className="mx-auto flex max-w-[960px] items-center gap-3 border-t border-border px-1 py-2">
                         <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${running ? "bg-accent" : "bg-ok"}`}
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            running || childWaiting ? "bg-accent" : "bg-ok"
+                          }`}
                         />
                         <div className="min-w-0 grow">
                           <div className="text-sm font-medium text-text">
                             {running
                               ? t('sessionPageWorkflowNodeRunning')
-                              : t('sessionPageWorkflowNodeFinished')}
+                              : childWaiting
+                                ? t('sessionPageWorkflowNodeWaiting')
+                                : t('sessionPageWorkflowNodeFinished')}
                           </div>
                           <div className="text-xs text-muted">
-                            {t('sessionPageWorkflowDrivenSessionHint')}
+                            {childWaiting
+                              ? t('sessionPageWorkflowNodeWaitingHint')
+                              : t('sessionPageWorkflowDrivenSessionHint')}
                           </div>
                         </div>
                         <a

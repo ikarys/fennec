@@ -199,18 +199,32 @@ pub(super) fn fresh_agent(
         .send(child_session_id, agent, &prompt, input.stop)?;
     let label = input.node.label();
 
-    match agent_end(label, outputs, run.reason, run.text, |reminder| {
+    agent_end(label, outputs, run.reason, run.text, |reminder| {
         let run = env
             .children
             .send(child_session_id, agent, reminder, input.stop)?;
         Ok((run.reason, run.text))
-    })? {
-        NodeEnd::AgentAsked => Ok(NodeEnd::EndRun {
-            outcome: RunOutcome::Blocked,
-            reason: Some(format!("\"{label}\" asked a question in a child session")),
-        }),
-        end => Ok(end),
-    }
+    })
+}
+
+/// A fresh agent node re-entered after its child was answered: read the
+/// child's last turn and finish on it, without re-sending a prompt. When the
+/// child is still waiting, it comes back `AgentAsked` and the node stays open.
+pub(super) fn resumed_child(
+    env: &WorkflowEnv,
+    input: &NodeInput,
+    agent: &str,
+    outputs: &[String],
+    child_session_id: &str,
+) -> Result<NodeEnd, String> {
+    let label = input.node.label();
+    let run = env.children.last_run(child_session_id)?;
+    agent_end(label, outputs, run.reason, run.text, |reminder| {
+        let run = env
+            .children
+            .send(child_session_id, agent, reminder, input.stop)?;
+        Ok((run.reason, run.text))
+    })
 }
 
 #[cfg(test)]

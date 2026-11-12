@@ -8,10 +8,11 @@ use crate::agent::turn::{Turn, compact_session, replay_turn, retry_turn, run_tur
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, run_workflow};
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
-use crate::domain::event::Event;
+use crate::domain::event::{DoneReason, Event};
 use crate::domain::queue;
 use crate::domain::rule_approval::Choice;
 use crate::domain::slash::{TurnInput, resolve};
+use crate::domain::workflow::run as run_state;
 use crate::notifier::{Notifier, NotifyingLog};
 use crate::skills;
 use crate::store::SqliteStore;
@@ -25,6 +26,7 @@ use std::sync::{Arc, Mutex};
 
 /// Where a session's turns run: its worktree when it has one, the project's
 /// directory otherwise.
+#[derive(Clone)]
 pub struct Place {
     pub workdir: PathBuf,
     pub worktree: Option<Worktree>,
@@ -133,78 +135,186 @@ impl Turns {
             }
             running.insert(session_id.to_string(), stop.clone());
         }
-        let settings = self.settings.clone();
-        let notifier = self.notifier.clone();
-        let running = self.running.clone();
-        let session_id = session_id.to_string();
-        std::thread::spawn(move || {
-            let mut job = job;
-            loop {
-                // A panic in the turn (a tool, a parser) must not leave the
-                // session running forever: its turn ends as cut, the loop goes on.
-                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    run(
-                        &settings,
-                        &notifier,
-                        &session_id,
-                        &place.workdir,
-                        &job,
-                        &stop,
-                        autonomous,
-                    )
-                }));
-                match outcome {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("fennec: session {session_id}: {e}"),
-                    Err(_) => {
-                        eprintln!("fennec: session {session_id}: the turn panicked");
-                        let ended = SqliteStore::open(&settings.db_path)
-                            .and_then(|store| store.end_cut_turn(&session_id));
-                        if let Err(e) = ended {
-                            eprintln!("fennec: session {session_id}: ending the cut turn: {e}");
-                        }
-                        notifier.notify();
-                    }
-                }
-                // Whatever the job did, what the agent wrote is recorded as
-                // fennec's commits for the human to cherry-pick.
-                if let Some(wt) = &place.worktree {
-                    let message = format!("fennec: agent work in session {session_id}");
-                    if let Err(e) = worktree::commit(wt, &message) {
-                        eprintln!("fennec: session {session_id}: commit: {e}");
-                    }
-                }
-                let mut running = running.lock().unwrap();
-                match next_job(
-                    &settings,
-                    &notifier,
-                    &session_id,
-                    &place.workdir,
-                    stop.load(Ordering::Relaxed),
-                ) {
-                    Ok(Some(next)) => {
-                        drop(running);
-                        job = next;
-                    }
-                    Ok(None) => {
-                        running.remove(&session_id);
-                        drop(running);
-                        // Whoever waits for the turn to end (the ideas queue) wakes now.
-                        notifier.notify();
-                        break;
-                    }
-                    Err(e) => {
-                        eprintln!("fennec: session {session_id}: queue: {e}");
-                        running.remove(&session_id);
-                        drop(running);
-                        notifier.notify();
-                        break;
-                    }
-                }
-            }
-        });
+        let ctx = TurnContext {
+            settings: self.settings.clone(),
+            notifier: self.notifier.clone(),
+            running: self.running.clone(),
+            session_id: session_id.to_string(),
+            place,
+            stop,
+            autonomous,
+        };
+        std::thread::spawn(move || run_turn_loop(ctx, job));
         Ok(())
     }
+}
+
+/// Everything a turn thread needs to run one session's turns: the shared
+/// wiring and where the session runs.
+struct TurnContext {
+    settings: Settings,
+    notifier: Arc<Notifier>,
+    running: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+    session_id: String,
+    place: Place,
+    stop: Arc<AtomicBool>,
+    autonomous: bool,
+}
+
+/// The turn's loop, one thread per session: runs the job, then whatever the
+/// queue drops in, until nothing is left. A child session that just finished
+/// re-drives its parent's workflow (`resume_blocked_parent`).
+fn run_turn_loop(ctx: TurnContext, job: Job) {
+    let mut job = job;
+    loop {
+        // A panic in the turn (a tool, a parser) must not leave the
+        // session running forever: its turn ends as cut, the loop goes on.
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run(
+                &ctx.settings,
+                &ctx.notifier,
+                &ctx.session_id,
+                &ctx.place.workdir,
+                &job,
+                &ctx.stop,
+                ctx.autonomous,
+            )
+        }));
+        match outcome {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("fennec: session {}: {e}", ctx.session_id),
+            Err(_) => {
+                eprintln!("fennec: session {}: the turn panicked", ctx.session_id);
+                let ended = SqliteStore::open(&ctx.settings.db_path)
+                    .and_then(|store| store.end_cut_turn(&ctx.session_id));
+                if let Err(e) = ended {
+                    eprintln!(
+                        "fennec: session {}: ending the cut turn: {e}",
+                        ctx.session_id
+                    );
+                }
+                ctx.notifier.notify();
+            }
+        }
+        // Whatever the job did, what the agent wrote is recorded as
+        // fennec's commits for the human to cherry-pick.
+        if let Some(wt) = &ctx.place.worktree {
+            let message = format!("fennec: agent work in session {}", ctx.session_id);
+            if let Err(e) = worktree::commit(wt, &message) {
+                eprintln!("fennec: session {}: commit: {e}", ctx.session_id);
+            }
+        }
+        let mut guard = ctx.running.lock().unwrap();
+        match next_job(
+            &ctx.settings,
+            &ctx.notifier,
+            &ctx.session_id,
+            &ctx.place.workdir,
+            ctx.stop.load(Ordering::Relaxed),
+        ) {
+            Ok(Some(next)) => {
+                drop(guard);
+                job = next;
+            }
+            Ok(None) => {
+                guard.remove(&ctx.session_id);
+                drop(guard);
+                resume_blocked_parent(&ctx);
+                // Whoever waits for the turn to end (the ideas queue) wakes now.
+                ctx.notifier.notify();
+                break;
+            }
+            Err(e) => {
+                eprintln!("fennec: session {}: queue: {e}", ctx.session_id);
+                guard.remove(&ctx.session_id);
+                drop(guard);
+                ctx.notifier.notify();
+                break;
+            }
+        }
+    }
+}
+
+/// A child session that just finished re-drives its parent's workflow: the
+/// node it ran in can now finish on its output. The parent's run must be
+/// active with that node open (a child that asked a question left it open); a
+/// child that is still waiting does not re-drive it.
+fn resume_blocked_parent(ctx: &TurnContext) {
+    let store = match SqliteStore::open(&ctx.settings.db_path) {
+        Ok(store) => store,
+        Err(_) => return,
+    };
+    let Some(child) = store.session(&ctx.session_id).ok().flatten() else {
+        return;
+    };
+    let Some(parent_id) = child.parent_id else {
+        return;
+    };
+    let child_events = match store.events(&ctx.session_id) {
+        Ok(events) => events,
+        Err(_) => return,
+    };
+    // Only a child whose last turn completed re-drives the parent; one that
+    // is still waiting (answered and asked again) does not.
+    let completed = child_events
+        .iter()
+        .rev()
+        .find_map(|event| match event {
+            Event::ChatDone { reason, .. } => Some(*reason),
+            _ => None,
+        })
+        .is_some_and(|reason| reason == DoneReason::Complete);
+    if !completed {
+        return;
+    }
+    let parent_events = match store.events(&parent_id) {
+        Ok(events) => events,
+        Err(_) => return,
+    };
+    let Some(parent_run) = run_state::current_run(&parent_events) else {
+        return;
+    };
+    // The nodes this run started in this child: the one it is blocked on is the
+    // open node among them.
+    let child_nodes: HashSet<&str> = parent_events
+        .iter()
+        .filter_map(|event| match event {
+            Event::WorkflowNodeStarted {
+                run_id,
+                node_id,
+                child_session_id: Some(child),
+                ..
+            } if run_id == &parent_run.run_id && child == &ctx.session_id => Some(node_id.as_str()),
+            _ => None,
+        })
+        .collect();
+    let blocked_on_child = parent_run
+        .open
+        .iter()
+        .any(|open| child_nodes.contains(open.node_id.as_str()));
+    if !blocked_on_child {
+        return;
+    }
+    let stop = Arc::new(AtomicBool::new(false));
+    {
+        let mut guard = ctx.running.lock().unwrap();
+        if guard.contains_key(&parent_id) {
+            return;
+        }
+        guard.insert(parent_id.clone(), stop.clone());
+    }
+    // The parent shares the child's workdir and root worktree, so the child's
+    // place is the parent's.
+    let parent_ctx = TurnContext {
+        settings: ctx.settings.clone(),
+        notifier: ctx.notifier.clone(),
+        running: ctx.running.clone(),
+        session_id: parent_id,
+        place: ctx.place.clone(),
+        stop,
+        autonomous: ctx.autonomous,
+    };
+    std::thread::spawn(move || run_turn_loop(parent_ctx, Job::Workflow(WorkflowJob::Resume)));
 }
 
 /// Opens the session's store, resolves its model choice and hands the turn

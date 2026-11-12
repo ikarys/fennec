@@ -68,6 +68,10 @@ impl<'a> Harness<'a> {
 struct FakeChildren {
     calls: Mutex<Vec<String>>,
     replies: Mutex<Vec<String>>,
+    /// The end reason of each `send`, in order; Complete when unscripted.
+    reasons: Mutex<Vec<DoneReason>>,
+    /// The scripted answer to `last_run`, in order; a completed "last" when none.
+    last_runs: Mutex<Vec<AgentRun>>,
 }
 
 impl ChildSessions for FakeChildren {
@@ -89,10 +93,21 @@ impl ChildSessions for FakeChildren {
             .unwrap()
             .push(format!("send:{child}:{agent}:{prompt}"));
         let text = self.replies.lock().unwrap().pop().unwrap_or_default();
-        Ok(AgentRun {
+        let reason = self
+            .reasons
+            .lock()
+            .unwrap()
+            .pop()
+            .unwrap_or(DoneReason::Complete);
+        Ok(AgentRun { reason, text })
+    }
+
+    fn last_run(&self, child: &str) -> Result<AgentRun, String> {
+        self.calls.lock().unwrap().push(format!("last_run:{child}"));
+        Ok(self.last_runs.lock().unwrap().pop().unwrap_or(AgentRun {
             reason: DoneReason::Complete,
-            text,
-        })
+            text: "last".into(),
+        }))
     }
 }
 
@@ -1396,6 +1411,7 @@ fn parallel_branches() {
     let children = FakeChildren {
         calls: Mutex::new(Vec::new()),
         replies: Mutex::new(vec!["result a".into(), "result b".into()]),
+        ..FakeChildren::default()
     };
     let commands = FakeCommands::default();
     let env = WorkflowEnv {
@@ -1436,6 +1452,134 @@ fn parallel_branches() {
     assert!(join_output.contains("result a"));
     assert!(join_output.contains("Branch B"));
     assert!(join_output.contains("result b"));
+}
+
+#[test]
+fn a_fresh_child_that_asks_a_question_keeps_the_run_open_and_reuses_the_child_on_resume() {
+    let workflow = Workflow {
+        id: "w".into(),
+        name: "w".into(),
+        description: String::new(),
+        max_steps: 50,
+        nodes: vec![
+            Node {
+                id: "start".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::Start,
+            },
+            Node {
+                id: "verify".into(),
+                name: Some("Verify".into()),
+                position: Position::default(),
+                kind: NodeKind::Agent {
+                    agent: "plan".into(),
+                    prompt: "verify".into(),
+                    retry_prompt: None,
+                    outputs: vec!["ok".into()],
+                    context: AgentContext::Fresh,
+                    verdicts: false,
+                },
+            },
+            Node {
+                id: "end".into(),
+                name: None,
+                position: Position::default(),
+                kind: NodeKind::End {
+                    outcome: EndOutcome::Done,
+                },
+            },
+        ],
+        edges: vec![
+            Edge {
+                from: "start".into(),
+                port: "next".into(),
+                to: "verify".into(),
+                max_passes: None,
+                pause: false,
+            },
+            Edge {
+                from: "verify".into(),
+                port: "ok".into(),
+                to: "end".into(),
+                max_passes: None,
+                pause: false,
+            },
+        ],
+    };
+
+    let model = Scripted(RefCell::new(vec![reply("unused", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren {
+        calls: Mutex::new(Vec::new()),
+        replies: Mutex::new(vec!["asked".into()]),
+        reasons: Mutex::new(vec![DoneReason::WaitingForUser]),
+        last_runs: Mutex::new(vec![AgentRun {
+            reason: DoneReason::Complete,
+            text: "verified".into(),
+        }]),
+    };
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+
+    // The child asks, so the run stays open (not finished) and the node is left
+    // for the human to answer in the child.
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "go".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+
+    let events = h.log.0.borrow().clone();
+    let state = run::current_run(&events).unwrap();
+    assert!(state.finished.is_none());
+    let open = state
+        .open
+        .iter()
+        .find(|open| open.node_id == "verify")
+        .expect("the verify node stays open");
+    let child_id = open.child_session_id.clone().unwrap();
+
+    // Answered in the child: the resume reuses that child and reads its output,
+    // creating no new one.
+    let reason = run_workflow(&mut h.turn(), &env, WorkflowJob::Resume).unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+
+    let calls = children.calls.lock().unwrap();
+    assert!(
+        calls
+            .iter()
+            .any(|call| call == &format!("last_run:{child_id}"))
+    );
+    let creates = calls
+        .iter()
+        .filter(|call| call.starts_with("create:"))
+        .count();
+    assert_eq!(
+        creates, 1,
+        "the resume must reuse the child, not create a new one"
+    );
+
+    let events = h.log.0.into_inner();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeFinished {
+            node_id, port, ..
+        } if node_id == "verify" && port == "ok"))
+    );
 }
 
 #[test]

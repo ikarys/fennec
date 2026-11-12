@@ -125,6 +125,10 @@ pub trait ChildSessions: Sync {
         prompt: &str,
         stop: &AtomicBool,
     ) -> Result<AgentRun, String>;
+    /// The child's last turn: its end reason and the agent's last text. A node
+    /// re-entered after its child was answered reads this instead of re-sending
+    /// a prompt.
+    fn last_run(&self, child_session_id: &str) -> Result<AgentRun, String>;
 }
 
 /// How a workflow shell node ended.
