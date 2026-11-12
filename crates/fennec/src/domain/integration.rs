@@ -23,6 +23,10 @@ pub struct DiffChecks {
     /// Changed files no step of the approved plan lists (set by the adapter,
     /// which reads the run's plan).
     pub outside_plan: Vec<String>,
+    /// The test files the human validated at the run's test gate (set by the adapter, which reads the log).
+    pub validated_tests: Vec<String>,
+    /// Changed files under a dependency or build-cache directory (.venv, node_modules, __pycache__…): rarely meant to be committed.
+    pub artifacts: Vec<String>,
     /// The security scanners' hits on the branch (filled by the adapter that
     /// ran them: the diff alone cannot tell).
     pub security: Vec<SecurityFinding>,
@@ -40,6 +44,7 @@ impl DiffChecks {
         let mut suppressions = Vec::new();
         let mut markers = Vec::new();
         let mut sensitive = Vec::new();
+        let mut artifacts = Vec::new();
 
         for (path, lines) in files {
             violations.extend(rules.check(path, &lines.added));
@@ -50,6 +55,9 @@ impl DiffChecks {
             if rules.is_sensitive(path) {
                 sensitive.push(path.clone());
             }
+            if is_artifact(path) {
+                artifacts.push(path.clone());
+            }
         }
 
         DiffChecks {
@@ -59,6 +67,8 @@ impl DiffChecks {
             markers,
             sensitive,
             outside_plan: Vec::new(),
+            validated_tests: Vec::new(),
+            artifacts,
             security: Vec::new(),
             scanning: false,
             understood: false,
@@ -73,6 +83,46 @@ fn is_conflict_marker(line: &str) -> bool {
         line.strip_prefix(marker)
             .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
     })
+}
+
+fn is_artifact(path: &str) -> bool {
+    let mut segments = path.split('/');
+    let file_name = segments.next_back().unwrap_or("");
+    for segment in segments {
+        if matches!(
+            segment,
+            ".venv"
+                | "venv"
+                | "node_modules"
+                | "__pycache__"
+                | ".pytest_cache"
+                | ".mypy_cache"
+                | ".ruff_cache"
+                | ".tox"
+        ) || segment.ends_with(".egg-info")
+        {
+            return true;
+        }
+    }
+    file_name.ends_with(".pyc") || file_name == ".DS_Store"
+}
+
+#[cfg(test)]
+mod artifact_tests {
+    use super::is_artifact;
+
+    #[test]
+    fn dependency_and_cache_paths_are_artifacts() {
+        assert!(is_artifact(".venv/bin/pip"));
+        assert!(is_artifact("pkg/__pycache__/a.pyc"));
+        assert!(is_artifact("web/node_modules/x/index.js"));
+    }
+
+    #[test]
+    fn similar_names_are_not_artifacts() {
+        assert!(!is_artifact("src/venv_utils.py"));
+        assert!(!is_artifact("docs/node_modules.md"));
+    }
 }
 
 /// What blocks an integration, shown to the human before they confirm it.
@@ -546,6 +596,8 @@ mod tests {
             markers: vec![],
             sensitive: vec![],
             outside_plan: Vec::new(),
+            validated_tests: Vec::new(),
+            artifacts: Vec::new(),
             security: vec![finding.clone()],
             scanning: true,
             understood: false,

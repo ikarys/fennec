@@ -63,6 +63,8 @@ export type ReviewSignal =
   | 'architecture'
   | 'conflictMarker'
   | 'testsWeakened'
+  | 'validatedTests'
+  | 'artifact'
   | 'hot'
   | 'untested'
   | 'large';

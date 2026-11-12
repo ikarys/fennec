@@ -18,6 +18,8 @@ pub enum ReviewSignal {
     Architecture,
     ConflictMarker,
     TestsWeakened,
+    ValidatedTests,
+    Artifact,
     Hot,
     Untested,
     Large,
@@ -72,6 +74,12 @@ pub fn signals(file: &FileFacts, checks: &DiffChecks) -> Vec<ReviewSignal> {
         .is_some_and(|weakened| weakened.paths.contains(&file.path))
     {
         out.push(ReviewSignal::TestsWeakened);
+    }
+    if checks.validated_tests.contains(&file.path) {
+        out.push(ReviewSignal::ValidatedTests);
+    }
+    if checks.artifacts.contains(&file.path) {
+        out.push(ReviewSignal::Artifact);
     }
     if file.hot {
         out.push(ReviewSignal::Hot);
@@ -331,5 +339,23 @@ mod tests {
 
         let single = order(&[plain], &checks);
         assert_eq!(common(&single), Vec::<ReviewSignal>::new());
+    }
+
+    #[test]
+    fn validated_tests_and_artifact_signals_are_informational() {
+        let checks = DiffChecks {
+            validated_tests: vec!["tests/a.rs".into()],
+            artifacts: vec![".venv/bin/pip".into()],
+            ..Default::default()
+        };
+
+        let validated = file("tests/a.rs", 0, 0, false, false, true);
+        assert_eq!(
+            signals(&validated, &checks),
+            vec![ReviewSignal::ValidatedTests]
+        );
+
+        let artifact = file(".venv/bin/pip", 0, 0, false, false, true);
+        assert_eq!(signals(&artifact, &checks), vec![ReviewSignal::Artifact]);
     }
 }

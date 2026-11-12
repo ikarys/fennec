@@ -144,6 +144,7 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
     let target = target(&store, app, id)?;
 
     let events = store.events(&target.session.id)?;
+    let task = crate::domain::conversation::first_request(&events).unwrap_or_default();
     let request = crate::domain::commit_subject::request_since_integration(&events);
     let commits: Vec<&str> = target
         .preview
@@ -163,6 +164,7 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
 
     match crate::web::jobs::commit_subject::suggest(
         &app.settings,
+        &task,
         &request,
         &target.session.title,
         &commits,

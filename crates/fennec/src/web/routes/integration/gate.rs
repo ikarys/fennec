@@ -130,14 +130,21 @@ pub(super) fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, Htt
     };
     checks.understood = understanding.held();
     // The plan is the contract the human approved: files it does not list are
-    // a deviation the gate must name.
+    // a deviation the gate must name. The tests the human validated are part
+    // of that contract.
     let plan = run::current_run(&events)
         .as_ref()
         .and_then(run::plan_output)
         .map(plan_scope::plan_files)
         .unwrap_or_default();
+    let validated: Vec<String> = crate::domain::test_files::approved(&events)
+        .iter()
+        .map(|path| path.trim_start_matches("./").to_string())
+        .collect();
+    let contract = plan_scope::contract(plan, &validated);
     let changed_paths: Vec<String> = changed.iter().map(|(path, _)| path.clone()).collect();
-    checks.outside_plan = plan_scope::outside(&plan, &changed_paths);
+    checks.outside_plan = plan_scope::outside(&contract, &changed_paths);
+    checks.validated_tests = validated;
     let hot = risk::hot_files(&top);
     let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);
     let facts: Vec<FileFacts> = preview
