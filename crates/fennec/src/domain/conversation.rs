@@ -449,6 +449,7 @@ mod tests {
         let report = Report {
             title: "Plan".into(),
             summary: "the work is done".into(),
+            findings: String::new(),
             steps: vec![ReportStep {
                 title: "s".into(),
                 done: true,

@@ -44,6 +44,7 @@ export interface PlanProposal {
 export interface ReportProposal {
   title?: string;
   summary?: string;
+  findings?: string;
   steps?: { title: string; done?: boolean; note?: string }[];
   doneWhen?: { text: string; met?: boolean; how?: string }[];
   changed?: { path: string; what: string }[];
@@ -87,6 +88,7 @@ export interface Report {
   kind: 'report';
   title: string;
   summary: string;
+  findings: string;
   steps: NumberedCheck[];
   doneWhen: NumberedCheck[];
   changed: { path: string; what: string }[];
@@ -118,6 +120,7 @@ export function reportFromSubmission(proposal: ReportProposal): Report {
     kind: 'report',
     title: proposal.title ?? '',
     summary: proposal.summary ?? '',
+    findings: (proposal.findings ?? '').trim(),
     steps,
     doneWhen,
     changed: proposal.changed ?? [],
@@ -360,7 +363,7 @@ function parseReport(title: string, lines: string[]): Report | null {
   }
 
   if (steps.length === 0 && doneWhen.length === 0) return null;
-  return { kind: 'report', title, summary, steps, doneWhen: unmetFirst(doneWhen), changed, test, todo };
+  return { kind: 'report', title, summary, findings: '', steps, doneWhen: unmetFirst(doneWhen), changed, test, todo };
 }
 
 /** The text before the contract and the contract itself; null when the text holds none. */

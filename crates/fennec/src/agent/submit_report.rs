@@ -30,6 +30,10 @@ pub fn definition() -> Value {
                         "type": "string",
                         "description": "One or two sentences: what changed for the user"
                     },
+                    "findings": {
+                        "type": "string",
+                        "description": "What the work found or measured that the human asked to know: benchmark numbers, an investigation's answer, a test run's result. Markdown, several lines allowed. Fill it whenever the task asks for a result, even when no criterion asks for it; empty otherwise"
+                    },
                     "steps": {
                         "type": "array",
                         "description": "The plan's steps; mark a step done only for what you verified",
@@ -113,6 +117,7 @@ pub fn parse(args: &Value) -> Result<Report, String> {
     let title = tool_args::single_line(&tool_args::required(NAME, args, "title")?, "'title'", 120)?;
     let summary =
         tool_args::single_line(&tool_args::required(NAME, args, "summary")?, "'summary'", 0)?;
+    let findings = optional_text(args, "findings", "the report")?;
 
     let steps = tool_args::required_array(NAME, args, "steps")?;
     let mut report_steps = Vec::with_capacity(steps.len());
@@ -168,6 +173,7 @@ pub fn parse(args: &Value) -> Result<Report, String> {
     Ok(Report {
         title,
         summary,
+        findings,
         steps: report_steps,
         done_when,
         changed,
@@ -213,6 +219,15 @@ fn optional_single_line(value: &Value, field: &str, what: &str) -> Result<Option
                 tool_args::single_line(s, &format!("{what}'s '{field}'"), 0).map(Some)
             }
         }
+        Some(_) => Err(format!("{what}'s '{field}' must be a string.")),
+    }
+}
+
+/// An optional multi-line string field: trimmed; empty when absent or null.
+fn optional_text(value: &Value, field: &str, what: &str) -> Result<String, String> {
+    match value.get(field) {
+        None | Some(Value::Null) => Ok(String::new()),
+        Some(Value::String(s)) => Ok(s.trim().to_string()),
         Some(_) => Err(format!("{what}'s '{field}' must be a string.")),
     }
 }
@@ -437,5 +452,17 @@ mod tests {
         let r = parse(&args).unwrap();
         assert_eq!(r.test, "");
         assert_eq!(r.todo, "");
+    }
+
+    #[test]
+    fn findings_are_optional_and_multi_line() {
+        let mut args = valid();
+        args["findings"] = json!("  p50 12 ms\n p99 40 ms  ");
+        let r = parse(&args).unwrap();
+        assert_eq!(r.findings, "p50 12 ms\n p99 40 ms");
+        args = valid();
+        args.as_object_mut().unwrap().remove("findings");
+        let r = parse(&args).unwrap();
+        assert_eq!(r.findings, "");
     }
 }

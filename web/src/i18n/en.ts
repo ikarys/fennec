@@ -331,6 +331,7 @@ export const en = {
   stepNotDone: 'Step {number} not done',
   criteriaAwaitBuild: 'The plan’s criteria take effect in the run that builds it.',
   reportBadge: 'Report',
+  reportFindings: 'Findings',
   reportIndicativeTitle: 'Checks declared by the model, not verified by fennec',
   stepsLabel: 'Steps',
   toTest: 'To test',
@@ -1247,6 +1248,8 @@ export const en = {
   runEndReadTokens: 'Read tokens',
   runEndCriteriaDetail: '{verified} verified{verifiedPlural} · {indicative} indicative{indicativePlural}',
   runEndTimeDetail: 'Time detail',
+  runEndShowStats: 'Show the run\'s numbers',
+  runEndHideStats: 'Hide the run\'s numbers',
   runEndNodesSummary: '{duration} · {count} node{plural}',
   runEndWorkReady: 'The work is ready in the agent\'s workspace.',
   // components/session/AgentsMdCard.tsx

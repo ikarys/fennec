@@ -21,7 +21,7 @@ use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
-use crate::domain::workflow::stats::{RunStats, run_stats};
+use crate::domain::workflow::stats::{RunStats, node_turns_ms, run_stats};
 use crate::domain::workflow::template::render;
 use nodes::NodeInput;
 use std::sync::atomic::Ordering;
@@ -238,7 +238,8 @@ fn continue_agent_node(
             session_send(turn, agent, reminder)
         })?
     };
-    let next = record(turn, &state, &node.id, end, None)?;
+    let worked = node_turns_ms(&events, &node.id);
+    let next = record(turn, &state, &node.id, end, Some(worked))?;
 
     match next {
         Step::Go(cursor) => walk_from(turn, env, cursor),

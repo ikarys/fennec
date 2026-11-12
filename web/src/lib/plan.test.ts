@@ -240,6 +240,12 @@ describe('reportFromSubmission', () => {
     expect(report.changed).toEqual([]);
     expect(report.test).toEqual([]);
     expect(report.todo).toEqual([]);
+    expect(report.findings).toBe('');
+  });
+
+  it('trims the findings, keeping their lines', () => {
+    const report = reportFromSubmission({ title: 'R', summary: 's', findings: '  p50 12 ms\n p99 40 ms ' });
+    expect(report.findings).toBe('p50 12 ms\n p99 40 ms');
   });
 
   it('lists the free text by line, or by sentence on one line', () => {
