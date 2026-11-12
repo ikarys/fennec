@@ -8,7 +8,7 @@ run: build
 build: web
     cargo build --release -p fennec
 
-# Build fennec with a local build number and install it to ~/.local/bin (systemd user service restarted)
+# Build fennec with a local build number and install it to ~/.local/bin (systemd user service restarted).
 install: web
     #!/usr/bin/env bash
     set -euo pipefail
@@ -18,7 +18,7 @@ install: web
     FENNEC_BUILD="$build" cargo build --release -p fennec
     FENNEC_LOCAL_BINARY=target/release/fennec sh install.sh
 
-# Build the web UI into web/dist (dependencies installed again when the lockfile changes)
+# Build the web UI into web/dist (dependencies installed again when the lockfile changes).
 web:
     cd web && ([ node_modules/.package-lock.json -nt package-lock.json ] || npm ci) && npm run build
 
@@ -55,7 +55,7 @@ dev:
     # the server's origin guard does not know (5174+ → "forbidden origin").
     cd web && FENNEC_API="http://127.0.0.1:$API_PORT" npm run dev -- --port "$UI_PORT" --strictPort
 
-# Measure fennec on a scripted session workload: `just perf` (fake model) or `just perf real` (the model at FENNEC_LLM_URL, default http://127.0.0.1:8000/v1)
+# Measure fennec on a scripted session workload: `just perf` (fake model) or `just perf real` (the model at FENNEC_LLM_URL, default http://127.0.0.1:8000/v1).
 perf mode="fake":
     cargo build --release -p fennec
     python3 scripts/perf/run.py --mode {{mode}}
@@ -63,7 +63,7 @@ perf mode="fake":
 # Everything CI checks: the conventions (web, lint) and the tests
 check: web lint test test-web licenses
 
-# Every dependency the binary ships has a licence the AGPL can absorb (needs web/node_modules)
+# Every dependency the binary ships has a licence the AGPL can absorb (needs web/node_modules).
 licenses:
     python3 scripts/licenses.py check
 
@@ -82,11 +82,11 @@ test:
     rm -rf "$dir" && mkdir -p "$dir"
     TMPDIR="$dir" cargo test
 
-# The unit tests of the UI's pure modules (the folds, the plan contract)
+# The unit tests of the UI's pure modules (the folds, the plan contract).
 test-web:
     cd web && npm test
 
-# No secret in the history (the pre-commit hook scans what is staged)
+# No secret in the history (the pre-commit hook scans what is staged).
 secrets:
     gitleaks git --no-banner --redact .
 
@@ -102,7 +102,7 @@ evidence:
     python3 scripts/outdated.py > audit/evidence/outdated.txt
     npx -y jscpd@4 crates web/src --silent --reporters json --output audit/evidence
 
-# The project site and its user guide, as GitHub Pages serves them, on :8080 (needs mdbook)
+# The project site and its user guide, as GitHub Pages serves them, on :8080 (needs mdbook).
 site:
     mdbook build docs/users -d ../../site/docs
     python3 -m http.server -d site 8080
@@ -111,14 +111,14 @@ site:
 guide:
     mdbook serve docs/users
 
-# The user guide's annotated screenshots, from a blank fennec (needs a release build and a model endpoint: DOC_SHOTS_MODEL_URL)
+# The user guide's annotated screenshots, from a blank fennec (needs a release build and a model endpoint: DOC_SHOTS_MODEL_URL).
 shots:
     cd web && node scripts/doc-shots.mjs
 
-# Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop)
+# Once per clone: use the repository's git hooks (Conventional Commits, no direct push to main/develop).
 setup:
     git config core.hooksPath .githooks
 
-# Open the PR that promotes develop to main (then release-please prepares the release)
+# Open the PR that promotes develop to main (then release-please prepares the release).
 promote:
     gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promote develop to main."

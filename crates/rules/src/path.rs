@@ -111,8 +111,8 @@ fn glob_match(pattern: &[char], text: &[char]) -> bool {
     pattern_index == pattern.len()
 }
 
-/// True when `pattern` (normalized) matches `relative` (`/`-separated, no leading `./`)
-/// or one of its ancestor directories.
+/// True when the normalized `pattern` matches `relative` or one of its ancestor
+/// directories; `relative` is `/`-separated, without a leading `./`.
 pub fn covers(pattern: &str, relative: &str) -> bool {
     let path_segments = split_segments(relative);
     (1..=path_segments.len()).any(|length| pattern_matches(pattern, &path_segments[..length]))
