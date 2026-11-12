@@ -66,7 +66,14 @@ When a task needs you, it moves to **To decide**: answer its question, or review
 
 ## Step 6: run it at night
 
-Tick **Night mode** ② before **Start the queue**. In night mode, the agent does not wait for you: it answers its own questions and records each answer as a decision, with its reason. It may never change the acceptance criteria: a change it would propose is recorded as a decision, and the work goes on against the approved criteria. A workflow step that waits for you still waits: in **Plan, build, verify**, the queue's workflow, the task stops at **Validate the tests** and shows as a question until you answer. Night mode applies to the run you start: tick it again next time.
+Tick **Night mode** ② before **Start the queue**. In night mode, nobody waits for you:
+
+- The agent answers its own questions. It records each answer as a decision, with its reason. When the task or the plan can be read more than one way, it records the reading it took.
+- It may never change the acceptance criteria. A change it would propose is recorded as a decision, and the work goes on against the approved criteria.
+- A workflow step that waits for you, such as **Validate the tests** in **Plan, build, verify**, is answered by fennec itself, never by the model: it takes the forward choice (**Validate**, **Accept**) and records it as a decision **answered by night mode**, to review. Validating the tests this way protects them exactly as your click would.
+- A task that asks to delete or disable tests, publish or deploy, delete data, push to a remote or handle credentials is not started. It shows as **halted**, with the reason. Restart it while you are there.
+
+The box keeps the choice of the last run.
 
 Set the caps first: click ③.
 
@@ -76,7 +83,7 @@ Set the caps first: click ③.
 
 ## In the morning: the night report
 
-On **Overview**, the **Night report** lists each task the queue ran: its duration, its tokens, the criteria passed and the decisions the agent took. Badges count the tasks **to review**, the **questions**, the **halted**, the **failed** and the **integrated**. Read the decisions first, then review the work. The report integrates nothing. Click **Mark as read** to hide it. Click **Reread** to show it again.
+On **Overview**, the **Night report** lists each task the queue ran: its duration, its tokens, the criteria passed, the step it reached, why it stopped, and each decision (title and choice), including the steps night mode answered for you. Badges count the tasks **to review**, the **questions**, the **halted**, the **failed** and the **integrated**. Read the decisions first, then review the work. The report integrates nothing. Click **Review** on a task to open its session. Click **Mark as read** to hide the report.
 
 ## Manage a task
 
@@ -139,7 +146,7 @@ Each idea also has a status:
 | **running** | The queue is running it. |
 | **question** | It needs your answer. |
 | **to review** | It has work to review. |
-| **halted** | It stopped at a night-mode cap. |
+| **halted** | Night mode stopped it: a cap, or a risky task it did not start. |
 | **failed** | The run failed. |
 | **integrated** | Its work was integrated. |
 | **done** | The task is complete. |

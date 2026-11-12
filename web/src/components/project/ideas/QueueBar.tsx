@@ -21,7 +21,7 @@ export function QueueBar({
 }) {
   const lang = useLang();
   const t = useT();
-  const [autonomous, setAutonomous] = useState(false);
+  const [autonomous, setAutonomous] = useState(queue.lastAutonomous);
   const [busy, setBusy] = useState(false);
 
   const handleStart = async () => {
