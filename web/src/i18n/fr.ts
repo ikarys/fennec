@@ -784,6 +784,8 @@ export const fr: Record<MsgKey, string> = {
   // Project: doc, question, module map (components/project)
   docVerifiedTitle: 'Lu depuis le fichier',
   noAdrs: 'Aucun ADR dans docs/adr/.',
+  adrsNotRecorded:
+    "Les ADR engagent le projet. Les décisions qu'un agent enregistre en travaillant sont listées dans sa session (onglet Session) et dans le rapport de nuit.",
   filesPickOne: 'Choisissez un fichier dans l’arborescence.',
   filesTruncated: 'Seuls les 20 000 premiers fichiers sont listés.',
   filesUntracked: 'Non suivi par git : lecture seule',
