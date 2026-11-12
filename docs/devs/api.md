@@ -527,6 +527,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/sessions/{id}/architecture-rules` `{}` → `{count}`: appends the last answer's proposed rules not yet in `.agents/architecture` (each with its comment), creating the file if needed; 400 when none is new; 409 when `.agents` or the file is a symlink; records `architecture.rules_added`;
 - `GET /api/sessions/{id}` → `{id, title, state, mode, model, project: {id, name, workdir}, worktree, idea, request, audit, proposedTasks, agentsMdDraft, ruleProposal, agentSuggestion}`;
   `idea` is `{id, state}` when the session frames one of the project's ideas, else null;
+  `workflowAsks` is true when the session is a workflow step's child whose question its parent's run waits on
+  (the human answers in the child; the parent resumes when the child's turn completes);
   `audit` is the session's last answer read as an audit report, `{scope, summary, findings: [{number, title,
   severity: high|medium|low, principle, locations: [string], problem, fix}], taken: [number]}`, or null when it is
   not one; `taken` lists findings already turned into tasks since this report;
@@ -735,7 +737,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   new session's title is the first attachment's filename when the prompt is
   empty; `/compact` takes no attachments (400)
 - `POST /api/sessions/{id}/messages` `{content, attachments?}` → 202; 409 if a
-  turn is running; when the session waits for the user, `content` is the
+  turn is running, or if its workflow run waits at a human node, a pause or a fresh step's question (answered in
+  that step's session); when the session waits for the user, `content` is the
   answer to the pending question; `attachments` is `[{filename, data}]` (data
   a base64 data URL; images only, 5 MB each, at most 10); `content` may be
   empty when attachments are present (400 `empty message` only if both are

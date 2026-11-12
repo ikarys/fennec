@@ -2,6 +2,7 @@
 
 use super::definition::{BRANCH, ConditionTest, EXHAUSTED, EndOutcome, Node, NodeKind, Workflow};
 use super::template;
+use crate::domain::conversation::last_done;
 use crate::domain::criteria::{Criterion, CriterionState, render_for_prompt};
 use crate::domain::criteria_fold;
 use crate::domain::event::{DoneReason, Event};
@@ -328,6 +329,9 @@ pub enum Waiting {
     Human,
     /// A paused edge: the human continues or stops.
     Pause,
+    /// A fresh agent node's child session asked: the human answers in that
+    /// session, and its completed turn resumes the run.
+    ChildQuestion,
     /// An agent node is open and its turn ended waiting for the user.
     AgentQuestion,
     /// The run is not running (interrupted): the human resumes or stops.
@@ -353,16 +357,31 @@ pub fn waiting(state: &RunState, events: &[Event]) -> Option<Waiting> {
     if open(NodeKind::is_human) {
         return Some(Waiting::Human);
     }
-    let last_done = events.iter().rev().find_map(|event| match event {
-        Event::ChatDone { reason, .. } => Some(*reason),
-        _ => None,
-    });
-    if open(|kind| matches!(kind, NodeKind::Agent { .. }))
-        && last_done == Some(DoneReason::WaitingForUser)
-    {
-        return Some(Waiting::AgentQuestion);
+    if last_done(events) == Some(DoneReason::WaitingForUser) {
+        if state
+            .open
+            .iter()
+            .any(|open| open.child_session_id.is_some())
+        {
+            return Some(Waiting::ChildQuestion);
+        }
+        if open(|kind| matches!(kind, NodeKind::Agent { .. })) {
+            return Some(Waiting::AgentQuestion);
+        }
     }
     Some(Waiting::Interrupted)
+}
+
+/// Whether the active run in `events` waits on `child_session_id`: one of its
+/// open nodes runs in that child and the child asked the human.
+pub fn waits_on_child(events: &[Event], child_session_id: &str) -> bool {
+    current_run(events).is_some_and(|state| {
+        waiting(&state, events) == Some(Waiting::ChildQuestion)
+            && state
+                .open
+                .iter()
+                .any(|open| open.child_session_id.as_deref() == Some(child_session_id))
+    })
 }
 
 /// The finish event the human's discard implies: a run still waiting on the
@@ -1408,6 +1427,64 @@ mod tests {
             duration_ms: None,
         }];
         assert_eq!(waiting(&state, &events), Some(Waiting::AgentQuestion));
+    }
+
+    #[test]
+    fn waiting_is_child_question_when_a_fresh_child_asked() {
+        let mut state = state(simple_workflow());
+        state.apply(&Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: Some("c".into()),
+            started_at: None,
+        });
+        let events = vec![Event::ChatDone {
+            message_id: "m".into(),
+            reason: DoneReason::WaitingForUser,
+            duration_ms: None,
+        }];
+        assert_eq!(waiting(&state, &events), Some(Waiting::ChildQuestion));
+    }
+
+    #[test]
+    fn waits_on_child_names_only_the_child_that_asked() {
+        let mut events = vec![Event::WorkflowStarted {
+            run_id: "r".into(),
+            workflow: simple_workflow(),
+            task: "t".into(),
+            step_by_step: false,
+            started_at: None,
+        }];
+        events.push(Event::WorkflowNodeStarted {
+            run_id: "r".into(),
+            node_id: "a".into(),
+            pass: 1,
+            via: Some(Via {
+                from: "start".into(),
+                port: "next".into(),
+            }),
+            child_session_id: Some("c".into()),
+            started_at: None,
+        });
+        events.push(Event::ChatDone {
+            message_id: "m".into(),
+            reason: DoneReason::WaitingForUser,
+            duration_ms: None,
+        });
+        assert!(waits_on_child(&events, "c"));
+        assert!(!waits_on_child(&events, "other"));
+
+        events[2] = Event::ChatDone {
+            message_id: "m".into(),
+            reason: DoneReason::Complete,
+            duration_ms: None,
+        };
+        assert!(!waits_on_child(&events, "c"));
     }
 
     #[test]

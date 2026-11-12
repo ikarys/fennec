@@ -299,8 +299,8 @@ export function SessionPage({
             replayable={served.replayable}
             onReplay={actions.handleReplay}
           />
-          {/* A node's session is driven by its workflow: the human answers in the parent. */}
-          {detail?.parentId && <WorkflowNodeNotice parentId={detail.parentId} running={running} />}
+          {/* A node's session is driven by its workflow: the human answers in the parent, or here when the step asked. */}
+          {detail?.parentId && <WorkflowNodeNotice parentId={detail.parentId} running={running} asks={detail.workflowAsks} />}
           <RunningStrip
             running={running}
             run={run}
@@ -332,7 +332,7 @@ export function SessionPage({
               onUndo={served.handedPlan.undoable ? () => void handleTakeBackPlan(served.handedPlan!.ideaId) : undefined}
             />
           )}
-          {!detail?.parentId && (
+          {(!detail?.parentId || detail.workflowAsks) && (
             <Composer
               text={text}
               onTextChange={setText}

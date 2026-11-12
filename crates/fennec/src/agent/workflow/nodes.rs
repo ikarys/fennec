@@ -2,6 +2,7 @@
 
 use super::WorkflowEnv;
 use super::outcome;
+use crate::agent::ports::AgentRun;
 use crate::domain::event::DoneReason;
 use crate::domain::workflow::definition::{DEFAULT_SHELL_TIMEOUT_SECS, Node, NodeKind};
 use crate::domain::workflow::run::{self as run, RunOutcome};
@@ -197,20 +198,26 @@ pub(super) fn fresh_agent(
     let run = env
         .children
         .send(child_session_id, agent, &prompt, input.stop)?;
-    let label = input.node.label();
+    child_end(env, input, agent, outputs, child_session_id, run)
+}
 
-    match agent_end(label, outputs, run.reason, run.text, |reminder| {
+/// How a fresh agent node ends on its child's turn `run`; a question leaves
+/// the node open for the human to answer in the child.
+pub(super) fn child_end(
+    env: &WorkflowEnv,
+    input: &NodeInput,
+    agent: &str,
+    outputs: &[String],
+    child_session_id: &str,
+    run: AgentRun,
+) -> Result<NodeEnd, String> {
+    let label = input.node.label();
+    agent_end(label, outputs, run.reason, run.text, |reminder| {
         let run = env
             .children
             .send(child_session_id, agent, reminder, input.stop)?;
         Ok((run.reason, run.text))
-    })? {
-        NodeEnd::AgentAsked => Ok(NodeEnd::EndRun {
-            outcome: RunOutcome::Blocked,
-            reason: Some(format!("\"{label}\" asked a question in a child session")),
-        }),
-        end => Ok(end),
-    }
+    })
 }
 
 #[cfg(test)]

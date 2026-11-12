@@ -1,10 +1,12 @@
 //! Child sessions for `fresh` agent nodes and parallel branches: ordinary
 //! sessions with a parent, run on their own turn.
 
-use crate::agent::ports::{AgentRun, ChildSessions};
+use crate::agent::ports::{AgentRun, ChildSessions, EventLog};
 use crate::agent::turn::run_child_agent_node;
 use crate::config::Settings;
-use crate::domain::conversation::node_output;
+use crate::domain::conversation::{last_done, node_output};
+use crate::domain::event::DoneReason;
+use crate::domain::workflow::run;
 use crate::notifier::Notifier;
 use crate::store::SqliteStore;
 use crate::web::turns::with_turn;
@@ -66,4 +68,28 @@ impl ChildSessions for Children<'_> {
             },
         )
     }
+
+    fn last_run(&self, child_session_id: &str) -> Result<AgentRun, String> {
+        let store = SqliteStore::open(&self.settings.db_path)?;
+        let events = store.events(child_session_id)?;
+        let reason = last_done(&events).ok_or("the child session has no turn")?;
+        let text = node_output(&events);
+        Ok(AgentRun { reason, text })
+    }
+}
+
+/// The parent session whose run resumes now that `child_session_id`'s turn
+/// ended: the child completed (the human answered its question) and the
+/// parent's run waits on it. `None` otherwise.
+pub(super) fn parent_to_resume(
+    store: &SqliteStore,
+    child_session_id: &str,
+) -> Result<Option<String>, String> {
+    if last_done(&store.events(child_session_id)?) != Some(DoneReason::Complete) {
+        return Ok(None);
+    }
+    let Some(parent) = store.session(child_session_id)?.and_then(|s| s.parent_id) else {
+        return Ok(None);
+    };
+    Ok(run::waits_on_child(&store.events(&parent)?, child_session_id).then_some(parent))
 }

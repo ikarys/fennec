@@ -95,6 +95,7 @@ export type RunWaiting =
   | { kind: 'human'; nodeId: string; question: string; choices: string[] }
   | { kind: 'pause'; to: string; toLabel: string }
   | { kind: 'interrupted' }
+  | { kind: 'child'; label: string; childSessionId: string }
   | { kind: 'relaunch' };
 
 function nodeById(def: WorkflowDef, nodeId: string) {
@@ -150,6 +151,11 @@ export function runWaiting(
   for (const nodeId of run.open) {
     const node = nodeById(run.workflow, nodeId);
     if (node?.kind === 'agent' && lastDone === 'waiting_for_user') {
+      // A fresh step may have asked in its own session; point the parent there.
+      const latest = [...run.runs].reverse().find((r) => r.nodeId === nodeId);
+      if (latest?.childSessionId) {
+        return { kind: 'child', label: labelOf(node, nodeId), childSessionId: latest.childSessionId };
+      }
       return undefined;
     }
   }

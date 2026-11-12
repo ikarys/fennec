@@ -212,6 +212,12 @@ pub(crate) fn get_session(app: &App, stream: &mut TcpStream, id: &str) -> Result
     v["project"] = project_json(&p, store_dir(app));
     v["mode"] = json!(mode);
     v["model"] = model_routes::session_model(app, &store, &s.id)?;
+    // A workflow step's child whose question the parent's run waits on: the
+    // human answers here.
+    v["workflowAsks"] = json!(match &s.parent_id {
+        Some(parent) => run::waits_on_child(&store.events(parent)?, &s.id),
+        None => false,
+    });
     // The idea this session frames, so its plan card can mark it ready (or, for a task, apply
     // the plan to its sheet).
     v["idea"] = match idea_for_session(&store.ideas(&p.id)?, &s.id) {
@@ -524,6 +530,11 @@ pub(crate) fn send_message(
                 }
             }
             Waiting::Human => error(stream, 409, "the workflow waits for a choice"),
+            Waiting::ChildQuestion => error(
+                stream,
+                409,
+                "a step's agent asked a question: answer it in its session",
+            ),
             Waiting::Pause => error(stream, 409, "the workflow is paused: continue or stop it"),
             Waiting::Interrupted => error(
                 stream,

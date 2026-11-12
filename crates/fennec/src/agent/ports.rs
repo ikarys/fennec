@@ -155,6 +155,9 @@ pub trait ChildSessions: Sync {
         prompt: &str,
         stop: &AtomicBool,
     ) -> Result<AgentRun, String>;
+    /// The child's last turn: how it ended and the agent's output, for a
+    /// resumed node whose child the human answered.
+    fn last_run(&self, child_session_id: &str) -> Result<AgentRun, String>;
 }
 
 /// How a workflow shell node ended.

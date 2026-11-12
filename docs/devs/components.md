@@ -28,7 +28,9 @@ a compaction, not cut by a replay), folded from the log.
 Workflows, done (`docs/devs/workflows.md`): graphs of agent, shell, human,
 condition, parallel/join nodes wired by named ports, drawn in a React Flow
 editor; loops capped per edge, pauses on edges or step by step; the run is
-folded from `workflow.*` events; fresh agents and branches in child sessions.
+folded from `workflow.*` events; fresh agents and branches in child sessions;
+a fresh agent's question is answered in its child, and the parent run resumes
+on its own once the child completes.
 The default workflow runs the criteria checks, verifies in a fresh context
 (`verify`, `review` sub-agents) and sends the findings back to the builder.
 Preview: ```html and ```md blocks of a message, and the .html/.md files an

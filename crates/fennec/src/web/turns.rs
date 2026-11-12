@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 
 /// Where a session's turns run: its worktree when it has one, the project's
 /// directory otherwise.
+#[derive(Clone)]
 pub struct Place {
     pub workdir: PathBuf,
     pub worktree: Option<Worktree>,
@@ -61,6 +62,7 @@ pub enum Job {
     Waiver { call_id: String },
 }
 
+#[derive(Clone)]
 pub struct Turns {
     settings: Settings,
     notifier: Arc<Notifier>,
@@ -137,6 +139,7 @@ impl Turns {
         let notifier = self.notifier.clone();
         let running = self.running.clone();
         let session_id = session_id.to_string();
+        let turns = self.clone();
         std::thread::spawn(move || {
             let mut job = job;
             loop {
@@ -191,6 +194,7 @@ impl Turns {
                         drop(running);
                         // Whoever waits for the turn to end (the ideas queue) wakes now.
                         notifier.notify();
+                        resume_parent(&turns, &session_id, &place, autonomous);
                         break;
                     }
                     Err(e) => {
@@ -204,6 +208,29 @@ impl Turns {
             }
         });
         Ok(())
+    }
+}
+
+/// A workflow step's child session completed after the human answered its
+/// question: the parent's run resumes on its own, in the same place (a child
+/// shares its root session's place).
+fn resume_parent(turns: &Turns, child_session_id: &str, place: &Place, autonomous: bool) {
+    let store = match SqliteStore::open(&turns.settings.db_path) {
+        Ok(store) => store,
+        Err(e) => {
+            eprintln!("fennec: session {child_session_id}: resuming its parent: {e}");
+            return;
+        }
+    };
+    match super::children::parent_to_resume(&store, child_session_id) {
+        Ok(Some(parent)) => {
+            let job = Job::Workflow(WorkflowJob::Resume);
+            if let Err(e) = turns.start_with(&parent, place.clone(), job, autonomous) {
+                eprintln!("fennec: session {child_session_id}: resuming {parent}: {e}");
+            }
+        }
+        Ok(None) => {}
+        Err(e) => eprintln!("fennec: session {child_session_id}: resuming its parent: {e}"),
     }
 }
 
