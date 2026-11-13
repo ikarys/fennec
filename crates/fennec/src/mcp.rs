@@ -205,21 +205,6 @@ pub fn connect_and_cache(
         .list_tools()
         .map_err(|e| (502, format!("tools/list failed: {e}")))?;
     prefs.mcp[index].cached_tools = tools;
-
-    // Re-check now that the tool list is known: a `{server}_{tool}` name must
-    // not collide with a built-in or with another server's tool.
-    if let Some(problem) = prefs.mcp[index].problems().into_iter().next() {
-        return Err((400, problem));
-    }
-    if let Some(name) = crate::domain::mcp::duplicate_tool_names(&prefs.mcp)
-        .into_iter()
-        .next()
-    {
-        return Err((
-            400,
-            format!("tool {name} is offered by more than one mcp server"),
-        ));
-    }
     store
         .save_preferences(prefs)
         .map_err(|e| (500, e.to_string()))?;

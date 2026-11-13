@@ -37,6 +37,7 @@ pub mod kernel_rules;
 pub mod lang;
 pub mod map_doc;
 pub mod mcp;
+pub mod mcp_notice;
 pub mod mcp_oauth;
 pub mod model_choice;
 pub mod modified_files;

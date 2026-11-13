@@ -62,7 +62,11 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
           ? String(tool.args.query ?? '')
           : tool.name === 'delegate'
             ? `${String(tool.args.agent ?? '')} · ${String(tool.args.task ?? '')}`
-            : String(tool.args.path ?? '');
+            : tool.name === 'mcp_call'
+              ? `${String(tool.args.server ?? '')}/${String(tool.args.tool ?? '')}`
+              : tool.name === 'mcp_tools'
+                ? `${String(tool.args.server ?? '')}: ${(Array.isArray(tool.args.tools) ? tool.args.tools : []).join(', ')}`
+                : String(tool.args.path ?? '');
   const lineCount = tool.output ? tool.output.split('\n').length : 0;
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();

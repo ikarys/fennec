@@ -11,6 +11,7 @@ use super::turn::Turn;
 use crate::agent::ports::RuleCheck;
 use crate::domain::agent::{AgentDefinition, WriteScope};
 use crate::domain::event::{Event, ToolCall, ToolResult};
+use crate::domain::mcp::META_TOOLS;
 use crate::domain::named_paths::{human_texts, named_by_human};
 use crate::domain::test_files;
 use std::sync::atomic::Ordering;
@@ -152,9 +153,9 @@ pub(super) fn execute_tools(
 ) -> Result<Flow, String> {
     let mut waiting = false;
     let mut done = false;
-    // MCP tools are a human-configured capability, not part of the agent's
-    // fixed allowed list: allow them here so a `{server}_{tool}` call runs.
-    let mcp_tools = turn.tools.mcp_tool_names();
+    // MCP is a human-configured capability, not part of the agent's fixed
+    // allowed list: allow `mcp_tools` and `mcp_call` here when it is offered.
+    let offers_mcp = turn.tools.offers_mcp();
     for call in calls {
         // The human pressed stop: a `write_file` queued after the stopped
         // command must not run, so record a failure without running it.
@@ -191,7 +192,7 @@ pub(super) fn execute_tools(
         }
         // The agent's allow-list check: the mode is
         // enforced here, at execution, so plan stays read-only.
-        if !agent.allows(&call.name) && !mcp_tools.contains(&call.name) {
+        if !agent.allows(&call.name) && !(offers_mcp && META_TOOLS.contains(&call.name.as_str())) {
             record(
                 turn,
                 message_id,
