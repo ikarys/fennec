@@ -237,7 +237,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - `shortcuts`: `[{action, combo, default}]`, every keyboard shortcut in the Settings page's order, the stored override applied (an empty combo: disabled). A combo is `Mod`/`Alt`/`Shift` (in that order) then a `KeyboardEvent.code`, e.g. `Alt+Shift+Digit1`; matching by code keeps a shortcut on the same key whatever the layout.
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
     MCP tool's access as its server declares it in its annotations (indicative, not verified;
-    `undeclared` without annotations) and its definition's estimated token cost
+    `undeclared` without annotations) and its schema's estimated token cost (paid when the model
+    fetches it with `mcp_tools`)
   - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
     agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec
     never installs one, `install` is the command shown to the human

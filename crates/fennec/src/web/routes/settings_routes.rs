@@ -31,7 +31,7 @@ fn mcp_tools(prefs: &Preferences) -> Map<String, Value> {
                     json!({
                         "name": tool.name,
                         "access": tool.access(),
-                        "tokens": mcp::estimate_tokens(&mcp::tool_definition(server, tool)),
+                        "tokens": mcp::estimate_tokens(tool),
                     })
                 })
                 .collect::<Vec<Value>>();
