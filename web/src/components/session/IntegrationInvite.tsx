@@ -1,12 +1,5 @@
-import { createContext, useContext } from 'react';
-
+// The two ways to take a finished run's work: try it in its worktree, or open the review.
 export interface IntegrationInvite {
   open: () => void;
   tryIt: () => void;
-}
-
-export const IntegrationInviteContext = createContext<IntegrationInvite | null>(null);
-
-export function useIntegrationInvite(): IntegrationInvite | null {
-  return useContext(IntegrationInviteContext);
 }

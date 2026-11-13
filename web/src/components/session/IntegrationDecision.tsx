@@ -19,7 +19,7 @@ export function IntegrationDecision({
 }) {
   const t = useT();
 
-  const actions = <TryOrIntegrate invite={invite} primary="integrate" />;
+  const actions = <TryOrIntegrate invite={invite} />;
 
   return (
     <DecisionRow

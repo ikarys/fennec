@@ -92,7 +92,6 @@ export function useSessionDecisions({
     runDecisionId,
     proposals,
     decisionCount,
-    integrationInvite,
     openDecision,
     closeDecisions: () => setOpenDecision(null),
     toggleDecision,

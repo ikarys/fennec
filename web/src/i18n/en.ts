@@ -1604,7 +1604,6 @@ export const en = {
   budgetSave: 'Save the budget',
   budgetRemove: 'Remove the budget',
   budgetCancel: 'Cancel',
-  runEndTryHint: "The change runs in its worktree — try it before integrating.",
   serverAdd: "Add a server",
   serverEdit: "Edit {name}",
   serverNameTaken: "Name already used by another server",

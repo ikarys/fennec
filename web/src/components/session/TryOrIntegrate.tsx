@@ -6,17 +6,15 @@ import type { IntegrationInvite } from './IntegrationInvite';
 
 export function TryOrIntegrate({
   invite,
-  primary,
 }: {
   invite: IntegrationInvite;
-  primary: 'try' | 'integrate';
 }) {
   const t = useT();
 
   return (
     <div className="flex items-center gap-1.5">
       <Button
-        variant={primary === 'try' ? 'primary' : 'secondary'}
+        variant="secondary"
         size="sm"
         title={t('tryChange')}
         onClick={invite.tryIt}
@@ -24,8 +22,8 @@ export function TryOrIntegrate({
         <PlayIcon className="h-3.5 w-3.5" />{t('tryBeforeIntegrating')}
       </Button>
       <Button
-        variant={primary === 'integrate' ? 'primary' : 'secondary'}
-        size="sm"
+        variant="primary"
+        size="md"
         onClick={invite.open}
       >
         {t('reviewAndIntegrate')}
