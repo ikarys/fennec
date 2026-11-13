@@ -21,6 +21,8 @@ use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
+/// Bound `tools/list` pagination so a hostile server cannot loop forever.
+const MAX_TOOL_PAGES: usize = 100;
 
 /// A connected MCP server, ready for `tools/list` and `tools/call`.
 pub struct Client {
@@ -39,6 +41,9 @@ enum Transport {
     Http {
         url: String,
         headers: BTreeMap<String, String>,
+        /// One agent per client: its connection pool keeps the TCP and TLS
+        /// connection alive from `initialize` to the last call.
+        agent: ureq::Agent,
     },
 }
 
@@ -104,6 +109,11 @@ impl Client {
             McpTransport::Http => Transport::Http {
                 url: server.url.clone().unwrap_or_default(),
                 headers: http_headers(server),
+                agent: ureq::Agent::config_builder()
+                    .timeout_global(Some(timeout))
+                    .http_status_as_error(false)
+                    .build()
+                    .into(),
             },
         };
         let mut client = Client {
@@ -125,13 +135,34 @@ impl Client {
 
     /// `tools/list`: the server's tools, in its own order.
     pub fn list_tools(&mut self) -> Result<Vec<McpTool>, String> {
-        let result = self.request("tools/list", json!({}))?;
-        let tools = result
-            .get("tools")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        tools.iter().map(value_to_tool).collect()
+        let mut tools = Vec::new();
+        let mut cursor: Option<String> = None;
+
+        for _ in 0..MAX_TOOL_PAGES {
+            let params = match &cursor {
+                None => json!({}),
+                Some(cursor) => json!({ "cursor": cursor }),
+            };
+            let result = self.request("tools/list", params)?;
+
+            if let Some(page) = result.get("tools").and_then(Value::as_array) {
+                for tool in page {
+                    tools.push(value_to_tool(tool)?);
+                }
+            }
+
+            match result.get("nextCursor").and_then(Value::as_str) {
+                Some(next) => {
+                    if cursor.as_deref() == Some(next) {
+                        return Err(format!("mcp: tools/list repeated its cursor {next}"));
+                    }
+                    cursor = Some(next.to_string());
+                }
+                None => return Ok(tools),
+            }
+        }
+
+        Err(format!("mcp: tools/list exceeded {MAX_TOOL_PAGES} pages"))
     }
 
     /// `tools/call`: run one tool and return its text result.
@@ -148,11 +179,15 @@ impl Client {
             Transport::Stdio { child, stdin, rx } => {
                 stdio_request(child, stdin, rx, method, params, self.timeout)
             }
-            Transport::Http { url, headers } => {
+            Transport::Http {
+                url,
+                headers,
+                agent,
+            } => {
                 let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
                 let body =
                     json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
-                let reply = http_post(url, headers, &mut self.session_id, &body, self.timeout)?;
+                let reply = http_post(agent, url, headers, &mut self.session_id, &body)?;
                 reply_response(&reply)
             }
         }
@@ -167,9 +202,13 @@ impl Client {
                     .and_then(|()| stdin.flush())
                     .map_err(|error| format!("mcp write failed: {error}"))
             }
-            Transport::Http { url, headers } => {
+            Transport::Http {
+                url,
+                headers,
+                agent,
+            } => {
                 let body = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
-                http_post(url, headers, &mut self.session_id, &body, self.timeout).map(|_| ())
+                http_post(agent, url, headers, &mut self.session_id, &body).map(|_| ())
             }
         }
     }
@@ -286,17 +325,12 @@ struct HttpReply {
 /// `initialize`) is kept and sent back on every later message, with the
 /// negotiated protocol version, as streamable HTTP requires.
 fn http_post(
+    agent: &ureq::Agent,
     url: &str,
     headers: &BTreeMap<String, String>,
     session_id: &mut Option<String>,
     body: &Value,
-    timeout: Duration,
 ) -> Result<HttpReply, String> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(timeout))
-        .http_status_as_error(false)
-        .build()
-        .into();
     let mut request = agent
         .post(url)
         .header("content-type", "application/json")
@@ -384,13 +418,64 @@ fn value_to_tool(value: &Value) -> Result<McpTool, String> {
 
 /// The text of a `tools/call` result, from its `content` parts.
 fn tool_text(result: &Value) -> Option<String> {
-    let content = result.get("content")?.as_array()?;
-    Some(
-        content
-            .iter()
-            .filter_map(|part| part.get("text").and_then(Value::as_str))
-            .collect(),
-    )
+    let content = result.get("content").and_then(Value::as_array);
+    let text = content
+        .map(|parts| parts.iter().map(part_text).collect::<String>())
+        .unwrap_or_default();
+    if !text.is_empty() {
+        return Some(text);
+    }
+    if let Some(structured) = result.get("structuredContent") {
+        return Some(structured.to_string());
+    }
+    content.map(|_| String::new())
+}
+
+/// One content part as text: binary parts become a marker, never their data.
+fn part_text(part: &Value) -> String {
+    let part_type = part
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    match part_type {
+        "text" => part
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        "image" => format!(
+            "[image: {}]",
+            part.get("mimeType")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+        ),
+        "audio" => format!(
+            "[audio: {}]",
+            part.get("mimeType")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+        ),
+        "resource" => {
+            let resource = part.get("resource");
+            if let Some(text) = resource
+                .and_then(|resource| resource.get("text"))
+                .and_then(Value::as_str)
+            {
+                text.to_string()
+            } else {
+                let uri = resource
+                    .and_then(|resource| resource.get("uri"))
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                format!("[resource: {uri}]")
+            }
+        }
+        "resource_link" => {
+            let uri = part.get("uri").and_then(Value::as_str).unwrap_or_default();
+            format!("[resource link: {uri}]")
+        }
+        _ => format!("[{part_type} content]"),
+    }
 }
 
 #[cfg(test)]
@@ -542,5 +627,89 @@ echo "{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",
         let result = json!({ "content": [ { "type": "text", "text": "a" }, { "type": "text", "text": "b" } ] });
         assert_eq!(tool_text(&result).as_deref(), Some("ab"));
         assert_eq!(tool_text(&json!({})), None);
+    }
+
+    #[test]
+    fn a_stdio_client_paginates_tools_list() {
+        let script = r#"
+read line
+id=$(printf '%s' "$line" | sed 's/.*"id":\([0-9]*\).*/\1/')
+echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"t\",\"version\":\"0\"}}}"
+read line
+read line
+id=$(printf '%s' "$line" | sed 's/.*"id":\([0-9]*\).*/\1/')
+echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"tools\":[{\"name\":\"a\",\"description\":\"a\",\"inputSchema\":{\"type\":\"object\"}}],\"nextCursor\":\"p2\"}}"
+read line
+id=$(printf '%s' "$line" | sed 's/.*"id":\([0-9]*\).*/\1/')
+case "$line" in
+  *'"cursor":"p2"'*)
+    echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"tools\":[{\"name\":\"b\",\"description\":\"b\",\"inputSchema\":{\"type\":\"object\"}}]}}"
+    ;;
+  *)
+    echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32600,\"message\":\"missing cursor\"}}"
+    ;;
+esac
+"#;
+        let server = McpServer {
+            name: "t".into(),
+            transport: McpTransport::Stdio,
+            command: Some("sh".into()),
+            args: vec!["-c".into(), script.into()],
+            ..Default::default()
+        };
+        let mut client = Client::connect(&server, &Sandbox::Off, Path::new(".")).unwrap();
+        let tools = client.list_tools().unwrap();
+        assert_eq!(tools.len(), 2);
+        assert_eq!(tools[0].name, "a");
+        assert_eq!(tools[1].name, "b");
+    }
+
+    #[test]
+    fn a_repeated_tools_list_cursor_errors() {
+        let script = r#"
+read line
+id=$(printf '%s' "$line" | sed 's/.*"id":\([0-9]*\).*/\1/')
+echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"t\",\"version\":\"0\"}}}"
+read line
+while read line; do
+  id=$(printf '%s' "$line" | sed 's/.*"id":\([0-9]*\).*/\1/')
+  echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"tools\":[{\"name\":\"x\",\"description\":\"x\",\"inputSchema\":{\"type\":\"object\"}}],\"nextCursor\":\"same\"}}"
+done
+"#;
+        let server = McpServer {
+            name: "t".into(),
+            transport: McpTransport::Stdio,
+            command: Some("sh".into()),
+            args: vec!["-c".into(), script.into()],
+            ..Default::default()
+        };
+        let mut client = Client::connect(&server, &Sandbox::Off, Path::new(".")).unwrap();
+        let error = client.list_tools().unwrap_err();
+        assert_eq!(error, "mcp: tools/list repeated its cursor same");
+    }
+
+    #[test]
+    fn tool_text_renders_non_text_content_parts() {
+        let result = json!({
+            "content": [
+                { "type": "image", "mimeType": "image/png", "data": "base64" },
+                { "type": "resource", "resource": { "uri": "file:///a", "text": "resource text" } },
+                { "type": "resource", "resource": { "uri": "file:///b", "blob": "base64" } },
+                { "type": "resource_link", "uri": "file:///c" },
+                { "type": "weird" },
+            ]
+        });
+        assert_eq!(
+            tool_text(&result).as_deref(),
+            Some(
+                "[image: image/png]resource text[resource: file:///b][resource link: file:///c][weird content]"
+            )
+        );
+    }
+
+    #[test]
+    fn tool_text_falls_back_to_structured_content() {
+        let result = json!({ "content": [], "structuredContent": { "n": 1 } });
+        assert_eq!(tool_text(&result).as_deref(), Some("{\"n\":1}"));
     }
 }
