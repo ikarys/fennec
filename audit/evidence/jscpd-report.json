@@ -1,12 +1,24 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-12T13:07:39.491Z",
+    "detectionDate": "2026-11-12T13:10:46.128Z",
     "formats": {
       "typescript": {
         "sources": {
           "web/src/components/workflow/session/runStepTone.ts": {
             "lines": 45,
             "tokens": 512,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "web/src/components/workflow/session/WorkflowPicker.test.ts": {
+            "lines": 34,
+            "tokens": 393,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1181,8 +1193,8 @@
             "newClones": 0
           },
           "web/src/hooks/useProjectOptions.ts": {
-            "lines": 133,
-            "tokens": 1048,
+            "lines": 135,
+            "tokens": 1153,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1350,14 +1362,14 @@
           }
         },
         "total": {
-          "lines": 12866,
-          "tokens": 128440,
-          "sources": 112,
+          "lines": 12902,
+          "tokens": 128938,
+          "sources": 113,
           "clones": 16,
           "duplicatedLines": 128,
           "duplicatedTokens": 1463,
           "percentage": 0.99,
-          "percentageTokens": 1.14,
+          "percentageTokens": 1.13,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -3913,8 +3925,8 @@
       "tsx": {
         "sources": {
           "web/src/components/workflow/session/WorkflowPicker.tsx": {
-            "lines": 91,
-            "tokens": 669,
+            "lines": 99,
+            "tokens": 720,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6445,8 +6457,8 @@
             "newClones": 0
           },
           "web/src/pages/SessionPage.tsx": {
-            "lines": 423,
-            "tokens": 3747,
+            "lines": 424,
+            "tokens": 3765,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6614,8 +6626,8 @@
           }
         },
         "total": {
-          "lines": 28240,
-          "tokens": 268679,
+          "lines": 28249,
+          "tokens": 268748,
           "sources": 225,
           "clones": 19,
           "duplicatedLines": 212,
@@ -8733,8 +8745,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/mcp.rs": {
-            "lines": 457,
-            "tokens": 3758,
+            "lines": 466,
+            "tokens": 3836,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9777,14 +9789,14 @@
             "newClones": 0
           },
           "crates/fennec/src/tools.rs": {
-            "lines": 597,
-            "tokens": 5575,
+            "lines": 639,
+            "tokens": 5956,
             "sources": 1,
             "clones": 5,
             "duplicatedLines": 78,
             "duplicatedTokens": 677,
-            "percentage": 13.07,
-            "percentageTokens": 12.14,
+            "percentage": 12.21,
+            "percentageTokens": 11.37,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10366,14 +10378,14 @@
           }
         },
         "total": {
-          "lines": 78602,
-          "tokens": 736570,
+          "lines": 78653,
+          "tokens": 737029,
           "sources": 309,
           "clones": 235,
           "duplicatedLines": 2742,
           "duplicatedTokens": 28698,
           "percentage": 3.49,
-          "percentageTokens": 3.9,
+          "percentageTokens": 3.89,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -10920,14 +10932,14 @@
       }
     },
     "total": {
-      "lines": 135707,
-      "tokens": 1289947,
-      "sources": 895,
+      "lines": 135803,
+      "tokens": 1290973,
+      "sources": 896,
       "clones": 273,
       "duplicatedLines": 3680,
       "duplicatedTokens": 37344,
       "percentage": 2.71,
-      "percentageTokens": 2.9,
+      "percentageTokens": 2.89,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
@@ -19261,12 +19273,12 @@
         "startLoc": {
           "line": 204,
           "column": 24,
-          "position": 1727
+          "position": 1730
         },
         "endLoc": {
           "line": 212,
           "column": 64,
-          "position": 1813
+          "position": 1816
         }
       },
       "secondFile": {
@@ -19276,12 +19288,12 @@
         "startLoc": {
           "line": 193,
           "column": 15,
-          "position": 1630
+          "position": 1633
         },
         "endLoc": {
           "line": 201,
           "column": 65,
-          "position": 1716
+          "position": 1719
         }
       }
     },
@@ -20063,17 +20075,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/tools.rs",
-        "start": 562,
-        "end": 570,
+        "start": 604,
+        "end": 612,
         "startLoc": {
-          "line": 562,
+          "line": 604,
           "column": 38,
-          "position": 5215
+          "position": 5596
         },
         "endLoc": {
-          "line": 570,
+          "line": 612,
           "column": 12,
-          "position": 5292
+          "position": 5673
         }
       }
     },
@@ -20099,12 +20111,12 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/tools.rs",
-        "start": 562,
+        "start": 604,
         "end": 361,
         "startLoc": {
-          "line": 562,
+          "line": 604,
           "column": 38,
-          "position": 5215
+          "position": 5596
         },
         "endLoc": {
           "line": 361,
@@ -20135,12 +20147,12 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/tools.rs",
-        "start": 562,
+        "start": 604,
         "end": 413,
         "startLoc": {
-          "line": 562,
+          "line": 604,
           "column": 38,
-          "position": 5215
+          "position": 5596
         },
         "endLoc": {
           "line": 413,
