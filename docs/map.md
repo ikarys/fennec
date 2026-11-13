@@ -21,17 +21,17 @@ graph LR
   m13["crates/fennec/src/agent/workflow"]
   m14["crates/fennec/src"]
   m15["crates/fennec/src/llm"]
-  m16["crates/fennec/src/mcp"]
-  m17["crates/fennec/src/domain/risk"]
-  m18["crates/fennec/src/worktree"]
-  m19["crates/fennec/src/agents"]
-  m20["crates/fennec/src/store"]
-  m21["crates/fennec/src/sandbox"]
-  m22["crates/fennec/src/agent"]
-  m23["crates/fennec/src/tools"]
-  m24["crates/fennec/src/agent/turn"]
-  m25["crates/fennec/src/domain/workflow"]
-  m26["crates/canvas/src"]
+  m16["crates/fennec/src/domain/risk"]
+  m17["crates/fennec/src/worktree"]
+  m18["crates/fennec/src/agents"]
+  m19["crates/fennec/src/agent"]
+  m20["crates/fennec/src/tools"]
+  m21["crates/fennec/src/agent/turn"]
+  m22["crates/fennec/src/domain/workflow"]
+  m23["crates/canvas/src"]
+  m24["crates/fennec/src/mcp"]
+  m25["crates/fennec/src/sandbox"]
+  m26["crates/fennec/src/store"]
   m27["crates/fennec/src/domain"]
   m28["crates/rules/src"]
   m29["crates/fennec/src/domain/preferences"]
@@ -67,176 +67,178 @@ graph LR
   m59["web"]
   m60["web/scripts"]
   m14 -->|1| m33
-  m14 -->|3| m22
-  m14 -->|1| m24
-  m14 -->|1| m19
+  m14 -->|3| m19
+  m14 -->|1| m21
+  m14 -->|1| m18
   m14 -->|20| m27
   m14 -->|3| m31
   m14 -->|2| m30
   m14 -->|2| m29
-  m14 -->|1| m17
-  m14 -->|1| m25
-  m14 -->|1| m15
   m14 -->|1| m16
-  m14 -->|3| m21
-  m14 -->|4| m20
-  m14 -->|1| m23
-  m14 -->|4| m18
+  m14 -->|1| m22
+  m14 -->|1| m15
+  m14 -->|1| m24
+  m14 -->|3| m25
+  m14 -->|4| m26
+  m14 -->|1| m20
+  m14 -->|4| m17
   m14 -->|1| m28
   m14 -->|3| m32
-  m22 -->|1| m24
-  m22 -->|16| m27
-  m22 -->|20| m31
-  m22 -->|2| m29
-  m22 -->|1| m25
-  m22 -->|1| m23
-  m22 -->|3| m28
-  m0 -->|1| m22
+  m19 -->|1| m21
+  m19 -->|16| m27
+  m19 -->|20| m31
+  m19 -->|2| m29
+  m19 -->|1| m22
+  m19 -->|1| m20
+  m19 -->|3| m28
+  m0 -->|1| m19
   m0 -->|1| m27
   m0 -->|1| m31
   m0 -->|1| m28
-  m24 -->|1| m27
-  m24 -->|1| m31
-  m24 -->|1| m29
-  m13 -->|1| m22
-  m13 -->|3| m24
+  m21 -->|1| m27
+  m21 -->|1| m31
+  m21 -->|1| m29
+  m13 -->|1| m19
+  m13 -->|3| m21
   m13 -->|3| m27
   m13 -->|4| m31
-  m13 -->|4| m25
-  m19 -->|2| m27
+  m13 -->|4| m22
+  m18 -->|2| m27
   m1 -->|6| m14
-  m1 -->|1| m22
-  m1 -->|1| m24
   m1 -->|1| m19
+  m1 -->|1| m21
+  m1 -->|1| m18
   m1 -->|5| m27
   m1 -->|2| m31
-  m1 -->|2| m20
+  m1 -->|2| m26
   m27 -->|2| m33
-  m27 -->|8| m31
+  m27 -->|9| m31
   m27 -->|1| m30
   m27 -->|1| m29
   m27 -->|4| m28
   m27 -->|2| m32
-  m25 -->|3| m27
-  m25 -->|2| m31
+  m22 -->|3| m27
+  m22 -->|2| m31
   m15 -->|2| m14
-  m15 -->|1| m22
+  m15 -->|1| m19
   m15 -->|1| m27
   m15 -->|1| m31
-  m16 -->|1| m14
-  m16 -->|2| m27
-  m16 -->|1| m29
-  m16 -->|2| m21
-  m16 -->|2| m20
+  m24 -->|1| m14
+  m24 -->|2| m27
+  m24 -->|1| m29
+  m24 -->|2| m25
+  m24 -->|2| m26
   m7 -->|3| m14
   m7 -->|4| m27
-  m7 -->|2| m21
-  m7 -->|2| m20
-  m21 -->|1| m29
-  m20 -->|1| m33
-  m20 -->|1| m14
-  m20 -->|1| m22
-  m20 -->|9| m27
-  m20 -->|3| m31
+  m7 -->|2| m25
+  m7 -->|2| m26
+  m25 -->|1| m29
+  m26 -->|1| m33
+  m26 -->|1| m14
+  m26 -->|1| m19
+  m26 -->|9| m27
+  m26 -->|3| m31
+  m26 -->|1| m29
+  m20 -->|1| m23
+  m20 -->|2| m14
+  m20 -->|2| m19
+  m20 -->|8| m27
+  m20 -->|8| m31
   m20 -->|1| m29
-  m23 -->|1| m26
-  m23 -->|2| m14
-  m23 -->|2| m22
-  m23 -->|7| m27
-  m23 -->|7| m31
-  m23 -->|1| m29
-  m23 -->|2| m28
+  m20 -->|1| m24
+  m20 -->|1| m25
+  m20 -->|2| m28
   m2 -->|3| m31
-  m2 -->|2| m21
+  m2 -->|2| m25
   m3 -->|1| m31
   m5 -->|5| m14
-  m5 -->|2| m22
-  m5 -->|2| m24
+  m5 -->|2| m19
+  m5 -->|2| m21
   m5 -->|1| m13
   m5 -->|4| m27
   m5 -->|2| m31
   m5 -->|1| m29
-  m5 -->|1| m25
+  m5 -->|1| m22
   m5 -->|1| m7
-  m5 -->|1| m21
-  m5 -->|3| m20
-  m5 -->|1| m23
+  m5 -->|1| m25
+  m5 -->|3| m26
+  m5 -->|1| m20
   m5 -->|2| m6
-  m5 -->|1| m18
+  m5 -->|1| m17
   m12 -->|3| m33
   m12 -->|4| m14
-  m12 -->|4| m22
+  m12 -->|4| m19
   m12 -->|1| m13
   m12 -->|5| m27
   m12 -->|2| m31
   m12 -->|3| m29
-  m12 -->|2| m25
+  m12 -->|2| m22
   m12 -->|3| m15
-  m12 -->|5| m20
+  m12 -->|5| m26
   m12 -->|1| m5
   m12 -->|1| m32
   m8 -->|1| m14
   m8 -->|2| m27
   m8 -->|3| m5
-  m8 -->|1| m18
+  m8 -->|1| m17
   m6 -->|5| m33
-  m6 -->|4| m26
+  m6 -->|4| m23
   m6 -->|24| m14
-  m6 -->|12| m22
+  m6 -->|12| m19
   m6 -->|2| m13
-  m6 -->|5| m19
+  m6 -->|5| m18
   m6 -->|30| m27
   m6 -->|10| m31
   m6 -->|4| m29
-  m6 -->|2| m25
-  m6 -->|2| m16
+  m6 -->|2| m22
+  m6 -->|2| m24
   m6 -->|1| m7
-  m6 -->|2| m21
-  m6 -->|6| m20
+  m6 -->|2| m25
+  m6 -->|6| m26
   m6 -->|36| m5
   m6 -->|2| m12
   m6 -->|3| m8
   m6 -->|1| m9
   m6 -->|7| m11
   m6 -->|1| m10
-  m6 -->|4| m18
+  m6 -->|4| m17
   m6 -->|4| m28
   m6 -->|3| m32
   m4 -->|2| m33
   m4 -->|2| m14
-  m4 -->|2| m22
-  m4 -->|1| m19
+  m4 -->|2| m19
+  m4 -->|1| m18
   m4 -->|2| m27
   m4 -->|1| m31
-  m4 -->|2| m25
-  m4 -->|1| m21
-  m4 -->|1| m20
+  m4 -->|2| m22
+  m4 -->|1| m25
+  m4 -->|1| m26
   m4 -->|2| m5
   m4 -->|1| m12
   m4 -->|1| m6
   m4 -->|1| m11
-  m4 -->|2| m18
+  m4 -->|2| m17
   m9 -->|2| m14
-  m9 -->|1| m22
+  m9 -->|1| m19
   m9 -->|1| m27
-  m9 -->|2| m20
+  m9 -->|2| m26
   m9 -->|2| m5
   m9 -->|1| m12
-  m9 -->|1| m18
+  m9 -->|1| m17
   m9 -->|1| m32
   m11 -->|3| m33
   m11 -->|2| m14
   m11 -->|8| m27
   m11 -->|5| m31
-  m11 -->|1| m25
-  m11 -->|2| m20
+  m11 -->|1| m22
+  m11 -->|2| m26
   m11 -->|3| m5
   m11 -->|1| m12
   m11 -->|7| m32
   m10 -->|1| m31
-  m10 -->|1| m25
-  m18 -->|2| m14
-  m18 -->|2| m21
+  m10 -->|1| m22
+  m17 -->|2| m14
+  m17 -->|2| m25
   m34 -->|1| m35
   m34 -->|1| m39
   m34 -->|1| m47
@@ -368,18 +370,18 @@ graph LR
 | `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
 | `crates/fennec/src` | 29 | 21 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
-| `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |
 | `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
 | `crates/fennec/src/worktree` | 2 | 2 |  | A session's own git worktree. |
 | `crates/fennec/src/agents` | 2 | 2 |  | Agent discovery: embedded defaults, then `~/.agents/agents`, then the project's `.agents/agents`, which overrides an agent of the same id. Each agent carries where it was found (`AgentOrigin`), and the human's CRUD writes the user ones. |
-| `crates/fennec/src/store` | 12 | 12 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
-| `crates/fennec/src/sandbox` | 3 | 3 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
 | `crates/fennec/src/agent` | 24 | 17 |  | The application layer: the agent loop, written against the ports in `ports` so that storage, model and tools stay replaceable. |
-| `crates/fennec/src/tools` | 11 | 9 |  | The host toolbox: `read_file`, `write_file`, `edit_file` and `run_command`, plus `load_skill`, run inside one working directory, and `web_search`, which queries the human's SearXNG instance: the model only chooses the query, and `web_fetch`, which saves a page in a cache and returns a pointer to it (the model reads the parts it needs with `read_file`). Commands run in the bwrap world when the human enabled it; the file tools keep the in-process path guard. Writes to protected paths are refused; commands see them read-only. A read-only agent's commands see the workdir read-only. `canvas` shows the human a document in fennec's canvas store, never the project, so read-only agents have it too. `mcp_tools` and `mcp_call` reach the human's MCP servers, declared as soon as one is configured so a toggle never changes the frozen tool list. |
+| `crates/fennec/src/tools` | 12 | 10 |  | The host toolbox: `read_file`, `write_file`, `edit_file` and `run_command`, plus `load_skill`, run inside one working directory, and `web_search`, which queries the human's SearXNG instance: the model only chooses the query, and `web_fetch`, which saves a page in a cache and returns a pointer to it (the model reads the parts it needs with `read_file`). Commands run in the bwrap world when the human enabled it; the file tools keep the in-process path guard. Writes to protected paths are refused; commands see them read-only. A read-only agent's commands see the workdir read-only. `canvas` shows the human a document in fennec's canvas store, never the project, so read-only agents have it too. `mcp_tools` and `mcp_call` reach the human's MCP servers, declared as soon as one is configured so a toggle never changes the frozen tool list. |
 | `crates/fennec/src/agent/turn` | 2 | 2 |  | The multi-turn loop. Each round streams the model (`round`), then runs its tool calls, until it answers without one. |
 | `crates/fennec/src/domain/workflow` | 6 | 5 |  | The workflow domain: definitions, templates, validation, and the run state folded from events. |
 | `crates/canvas/src` | 6 | 5 | yes | Storage and model for canvas artifacts. |
-| `crates/fennec/src/domain` | 79 | 77 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |
+| `crates/fennec/src/sandbox` | 3 | 3 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
+| `crates/fennec/src/store` | 12 | 12 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
+| `crates/fennec/src/domain` | 80 | 78 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
 | `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
 | `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
