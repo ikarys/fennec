@@ -199,6 +199,7 @@ dependencies = [
  "base64",
  "canvas",
  "llm-providers-connector",
+ "mcp-lite",
  "ring",
  "rules",
  "rusqlite",
@@ -459,6 +460,17 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+
+[[package]]
+name = "mcp-lite"
+version = "0.5.0"
+dependencies = [
+ "base64",
+ "ring",
+ "serde",
+ "serde_json",
+ "ureq",
+]
 
 [[package]]
 name = "memchr"

@@ -3,7 +3,7 @@
 
 use super::{SqliteStore, StoreError};
 use crate::domain::clock::now_ms;
-use crate::domain::mcp_oauth::McpCredentials;
+use mcp_lite::oauth::McpCredentials;
 use rusqlite::{OptionalExtension, params};
 
 fn key(server: &str) -> String {
@@ -55,7 +55,7 @@ impl SqliteStore {
 #[cfg(test)]
 mod tests {
     use super::super::SqliteStore;
-    use crate::domain::mcp_oauth::McpCredentials;
+    use mcp_lite::oauth::McpCredentials;
 
     fn credentials() -> McpCredentials {
         McpCredentials {

@@ -1032,7 +1032,7 @@ fn tool_definitions_are_frozen_with_the_prompt() {
 
 #[test]
 fn toggling_an_mcp_server_keeps_the_frozen_tools() {
-    use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+    use mcp_lite::{McpServer, McpTool, McpTransport};
 
     let stop = AtomicBool::new(false);
     let snapshots = |log: &MemoryLog| {

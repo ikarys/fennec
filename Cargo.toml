@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/backlog", "crates/canvas", "crates/fennec", "crates/rules", "crates/token-usage"]
+members = ["crates/backlog", "crates/canvas", "crates/fennec", "crates/mcp-lite", "crates/rules", "crates/token-usage"]
 
 [workspace.package]
 version = "0.5.0"
