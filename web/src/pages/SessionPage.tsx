@@ -115,6 +115,7 @@ export function SessionPage({
       projectId: detail?.project.id ?? projectId,
       launchWorkflow,
       runWorkflowId: run?.workflow.id,
+      runFinished: run?.finished !== undefined,
       frameIdeaId,
       framingIdea,
       mode: sessionId ? detail?.mode : null,
