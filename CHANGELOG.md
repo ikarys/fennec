@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0](https://github.com/ikarys/fennec/compare/v0.4.1...v0.5.0) (2026-11-13)
+
+
+### Features
+
+* **mcp:** offer MCP servers through two frozen meta tools ([#405](https://github.com/ikarys/fennec/issues/405)) ([4c94331](https://github.com/ikarys/fennec/commit/4c943311fe96440d7ecee6c5b24e0ef5798808ba))
+* **ui:** use the About emblem as favicon and header logo ([#406](https://github.com/ikarys/fennec/issues/406)) ([9b76f7f](https://github.com/ikarys/fennec/commit/9b76f7f921b4da2be86e0ed9da85c2c8681eb584))
+
+
+### Bug Fixes
+
+* **agents:** give the builder's result its own place, count a session node's real working time ([#397](https://github.com/ikarys/fennec/issues/397)) ([a4bae15](https://github.com/ikarys/fennec/commit/a4bae153ab4952041f6176823ab2ce161204d81f))
+* **gate:** count validated tests in the plan, flag committed artifacts ([#401](https://github.com/ikarys/fennec/issues/401)) ([4c41de3](https://github.com/ikarys/fennec/commit/4c41de3dadd3b6813b815fc03cbc68638050633c))
+* **plan:** keep the planning node open while it talks, tighten the plan format ([#396](https://github.com/ikarys/fennec/issues/396)) ([3eee5e5](https://github.com/ikarys/fennec/commit/3eee5e58da63d99529bf7b3e13d398cbe7f9c36e))
+* **rules:** enforce absolute Block write rules in the sandbox, Never blocks the exact path ([#393](https://github.com/ikarys/fennec/issues/393)) ([98eeaf3](https://github.com/ikarys/fennec/commit/98eeaf3998336556ad874288d9eecf3e4c4292fa))
+* **sandbox:** read the main checkout from a worktree, report failed commits ([#395](https://github.com/ikarys/fennec/issues/395)) ([725d726](https://github.com/ikarys/fennec/commit/725d726f22a39262e3b143aa6457db49a44eebbb))
+* **ui:** name the controls and the actions the blind tests stumbled on ([#399](https://github.com/ikarys/fennec/issues/399)) ([fea0a4d](https://github.com/ikarys/fennec/commit/fea0a4dde8ad492f863095d99479908cf7fbfbd4))
+* **ui:** run a workflow from its editor, show a labelled Enable on plugins ([#402](https://github.com/ikarys/fennec/issues/402)) ([06a1dd7](https://github.com/ikarys/fennec/commit/06a1dd7895d0bae57f5940ea3bc408be07dcfa3f))
+* **ui:** say where recorded decisions live on the Decisions page ([#400](https://github.com/ikarys/fennec/issues/400)) ([23f0b12](https://github.com/ikarys/fennec/commit/23f0b1255aa6e9177e9625bfa68c9aad348ce71a))
+* **ui:** show the numbers the run really has ([#398](https://github.com/ikarys/fennec/issues/398)) ([fd5c30d](https://github.com/ikarys/fennec/commit/fd5c30d1351e6ee934e7f3ffd510907787841966))
+* **waiver:** a granted waiver overrides the matching path rule ([#394](https://github.com/ikarys/fennec/issues/394)) ([986c0c5](https://github.com/ikarys/fennec/commit/986c0c5b1629d86db828b5ce887907ed9d070e77))
+* **workflow:** a message after a finished run is a plain turn ([#404](https://github.com/ikarys/fennec/issues/404)) ([3a107ae](https://github.com/ikarys/fennec/commit/3a107ae99e05f890f2d1c02c99dbfe5d7515659d))
+
 ## [0.4.1](https://github.com/ikarys/fennec/compare/v0.4.0...v0.4.1) (2026-11-12)
 
 
