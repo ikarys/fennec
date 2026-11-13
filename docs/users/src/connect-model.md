@@ -20,7 +20,7 @@ Click **Fix in Settings** ①.
 
 ## Step 2: type the model's address
 
-The **Providers** page opens. It holds one card: the provider fennec calls `local`, its **Name** field may be empty.
+The **Providers** page opens. It holds one card, the provider named `local`. Its first field, **Name**, already reads `local`: leave it, it only names the card. Your model's address goes in the second field, **Base URL**.
 
 ![The local provider card: Base URL and API key](images/connect-model-2.png)
 

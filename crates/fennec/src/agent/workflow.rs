@@ -21,7 +21,7 @@ use crate::domain::event::{DoneReason, Event};
 use crate::domain::id::new_id;
 use crate::domain::workflow::definition::{AgentContext, NodeKind, Workflow};
 use crate::domain::workflow::run::{self as run, Next, RunOutcome, RunState, Via};
-use crate::domain::workflow::stats::{RunStats, run_stats};
+use crate::domain::workflow::stats::{RunStats, node_turns_ms, run_stats};
 use crate::domain::workflow::template::render;
 use nodes::NodeInput;
 use std::sync::atomic::Ordering;
@@ -231,10 +231,15 @@ fn continue_agent_node(
     let text = node_output(&events[before..]);
     let label = node.label();
 
-    let end = nodes::agent_end(label, outputs, reason, text, |reminder| {
-        session_send(turn, agent, reminder)
-    })?;
-    let next = record(turn, &state, &node.id, end, None)?;
+    let end = if still_framing(turn, agent, reason, &events[before..]) {
+        nodes::NodeEnd::AgentAsked
+    } else {
+        nodes::agent_end(label, outputs, reason, text, |reminder| {
+            session_send(turn, agent, reminder)
+        })?
+    };
+    let worked = node_turns_ms(&events, &node.id);
+    let next = record(turn, &state, &node.id, end, Some(worked))?;
 
     match next {
         Step::Go(cursor) => walk_from(turn, env, cursor),
@@ -364,6 +369,20 @@ fn run_node(
     )
 }
 
+/// A planning agent that answered without proposing a plan is still talking
+/// with the human: its node waits for their reply instead of finishing.
+fn still_framing(turn: &Turn, agent: &str, reason: DoneReason, events: &[Event]) -> bool {
+    reason == DoneReason::Complete
+        && turn
+            .agents
+            .iter()
+            .find(|a| a.id == agent)
+            .is_some_and(|a| a.allows(crate::agent::propose_plan::NAME))
+        && !events
+            .iter()
+            .any(|e| matches!(e, Event::PlanProposed { .. }))
+}
+
 fn session_agent(
     turn: &mut Turn,
     input: &NodeInput,
@@ -377,9 +396,14 @@ fn session_agent(
     let text = node_output(&events[before..]);
     let label = input.node.label();
 
-    nodes::agent_end(label, outputs, reason, text, |reminder| {
-        session_send(turn, agent, reminder)
-    })
+    let end = if still_framing(turn, agent, reason, &events[before..]) {
+        nodes::NodeEnd::AgentAsked
+    } else {
+        nodes::agent_end(label, outputs, reason, text, |reminder| {
+            session_send(turn, agent, reminder)
+        })?
+    };
+    Ok(end)
 }
 
 fn session_send(
@@ -497,7 +521,9 @@ fn map_outcome(outcome: RunOutcome) -> DoneReason {
 
 fn end_turn(turn: &mut Turn, reason: DoneReason) -> Result<DoneReason, String> {
     let events = turn.log.events(turn.session_id)?;
-    if !matches!(events.last(), Some(Event::ChatDone { .. })) {
+    // The node's own turn may have ended `Complete` while the run waits for the
+    // human: the last `ChatDone` must carry the run's reason.
+    if !matches!(events.last(), Some(Event::ChatDone { reason: last, .. }) if *last == reason) {
         turn.append(Event::ChatDone {
             message_id: new_id(),
             reason,

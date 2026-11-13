@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
-import { CheckIcon, ChevronDownIcon, ChevronRightIcon, MoonIcon, ReviewIcon } from '../../ui/Icons';
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, EyeIcon, MoonIcon } from '../../ui/Icons';
 import { Card } from '../../ui/Card';
 import { formatRelative } from '../../../lib/format';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
@@ -143,11 +143,11 @@ export function NightReport({
                       variant="ghost"
                       size="sm"
                       iconOnly
-                      title={t('actionReview')}
-                      aria-label={t('actionReview')}
+                      title={t('actionOpen')}
+                      aria-label={t('actionOpen')}
                       onClick={() => onOpenSession(sid)}
                     >
-                      <ReviewIcon className="h-4 w-4" />
+                      <EyeIcon className="h-4 w-4" />
                     </Button>
                   ) : null}
                 </div>

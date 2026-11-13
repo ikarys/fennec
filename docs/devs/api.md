@@ -237,7 +237,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   - `shortcuts`: `[{action, combo, default}]`, every keyboard shortcut in the Settings page's order, the stored override applied (an empty combo: disabled). A combo is `Mod`/`Alt`/`Shift` (in that order) then a `KeyboardEvent.code`, e.g. `Alt+Shift+Digit1`; matching by code keeps a shortcut on the same key whatever the layout.
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
     MCP tool's access as its server declares it in its annotations (indicative, not verified;
-    `undeclared` without annotations) and its definition's estimated token cost
+    `undeclared` without annotations) and its schema's estimated token cost (paid when the model
+    fetches it with `mcp_tools`)
   - `scanners`: `[{id, name, covers, install, url, path}]`, the security scanners the `audit-security`
     agent runs; `path` is where fennec found the executable on PATH, null when absent (verified); fennec
     never installs one, `install` is the command shown to the human
@@ -550,7 +551,9 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   what integrating the session's worktree branch would do (409 without a
   worktree). `files` come riskiest first (the review order): `signals` ⊂
   protected, sensitive, outsidePlan, bypass, architecture, conflictMarker, testsWeakened (the gate's
-  own checks, per file), hot (5+ commits in 90 days), untested (no test of its own: no inline
+  own checks, per file), validatedTests (validated at the run's test gate; informational), artifact
+  (under a dependency or cache directory such as .venv, node_modules, __pycache__; informational),
+  hot (5+ commits in 90 days), untested (no test of its own: no inline
   test, no test file of the same stem on the branch; declaration-only modules, test support and build tooling
   need none), large (200+ lines
   changed); deterministic. `commonSignals` are the signals every file carries (empty
@@ -561,7 +564,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   commit message (`feat: <title>`, an empty title gives `feat: integrate the
   agent's work`); the human edits it. `idea` is the idea tied to the session that the human may finish here (state started), null otherwise. `securityScans` is one `{scanner, state}` per scanner, `state` one of `ran {findings}`, `notInstalled`, `notApplicable`, `failed {reason}`, `running {seconds}`: a scanner missing, not needed or failing is shown, never a blocker. The scanners run in the background, started by the first read of the gate and cached per (base, branch); while one runs, the gate carries `securityScanRunning` and the UI reads it again each second. `blockers` is the review gate, each
   `{kind, acknowledgeable, …}` (`acknowledgeable` false for the kinds the human may never accept): `noCommits`, `conflict {files}` (the merge onto the human's HEAD would conflict on these files; never acknowledged: the branch must be brought up to date first), `branchChanged {from, to}`, `localChanges {paths}` (uncommitted changes in the human's tree the agent's work would overwrite: content equal to neither the base's nor the branch's; the common case, the same dirty work copied into the worktree at the run's start, is not a blocker but a file flagged `carried`, whose uncommitted work goes into the integration commit; never acknowledged: the pick refuses to overwrite it, commit, stash or remove it first), `criteriaNotPassed
-  {criteria}`, `noCriteria`, `protectedTouched {paths}`, `sensitiveTouched {paths}` (changed files inside the sensitive zones of `.agents/architecture`, one `sensitive <pattern>` per line, gitignore-like: the human's review is mandatory there; deterministic), `outsidePlan {paths}` (changed files that no `Files:` line of the run's approved plan lists, the plan read from the plan node named by the workflow's criteria node; no plan, no check; deterministic), `understandingMissing` (the branch changes a sensitive zone and no comprehension dialogue was held on its current head; deterministic), `securityFindings {findings: [{scanner, rule, path, line, detail}]}` (what the security scanners found on PATH report on the branch, run by fennec in the read-only sandbox without network: gitleaks on the branch's commits, secrets redacted; cargo-audit when a Cargo.lock changed, offline; semgrep on the changed files only with the human's own `.semgrep.yml`; deterministic, zero model tokens), `securityScanRunning` (a scanner still runs, its findings unknown; never acknowledged, it clears when the scanners end), `architectureViolated {violations: [{path, line, prefix, forbidden}]}` (added lines that break the project's `.agents/architecture` rules, one `<path prefix> forbids <text>` per line; deterministic, checked on added lines only), `suppressionsAdded {suppressions: [{path, line, marker}]}` (added lines that silence a lint, a type check or a test: `#[allow(`, `@ts-ignore`, `noqa`, `it.skip(`, `pytest.mark.skip`…; text tripwires, comments included), `testsWeakened {testsRemoved, assertionsRemoved, paths}` (the branch removes more test declarations or assertions than it adds, summed over all files so moved tests do not count; `paths` are the files that lost some); `branchChanged.to`
+  {criteria}`, `noCriteria`, `protectedTouched {paths}`, `sensitiveTouched {paths}` (changed files inside the sensitive zones of `.agents/architecture`, one `sensitive <pattern>` per line, gitignore-like: the human's review is mandatory there; deterministic), `outsidePlan {paths}` (changed files that no `Files:` line of the run's approved plan lists, the plan read from the plan node named by the workflow's criteria node; no plan, no check; the test files validated at the test gate count as listed; deterministic), `understandingMissing` (the branch changes a sensitive zone and no comprehension dialogue was held on its current head; deterministic), `securityFindings {findings: [{scanner, rule, path, line, detail}]}` (what the security scanners found on PATH report on the branch, run by fennec in the read-only sandbox without network: gitleaks on the branch's commits, secrets redacted; cargo-audit when a Cargo.lock changed, offline; semgrep on the changed files only with the human's own `.semgrep.yml`; deterministic, zero model tokens), `securityScanRunning` (a scanner still runs, its findings unknown; never acknowledged, it clears when the scanners end), `architectureViolated {violations: [{path, line, prefix, forbidden}]}` (added lines that break the project's `.agents/architecture` rules, one `<path prefix> forbids <text>` per line; deterministic, checked on added lines only), `suppressionsAdded {suppressions: [{path, line, marker}]}` (added lines that silence a lint, a type check or a test: `#[allow(`, `@ts-ignore`, `noqa`, `it.skip(`, `pytest.mark.skip`…; text tripwires, comments included), `testsWeakened {testsRemoved, assertionsRemoved, paths}` (the branch removes more test declarations or assertions than it adds, summed over all files so moved tests do not count; `paths` are the files that lost some); `branchChanged.to`
   is null for a detached HEAD; `testFiles` are the integrated test files (paths
   relative to the project) that the protection does not cover yet; protection is read from the project's tree, not
   the worktree's.
@@ -687,7 +690,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `GET /api/sessions/{id}/vision` → `[{label, anchorId, src, inContext}]`: the images the model received over the
   whole log, in log order; `inContext` false once a compaction, a replay or the image window (4 to 6 latest images)
   took it out of the model's view; deterministic; 404 if no session.
-- `GET /api/sessions/{id}/thread` → `{pendingApproval, pendingWaiver, pendingPlan, handedPlan, queued, criteria, criteriaTally, decisions, replayable, modifiedFiles}`: the session's
+- `GET /api/sessions/{id}/thread` → `{pendingApproval, pendingWaiver, pendingPlan, handedPlan, planAwaitingBuild, queued, criteria, criteriaTally, decisions, replayable, modifiedFiles}`: the session's
   blocks, folded by the server (the UI computes none): `pendingApproval` `{callId, subject, kind, pattern, access,
   folders}` or null, the tool call waiting for the human's answer; `pendingWaiver` `{callId, path, reason}` or null;
   `pendingPlan` `{callId, plan, markdown, preflight}` the last `plan.proposed` still waiting for the human, served whole
@@ -695,14 +698,17 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   it, so does a human message once the session left the plan agent; a question in plan mode keeps it (the decision bar);
   `handedPlan` `{ideaId, undoable}` or null: the session's idea carries that plan to the backlog (`idea.ready` with the same
   markdown, trimmed), so `pendingPlan` is null instead; `undoable` while the idea only waits (a `framing` takes it back);
+  `planAwaitingBuild` true while the last `plan.proposed` carries criteria and no `criteria.set` or `workflow.finished` followed it;
   `queued` `[{queueId, content}]` the messages queued for the next rounds, in order; `criteria`
   `[{id, description, check?, status, passedBefore, existenceOnly}]` the criteria in force (the last `criteria.set` and the
   `criterion.updated` since; `status` as in the integration preview, `passedBefore` from the last preflight, `existenceOnly` true when the check only searches the code: it proves the code exists, not that it works);
   `criteriaTally` `{total, passed, failed, indicative, percent}` those criteria counted (`indicative`: the passes an agent judged; `percent`: the passes' share, 0 to 100, rounded down);
   `decisions` `[{callId, title, choice, reason, alternatives}]` those recorded, oldest first; `replayable` the ids
   of the messages the human may replay (typed, in the model's current view: the UI offers the action on those only);
-  `modifiedFiles` `{count, added, removed, files: [{path, added, removed}]}` (`files`: the 5 most changed, most lines first) what the `write_file` and `edit_file` calls changed (files merged by their path
-  relative to the session's workdir, lines as the calls wrote them);
+  `modifiedFiles` `{count, added, removed, files: [{path, added, removed}]}` (`files`: the 5 most changed, most lines first) what the session's live worktree changed, counted by git
+  (tracked changes since the merge start, committed or not, plus untracked files, as the integration gate), else what the
+  `write_file` and `edit_file` calls changed, but those whose result in the model's window failed (paths relative to the session's workdir or its removed
+  worktree, lines as the calls wrote them);
   deterministic (the decisions and the indicative statuses record what a model said); 404 if no session.
 - `GET /api/sessions/{id}/usage/calls` → `[{messageId, line, detail, turnRecap}]`, oldest first: what sits under
   each answer, written by the server from the ledger (`line` `↑ 12,3k · cache 82 % · ↓ 345 · 4,2 s`, `detail` the

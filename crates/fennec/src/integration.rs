@@ -246,7 +246,7 @@ fn content_equals(top: &Path, ref_name: &str, file: &str) -> bool {
 
 /// `git diff --numstat` lines (`added<TAB>removed<TAB>path`); binary files
 /// show `-` and count 0.
-fn parse_numstat(out: &str) -> HashMap<String, (u64, u64)> {
+pub(crate) fn parse_numstat(out: &str) -> HashMap<String, (u64, u64)> {
     out.lines()
         .filter_map(|line| {
             let mut parts = line.splitn(3, '\t');

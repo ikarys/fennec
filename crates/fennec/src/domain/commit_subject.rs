@@ -14,7 +14,10 @@ characters.
 Return ONLY the line.
 Describe the commits and files below, not the session as a whole.
 
-The human's requests since the last integration:
+The task:
+{task}
+
+The human's later requests (they refine the task; the subject still describes the task's change unless the commits show otherwise):
 {request}
 
 Session title:
@@ -31,12 +34,20 @@ const COMMIT_TYPES: &[&str] = &[
 ];
 
 /// The model-facing prompt for one integration commit subject.
-pub fn prompt(request: &str, title: &str, commits: &[&str], files: &[(&str, u64, u64)]) -> String {
+pub fn prompt(
+    task: &str,
+    request: &str,
+    title: &str,
+    commits: &[&str],
+    files: &[(&str, u64, u64)],
+) -> String {
+    let task: String = task.chars().take(2000).collect();
     let request: String = request.chars().take(2000).collect();
     let commits = commit_lines(commits);
     let files = file_lines(files);
 
     COMMIT_SUBJECT_PROMPT
+        .replace("{task}", &task)
         .replace("{request}", &request)
         .replace("{title}", title)
         .replace("{commits}", &commits)
@@ -151,20 +162,28 @@ mod tests {
 
     #[test]
     fn prompt_includes_the_request() {
-        let p = prompt("add the feature", "Title", &[], &[]);
-        assert!(p.contains("The human's requests since the last integration:\nadd the feature"));
+        let p = prompt("task", "add the feature", "Title", &[], &[]);
+        assert!(p.contains(
+            "The human's later requests (they refine the task; the subject still describes the task's change unless the commits show otherwise):\nadd the feature"
+        ));
+    }
+
+    #[test]
+    fn prompt_includes_the_task() {
+        let p = prompt("the task", "request", "Title", &[], &[]);
+        assert!(p.contains("The task:\nthe task"));
     }
 
     #[test]
     fn prompt_skips_fennec_auto_commits_and_writes_none() {
-        let p = prompt("r", "t", &["fennec: agent work in session x"], &[]);
+        let p = prompt("task", "r", "t", &["fennec: agent work in session x"], &[]);
         assert!(p.contains("Commits on the branch:\n(none)"));
     }
 
     #[test]
     fn prompt_caps_files() {
         let files = vec![("a.rs", 1, 0); 61];
-        let p = prompt("r", "t", &[], &files);
+        let p = prompt("task", "r", "t", &[], &files);
         assert_eq!(p.matches("- a.rs (+1 -0)").count(), 60);
         assert!(p.contains("- … and 1 more"));
     }

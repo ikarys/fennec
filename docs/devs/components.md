@@ -340,3 +340,11 @@ human, and the framing session, which sees the current sheet (a changed sheet re
 and whose plan can be applied to the sheet. The board opens a task in a right-side drawer kept in the URL
 (`?task=<id>`) (ADR 0006, `crates/backlog/src/sheet.rs`, `domain/sheet_notice.rs`,
 `web/src/components/project/ideas/TaskDrawer.tsx`).
+
+Lazy MCP, done: as soon as an MCP server is configured the model gets two fixed tools, `mcp_tools(server,
+tools)` for a tool's schema and `mcp_call(server, tool, arguments)` to call it, instead of one tool per MCP tool.
+Which servers are active is told by an appended catalog notice (servers, tools, the parameters of small servers),
+re-sent only when its text changes, so turning a server on or off mid-session keeps the frozen tool list and the
+prompt cache. A call to a server that is off is refused, arguments are checked against the cached schema (the
+error carries it), and the human's per-tool rules see the call as `{server}_{tool}`. A session frozen with the
+older per-tool definitions re-freezes once (`domain/mcp.rs`, `domain/mcp_notice.rs`, `tools/mcp_call.rs`).

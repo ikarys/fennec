@@ -2,6 +2,7 @@
 //! decision: the agent loop only enforces the crate's answer.
 
 use crate::agent::ports::RuleCheck;
+use crate::domain::protection::Protection;
 use crate::tools::path_guard;
 use rules::{Access, Decision, Proposal, Request, Rules};
 use serde_json::Value;
@@ -11,6 +12,7 @@ pub(super) fn check<'r>(
     rules: &'r Rules,
     workdir: &Path,
     home: Option<&str>,
+    protection: &Protection,
     name: &str,
     args: &Value,
 ) -> RuleCheck<'r> {
@@ -50,6 +52,11 @@ pub(super) fn check<'r>(
     if let Some(access) = access
         && let Some(path) = argument("path")
         && let Some(request) = path_guard::path_request(workdir, home, path, access)
+        // A granted waiver is the human's narrower, newer decision for that exact file.
+        && !request
+            .relative
+            .as_deref()
+            .is_some_and(|relative| protection.is_exempt(relative))
     {
         weigh(
             rules.decide(&Request::Path(&request)),
@@ -89,6 +96,7 @@ fn has_rule(decision: Decision) -> bool {
 mod tests {
     use super::check;
     use crate::domain::id::new_id;
+    use crate::domain::protection::Protection;
     use rules::{
         Access, Action, Decision, Origin, Proposal, Rule, Rules, Scope, Target, TargetKind,
     };
@@ -143,6 +151,7 @@ mod tests {
             &rules,
             &workdir,
             None,
+            &Protection::default(),
             "run_command",
             &json!({"command": "cd x && rm -fr y"}),
         );
@@ -156,6 +165,7 @@ mod tests {
             &rules,
             &workdir,
             None,
+            &Protection::default(),
             "run_command",
             &json!({"command": "ls"}),
         );
@@ -169,7 +179,14 @@ mod tests {
         let workdir = temp_workdir();
         let rules = Rules::new(vec![tool_rule(1, "web_search", Action::Block)]);
 
-        let refused = check(&rules, &workdir, None, "web_search", &json!({}));
+        let refused = check(
+            &rules,
+            &workdir,
+            None,
+            &Protection::default(),
+            "web_search",
+            &json!({}),
+        );
         assert!(matches!(
             refused.decision,
             Decision::Block(rule) if rule.id == 1
@@ -188,6 +205,7 @@ mod tests {
             &rules,
             &workdir,
             None,
+            &Protection::default(),
             "write_file",
             &json!({"path": "secrets/a.txt"}),
         );
@@ -201,6 +219,7 @@ mod tests {
             &rules,
             &workdir,
             None,
+            &Protection::default(),
             "write_file",
             &json!({"path": workdir.join("secrets/a.txt").to_string_lossy()}),
         );
@@ -214,6 +233,7 @@ mod tests {
             &rules,
             &workdir,
             None,
+            &Protection::default(),
             "write_file",
             &json!({"path": "src/a.rs"}),
         );
@@ -233,6 +253,7 @@ mod tests {
             &rules,
             &workdir,
             None,
+            &Protection::default(),
             "read_file",
             &json!({"path": outside.to_string_lossy()}),
         );
@@ -263,6 +284,7 @@ mod tests {
             &rules,
             &workdir,
             Some(home.to_string_lossy().as_ref()),
+            &Protection::default(),
             "read_file",
             &json!({"path": home.join(".ssh").join("config").to_string_lossy()}),
         );
@@ -272,6 +294,38 @@ mod tests {
         ));
 
         let _ = std::fs::remove_dir_all(&home);
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn a_waiver_overrides_the_matching_path_rule() {
+        let workdir = temp_workdir();
+        let rules = Rules::new(vec![path_rule(1, "todo/", Access::Write, Action::Block)]);
+        let protection = Protection::default().exempting(&["todo/cli.py".to_string()]);
+
+        let waived = check(
+            &rules,
+            &workdir,
+            None,
+            &protection,
+            "write_file",
+            &json!({"path": "todo/cli.py"}),
+        );
+        assert_eq!(waived.decision, Decision::Allow(None));
+
+        let other = check(
+            &rules,
+            &workdir,
+            None,
+            &protection,
+            "write_file",
+            &json!({"path": "todo/other.py"}),
+        );
+        assert!(matches!(
+            other.decision,
+            Decision::Block(rule) if rule.id == 1
+        ));
+
         let _ = std::fs::remove_dir_all(&workdir);
     }
 }

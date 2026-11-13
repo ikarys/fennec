@@ -99,6 +99,8 @@ The review map lists the branch's files riskiest first. Each file can carry sign
 - **architecture**
 - **conflict markers**
 - **weakened tests**
+- **validated tests**
+- **artifact**
 - **often modified**
 - **no own test**
 - **large change**
@@ -121,7 +123,7 @@ Module rules, such as `<A> never imports <B>`, are checked against the project m
 
 ### Plan scope
 
-The gate reads the `Files:` lines of the run's approved plan. A branch file no step lists gets an **outside the plan** signal and a **Changed outside the approved plan** blocker. You accept it if the extra file is justified.
+The gate reads the `Files:` lines of the run's approved plan. The test files you validated at the test gate count as listed: they carry a **validated tests** signal instead. A branch file no step lists gets an **outside the plan** signal and a **Changed outside the approved plan** blocker. You accept it if the extra file is justified.
 
 ### Security scanners
 

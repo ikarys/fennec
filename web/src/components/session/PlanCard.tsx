@@ -2,11 +2,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { pathParts, type Plan, type PlanCriterion, type Report } from '../../lib/plan';
 import type { PreflightResultView } from '../../lib/fold';
-import { AlertIcon, CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, FileIcon, PlayIcon } from '../ui/Icons';
+import { AlertIcon, CheckIcon, ChevronRightIcon, CloseIcon, EyeIcon, FileIcon, InsightIcon, PlayIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SectionLabel } from '../ui/SectionLabel';
 import { PreflightSection } from './PreflightSection';
+import { markdownComponents } from './markdownComponents';
 import { useT } from '../../i18n';
 import { useFileLink } from './FileLinkContext';
 import type { MsgKey } from '../../i18n/messages';
@@ -279,6 +280,19 @@ export function ReportCard({ report }: { report: Report }) {
         <p className="m-0 text-sm leading-relaxed text-text">
           <Inline>{report.summary}</Inline>
         </p>
+      )}
+      {report.findings && (
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="flex items-center gap-2 border-b border-border bg-raised px-3 py-1.5">
+            <InsightIcon className="h-3.5 w-3.5 text-accent" />
+            <SectionLabel>{t('reportFindings')}</SectionLabel>
+          </div>
+          <div className="px-3 py-2 text-sm">
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
+              {report.findings}
+            </ReactMarkdown>
+          </div>
+        </div>
       )}
       {report.steps.length > 0 && (
         <div className="overflow-hidden rounded-md border border-border">

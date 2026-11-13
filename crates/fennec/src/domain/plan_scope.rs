@@ -79,6 +79,25 @@ pub fn outside(plan: &[String], changed: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// The gate's contract: the plan's entries plus the test files the human
+/// validated. An empty plan stays empty (no plan, no check).
+pub fn contract(plan: Vec<String>, validated_tests: &[String]) -> Vec<String> {
+    if plan.is_empty() {
+        return Vec::new();
+    }
+    let mut out = plan;
+    for test in validated_tests {
+        let test = test.strip_prefix("./").unwrap_or(test.as_str()).to_string();
+        if test.is_empty() {
+            continue;
+        }
+        if !out.contains(&test) {
+            out.push(test);
+        }
+    }
+    out
+}
+
 fn covers(entry: &str, path: &str) -> bool {
     entry == path
         || (entry.ends_with('/') && path.starts_with(entry))
@@ -155,5 +174,34 @@ mod tests {
             outside(&[], &["src/a.rs".to_string()]),
             Vec::<String>::new()
         );
+    }
+
+    #[test]
+    fn contract_adds_validated_tests_and_strips_dot_slash() {
+        let plan = vec!["src/a.rs".to_string()];
+        let validated = vec!["./tests/a.rs".to_string(), "tests/a.rs".to_string()];
+
+        assert_eq!(
+            contract(plan, &validated),
+            vec!["src/a.rs".to_string(), "tests/a.rs".to_string()]
+        );
+    }
+
+    #[test]
+    fn contract_validated_test_covers_its_path() {
+        let plan = vec!["src/a.rs".to_string()];
+        let contract = contract(plan, &["tests/a.rs".to_string()]);
+
+        assert_eq!(
+            outside(&contract, &["tests/a.rs".to_string()]),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn contract_empty_plan_stays_empty() {
+        let validated = vec!["tests/a.rs".to_string()];
+
+        assert_eq!(contract(Vec::new(), &validated), Vec::<String>::new());
     }
 }

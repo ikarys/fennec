@@ -115,6 +115,7 @@ export const fr: Record<MsgKey, string> = {
   acceptedDespite: 'Accepté malgré : {kinds}',
   integratedNote: 'Intégré par toi · {commits} dans HEAD {head}',
   discardedNote: "Travail de l'agent abandonné · {commits}",
+  worktreeCleanedNote: "Espace de travail de l'agent nettoyé",
   commit: 'commit',
   commits: 'commits',
   // Context panel blocks and pages (lib/panelBlocks.ts)
@@ -131,7 +132,7 @@ export const fr: Record<MsgKey, string> = {
   diffEmpty: 'Aucune ligne modifiée (mode ou fichier vide).',
   diffTruncated: "Diff coupé à 5 000 lignes : ouvre le fichier dans l'éditeur pour la suite.",
   panelWorkplace: 'Où atterrit le travail',
-  worktreeCommits: '{count} commits',
+  worktreeCommits: '{count} commit{s}',
   landsOn: 'Atterrit sur {branch} dans {dir} après ta revue.',
   serverLogs: 'Voir la sortie',
   contextTabWork: 'Travail',
@@ -178,6 +179,7 @@ export const fr: Record<MsgKey, string> = {
   existenceOnly: 'existence seulement',
   existenceOnlyTitle: "Cette vérification ne fait que chercher dans le code : elle prouve que le code existe, pas qu'il marche. Préférez un test qui l'exerce.",
   verified: 'vérifié',
+  nothingVerified: 'rien de vérifié',
   verifiedTitle: 'La vérification a tourné elle-même : le résultat est déterministe.',
   indicative: 'indicatif',
   indicativeTitle: "Un agent l'a jugé : le résultat est le dire du modèle, à vérifier.",
@@ -247,6 +249,10 @@ export const fr: Record<MsgKey, string> = {
   signalConflictTitle: 'Des marqueurs de conflit git restent dans les lignes ajoutées.',
   signalTestsLabel: 'tests affaiblis',
   signalTestsTitle: 'Des tests ou assertions ont été affaiblis dans ce fichier.',
+  signalValidatedTestsLabel: 'tests validés',
+  signalValidatedTestsTitle: "Fichier de test que tu as validé à l'étape des tests : son diff est celui des tests approuvés, gelés depuis (vérifié).",
+  signalArtifactLabel: 'artefact',
+  signalArtifactTitle: 'Dans un dossier de dépendances ou de cache (.venv, node_modules, __pycache__…) : rarement à commiter (vérifié).',
   signalHotLabel: 'souvent modifié',
   signalHotTitle: 'Modifié 5 fois ou plus ces 90 derniers jours.',
   signalUntestedLabel: 'sans test propre',
@@ -362,6 +368,7 @@ export const fr: Record<MsgKey, string> = {
   stepNotDone: 'Étape {number} non faite',
   criteriaAwaitBuild: 'Les critères du plan s’appliquent dans le run qui le construit.',
   reportBadge: 'Rapport',
+  reportFindings: 'Résultats',
   reportIndicativeTitle: 'Coches déclarées par le modèle, non vérifiées par fennec',
   stepsLabel: 'Étapes',
   toTest: 'À tester',
@@ -396,7 +403,7 @@ export const fr: Record<MsgKey, string> = {
   sessionTitle: 'Pour cette session : {scope}',
   alwaysTitle: 'Règle du projet, visible et supprimable dans Réglages › Règles',
   always: 'Toujours',
-  neverTitle: 'Refuser et créer une règle du projet (Réglages › Règles)',
+  neverTitle: 'Refuser et bloquer {scope} dans une règle du projet (Réglages › Règles)',
   never: 'Jamais',
   // Settings page and model sections (pages/SettingsPage.tsx, components/settings)
   settingsTitle: 'Réglages',
@@ -467,6 +474,7 @@ export const fr: Record<MsgKey, string> = {
   modelParams: 'Paramètres du modèle',
   editConnection: 'Modifier la connexion',
   envDefaultOption: "Défaut de l'environnement ({model})",
+  envDefaultOptionUnnamed: "Défaut de l'environnement",
   unlistedModelOption: '{model} — {provider} (non listé)',
   modelSectionHint: "Les nouvelles sessions l'utilisent ; le composer change celui d'une session. Le modèle par défaut est marqué ★ ; les favoris (♥) sont proposés dans le composer.",
   probeContextFound: 'contexte {window}',
@@ -780,6 +788,8 @@ export const fr: Record<MsgKey, string> = {
   // Project: doc, question, module map (components/project)
   docVerifiedTitle: 'Lu depuis le fichier',
   noAdrs: 'Aucun ADR dans docs/adr/.',
+  adrsNotRecorded:
+    "Les ADR engagent le projet. Les décisions qu'un agent enregistre en travaillant sont listées dans sa session (onglet Session) et dans le rapport de nuit.",
   filesPickOne: 'Choisissez un fichier dans l’arborescence.',
   filesTruncated: 'Seuls les 20 000 premiers fichiers sont listés.',
   filesUntracked: 'Non suivi par git : lecture seule',
@@ -944,7 +954,7 @@ export const fr: Record<MsgKey, string> = {
     "Un agent en lecture seule lit les modules les plus risqués et propose quelques tâches (5 au plus), les plus risqués d'abord ; les fichiers sans logique sont écartés. Tu choisis celles qui entrent au backlog. Relire reste ton travail : il te dit quels fichiers lire d'abord.",
   signalNeverReviewed: 'jamais relu',
   signalNoTest: 'sans test propre',
-  signalChurn: '{count} commits',
+  signalChurn: '{count} commit{s}',
   // Project: disk
   deleteFolderQuestion: 'Supprimer ce dossier ?',
   deleteWorktreeQuestion: 'Supprimer le worktree ?',
@@ -1282,6 +1292,8 @@ export const fr: Record<MsgKey, string> = {
   runEndReadTokens: 'Tokens lus',
   runEndCriteriaDetail: '{verified} vérifié{verifiedPlural} · {indicative} indicatif{indicativePlural}',
   runEndTimeDetail: 'Détail du temps',
+  runEndShowStats: 'Afficher les chiffres du run',
+  runEndHideStats: 'Masquer les chiffres du run',
   runEndNodesSummary: '{duration} · {count} nœud{plural}',
   runEndWorkReady: 'Le travail est prêt dans l\'espace de l\'agent.',
   // components/session/AgentsMdCard.tsx
@@ -1361,7 +1373,6 @@ export const fr: Record<MsgKey, string> = {
   runRailStateDone: 'Terminé',
   runRailStateFailed: 'Échoué',
   runRailStateStopped: 'Arrêté',
-  runRailStateRunning: 'En cours',
   // components/workflow/session/WorkflowPicker.tsx
   workflowPickerLabel: 'Workflow',
   workflowPickerNone: 'Aucun workflow',
@@ -1412,6 +1423,8 @@ export const fr: Record<MsgKey, string> = {
   nodeDividerInterrupted: 'interrompu',
   nodeDividerDetails: 'détails',
   nodeDividerExitCode: 'code de sortie : {code}',
+  nodeDividerCommand: 'Commande',
+  nodeDividerNoOutput: 'Aucune sortie.',
   // components/workflow/fields/ShellFields.tsx
   shellCommand: 'Commande',
   shellTimeoutSecs: 'Délai (s)',
@@ -1462,6 +1475,8 @@ export const fr: Record<MsgKey, string> = {
   workflowEditorIssueCount: '{count} problème(s)',
   workflowEditorTestAria: 'Tester pas à pas',
   workflowEditorTestTitle: 'Ouvre une nouvelle session avec ce workflow, en pas à pas.',
+  workflowEditorRunAria: 'Lancer',
+  workflowEditorRunTitle: 'Ouvre une nouvelle session avec ce workflow sélectionné.',
   workflowEditorTestSaveTitle: 'Enregistre le workflow avant de le tester.',
   // pages/ProjectPage.tsx
   projectPageDecisions: 'Décisions',

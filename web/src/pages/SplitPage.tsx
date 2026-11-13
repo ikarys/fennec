@@ -145,7 +145,7 @@ export function SplitPage({
       <SessionPage
         sessionId={isNew ? null : value}
         projectId={isNew ? value.slice(4) : null}
-        testWorkflowId={null}
+        launchWorkflow={null}
         frameIdeaId={null}
         fromSessionId={null}
         pseudoTabId={isNew ? value : null}

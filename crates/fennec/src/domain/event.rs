@@ -399,8 +399,8 @@ pub enum Event {
         /// before they were frozen too.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cached_tools: Option<Value>,
-        /// The MCP tool names frozen with it; empty in snapshots stored
-        /// before MCP existed. Re-freezing compares this to the current set.
+        /// Legacy: the per-tool MCP names older builds froze with it. Lazy
+        /// MCP writes it empty; kept so stored logs still read.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         mcp_tool_names: Vec<String>,
     },

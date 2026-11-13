@@ -156,7 +156,23 @@ impl Sandbox {
     }
 
     /// The same sandbox with `mounts` bound read-only from source to destination.
-    pub fn with_mounts(self, mounts: Vec<(PathBuf, PathBuf)>) -> Sandbox {
+    /// A source overlapping a hidden path is dropped: mount paths come from git
+    /// metadata a repository controls, which must never re-expose the human's
+    /// secrets.
+    pub fn with_mounts(self, mut mounts: Vec<(PathBuf, PathBuf)>) -> Sandbox {
+        if let Sandbox::On {
+            hidden_dirs,
+            hidden_files,
+            ..
+        } = &self
+        {
+            mounts.retain(|(source, _)| {
+                !hidden_dirs
+                    .iter()
+                    .chain(hidden_files)
+                    .any(|hidden| source.starts_with(hidden) || hidden.starts_with(source))
+            });
+        }
         match self {
             Sandbox::Off => Sandbox::Off,
             Sandbox::On {
@@ -491,7 +507,7 @@ fn bwrap_args(sandbox: &Sandbox, workdir: &Path, cwd: &Path, command: &str) -> V
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::tools::test_support::temp_dir;
     use std::os::unix::process::ExitStatusExt;
@@ -739,6 +755,30 @@ mod tests {
     }
 
     #[test]
+    fn with_mounts_drops_a_source_overlapping_a_hidden_path() {
+        let sandbox = Sandbox::On {
+            network: false,
+            hidden_dirs: vec![PathBuf::from("/home/user/.ssh")],
+            hidden_files: vec![PathBuf::from("/home/user/.netrc")],
+            writable: vec![],
+            read_only: vec![],
+            mounts: vec![],
+        }
+        .with_mounts(
+            ["/home/user/.ssh/keys", "/home/user", "/srv/repo"]
+                .map(|path| (PathBuf::from(path), PathBuf::from(path)))
+                .to_vec(),
+        );
+        let Sandbox::On { mounts, .. } = sandbox else {
+            panic!("the sandbox is on");
+        };
+        assert_eq!(
+            mounts,
+            vec![(PathBuf::from("/srv/repo"), PathBuf::from("/srv/repo"))]
+        );
+    }
+
+    #[test]
     fn bwrap_args_ro_bind_git_metadata_after_the_workdir_bind() {
         let workdir = temp_dir();
         std::fs::create_dir_all(workdir.join(".git")).unwrap();
@@ -914,7 +954,7 @@ mod tests {
 
     /// Whether a real bwrap is here; locally its absence skips the end-to-end
     /// tests, on CI it fails them, so CI never goes green without proving the sandbox.
-    fn bwrap_available() -> bool {
+    pub(crate) fn bwrap_available() -> bool {
         let available = Command::new("bwrap")
             .arg("--version")
             .output()

@@ -29,6 +29,7 @@ use crate::domain::event::{
     DoneReason, Event, MessageMetadata, MetadataSource, ReminderKind, Role, ToolResult,
 };
 use crate::domain::id::new_id;
+use crate::domain::mcp_notice;
 use crate::domain::open_calls;
 use crate::domain::preferences::ReasoningEffort;
 use crate::domain::replay::replayable;
@@ -213,6 +214,7 @@ pub(super) fn answer_or_prompt(
     let answered = close_open_calls(turn, prompt)?;
     ensure_workdir_notice(turn)?;
     ensure_sheet_notice(turn)?;
+    ensure_mcp_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     if !answered {
         turn.append_user(prompt, false, None, attachments.to_vec())?;
@@ -319,6 +321,18 @@ fn ensure_workdir_notice(turn: &mut Turn) -> Result<(), String> {
 fn ensure_sheet_notice(turn: &mut Turn) -> Result<(), String> {
     if let Some(sheet) = turn.task_sheet
         && let Some(notice) = sheet_notice::needed(&turn.log.events(turn.session_id)?, sheet)
+    {
+        turn.append_system(&notice)?;
+    }
+    Ok(())
+}
+
+/// Tells the model which MCP servers it can call when that changed since it
+/// was last told; nothing when no MCP server is configured.
+fn ensure_mcp_notice(turn: &mut Turn) -> Result<(), String> {
+    if turn.tools.offers_mcp()
+        && let Some(notice) =
+            mcp_notice::needed(&turn.log.events(turn.session_id)?, turn.tools.mcp_servers())
     {
         turn.append_system(&notice)?;
     }
@@ -541,6 +555,7 @@ pub fn run_agent_node(turn: &mut Turn, agent_id: &str, prompt: &str) -> Result<D
 
     ensure_workdir_notice(turn)?;
     ensure_sheet_notice(turn)?;
+    ensure_mcp_notice(turn)?;
     ensure_agent_reminder(turn, agent)?;
     turn.append_system(prompt)?;
     run_top_level_agent_loop(turn, agent)

@@ -48,6 +48,9 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
     if (tool.name === 'run_command' && tool.status === 'running') {
       setOpen(true);
     }
+    if ((tool.name === 'propose_plan' || tool.name === 'submit_report') && tool.status === 'error') {
+      setOpen(true);
+    }
   }, [tool.name, tool.status]);
 
   const arg =
@@ -59,7 +62,11 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
           ? String(tool.args.query ?? '')
           : tool.name === 'delegate'
             ? `${String(tool.args.agent ?? '')} · ${String(tool.args.task ?? '')}`
-            : String(tool.args.path ?? '');
+            : tool.name === 'mcp_call'
+              ? `${String(tool.args.server ?? '')}/${String(tool.args.tool ?? '')}`
+              : tool.name === 'mcp_tools'
+                ? `${String(tool.args.server ?? '')}: ${(Array.isArray(tool.args.tools) ? tool.args.tools : []).join(', ')}`
+                : String(tool.args.path ?? '');
   const lineCount = tool.output ? tool.output.split('\n').length : 0;
   const opener = usePreviewOpener();
   const workdir = usePreviewWorkdir();
@@ -212,6 +219,12 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
           {tool.name === 'ask_user' && (
             <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
               {tool.output || tool.error || t('awaitingAnswer')}
+            </pre>
+          )}
+
+          {(tool.name === 'propose_plan' || tool.name === 'submit_report') && (
+            <pre className="overflow-x-auto bg-code p-2.5 font-mono text-xs text-muted whitespace-pre">
+              {tool.output || tool.error || t('noOutput')}
             </pre>
           )}
         </div>

@@ -213,7 +213,7 @@ describe('parseRoute', () => {
     expect(parseRoute('#/s/new%3Ap1')).toEqual({
       name: 'new',
       id: 'p1',
-      testWorkflowId: null,
+      launchWorkflow: null,
       frameIdeaId: null,
       fromSessionId: null,
     });
@@ -223,9 +223,19 @@ describe('parseRoute', () => {
     expect(parseRoute('#/new/p1?test=w1&frame=i1&from=s0')).toEqual({
       name: 'new',
       id: 'p1',
-      testWorkflowId: 'w1',
+      launchWorkflow: { id: 'w1', stepByStep: true },
       frameIdeaId: 'i1',
       fromSessionId: 's0',
+    });
+  });
+
+  it('parses new route with run query param', () => {
+    expect(parseRoute('#/new/p1?run=w2')).toEqual({
+      name: 'new',
+      id: 'p1',
+      launchWorkflow: { id: 'w2', stepByStep: false },
+      frameIdeaId: null,
+      fromSessionId: null,
     });
   });
 
@@ -233,7 +243,7 @@ describe('parseRoute', () => {
     expect(parseRoute('#/new/p1')).toEqual({
       name: 'new',
       id: 'p1',
-      testWorkflowId: null,
+      launchWorkflow: null,
       frameIdeaId: null,
       fromSessionId: null,
     });
@@ -281,7 +291,7 @@ describe('tabIdForRoute', () => {
       tabIdForRoute({
         name: 'new',
         id: 'p1',
-        testWorkflowId: null,
+        launchWorkflow: null,
         frameIdeaId: null,
         fromSessionId: null,
       }),

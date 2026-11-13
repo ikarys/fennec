@@ -86,7 +86,7 @@ function WorkflowEditorInner({ initialDef, initialOrigin, projectId }: WorkflowE
         onDescriptionChange={(description) => editor.updateDef((previous) => ({ ...previous, description }))}
         onScopeChange={editor.setScope}
         onSave={editor.save}
-        onTest={projectId ? () => { window.location.hash = `#/new/${encodeURIComponent(projectId)}?test=${encodeURIComponent(editor.def.id)}`; } : null}
+        onLaunch={projectId ? (stepByStep) => { window.location.hash = `#/new/${encodeURIComponent(projectId)}?${stepByStep ? 'test' : 'run'}=${encodeURIComponent(editor.def.id)}`; } : null}
         canTest={!editor.dirty}
       />
 

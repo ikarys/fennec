@@ -85,6 +85,7 @@ export const en = {
   acceptedDespite: 'Accepted despite: {kinds}',
   integratedNote: 'Integrated by you · {commits} into HEAD {head}',
   discardedNote: "Agent's work discarded · {commits}",
+  worktreeCleanedNote: "Agent's workspace cleaned up",
   commit: 'commit',
   commits: 'commits',
   // Context panel blocks and pages (lib/panelBlocks.ts)
@@ -101,7 +102,7 @@ export const en = {
   diffEmpty: 'No line changed (mode or empty file).',
   diffTruncated: 'Diff cut at 5,000 lines: open the file in the editor for the rest.',
   panelWorkplace: 'Where the work lands',
-  worktreeCommits: '{count} commits',
+  worktreeCommits: '{count} commit{s}',
   landsOn: 'Lands on {branch} in {dir} after your review.',
   serverLogs: 'Show the output',
   contextTabWork: 'Work',
@@ -147,6 +148,7 @@ export const en = {
   existenceOnly: 'existence only',
   existenceOnlyTitle: 'This check only searches the code: it proves the code exists, not that it works. Prefer a test that exercises it.',
   verified: 'verified',
+  nothingVerified: 'nothing verified',
   verifiedTitle: 'The check ran itself: the result is deterministic.',
   indicative: 'indicative',
   indicativeTitle: 'An agent judged it: the result is the model\'s word, to be checked.',
@@ -216,6 +218,10 @@ export const en = {
   signalConflictTitle: 'Git conflict markers remain in the added lines.',
   signalTestsLabel: 'weakened tests',
   signalTestsTitle: 'Tests or assertions were weakened in this file.',
+  signalValidatedTestsLabel: 'validated tests',
+  signalValidatedTestsTitle: 'Test file you validated at the test gate: its diff is the tests you approved, frozen since (verified).',
+  signalArtifactLabel: 'artifact',
+  signalArtifactTitle: 'Under a dependency or cache folder (.venv, node_modules, __pycache__…): rarely meant to be committed (verified).',
   signalHotLabel: 'often modified',
   signalHotTitle: 'Modified 5 times or more in the last 90 days.',
   signalUntestedLabel: 'no own test',
@@ -331,6 +337,7 @@ export const en = {
   stepNotDone: 'Step {number} not done',
   criteriaAwaitBuild: 'The plan’s criteria take effect in the run that builds it.',
   reportBadge: 'Report',
+  reportFindings: 'Findings',
   reportIndicativeTitle: 'Checks declared by the model, not verified by fennec',
   stepsLabel: 'Steps',
   toTest: 'To test',
@@ -365,7 +372,7 @@ export const en = {
   sessionTitle: 'For this session: {scope}',
   alwaysTitle: 'Project rule, visible and removable in Settings › Rules',
   always: 'Always',
-  neverTitle: 'Refuse and create a project rule (Settings › Rules)',
+  neverTitle: 'Refuse and block {scope} in a project rule (Settings › Rules)',
   never: 'Never',
   // Settings page and model sections (pages/SettingsPage.tsx, components/settings)
   settingsTitle: 'Settings',
@@ -436,6 +443,7 @@ export const en = {
   modelParams: 'Model parameters',
   editConnection: 'Edit the connection',
   envDefaultOption: 'Environment default ({model})',
+  envDefaultOptionUnnamed: 'Environment default',
   unlistedModelOption: '{model} — {provider} (not listed)',
   modelSectionHint: 'New sessions use it; the composer changes a session\'s. The default model is marked ★; favorites (♥) are offered in the composer.',
   probeContextFound: 'context {window}',
@@ -749,6 +757,8 @@ export const en = {
   // Project: doc, question, module map (components/project)
   docVerifiedTitle: 'Read from the file',
   noAdrs: 'No ADR in docs/adr/.',
+  adrsNotRecorded:
+    'The ADRs bind the project. The decisions an agent records while it works are listed in its session (Session tab) and in the night report.',
   filesPickOne: 'Pick a file in the tree.',
   filesTruncated: 'Only the first 20,000 files are listed.',
   filesUntracked: 'Not tracked by git: read-only',
@@ -911,7 +921,7 @@ export const en = {
     'A read-only agent reads the riskiest modules and proposes a few tasks (5 at most), the riskiest first; files without logic are set aside. You choose the ones that enter the backlog. Rereading stays your work: it tells you which files to read first.',
   signalNeverReviewed: 'never reviewed',
   signalNoTest: 'no own test',
-  signalChurn: '{count} commits',
+  signalChurn: '{count} commit{s}',
   // Project: disk
   deleteFolderQuestion: 'Delete this folder?',
   deleteWorktreeQuestion: 'Delete the worktree?',
@@ -1247,6 +1257,8 @@ export const en = {
   runEndReadTokens: 'Read tokens',
   runEndCriteriaDetail: '{verified} verified{verifiedPlural} · {indicative} indicative{indicativePlural}',
   runEndTimeDetail: 'Time detail',
+  runEndShowStats: 'Show the run\'s numbers',
+  runEndHideStats: 'Hide the run\'s numbers',
   runEndNodesSummary: '{duration} · {count} node{plural}',
   runEndWorkReady: 'The work is ready in the agent\'s workspace.',
   // components/session/AgentsMdCard.tsx
@@ -1326,7 +1338,6 @@ export const en = {
   runRailStateDone: 'Finished',
   runRailStateFailed: 'Failed',
   runRailStateStopped: 'Stopped',
-  runRailStateRunning: 'Running',
   // components/workflow/session/WorkflowPicker.tsx
   workflowPickerLabel: 'Workflow',
   workflowPickerNone: 'No workflow',
@@ -1377,6 +1388,8 @@ export const en = {
   nodeDividerInterrupted: 'Interrupted',
   nodeDividerDetails: 'Details',
   nodeDividerExitCode: 'Exit code: {code}',
+  nodeDividerCommand: 'Command',
+  nodeDividerNoOutput: 'No output.',
   // components/workflow/fields/ShellFields.tsx
   shellCommand: 'Command',
   shellTimeoutSecs: 'Timeout (s)',
@@ -1427,6 +1440,8 @@ export const en = {
   workflowEditorIssueCount: '{count} issue(s)',
   workflowEditorTestAria: 'Test step by step',
   workflowEditorTestTitle: 'Opens a new session with this workflow, step by step.',
+  workflowEditorRunAria: 'Run',
+  workflowEditorRunTitle: 'Opens a new session with this workflow selected.',
   workflowEditorTestSaveTitle: 'Save the workflow before testing it.',
   // pages/ProjectPage.tsx
   projectPageDecisions: 'Decisions',

@@ -1031,7 +1031,7 @@ fn tool_definitions_are_frozen_with_the_prompt() {
 }
 
 #[test]
-fn an_mcp_tool_set_change_refreezes_the_snapshot_once() {
+fn toggling_an_mcp_server_keeps_the_frozen_tools() {
     use crate::domain::mcp::{McpServer, McpTool, McpTransport};
 
     let stop = AtomicBool::new(false);
@@ -1074,31 +1074,68 @@ fn an_mcp_tool_set_change_refreezes_the_snapshot_once() {
         server
     };
 
+    let notices = |log: &MemoryLog| {
+        log.0
+            .borrow()
+            .iter()
+            .filter(|e| matches!(e, Event::MessageStart { content: Some(c), is_system_generated: true, .. }
+                if c.starts_with("<system-reminder>\nMCP servers") || c.starts_with("<system-reminder>\nNo MCP server")))
+            .count()
+    };
+    let tools = |servers: Vec<McpServer>, offered: bool| {
+        LocalTools::new(PathBuf::from("/tmp")).with_mcp(servers, offered)
+    };
+
     let model = RecordingTools::default();
     let mut h = Harness::new(Box::new(model.clone()), PathBuf::from("/tmp"), &stop);
-    h.tools = LocalTools::new(PathBuf::from("/tmp")).with_mcp(vec![server(&["read", "write"])]);
+    h.tools = tools(vec![server(&["read", "write"])], true);
     run_turn(&mut h.turn(), "one", &[]).unwrap();
     assert_eq!(snapshots(&h.log), 1);
+    assert_eq!(notices(&h.log), 1);
     let first_tools = model.0.borrow()[0].clone();
+    assert!(first_tools.to_string().contains("\"mcp_call\""));
 
-    // The set is unchanged: no re-freeze, same tools sent.
+    // Nothing changed: no re-freeze, no second catalog.
     run_turn(&mut h.turn(), "two", &[]).unwrap();
     assert_eq!(snapshots(&h.log), 1);
+    assert_eq!(notices(&h.log), 1);
     assert_eq!(model.0.borrow()[1], first_tools);
 
-    // A tool is added: one re-freeze, and the prompt stays byte-identical.
-    h.tools =
-        LocalTools::new(PathBuf::from("/tmp")).with_mcp(vec![server(&["read", "write", "delete"])]);
+    // The server is turned off for the session: the tools stay byte-identical,
+    // only a new catalog is appended.
+    h.tools = tools(Vec::new(), true);
     run_turn(&mut h.turn(), "three", &[]).unwrap();
-    assert_eq!(snapshots(&h.log), 2);
-    assert_ne!(model.0.borrow()[2], first_tools);
-    let prompts = prompts(&h.log);
-    assert_eq!(prompts.len(), 2);
-    assert_eq!(prompts[0], prompts[1]);
+    assert_eq!(snapshots(&h.log), 1);
+    assert_eq!(notices(&h.log), 2);
+    assert_eq!(model.0.borrow()[2], first_tools);
 
-    // The set is stable again: no further re-freeze.
+    // MCP is removed from the settings: one re-freeze, the prompt unchanged.
+    h.tools = tools(Vec::new(), false);
     run_turn(&mut h.turn(), "four", &[]).unwrap();
     assert_eq!(snapshots(&h.log), 2);
+    assert_ne!(model.0.borrow()[3], first_tools);
+    let prompts = prompts(&h.log);
+    assert_eq!(prompts[0], prompts[1]);
+
+    // A session frozen by an older build with per-tool MCP definitions
+    // re-freezes once to the lazy tools.
+    let model = RecordingTools::default();
+    let mut h = Harness::new(Box::new(model.clone()), PathBuf::from("/tmp"), &stop);
+    h.log
+        .append(
+            "s",
+            &Event::TurnSnapshot {
+                cached_system_prompt: "frozen".into(),
+                cached_tools: Some(json!([{"function": {"name": "fs_read"}}])),
+                mcp_tool_names: vec!["fs_read".into()],
+            },
+        )
+        .unwrap();
+    h.tools = tools(vec![server(&["read"])], true);
+    run_turn(&mut h.turn(), "one", &[]).unwrap();
+    run_turn(&mut h.turn(), "two", &[]).unwrap();
+    assert_eq!(snapshots(&h.log), 2);
+    assert!(model.0.borrow()[0].to_string().contains("\"mcp_call\""));
 }
 
 /// Records the chat messages of each request and answers from a scripted

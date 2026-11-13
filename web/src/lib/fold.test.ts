@@ -23,6 +23,12 @@ const toolOf = (items: ThreadItem[], id: string): ToolCallView | undefined => {
 };
 
 describe('createThreadFold', () => {
+  it('says a cleanup without commits cleaned the workspace, not discarded work', () => {
+    const fold = createThreadFold();
+    fold.apply(ev('worktree.discarded', { commits: [] }));
+    expect(fold.view().items).toEqual([{ kind: 'note', id: 'worktree-discarded-1', text: "Agent's workspace cleaned up" }]);
+  });
+
   it('returns a new view object on each call', () => {
     const fold = createThreadFold();
     expect(fold.view()).not.toBe(fold.view());

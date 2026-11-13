@@ -266,6 +266,102 @@ fn agent_input_stats_cover_the_calls_before_the_interruption() {
     assert_eq!(reason, DoneReason::Complete);
 }
 
+#[test]
+fn a_planning_agent_that_only_talks_keeps_its_node_open() {
+    let model = Scripted(RefCell::new(vec![
+        reply("Which option?", vec![]),
+        reply("Still a question?", vec![]),
+        reply("", vec![proposed_plan()]),
+        reply("done", vec![]),
+    ]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    let mut planner = plan();
+    planner.allowed_tools.push("propose_plan".into());
+    h.agents = vec![planner];
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow: simple_workflow(),
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+
+    let events = h.log.0.borrow().clone();
+    let state = crate::domain::workflow::run::current_run(&events).unwrap();
+    assert_eq!(
+        crate::domain::workflow::run::waiting(&state, &events),
+        Some(crate::domain::workflow::run::Waiting::AgentQuestion)
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeFinished { node_id, .. } if node_id == "a"))
+    );
+
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::AgentInput {
+            prompt: "option B".into(),
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::WaitingForUser);
+
+    let events = h.log.0.borrow().clone();
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeFinished { node_id, .. } if node_id == "a"))
+    );
+
+    run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::AgentInput {
+            prompt: "go with B".into(),
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    let events = h.log.0.borrow().clone();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::WorkflowNodeFinished { node_id, .. } if node_id == "a"))
+    );
+}
+
+fn proposed_plan() -> ToolCall {
+    ToolCall {
+        id: "p1".into(),
+        name: "propose_plan".into(),
+        arguments: serde_json::json!({
+            "title": "Option B",
+            "goal": "The human's choice is built",
+            "steps": [{"title": "Build B", "files": ["src/b.rs"], "change": "Option B"}],
+            "doneWhen": [{"text": "The build passes"}],
+            "risks": []
+        }),
+        parse_error: None,
+        raw_arguments: None,
+    }
+}
+
 fn criteria_workflow() -> Workflow {
     Workflow {
         id: "w".into(),

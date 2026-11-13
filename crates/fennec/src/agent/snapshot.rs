@@ -14,6 +14,7 @@ use super::suggest_agent;
 use super::turn::Turn;
 use crate::domain::conversation::frozen_prompt;
 use crate::domain::event::Event;
+use crate::domain::mcp::META_TOOLS;
 use serde_json::Value;
 
 /// The system prompt, tools included: frozen at the session's first turn
@@ -23,26 +24,17 @@ use serde_json::Value;
 pub(super) fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), String> {
     let events = turn.log.events_of(turn.session_id, &["turn.snapshot"])?;
     let (prompt, tools) = frozen_prompt(&events);
-    let current_mcp = turn.tools.mcp_tool_names();
     if let (Some(prompt), Some(tools)) = (prompt, tools) {
-        // The MCP tool set changed since the last freeze (a global flag, a
-        // Connect refresh, or a per-session toggle): re-freeze the tools,
-        // keeping the prompt byte-identical. One deliberate cache miss.
-        let frozen_mcp = events
-            .iter()
-            .rev()
-            .find_map(|event| match event {
-                Event::TurnSnapshot { mcp_tool_names, .. } => Some(mcp_tool_names),
-                _ => None,
-            })
-            .cloned()
-            .unwrap_or_default();
-        if frozen_mcp != current_mcp {
+        // MCP was configured or removed since the last freeze, or the session
+        // still has the per-tool MCP definitions of older builds: re-freeze
+        // the tools, keeping the prompt byte-identical. One deliberate cache
+        // miss; turning a server on or off is told by the catalog notice.
+        if declares_mcp(tools) != turn.tools.offers_mcp() || froze_legacy_mcp(&events) {
             let new_tools = tool_definitions(turn);
             turn.append(Event::TurnSnapshot {
                 cached_system_prompt: prompt.to_string(),
                 cached_tools: Some(new_tools.clone()),
-                mcp_tool_names: current_mcp,
+                mcp_tool_names: Vec::new(),
             })?;
             return Ok((prompt.to_string(), new_tools));
         }
@@ -65,9 +57,26 @@ pub(super) fn round_prompt_parts(turn: &mut Turn) -> Result<(String, Value), Str
     turn.append(Event::TurnSnapshot {
         cached_system_prompt: prompt.clone(),
         cached_tools: Some(tools.clone()),
-        mcp_tool_names: current_mcp,
+        mcp_tool_names: Vec::new(),
     })?;
     Ok((prompt, tools))
+}
+
+/// Whether the frozen tools declare the lazy MCP tools.
+fn declares_mcp(tools: &Value) -> bool {
+    tools.as_array().is_some_and(|tools| {
+        tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == META_TOOLS[1])
+    })
+}
+
+/// Whether the last freeze holds the per-tool MCP definitions of older builds.
+fn froze_legacy_mcp(events: &[Event]) -> bool {
+    events.iter().rev().find_map(|event| match event {
+        Event::TurnSnapshot { mcp_tool_names, .. } => Some(!mcp_tool_names.is_empty()),
+        _ => None,
+    }) == Some(true)
 }
 
 /// The loop owns `ask_user`, `request_waiver`, `propose_criteria`,

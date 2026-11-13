@@ -4,6 +4,7 @@
 
 use crate::domain::agent::CommandAccess;
 use crate::domain::event::{DoneReason, Event, OutputStream, ToolCall, ToolResult};
+use crate::domain::mcp::McpServer;
 use crate::domain::preferences::ReasoningEffort;
 use serde_json::Value;
 use std::sync::atomic::AtomicBool;
@@ -127,10 +128,16 @@ pub trait Toolbox {
     /// The human's rules on this call, decided before it runs. No default: a
     /// toolbox that forgot the rules would run every call unchecked.
     fn check_rules(&self, name: &str, args: &Value) -> RuleCheck<'_>;
-    /// The MCP tool names offered; empty when the toolbox has no MCP servers.
-    /// The snapshot re-freezes when this set changes.
-    fn mcp_tool_names(&self) -> Vec<String> {
-        Vec::new()
+    /// Whether `mcp_tools` and `mcp_call` are declared: true as soon as the
+    /// human configured an MCP server, active or not, so a toggle never changes
+    /// the frozen tool list.
+    fn offers_mcp(&self) -> bool {
+        false
+    }
+    /// The session's active MCP servers, listed to the model by the catalog
+    /// notice.
+    fn mcp_servers(&self) -> &[McpServer] {
+        &[]
     }
 }
 

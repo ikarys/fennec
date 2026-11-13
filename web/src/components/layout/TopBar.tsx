@@ -77,7 +77,7 @@ export function TopBar({
         title={versionLabel ? `fennec ${versionLabel}` : undefined}
         className="flex items-center gap-2 py-2 pl-1 pr-3 text-base font-semibold tracking-[-0.01em] text-text"
       >
-        <img src="/logo.png" alt="" className="h-6 w-6" />
+        <img src="/emblem.png" alt="" className="h-6 w-6 rounded-md" />
         <span>fennec</span>
         {versionLabel ? <span className="font-mono text-xs font-normal text-faint">{versionLabel}</span> : null}
       </a>

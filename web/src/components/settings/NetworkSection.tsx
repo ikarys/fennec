@@ -5,6 +5,7 @@ import { SettingRow } from '../ui/SettingRow';
 import { TextInput } from '../ui/Field';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Switch } from '../ui/Switch';
 import { CheckIcon, GlobeIcon, RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
@@ -20,6 +21,7 @@ export function NetworkSection() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
+  const [confirmingRestart, setConfirmingRestart] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export function NetworkSection() {
   const dirty = portDraft !== String(view.port) || remoteDraft !== view.remote;
   const save: SectionSave = {
     dirty,
+    note: t('serverRestartNeeded'),
     onSave: async () => {
       const next = await setServer(Number(portDraft), remoteDraft);
       setView(next);
@@ -80,10 +83,7 @@ export function NetworkSection() {
   };
 
   const onRestart = async () => {
-    if (!window.confirm(t('serverRestartConfirm'))) {
-      return;
-    }
-
+    setConfirmingRestart(false);
     setRestarting(true);
     try {
       await restartServer();
@@ -163,7 +163,7 @@ export function NetworkSection() {
           iconOnly
           title={t('serverRestartTitle')}
           aria-label={t('serverRestartTitle')}
-          onClick={onRestart}
+          onClick={() => setConfirmingRestart(true)}
           disabled={restarting}
         >
           {restarting ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <RefreshIcon className="h-4 w-4" />}
@@ -236,6 +236,15 @@ export function NetworkSection() {
         {view.restartNeeded ? <Badge tone="attention">{t('serverRestartNeeded')}</Badge> : null}
       </div>
       {view.fromFlag ? <p className="m-0 px-4 pb-2.5 text-xs text-faint">{t('serverFromFlag')}</p> : null}
+      <ConfirmDialog
+        open={confirmingRestart}
+        title={t('serverRestartTitle')}
+        body={t('serverRestartConfirm')}
+        confirmLabel={t('serverRestartTitle')}
+        variant="primary"
+        onConfirm={() => void onRestart()}
+        onCancel={() => setConfirmingRestart(false)}
+      />
     </Section>
   );
 }

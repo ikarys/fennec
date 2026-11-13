@@ -1,6 +1,7 @@
 // The workflow run's left side rail: a SideRail whose run drawer holds the step timeline.
 import { useT } from '../../../i18n';
 import { nodeKindOf, type RunView } from '../../../lib/runView';
+import type { SessionStatus } from '../../../lib/sessionStatus';
 import { BranchIcon } from '../../ui/Icons';
 import { SideRail, type RailPanel } from '../../ui/SideRail';
 import { RunTimeline } from './RunTimeline';
@@ -8,7 +9,7 @@ import { nodeRunTone } from './runStepTone';
 
 type JumpToNode = (runId: string, nodeId: string, pass: number) => void;
 
-export function RunRail({ run, onJump }: { run: RunView; onJump: JumpToNode }) {
+export function RunRail({ run, status, onJump }: { run: RunView; status: SessionStatus; onJump: JumpToNode }) {
   const t = useT();
 
   const finishedCount = run.counts.done;
@@ -29,7 +30,7 @@ export function RunRail({ run, onJump }: { run: RunView; onJump: JumpToNode }) {
     statusClass = 'text-accent';
   }
 
-  if (anyHumanRunning) alert = true;
+  if (anyHumanRunning || (!outcome && !status.live)) alert = true;
 
   const runPanel: RailPanel = {
     id: 'run',
@@ -39,7 +40,7 @@ export function RunRail({ run, onJump }: { run: RunView; onJump: JumpToNode }) {
     status: `${finishedCount}/${run.counts.total}`,
     statusClass,
     alert,
-    body: <RunTimeline run={run} onJump={onJump} />,
+    body: <RunTimeline run={run} status={status} onJump={onJump} />,
   };
 
   return (

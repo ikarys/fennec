@@ -48,6 +48,17 @@ pub struct Pending {
     pub folders: Vec<String>,
 }
 
+/// The pattern an answer stores: the folder the human picked, else for "never" on a path the exact path asked (a refusal must not spread to its folder), else the proposal.
+pub fn stored_pattern(pending: &Pending, choice: Choice, chosen: Option<String>) -> String {
+    if let Some(chosen) = chosen {
+        return chosen;
+    }
+    if choice == Choice::Never && pending.kind == rules::TargetKind::Path {
+        return pending.subject.clone();
+    }
+    pending.pattern.clone()
+}
+
 /// The last `rule.approval_requested` whose call is still open and has no
 /// `rule.approval_answered` in the model's view.
 pub fn pending(events: &[Event]) -> Option<Pending> {
@@ -167,5 +178,48 @@ mod tests {
     fn none_after_the_call_got_a_result() {
         let events = vec![tool_call("c1", "read_file"), request("c1"), result("c1")];
         assert!(pending(&events).is_none());
+    }
+
+    fn make_pending(subject: &str, pattern: &str) -> Pending {
+        Pending {
+            call_id: "c1".into(),
+            message_id: "m".into(),
+            call: ToolCall {
+                id: "c1".into(),
+                name: "write_file".into(),
+                arguments: json!({}),
+                parse_error: None,
+                raw_arguments: None,
+            },
+            subject: subject.into(),
+            kind: rules::TargetKind::Path,
+            pattern: pattern.into(),
+            access: Some("write".into()),
+            folders: vec![pattern.into()],
+        }
+    }
+
+    #[test]
+    fn stored_pattern_uses_the_chosen_folder() {
+        let pending = make_pending("/tmp/mini.py", "/tmp/");
+        assert_eq!(
+            stored_pattern(&pending, Choice::Never, Some("/tmp/".into())),
+            "/tmp/"
+        );
+    }
+
+    #[test]
+    fn stored_pattern_never_blocks_the_exact_path() {
+        let pending = make_pending("/tmp/mini.py", "/tmp/");
+        assert_eq!(
+            stored_pattern(&pending, Choice::Never, None),
+            "/tmp/mini.py"
+        );
+    }
+
+    #[test]
+    fn stored_pattern_uses_the_proposal_for_other_choices() {
+        let pending = make_pending("/tmp/mini.py", "/tmp/");
+        assert_eq!(stored_pattern(&pending, Choice::Always, None), "/tmp/");
     }
 }

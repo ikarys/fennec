@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Lang, MsgKey } from "../../../i18n/messages";
 import type { ThreadItem, WorkflowNodeStat } from "../../../lib/fold";
 import { formatClockTime, formatDuration } from "../../../lib/format";
 import {
+  ActivityIcon,
   AlertIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -15,6 +16,7 @@ import {
   WandIcon,
 } from "../../ui/Icons";
 import { Badge } from "../../ui/Badge";
+import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
 import { Tile } from "../../ui/Tile";
 import { useRunUsage } from "../../session/CallUsage";
@@ -124,6 +126,8 @@ export function RunEndCard({
   const stats = item.stats;
   const usage = useRunUsage(item.runId);
   const invite = useIntegrationInvite();
+  // Most runs need only the outcome: the numbers wait behind an icon until asked for.
+  const [showStats, setShowStats] = useState(false);
 
   const startAt = stats?.startedAt;
   const endAt = stats?.finishedAt;
@@ -174,9 +178,27 @@ export function RunEndCard({
             {outcome.icon}
             {outcome.text}
           </span>
-          <Badge tone="ok" title={t("verifiedFromLog")}>
-            {t("verified")}
-          </Badge>
+          {stats && stats.criteriaTotal === 0 ? (
+            <Badge tone="neutral" title={t("noCriteria")}>
+              {t("nothingVerified")}
+            </Badge>
+          ) : (
+            <Badge tone="ok" title={t("verifiedFromLog")}>
+              {t("verified")}
+            </Badge>
+          )}
+          {stats && (
+            <Button
+              variant="icon"
+              iconOnly
+              className="ml-auto"
+              title={t(showStats ? "runEndHideStats" : "runEndShowStats")}
+              aria-pressed={showStats}
+              onClick={() => setShowStats((shown) => !shown)}
+            >
+              <ActivityIcon />
+            </Button>
+          )}
         </div>
         {startAt != null && endAt != null && (
           <div
@@ -200,7 +222,7 @@ export function RunEndCard({
         <div className="px-4 pt-2.5 text-sm text-muted">{item.reason}</div>
       )}
 
-      {stats && (
+      {stats && showStats && (
         <div className="flex flex-col">
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
             <Tile

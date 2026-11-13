@@ -20,6 +20,7 @@ import { splitSources } from '../../lib/sources';
 import { attachmentAnchorId } from '../../lib/vision';
 import { planAnchorId, usePendingPlan } from './PendingPlan';
 import { useT } from '../../i18n';
+import type { SessionStatus } from '../../lib/sessionStatus';
 
 // Memoised on their text: while one message streams, the others are not
 // parsed again on every frame.
@@ -184,6 +185,7 @@ export function ThreadItemView({
   onReplay,
   pendingCallId,
   latest = false,
+  waitingStatus,
 }: {
   item: ThreadItem;
   model: string;
@@ -192,6 +194,7 @@ export function ThreadItemView({
   onReplay?: (messageId: string) => void;
   pendingCallId?: string;
   latest?: boolean;
+  waitingStatus?: SessionStatus;
 }) {
   const t = useT();
   if (item.kind === 'mode') {
@@ -262,7 +265,7 @@ export function ThreadItemView({
   }
 
   if (item.kind === 'workflow-node') {
-    return <NodeDivider item={item} running={running} />;
+    return <NodeDivider item={item} running={running} waitingStatus={waitingStatus} />;
   }
 
   if (item.kind === 'workflow-end') {

@@ -30,8 +30,8 @@ export function sessionStatus(lang: Lang, state: SessionState, run: RunView | un
         return { label: t(lang, 'interrupted'), tone: 'err', live: false };
     }
   }
+  if (state === 'waiting_for_user') return { label: t(lang, 'awaitAnswer'), tone: 'accent', live: false };
   if (run) return { label: t(lang, 'workflowRunning'), tone: 'accent', live: true };
   if (state === 'running') return { label: t(lang, 'running'), tone: 'accent', live: true };
-  if (state === 'waiting_for_user') return { label: t(lang, 'awaitAnswer'), tone: 'accent', live: false };
   return { label: stateLabel(lang, state), tone: 'neutral', live: false };
 }

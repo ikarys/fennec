@@ -499,14 +499,22 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
 
       case 'worktree.discarded': {
         const commits = Array.isArray(data.commits) ? data.commits.map((commit: unknown) => String(commit)) : [];
-        pushItem({
-          kind: 'note',
-          id: `worktree-discarded-${index}`,
-          text: t(lang, 'discardedNote', {
-            commits: `${commits.length} ${t(lang, commits.length === 1 ? 'commit' : 'commits')}`
-          }),
-          detail: commits.length > 0 ? commits.join(' ') : undefined
-        });
+        if (commits.length === 0) {
+          pushItem({
+            kind: 'note',
+            id: `worktree-discarded-${index}`,
+            text: t(lang, 'worktreeCleanedNote')
+          });
+        } else {
+          pushItem({
+            kind: 'note',
+            id: `worktree-discarded-${index}`,
+            text: t(lang, 'discardedNote', {
+              commits: `${commits.length} ${t(lang, commits.length === 1 ? 'commit' : 'commits')}`
+            }),
+            detail: commits.join(' ')
+          });
+        }
         break;
       }
 
@@ -577,6 +585,10 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
         if (typeof data.startedAt === 'number') {
           item.startedAt = data.startedAt;
         }
+        const command = node?.command;
+        if (kind === 'shell' && typeof command === 'string' && command.length > 0) {
+          item.command = command;
+        }
         // A resume restarts an interrupted node on its own pass: the restart
         // replaces the unfinished divider instead of showing a second one.
         const stale = openWorkflowItems.get(`${runId}:${nodeId}`);
@@ -646,6 +658,9 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
       } else {
         item.label = node.name ?? item.nodeId;
         item.nodeKind = node.kind;
+        if (node.kind === 'shell' && typeof node.command === 'string' && node.command.length > 0) {
+          item.command = node.command;
+        }
       }
     }
     // pendingPromptFor is only for agent nodes; clear it if the node is not one.

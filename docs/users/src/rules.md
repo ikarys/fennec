@@ -1,6 +1,6 @@
 # Rules
 
-Define rules that fennec enforces before a tool call or workflow command runs. Rules are guard rails, not the wall: a path rule guards the file tools, but a command the model writes can still change a blocked file inside the work folder. Only [the sandbox](sandbox.md) limits what a command reaches.
+Define rules that fennec enforces before a tool call or workflow command runs. A **Block** rule on writes also reaches commands: [the sandbox](sandbox.md) mounts the files it covers read-only when a turn starts. A command can still create a blocked file that did not exist yet, and an **Ask** rule guards the file tools only.
 
 ## Where rules are managed
 
@@ -35,7 +35,7 @@ When an **Ask** rule or a file tool reaching outside the workdir pauses a turn, 
 - **Once**: **Allow this call only**.
 - **For this session: {scope}**: grant the path and its subdirectories, command, or tool for the session.
 - **Always**: create a project rule, visible and removable in **Settings** › **Rules**.
-- **Never**: refuse and create a project rule.
+- **Never**: refuse and block the exact path in a project rule, unless you pick a folder.
 
 The folder scope is shown as **Folder allowed for Session, Always or Never** and ** and its subfolders**.
 
@@ -59,7 +59,7 @@ Protected files are refused to the file tools and mounted read-only in the sandb
 
 You can add paths to `.agents/protected`. In the integration dialog, **Protect the integrated tests ({count})** appends the integrated test files to `.agents/protected`.
 
-If an agent needs a protected file, it can request a waiver. The **Waiver** card shows the reason and asks you to **Grant** or **Refuse**. A grant exempts exactly that path, in that session, for 1, 8, or 24 hours, and writes a MADR file to the session's `docs/adr/`.
+If an agent needs a protected file, it can request a waiver. The **Waiver** card shows the reason and asks you to **Grant** or **Refuse**. A grant exempts exactly that path, in that session, for 1, 8, or 24 hours, and writes a MADR file to the session's `docs/adr/`. It also overrides a path rule that blocks that path, for the file tools. When a Block write rule covers the whole project folder, commands still cannot write it.
 
 ## Limits
 

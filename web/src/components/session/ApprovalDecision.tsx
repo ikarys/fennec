@@ -83,7 +83,7 @@ export function ApprovalDecision({
             variant="danger"
             size="sm"
             disabled={disabled}
-            title={t('neverTitle')}
+            title={t('neverTitle', { scope: folder !== approval.pattern ? folder : approval.subject })}
             onClick={() => onAnswer('never', folder !== approval.pattern ? folder : undefined)}
           >
             {t('never')}

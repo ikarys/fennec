@@ -124,6 +124,11 @@ impl Protection {
         self
     }
 
+    /// A granted waiver: this exact path is exempt from protection.
+    pub fn is_exempt(&self, relative: &str) -> bool {
+        self.exempt.iter().any(|path| path == relative)
+    }
+
     /// `relative`: a path relative to the project root, `/`-separated, no
     /// leading `./`.
     pub fn is_protected(&self, relative: &str) -> bool {
@@ -131,7 +136,7 @@ impl Protection {
             return false;
         }
 
-        if self.exempt.iter().any(|path| path == relative) {
+        if self.is_exempt(relative) {
             return false;
         }
 

@@ -20,6 +20,8 @@ const Nested = createContext(false);
 export interface SectionSave {
   dirty: boolean;
   onSave: () => Promise<void>;
+  /** When the saved value applies; the next turn when absent. */
+  note?: string;
   /** Saved by the page shortly after an edit: no button, a status in the header. */
   auto?: { saving: boolean; error: string | null };
 }
@@ -74,7 +76,7 @@ export function Section({ title, description, Icon, actions, className = '', flu
         <Button type="button" variant="primary" size="sm" disabled={saving} onClick={() => void handleSave()}>
           {saving ? t('sectionSaving') : t('agentSave')}
         </Button>
-        <span className="text-xs text-muted">{t('sectionNextTurn')}</span>
+        <span className="text-xs text-muted">{save.note ?? t('sectionNextTurn')}</span>
         {error && <span className="text-xs text-err">{error}</span>}
       </>
     ) : null;

@@ -31,7 +31,7 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
   const [selection, setSelection] = useState<FlowSelection>({ nodeId: null, edgeId: null });
   const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
 
   // Load agents for the agent select.
   useEffect(() => {
@@ -147,8 +147,14 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
         const newEdge: WorkflowEdge = { from: source, port, to: target };
         return { ...previous, edges: [...edges, newEdge] };
       });
+      // A loop edge is routed in a right lane; refit so it stays in view.
+      const sourceNode = def.nodes.find((node) => node.id === connection.source);
+      const targetNode = def.nodes.find((node) => node.id === connection.target);
+      if (sourceNode && targetNode && targetNode.position.y <= sourceNode.position.y) {
+        requestAnimationFrame(() => fitView({ duration: 200 }));
+      }
     },
-    [updateDef]
+    [updateDef, def, fitView]
   );
 
   const addNode = useCallback(

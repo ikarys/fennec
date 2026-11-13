@@ -13,6 +13,7 @@ use crate::domain::kernel_rules;
 use crate::domain::mcp;
 use crate::domain::preferences::{ModelRef, Preferences, ReasoningEffort};
 use crate::domain::project::SessionSummary;
+use crate::domain::protection::Protection;
 use crate::domain::test_files;
 use crate::domain::waiver;
 use crate::instructions::all_instructions;
@@ -194,27 +195,48 @@ fn refuse_over_budget(
     Err(refusal)
 }
 
-/// Only project-relative `Block` path rules that cover writes can be enforced
-/// by the file tools' protection and the sandbox's read-only mounts; the rest
-/// are checked per call by the `rules` crate.
-fn blocked_write_paths(rules: &rules::Rules) -> Vec<String> {
-    rules
-        .all()
-        .iter()
-        .filter_map(|rule| {
-            if !matches!(rule.action, rules::Action::Block) {
-                return None;
-            }
-            match &rule.target {
-                rules::Target::Path { pattern, access }
-                    if access.covers(rules::Access::Write) && pattern.is_relative() =>
-                {
-                    Some(pattern.text().to_string())
-                }
-                _ => None,
-            }
-        })
-        .collect()
+/// The `Block` path rules that cover writes, rebased to the work folder for the
+/// file tools' protection and the sandbox's read-only mounts, and whether one
+/// covers the whole work folder. The rest are checked per call by the `rules`
+/// crate.
+fn blocked_write_paths(
+    rules: &rules::Rules,
+    workdir: &Path,
+    home: Option<&str>,
+) -> (Vec<String>, bool) {
+    let root = workdir.to_string_lossy();
+    let mut patterns = Vec::new();
+    let mut whole = false;
+    for rule in rules.all() {
+        if !matches!(rule.action, rules::Action::Block) {
+            continue;
+        }
+        let rules::Target::Path { pattern, access } = &rule.target else {
+            continue;
+        };
+        if !access.covers(rules::Access::Write) {
+            continue;
+        }
+        let Some(under) = pattern.under(&root, home) else {
+            continue;
+        };
+        match under {
+            rules::Under::Root => whole = true,
+            rules::Under::Pattern(pattern) => patterns.push(pattern),
+        }
+    }
+    (patterns, whole)
+}
+
+/// The sandbox with the protected files read-only, or the whole work folder when a
+/// `Block` write rule covers it: commands cannot write what the file tools refuse.
+fn guarded(sandbox: Sandbox, workdir: &Path, protection: &Protection, whole: bool) -> Sandbox {
+    let sandbox = sandbox.protecting(protected::existing_paths(workdir, protection));
+    if whole {
+        sandbox.read_only(workdir).unwrap_or(sandbox)
+    } else {
+        sandbox
+    }
 }
 
 /// The turn's toolbox: the sandbox, the protected files, the rules, MCP and the canvas.
@@ -227,7 +249,8 @@ fn build_tools(
     rules: rules::Rules,
     events: &[Event],
 ) -> Result<LocalTools, String> {
-    let blocked_paths = blocked_write_paths(&rules);
+    let home = std::env::var("HOME").ok();
+    let (blocked_paths, whole) = blocked_write_paths(&rules, workdir, home.as_deref());
     // ponytail: a waiver's expiry is checked when a turn starts, not mid-turn.
     let waiver_paths = waiver::active(events, clock::now_ms());
     let protection = (if workdir.starts_with(worktree::root(&settings.db_path)) {
@@ -255,14 +278,22 @@ fn build_tools(
     if let Err(e) = worktree::link_dependencies(workdir) {
         eprintln!("fennec: link the dependencies: {e}");
     }
+    let sandbox = guarded(
+        Sandbox::for_store(&prefs.sandbox, &settings.db_path),
+        workdir,
+        &protection,
+        whole,
+    )
+    .with_mounts(
+        worktree::main_view(workdir)
+            .into_iter()
+            .chain(worktree::dependency_mounts(workdir))
+            .collect(),
+    )
+    .writing(shared_target.iter().cloned().collect());
     let tools = LocalTools::new(workdir.to_path_buf())
         .with_search(prefs.search.clone())
-        .with_sandbox(
-            Sandbox::for_store(&prefs.sandbox, &settings.db_path)
-                .protecting(protected::existing_paths(workdir, &protection))
-                .with_mounts(worktree::dependency_mounts(workdir))
-                .writing(shared_target.iter().cloned().collect()),
-        )
+        .with_sandbox(sandbox)
         .with_protection(protection)
         .with_env(
             shared_target
@@ -271,7 +302,7 @@ fn build_tools(
                 .collect(),
         )
         .with_rules(rules)
-        .with_mcp(mcp::active_servers(events, prefs))
+        .with_mcp(mcp::active_servers(events, prefs), !prefs.mcp.is_empty())
         .with_mcp_vault(crate::mcp::oauth::Vault::for_settings(settings));
     let tools = match project_dir {
         Some(dir) => tools.with_project_dir(dir),
@@ -347,5 +378,128 @@ mod tests {
         )
         .unwrap();
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn blocked_write_paths_rebases_path_rules() {
+        fn rule(
+            id: i64,
+            pattern: &str,
+            access: rules::Access,
+            action: rules::Action,
+        ) -> rules::Rule {
+            rules::Rule {
+                id,
+                scope: rules::Scope::Global,
+                target: rules::Target::parse(rules::TargetKind::Path, pattern, Some(access))
+                    .unwrap(),
+                action,
+                note: None,
+                origin: rules::Origin::Human,
+            }
+        }
+
+        let workdir = std::path::Path::new("/tmp/wt/s1");
+        let rules = rules::Rules::new(vec![
+            rule(1, "todo/cli.py", rules::Access::Write, rules::Action::Block),
+            rule(
+                2,
+                "/tmp/wt/s1/todo/cli.py",
+                rules::Access::Write,
+                rules::Action::Block,
+            ),
+            rule(3, "/etc/passwd", rules::Access::Write, rules::Action::Block),
+            rule(
+                4,
+                "/tmp/wt/s1/todo/cli.py",
+                rules::Access::Write,
+                rules::Action::Allow,
+            ),
+            rule(
+                5,
+                "/tmp/wt/s1/todo/cli.py",
+                rules::Access::Read,
+                rules::Action::Block,
+            ),
+        ]);
+        let (patterns, whole) = blocked_write_paths(&rules, workdir, None);
+        assert_eq!(
+            patterns,
+            vec!["todo/cli.py".to_string(), "/todo/cli.py".to_string()]
+        );
+        assert!(!whole);
+
+        let whole_rules = rules::Rules::new(vec![rule(
+            6,
+            "/tmp/",
+            rules::Access::Write,
+            rules::Action::Block,
+        )]);
+        let (patterns, whole) = blocked_write_paths(&whole_rules, workdir, None);
+        assert!(patterns.is_empty());
+        assert!(whole);
+    }
+
+    #[test]
+    fn e2e_an_absolute_block_write_rule_stops_a_command() {
+        if !crate::sandbox::tests::bwrap_available() {
+            return;
+        }
+        fn block(pattern: &str) -> rules::Rules {
+            rules::Rules::new(vec![rules::Rule {
+                id: 1,
+                scope: rules::Scope::Global,
+                target: rules::Target::parse(
+                    rules::TargetKind::Path,
+                    pattern,
+                    Some(rules::Access::Write),
+                )
+                .unwrap(),
+                action: rules::Action::Block,
+                note: None,
+                origin: rules::Origin::Human,
+            }])
+        }
+        let run = |sandbox: &Sandbox, workdir: &Path, command: &str| {
+            sandbox
+                .spawn("sh", &["-c".into(), command.into()], workdir, workdir)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        };
+        let base = std::env::temp_dir().join(format!("fennec-rule-e2e-{}", std::process::id()));
+        let workdir = base.join("work");
+        std::fs::create_dir_all(&workdir).unwrap();
+        let file = workdir.join("cli.py");
+        std::fs::write(&file, "original").unwrap();
+        let prefs = crate::domain::preferences::SandboxPrefs {
+            enabled: true,
+            network: false,
+        };
+        let sandbox_for = |rules: &rules::Rules| {
+            let (patterns, whole) = blocked_write_paths(rules, &workdir, None);
+            let protection = Protection::default().with_patterns(&patterns);
+            guarded(
+                Sandbox::from_prefs(&prefs, None, &base),
+                &workdir,
+                &protection,
+                whole,
+            )
+        };
+
+        // The file itself, named by its absolute path.
+        let sandbox = sandbox_for(&block(&file.to_string_lossy()));
+        assert!(!run(&sandbox, &workdir, "echo changed > cli.py"));
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
+        assert!(run(&sandbox, &workdir, "echo ok > sibling.py"));
+
+        // A folder above the work folder: nothing in it is writable.
+        let sandbox = sandbox_for(&block(&format!("{}/", base.display())));
+        assert!(!run(&sandbox, &workdir, "echo changed > cli.py"));
+        assert!(!run(&sandbox, &workdir, "echo new > new.py"));
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "original");
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

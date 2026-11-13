@@ -12,6 +12,7 @@ A sandboxed command can:
 - Write its working folder: the session's worktree, or the project folder for a session without one.
 - Run builds and tests offline, such as `cargo test`, `npm test`, and `pytest`.
 - Use the checkout's `node_modules` or `.venv` read-only, and share the project's Cargo build folder.
+- Read your checkout from a worktree, so git and a `.venv`'s scripts work even when the project lives under `/tmp` (the sandbox's own `/tmp` is empty).
 
 A sandboxed command cannot:
 
@@ -88,7 +89,7 @@ The recipe: put the package on disk yourself, then let the agent declare it in t
 | Rust | Turn **Network for commands** on for that turn | Adds it to `Cargo.toml`; `cargo build` downloads it and updates the worktree's `Cargo.lock`. Turn the network off again. |
 | Python | In your checkout: `uv pip install <pkg>` (or `.venv/bin/pip install <pkg>`) | Adds it to `pyproject.toml` / `requirements.txt`; the worktree's mounted `.venv` already has it. |
 
-The worktree sees your checkout's `node_modules` and `.venv` live. If your checkout had none when the turn started, it sees them from the next turn.
+The worktree sees your checkout's `node_modules` and `.venv` live. If your checkout had none when the turn started, it sees them from the next turn. Outside the sandbox, the worktree's `.venv` or `node_modules` can be an empty folder, the sandbox's mount point, so a command you run by hand in the worktree does not find them. Run it from your checkout, or through a shell step.
 
 ### When a command fails because of the sandbox
 

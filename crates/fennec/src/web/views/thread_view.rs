@@ -62,6 +62,8 @@ pub struct ThreadView {
     pub pending_plan: Option<plan::Pending>,
     /// The plan the human handed to the backlog instead: the bar gives way to a note.
     pub handed_plan: Option<HandedPlan>,
+    /// A plan with criteria waits for its build: the criteria section says so instead of "no criteria".
+    pub plan_awaiting_build: bool,
     pub queued: Vec<QueuedView>,
     pub criteria: Vec<CriterionView>,
     pub criteria_tally: criteria_fold::Tally,
@@ -132,6 +134,8 @@ pub const SESSION_KINDS: &[&str] = &[
     "queue.cancelled",
     "decision.recorded",
     "tool.call",
+    "plan.proposed",
+    "workflow.finished",
 ];
 
 /// `window` is the model's window (`EventLog::window`), `session` the `SESSION_KINDS` events;
@@ -168,7 +172,7 @@ impl ThreadView {
     }
 }
 
-pub fn thread_view(window: &[Event], session: &[Event], workdir: &str) -> ThreadView {
+pub fn thread_view(window: &[Event], session: &[Event], workdirs: &[&str]) -> ThreadView {
     // The domain folds each block; the view only shapes it for the UI.
     let passed_before = preflight::passed_before(session);
     let criteria = criteria_fold::in_force(session);
@@ -177,6 +181,7 @@ pub fn thread_view(window: &[Event], session: &[Event], workdir: &str) -> Thread
         pending_waiver: waiver::pending(window).map(WaiverView::from),
         pending_plan: plan::pending(window),
         handed_plan: None,
+        plan_awaiting_build: plan::awaiting_build(session),
         queued: queue::pending(session)
             .into_iter()
             .map(QueuedView::from)
@@ -188,7 +193,9 @@ pub fn thread_view(window: &[Event], session: &[Event], workdir: &str) -> Thread
             .collect(),
         decisions: decisions_in_force(session),
         replayable: replay::replayable_ids(window),
-        modified_files: modified_files::tally(session, workdir),
+        // The window's results are decoded already; a session's results would cost megabytes per refresh.
+        // ponytail: a call refused before the last compaction still counts, only when git cannot count.
+        modified_files: modified_files::tally(session, window, workdirs),
     }
 }
 
@@ -243,7 +250,7 @@ mod tests {
             },
             markdown: "the plan\n".into(),
         };
-        thread_view(&[proposed], &[], "/w")
+        thread_view(&[proposed], &[], &["/w"])
     }
 
     #[test]
@@ -282,7 +289,7 @@ mod tests {
 
     #[test]
     fn empty_log_has_nothing_pending() {
-        let view = thread_view(&[], &[], "/w");
+        let view = thread_view(&[], &[], &["/w"]);
 
         assert!(view.pending_approval.is_none());
         assert!(view.pending_waiver.is_none());
@@ -309,7 +316,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events, &events, "/w");
+        let view = thread_view(&events, &events, &["/w"]);
 
         assert_eq!(
             view.pending_approval,
@@ -352,7 +359,7 @@ mod tests {
         ];
 
         assert!(
-            thread_view(&events, &events, "/w")
+            thread_view(&events, &events, &["/w"])
                 .pending_approval
                 .is_none()
         );
@@ -372,7 +379,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events, &events, "/w");
+        let view = thread_view(&events, &events, &["/w"]);
 
         assert_eq!(
             view.pending_waiver,
@@ -417,7 +424,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events, &events, "/w");
+        let view = thread_view(&events, &events, &["/w"]);
 
         assert_eq!(
             view.queued,
@@ -467,7 +474,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events, &events, "/w");
+        let view = thread_view(&events, &events, &["/w"]);
 
         assert_eq!(
             view.criteria,
@@ -519,7 +526,7 @@ mod tests {
         ];
 
         assert_eq!(
-            thread_view(&events, &events, "/w").replayable,
+            thread_view(&events, &events, &["/w"]).replayable,
             vec!["u1".to_string()]
         );
     }
@@ -604,9 +611,9 @@ mod tests {
         let targeted = thread_view(
             &store.window(&session).unwrap(),
             &store.events_of(&session, super::SESSION_KINDS).unwrap(),
-            "/w",
+            &["/w"],
         );
-        assert_eq!(targeted, thread_view(&events, &events, "/w"));
+        assert_eq!(targeted, thread_view(&events, &events, &["/w"]));
         assert!(targeted.pending_waiver.is_some());
         assert_eq!(targeted.modified_files.count, 1);
     }
@@ -630,7 +637,7 @@ mod tests {
             },
         ];
 
-        let view = thread_view(&events, &events, "/w");
+        let view = thread_view(&events, &events, &["/w"]);
 
         assert_eq!(
             view.decisions
@@ -643,7 +650,7 @@ mod tests {
 
     #[test]
     fn serializes_with_camel_case_and_nulls() {
-        let value = serde_json::to_value(thread_view(&[], &[], "/w")).unwrap();
+        let value = serde_json::to_value(thread_view(&[], &[], &["/w"])).unwrap();
 
         assert_eq!(
             value,
@@ -652,6 +659,7 @@ mod tests {
                 "pendingWaiver": null,
                 "pendingPlan": null,
                 "handedPlan": null,
+                "planAwaitingBuild": false,
                 "queued": [],
                 "criteria": [],
                 "criteriaTally": {"total": 0, "passed": 0, "failed": 0, "indicative": 0, "percent": 0},

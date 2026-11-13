@@ -10,7 +10,7 @@ A plan says what the agent will do and, in **Done when**, how you will know it i
 4. Describe the change: what and why.
 5. Press `Enter`.
 
-The plan agent reads the code but changes nothing.
+The plan agent reads the code but changes nothing. Before the plan, it talks with you: what it found, the options, the one it recommends, and its questions. Answer it until you agree on the approach; only a small change with one obvious way to do it, or a task sheet, gets a plan straight away.
 
 ## Step 2: read and approve it
 
@@ -37,6 +37,10 @@ A model verdict never overrides a **verified** check.
 
 When the build ends, the **Report** card ① replaces the plan in the thread: the steps the builder says it did, with the **indicative** badge since a model wrote it. **Done when** ② shows each criterion as **met** or not.
 
+When you asked for a result (a benchmark, an investigation, a test run), **Findings** under the summary gives it, even if no criterion asks for it.
+
+The **Workflow finished** card shows the outcome and the run's start, end and duration. Click its chart icon to see the numbers: working time, model calls, tokens, modified files, criteria and the time per step.
+
 1. Check the criteria marked **verified** first.
 2. Review the changes at [the review gate](review-gate.md).
 
@@ -52,7 +56,7 @@ When the build ends, the **Report** card ① replaces the plan in the thread: th
 
 ### How a plan is made
 
-You start a session on the **Plan** agent, or open a plan session from an idea in [tasks](tasks.md). The plan agent is read-only: it explores the codebase and proposes a plan, but it changes nothing.
+You start a session on the **Plan** agent, or open a plan session from an idea in [tasks](tasks.md). The plan agent is read-only: it explores the codebase, discusses the approach with you, then proposes a plan, but it changes nothing.
 
 The plan card in the thread shows **Steps**, **To test**, **To do**, and **Risks** when the agent includes them. Use **Revise** to keep working on the plan with the agent.
 

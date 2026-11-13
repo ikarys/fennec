@@ -3,7 +3,7 @@ import type { MsgKey } from '../../i18n/messages';
 import { useT } from '../../i18n';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { PlayIcon } from '../ui/Icons';
+import { PlayIcon, StepIcon } from '../ui/Icons';
 import { Select, TextInput } from '../ui/Field';
 
 interface EditorHeaderProps {
@@ -17,7 +17,7 @@ interface EditorHeaderProps {
   onDescriptionChange: (description: string) => void;
   onScopeChange: (scope: 'project' | 'global') => void;
   onSave: () => void;
-  onTest: (() => void) | null;
+  onLaunch: ((stepByStep: boolean) => void) | null;
   canTest: boolean;
 }
 
@@ -38,7 +38,7 @@ export function EditorHeader({
   onDescriptionChange,
   onScopeChange,
   onSave,
-  onTest,
+  onLaunch,
   canTest
 }: EditorHeaderProps) {
   const t = useT();
@@ -70,19 +70,33 @@ export function EditorHeader({
       </Select>
       {dirty && <span className="text-xs text-accent" title={t('sectionUnsavedChanges')}>●</span>}
       {issueCount > 0 && <span className="text-xs text-err">{t('workflowEditorIssueCount', { count: issueCount })}</span>}
-      {onTest && (
-        <Button
-          variant="secondary"
-          size="sm"
-          type="button"
-          iconOnly
-          onClick={onTest}
-          disabled={!canTest}
-          aria-label={t('workflowEditorTestAria')}
-          title={canTest ? t('workflowEditorTestTitle') : t('workflowEditorTestSaveTitle')}
-        >
-          <PlayIcon className="h-4 w-4" />
-        </Button>
+      {onLaunch && (
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            iconOnly
+            onClick={() => onLaunch(false)}
+            disabled={!canTest}
+            aria-label={t('workflowEditorRunAria')}
+            title={canTest ? t('workflowEditorRunTitle') : t('workflowEditorTestSaveTitle')}
+          >
+            <PlayIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            iconOnly
+            onClick={() => onLaunch(true)}
+            disabled={!canTest}
+            aria-label={t('workflowEditorTestAria')}
+            title={canTest ? t('workflowEditorTestTitle') : t('workflowEditorTestSaveTitle')}
+          >
+            <StepIcon className="h-4 w-4" />
+          </Button>
+        </>
       )}
       <Button variant="primary" size="sm" type="button" onClick={onSave} disabled={saving}>
         {saving ? t('sectionSaving') : t('agentSave')}

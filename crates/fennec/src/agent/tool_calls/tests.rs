@@ -35,8 +35,8 @@ impl Toolbox for McpToolbox {
         ToolResult::success("mcp ran".into(), false)
     }
 
-    fn mcp_tool_names(&self) -> Vec<String> {
-        vec!["fs_echo".into()]
+    fn offers_mcp(&self) -> bool {
+        true
     }
 }
 
@@ -68,10 +68,6 @@ impl Toolbox for RecordingToolbox {
             subject: name.to_string(),
             proposal: None,
         }
-    }
-
-    fn mcp_tool_names(&self) -> Vec<String> {
-        Vec::new()
     }
 }
 
@@ -231,17 +227,17 @@ fn an_mcp_tool_call_is_allowed_even_if_not_in_the_agents_list() {
         children: None,
     };
     let agent = &agents[0];
-    // The builder does not list `fs_echo`; the MCP set is what allows it.
-    assert!(!agent.allows("fs_echo"));
+    // The builder does not list `mcp_call`; offering MCP is what allows it.
+    assert!(!agent.allows("mcp_call"));
     let mcp_call = ToolCall {
         id: "c1".into(),
-        name: "fs_echo".into(),
+        name: "mcp_call".into(),
         arguments: json!({}),
         parse_error: None,
         raw_arguments: None,
     };
     execute_tools(&mut turn, agent, "m1", &[mcp_call]).unwrap();
-    assert_eq!(*executed.borrow(), vec!["fs_echo".to_string()]);
+    assert_eq!(*executed.borrow(), vec!["mcp_call".to_string()]);
 
     // A non-MCP tool not in the list is still refused and never runs.
     let refused = ToolCall {
@@ -252,7 +248,7 @@ fn an_mcp_tool_call_is_allowed_even_if_not_in_the_agents_list() {
         raw_arguments: None,
     };
     execute_tools(&mut turn, agent, "m2", &[refused]).unwrap();
-    assert_eq!(*executed.borrow(), vec!["fs_echo".to_string()]);
+    assert_eq!(*executed.borrow(), vec!["mcp_call".to_string()]);
     assert!(
         log.0
             .borrow()

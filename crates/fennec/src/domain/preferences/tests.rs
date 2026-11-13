@@ -1,5 +1,4 @@
 use super::*;
-use crate::domain::mcp::McpTool;
 
 #[test]
 fn preferences_stored_before_shortcuts_load_with_none() {
@@ -408,27 +407,6 @@ fn validate_rejects_duplicate_mcp_server_names() {
         },
     ];
     assert!(p.validate().unwrap_err().contains("duplicate mcp server"));
-}
-
-#[test]
-fn validate_rejects_an_mcp_tool_that_collides_with_a_builtin() {
-    let mut p = valid();
-    p.mcp = vec![McpServer {
-        name: "read".into(),
-        command: Some("read-mcp".into()),
-        cached_tools: vec![McpTool {
-            annotations: None,
-            name: "file".into(),
-            description: None,
-            input_schema: serde_json::json!({}),
-        }],
-        ..Default::default()
-    }];
-    assert!(
-        p.validate()
-            .unwrap_err()
-            .contains("collides with a built-in tool")
-    );
 }
 
 #[test]

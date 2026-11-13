@@ -14,6 +14,7 @@ use std::sync::atomic::AtomicBool;
 /// Proposes an English Conventional Commit subject for the integration.
 pub fn suggest(
     settings: &Settings,
+    task: &str,
     request: &str,
     title: &str,
     commits: &[&str],
@@ -25,7 +26,7 @@ pub fn suggest(
     let model = OpenAiClient::new(settings.endpoint(&prefs, &params.provider)?, &params.model);
     let stop = AtomicBool::new(false);
 
-    let content = commit_subject::prompt(request, title, commits, files);
+    let content = commit_subject::prompt(task, request, title, commits, files);
     let messages = vec![json!({ "role": "user", "content": content })];
     let tools = json!([]);
     let model_request = Request {
