@@ -265,7 +265,6 @@ export function SessionPage({
       onPreview={setPreview}
       onOpenCanvas={setCanvasId}
       pendingPlanCallId={served.pendingPlan?.callId ?? null}
-      integrationInvite={decisions.proposals.integration}
       calls={calls}
       workflowUsage={workflowUsage}
     >

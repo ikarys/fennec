@@ -1,4 +1,4 @@
-// The contexts a session's subtree reads: previews, canvas, file links, pending plan, integration invite and usage.
+// The contexts a session's subtree reads: previews, canvas, file links, pending plan and usage.
 import { useMemo, type ReactNode } from 'react';
 import type { SessionDetail, WorkflowUsage } from '../../lib/api';
 import type { CallUsage } from '../../lib/api';
@@ -11,7 +11,6 @@ import {
 } from '../preview/PreviewContext';
 import { CallUsageContext, WorkflowUsageContext } from './CallUsage';
 import { FileLinkContext } from './FileLinkContext';
-import { IntegrationInviteContext, type IntegrationInvite } from './IntegrationInvite';
 import { PendingPlanContext } from './PendingPlan';
 
 interface SessionProvidersProps {
@@ -23,7 +22,6 @@ interface SessionProvidersProps {
   onPreview: (target: PreviewTarget) => void;
   onOpenCanvas: (artifactId: number) => void;
   pendingPlanCallId: string | null;
-  integrationInvite: IntegrationInvite | null;
   calls: ReadonlyMap<string, CallUsage>;
   workflowUsage: WorkflowUsage;
   children: ReactNode;
@@ -37,7 +35,6 @@ export function SessionProviders({
   onPreview,
   onOpenCanvas,
   pendingPlanCallId,
-  integrationInvite,
   calls,
   workflowUsage,
   children,
@@ -59,13 +56,11 @@ export function SessionProviders({
             {/* The agent writes in its worktree when it has one: paths are relative to it, and the preview route resolves them there too. */}
             <PreviewWorkdirContext.Provider value={detail?.worktree?.path ?? detail?.project.workdir}>
               <PendingPlanContext.Provider value={pendingPlanCallId}>
-                <IntegrationInviteContext.Provider value={integrationInvite}>
-                  <CallUsageContext.Provider value={calls}>
-                    <WorkflowUsageContext.Provider value={workflowUsage}>
-                      {children}
-                    </WorkflowUsageContext.Provider>
-                  </CallUsageContext.Provider>
-                </IntegrationInviteContext.Provider>
+                <CallUsageContext.Provider value={calls}>
+                  <WorkflowUsageContext.Provider value={workflowUsage}>
+                    {children}
+                  </WorkflowUsageContext.Provider>
+                </CallUsageContext.Provider>
               </PendingPlanContext.Provider>
             </PreviewWorkdirContext.Provider>
           </FileLinkContext.Provider>
