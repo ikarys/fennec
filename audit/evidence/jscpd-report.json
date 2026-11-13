@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-12T13:10:46.128Z",
+    "detectionDate": "2026-11-13T09:22:46.091Z",
     "formats": {
       "typescript": {
         "sources": {
@@ -89,8 +89,8 @@
             "newClones": 0
           },
           "web/src/lib/api/sessions.ts": {
-            "lines": 600,
-            "tokens": 4641,
+            "lines": 602,
+            "tokens": 4651,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -209,8 +209,8 @@
             "newClones": 0
           },
           "web/src/lib/api/integration.ts": {
-            "lines": 236,
-            "tokens": 1882,
+            "lines": 238,
+            "tokens": 1892,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -281,8 +281,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/useWorkflowEditor.ts": {
-            "lines": 303,
-            "tokens": 3525,
+            "lines": 309,
+            "tokens": 3653,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -402,7 +402,7 @@
           },
           "web/src/lib/threadView.ts": {
             "lines": 130,
-            "tokens": 1200,
+            "tokens": 1207,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -580,6 +580,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/lib/sessionStatus.test.ts": {
+            "lines": 19,
+            "tokens": 194,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/lib/servers.ts": {
             "lines": 40,
             "tokens": 490,
@@ -629,8 +641,8 @@
             "newClones": 0
           },
           "web/src/lib/route.ts": {
-            "lines": 217,
-            "tokens": 2892,
+            "lines": 227,
+            "tokens": 2991,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -641,8 +653,8 @@
             "newClones": 0
           },
           "web/src/lib/route.test.ts": {
-            "lines": 437,
-            "tokens": 3583,
+            "lines": 447,
+            "tokens": 3681,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -701,8 +713,8 @@
             "newClones": 0
           },
           "web/src/lib/plan.ts": {
-            "lines": 412,
-            "tokens": 4772,
+            "lines": 415,
+            "tokens": 4813,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -713,8 +725,8 @@
             "newClones": 0
           },
           "web/src/lib/plan.test.ts": {
-            "lines": 288,
-            "tokens": 3227,
+            "lines": 294,
+            "tokens": 3306,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -809,26 +821,26 @@
             "newClones": 0
           },
           "web/src/lib/fold.ts": {
-            "lines": 668,
-            "tokens": 7733,
+            "lines": 683,
+            "tokens": 7897,
             "sources": 1,
             "clones": 4,
             "duplicatedLines": 22,
             "duplicatedTokens": 410,
-            "percentage": 3.29,
-            "percentageTokens": 5.3,
+            "percentage": 3.22,
+            "percentageTokens": 5.19,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "web/src/lib/fold.test.ts": {
-            "lines": 508,
-            "tokens": 6989,
+            "lines": 514,
+            "tokens": 7082,
             "sources": 1,
             "clones": 10,
             "duplicatedLines": 58,
             "duplicatedTokens": 844,
-            "percentage": 11.42,
-            "percentageTokens": 12.08,
+            "percentage": 11.28,
+            "percentageTokens": 11.92,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -893,8 +905,8 @@
             "newClones": 0
           },
           "web/src/lib/contract.fixtures.ts": {
-            "lines": 59,
-            "tokens": 661,
+            "lines": 60,
+            "tokens": 668,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1050,7 +1062,7 @@
           },
           "web/src/hooks/useSessionThread.ts": {
             "lines": 358,
-            "tokens": 3764,
+            "tokens": 3770,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1193,8 +1205,8 @@
             "newClones": 0
           },
           "web/src/hooks/useProjectOptions.ts": {
-            "lines": 135,
-            "tokens": 1153,
+            "lines": 150,
+            "tokens": 1315,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1362,13 +1374,13 @@
           }
         },
         "total": {
-          "lines": 12902,
-          "tokens": 128938,
-          "sources": 113,
+          "lines": 12997,
+          "tokens": 130036,
+          "sources": 114,
           "clones": 16,
           "duplicatedLines": 128,
           "duplicatedTokens": 1463,
-          "percentage": 0.99,
+          "percentage": 0.98,
           "percentageTokens": 1.13,
           "newDuplicatedLines": 0,
           "newClones": 0
@@ -1390,7 +1402,7 @@
           },
           "web/src/components/workflow/session/RunTimeline.tsx": {
             "lines": 280,
-            "tokens": 3788,
+            "tokens": 3798,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1402,7 +1414,7 @@
           },
           "web/src/components/workflow/session/RunRail.tsx": {
             "lines": 11,
-            "tokens": 63,
+            "tokens": 69,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1413,8 +1425,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunEndCard.tsx": {
-            "lines": 134,
-            "tokens": 1053,
+            "lines": 152,
+            "tokens": 1205,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1449,8 +1461,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/NodeDivider.tsx": {
-            "lines": 82,
-            "tokens": 971,
+            "lines": 98,
+            "tokens": 1145,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1473,8 +1485,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/nodes/NodeFrame.tsx": {
-            "lines": 13,
-            "tokens": 117,
+            "lines": 14,
+            "tokens": 120,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1774,7 +1786,7 @@
           },
           "web/src/components/workflow/WorkflowEditor.tsx": {
             "lines": 122,
-            "tokens": 1259,
+            "tokens": 1271,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1833,8 +1845,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/EditorHeader.tsx": {
-            "lines": 39,
-            "tokens": 423,
+            "lines": 53,
+            "tokens": 532,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1954,7 +1966,7 @@
           },
           "web/src/components/ui/Section.tsx": {
             "lines": 64,
-            "tokens": 725,
+            "tokens": 732,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2037,20 +2049,20 @@
             "newClones": 0
           },
           "web/src/components/ui/Icons.tsx": {
-            "lines": 723,
-            "tokens": 5930,
+            "lines": 733,
+            "tokens": 6020,
             "sources": 1,
             "clones": 4,
-            "duplicatedLines": 1138,
-            "duplicatedTokens": 9654,
-            "percentage": 157.4,
-            "percentageTokens": 162.8,
+            "duplicatedLines": 1158,
+            "duplicatedTokens": 9834,
+            "percentage": 157.98,
+            "percentageTokens": 163.36,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "web/src/components/ui/Field.tsx": {
             "lines": 16,
-            "tokens": 246,
+            "tokens": 238,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2301,8 +2313,8 @@
             "newClones": 0
           },
           "web/src/components/settings/PluginCard.tsx": {
-            "lines": 52,
-            "tokens": 535,
+            "lines": 65,
+            "tokens": 578,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2325,8 +2337,8 @@
             "newClones": 0
           },
           "web/src/components/settings/NetworkSection.tsx": {
-            "lines": 67,
-            "tokens": 483,
+            "lines": 92,
+            "tokens": 789,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2338,7 +2350,7 @@
           },
           "web/src/components/settings/ModelSection.tsx": {
             "lines": 15,
-            "tokens": 258,
+            "tokens": 269,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2541,8 +2553,8 @@
             "newClones": 0
           },
           "web/src/components/session/Thread.tsx": {
-            "lines": 235,
-            "tokens": 2696,
+            "lines": 237,
+            "tokens": 2714,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2577,8 +2589,8 @@
             "newClones": 0
           },
           "web/src/components/session/SessionThreadPane.tsx": {
-            "lines": 37,
-            "tokens": 261,
+            "lines": 38,
+            "tokens": 293,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2805,8 +2817,8 @@
             "newClones": 0
           },
           "web/src/components/session/PlanCard.tsx": {
-            "lines": 336,
-            "tokens": 3564,
+            "lines": 349,
+            "tokens": 3681,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3010,7 +3022,7 @@
           },
           "web/src/components/session/ContextPanel.tsx": {
             "lines": 78,
-            "tokens": 830,
+            "tokens": 819,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3082,7 +3094,7 @@
           },
           "web/src/components/session/ApprovalDecision.tsx": {
             "lines": 72,
-            "tokens": 613,
+            "tokens": 636,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3357,8 +3369,8 @@
             "newClones": 0
           },
           "web/src/components/project/DecisionsSection.tsx": {
-            "lines": 121,
-            "tokens": 1125,
+            "lines": 122,
+            "tokens": 1145,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3765,8 +3777,8 @@
             "newClones": 0
           },
           "web/src/pages/SessionPage.tsx": {
-            "lines": 141,
-            "tokens": 1124,
+            "lines": 143,
+            "tokens": 1154,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3910,14 +3922,14 @@
           }
         },
         "total": {
-          "lines": 14428,
-          "tokens": 136983,
+          "lines": 14544,
+          "tokens": 138127,
           "sources": 211,
           "clones": 3,
-          "duplicatedLines": 598,
-          "duplicatedTokens": 5071,
-          "percentage": 4.14,
-          "percentageTokens": 3.7,
+          "duplicatedLines": 608,
+          "duplicatedTokens": 5161,
+          "percentage": 4.18,
+          "percentageTokens": 3.74,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -3937,8 +3949,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunTimeline.tsx": {
-            "lines": 297,
-            "tokens": 4054,
+            "lines": 298,
+            "tokens": 4079,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3949,8 +3961,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunRail.tsx": {
-            "lines": 55,
-            "tokens": 590,
+            "lines": 56,
+            "tokens": 634,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3961,8 +3973,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunEndCard.tsx": {
-            "lines": 307,
-            "tokens": 2579,
+            "lines": 329,
+            "tokens": 2772,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3997,8 +4009,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/NodeDivider.tsx": {
-            "lines": 157,
-            "tokens": 1816,
+            "lines": 174,
+            "tokens": 2031,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4021,8 +4033,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/nodes/NodeFrame.tsx": {
-            "lines": 61,
-            "tokens": 578,
+            "lines": 62,
+            "tokens": 607,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4177,8 +4189,8 @@
             "newClones": 0
           },
           "web/src/components/project/ideas/QueueBar.tsx": {
-            "lines": 148,
-            "tokens": 1296,
+            "lines": 149,
+            "tokens": 1318,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4322,7 +4334,7 @@
           },
           "web/src/components/workflow/WorkflowEditor.tsx": {
             "lines": 203,
-            "tokens": 1975,
+            "tokens": 1987,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4381,8 +4393,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/EditorHeader.tsx": {
-            "lines": 92,
-            "tokens": 848,
+            "lines": 106,
+            "tokens": 964,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4525,14 +4537,14 @@
             "newClones": 0
           },
           "web/src/components/ui/Section.tsx": {
-            "lines": 130,
-            "tokens": 1275,
+            "lines": 132,
+            "tokens": 1293,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 22,
             "duplicatedTokens": 246,
-            "percentage": 16.92,
-            "percentageTokens": 19.29,
+            "percentage": 16.67,
+            "percentageTokens": 19.03,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4633,20 +4645,20 @@
             "newClones": 0
           },
           "web/src/components/ui/Icons.tsx": {
-            "lines": 743,
-            "tokens": 6078,
+            "lines": 753,
+            "tokens": 6168,
             "sources": 1,
             "clones": 4,
             "duplicatedLines": 54,
             "duplicatedTokens": 356,
-            "percentage": 7.27,
-            "percentageTokens": 5.86,
+            "percentage": 7.17,
+            "percentageTokens": 5.77,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "web/src/components/ui/Field.tsx": {
-            "lines": 33,
-            "tokens": 380,
+            "lines": 32,
+            "tokens": 379,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4897,8 +4909,8 @@
             "newClones": 0
           },
           "web/src/components/settings/PluginCard.tsx": {
-            "lines": 85,
-            "tokens": 916,
+            "lines": 98,
+            "tokens": 959,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4921,8 +4933,8 @@
             "newClones": 0
           },
           "web/src/components/settings/NetworkSection.tsx": {
-            "lines": 241,
-            "tokens": 2209,
+            "lines": 250,
+            "tokens": 2313,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4934,7 +4946,7 @@
           },
           "web/src/components/settings/ModelSection.tsx": {
             "lines": 57,
-            "tokens": 699,
+            "tokens": 710,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5089,8 +5101,8 @@
             "newClones": 0
           },
           "web/src/components/session/WaiverDecision.tsx": {
-            "lines": 94,
-            "tokens": 737,
+            "lines": 95,
+            "tokens": 757,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5125,8 +5137,8 @@
             "newClones": 0
           },
           "web/src/components/session/ToolCard.tsx": {
-            "lines": 221,
-            "tokens": 2700,
+            "lines": 234,
+            "tokens": 2922,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5149,8 +5161,8 @@
             "newClones": 0
           },
           "web/src/components/session/Thread.tsx": {
-            "lines": 271,
-            "tokens": 3141,
+            "lines": 274,
+            "tokens": 3174,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5185,8 +5197,8 @@
             "newClones": 0
           },
           "web/src/components/session/SessionThreadPane.tsx": {
-            "lines": 97,
-            "tokens": 722,
+            "lines": 103,
+            "tokens": 795,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5413,8 +5425,8 @@
             "newClones": 0
           },
           "web/src/components/session/PlanCard.tsx": {
-            "lines": 383,
-            "tokens": 4045,
+            "lines": 397,
+            "tokens": 4178,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5497,8 +5509,8 @@
             "newClones": 0
           },
           "web/src/components/session/IntegrationReview.tsx": {
-            "lines": 208,
-            "tokens": 1964,
+            "lines": 218,
+            "tokens": 2024,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5654,7 +5666,7 @@
           },
           "web/src/components/session/ContextPanel.tsx": {
             "lines": 179,
-            "tokens": 1737,
+            "tokens": 1726,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5738,7 +5750,7 @@
           },
           "web/src/components/session/ApprovalDecision.tsx": {
             "lines": 142,
-            "tokens": 1300,
+            "tokens": 1323,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6013,14 +6025,14 @@
             "newClones": 0
           },
           "web/src/components/project/DecisionsSection.tsx": {
-            "lines": 178,
-            "tokens": 1518,
+            "lines": 179,
+            "tokens": 1538,
             "sources": 1,
             "clones": 1,
             "duplicatedLines": 11,
             "duplicatedTokens": 95,
-            "percentage": 6.18,
-            "percentageTokens": 6.26,
+            "percentage": 6.15,
+            "percentageTokens": 6.18,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -6457,8 +6469,8 @@
             "newClones": 0
           },
           "web/src/pages/SessionPage.tsx": {
-            "lines": 424,
-            "tokens": 3765,
+            "lines": 429,
+            "tokens": 3836,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6626,14 +6638,14 @@
           }
         },
         "total": {
-          "lines": 28249,
-          "tokens": 268748,
+          "lines": 28392,
+          "tokens": 270313,
           "sources": 225,
           "clones": 19,
           "duplicatedLines": 212,
           "duplicatedTokens": 2112,
           "percentage": 0.75,
-          "percentageTokens": 0.79,
+          "percentageTokens": 0.78,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -6681,8 +6693,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/routes/integration/gate.rs": {
-            "lines": 228,
-            "tokens": 2449,
+            "lines": 235,
+            "tokens": 2543,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6705,14 +6717,14 @@
             "newClones": 0
           },
           "crates/fennec/src/web/views/thread_view.rs": {
-            "lines": 726,
-            "tokens": 6121,
+            "lines": 734,
+            "tokens": 6209,
             "sources": 1,
             "clones": 8,
             "duplicatedLines": 77,
             "duplicatedTokens": 676,
-            "percentage": 10.61,
-            "percentageTokens": 11.04,
+            "percentage": 10.49,
+            "percentageTokens": 10.89,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -6793,10 +6805,10 @@
             "tokens": 6734,
             "sources": 1,
             "clones": 10,
-            "duplicatedLines": 210,
-            "duplicatedTokens": 2313,
-            "percentage": 31.02,
-            "percentageTokens": 34.35,
+            "duplicatedLines": 183,
+            "duplicatedTokens": 1996,
+            "percentage": 27.03,
+            "percentageTokens": 29.64,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -6910,7 +6922,7 @@
           },
           "crates/fennec/src/web/routes/settings_routes.rs": {
             "lines": 457,
-            "tokens": 4840,
+            "tokens": 4830,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6921,14 +6933,14 @@
             "newClones": 0
           },
           "crates/fennec/src/web/routes/session_routes.rs": {
-            "lines": 797,
-            "tokens": 9647,
+            "lines": 811,
+            "tokens": 9823,
             "sources": 1,
             "clones": 8,
             "duplicatedLines": 58,
             "duplicatedTokens": 768,
-            "percentage": 7.28,
-            "percentageTokens": 7.96,
+            "percentage": 7.15,
+            "percentageTokens": 7.82,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -6936,11 +6948,11 @@
             "lines": 206,
             "tokens": 2580,
             "sources": 1,
-            "clones": 6,
-            "duplicatedLines": 66,
-            "duplicatedTokens": 726,
-            "percentage": 32.04,
-            "percentageTokens": 28.14,
+            "clones": 5,
+            "duplicatedLines": 51,
+            "duplicatedTokens": 603,
+            "percentage": 24.76,
+            "percentageTokens": 23.37,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7077,14 +7089,14 @@
             "newClones": 0
           },
           "crates/fennec/src/web/routes/mcp_routes.rs": {
-            "lines": 401,
-            "tokens": 4579,
+            "lines": 225,
+            "tokens": 2532,
             "sources": 1,
-            "clones": 6,
-            "duplicatedLines": 84,
-            "duplicatedTokens": 910,
-            "percentage": 20.95,
-            "percentageTokens": 19.87,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7101,14 +7113,14 @@
             "newClones": 0
           },
           "crates/fennec/src/web/routes/integration.rs": {
-            "lines": 490,
-            "tokens": 4982,
+            "lines": 492,
+            "tokens": 5014,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 20,
             "duplicatedTokens": 198,
-            "percentage": 4.08,
-            "percentageTokens": 3.97,
+            "percentage": 4.07,
+            "percentageTokens": 3.95,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7389,14 +7401,14 @@
             "newClones": 0
           },
           "crates/fennec/src/web/jobs/commit_subject.rs": {
-            "lines": 44,
-            "tokens": 497,
+            "lines": 45,
+            "tokens": 508,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 22,
             "duplicatedTokens": 281,
-            "percentage": 50,
-            "percentageTokens": 56.54,
+            "percentage": 48.89,
+            "percentageTokens": 55.31,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7485,14 +7497,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/workflow/stats.rs": {
-            "lines": 509,
-            "tokens": 4136,
+            "lines": 554,
+            "tokens": 4547,
             "sources": 1,
             "clones": 12,
             "duplicatedLines": 222,
             "duplicatedTokens": 1913,
-            "percentage": 43.61,
-            "percentageTokens": 46.25,
+            "percentage": 40.07,
+            "percentageTokens": 42.07,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7521,14 +7533,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/preferences/tests.rs": {
-            "lines": 658,
-            "tokens": 5954,
+            "lines": 636,
+            "tokens": 5779,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 14,
             "duplicatedTokens": 140,
-            "percentage": 2.13,
-            "percentageTokens": 2.35,
+            "percentage": 2.2,
+            "percentageTokens": 2.42,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7569,14 +7581,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/event/tests.rs": {
-            "lines": 352,
-            "tokens": 2872,
+            "lines": 353,
+            "tokens": 2884,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 30,
             "duplicatedTokens": 257,
-            "percentage": 8.52,
-            "percentageTokens": 8.95,
+            "percentage": 8.5,
+            "percentageTokens": 8.91,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7665,8 +7677,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/turns.rs": {
-            "lines": 395,
-            "tokens": 3471,
+            "lines": 458,
+            "tokens": 4188,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7680,7 +7692,7 @@
             "lines": 79,
             "tokens": 896,
             "sources": 1,
-            "clones": 2,
+            "clones": 3,
             "duplicatedLines": 37,
             "duplicatedTokens": 402,
             "percentage": 46.84,
@@ -7869,8 +7881,8 @@
             "newClones": 0
           },
           "crates/fennec/src/tools/rule_request.rs": {
-            "lines": 277,
-            "tokens": 2636,
+            "lines": 331,
+            "tokens": 3066,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7901,6 +7913,18 @@
             "duplicatedTokens": 332,
             "percentage": 6.97,
             "percentageTokens": 5.66,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/tools/mcp_call.rs": {
+            "lines": 429,
+            "tokens": 4071,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 44,
+            "duplicatedTokens": 486,
+            "percentage": 10.26,
+            "percentageTokens": 11.94,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8445,14 +8469,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/rule_approval.rs": {
-            "lines": 171,
-            "tokens": 1481,
+            "lines": 225,
+            "tokens": 1962,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 36,
             "duplicatedTokens": 321,
-            "percentage": 21.05,
-            "percentageTokens": 21.67,
+            "percentage": 16,
+            "percentageTokens": 16.36,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8469,8 +8493,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/review_map.rs": {
-            "lines": 335,
-            "tokens": 3165,
+            "lines": 361,
+            "tokens": 3416,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8493,14 +8517,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/report.rs": {
-            "lines": 220,
-            "tokens": 1837,
+            "lines": 244,
+            "tokens": 2046,
             "sources": 1,
             "clones": 1,
             "duplicatedLines": 12,
             "duplicatedTokens": 85,
-            "percentage": 5.45,
-            "percentageTokens": 4.63,
+            "percentage": 4.92,
+            "percentageTokens": 4.15,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8541,8 +8565,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/protection.rs": {
-            "lines": 277,
-            "tokens": 1988,
+            "lines": 282,
+            "tokens": 2027,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8637,8 +8661,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/plan_scope.rs": {
-            "lines": 159,
-            "tokens": 1202,
+            "lines": 207,
+            "tokens": 1624,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8649,14 +8673,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/plan.rs": {
-            "lines": 463,
-            "tokens": 3746,
+            "lines": 512,
+            "tokens": 4176,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 19,
             "duplicatedTokens": 196,
-            "percentage": 4.1,
-            "percentageTokens": 5.23,
+            "percentage": 3.71,
+            "percentageTokens": 4.69,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8709,8 +8733,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/modified_files.rs": {
-            "lines": 258,
-            "tokens": 2434,
+            "lines": 326,
+            "tokens": 3009,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8744,9 +8768,21 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "crates/fennec/src/domain/mcp_notice.rs": {
+            "lines": 109,
+            "tokens": 1046,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "crates/fennec/src/domain/mcp.rs": {
-            "lines": 466,
-            "tokens": 3836,
+            "lines": 825,
+            "tokens": 7040,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8925,14 +8961,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/conversation.rs": {
-            "lines": 818,
-            "tokens": 7766,
+            "lines": 819,
+            "tokens": 7778,
             "sources": 1,
             "clones": 9,
             "duplicatedLines": 94,
             "duplicatedTokens": 881,
-            "percentage": 11.49,
-            "percentageTokens": 11.34,
+            "percentage": 11.48,
+            "percentageTokens": 11.33,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8961,14 +8997,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/commit_subject.rs": {
-            "lines": 234,
-            "tokens": 2222,
+            "lines": 253,
+            "tokens": 2384,
             "sources": 1,
             "clones": 1,
             "duplicatedLines": 11,
             "duplicatedTokens": 98,
-            "percentage": 4.7,
-            "percentageTokens": 4.41,
+            "percentage": 4.35,
+            "percentageTokens": 4.11,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9249,14 +9285,14 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow.rs": {
-            "lines": 508,
-            "tokens": 5188,
+            "lines": 534,
+            "tokens": 5486,
             "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
+            "clones": 2,
+            "duplicatedLines": 18,
+            "duplicatedTokens": 200,
+            "percentage": 3.37,
+            "percentageTokens": 3.65,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9273,20 +9309,20 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/turn.rs": {
-            "lines": 550,
-            "tokens": 5011,
+            "lines": 565,
+            "tokens": 5147,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 19,
             "duplicatedTokens": 267,
-            "percentage": 3.45,
-            "percentageTokens": 5.33,
+            "percentage": 3.36,
+            "percentageTokens": 5.19,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "crates/fennec/src/agent/tool_calls.rs": {
-            "lines": 226,
-            "tokens": 2019,
+            "lines": 227,
+            "tokens": 2043,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9333,26 +9369,26 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/submit_report.rs": {
-            "lines": 441,
-            "tokens": 4361,
+            "lines": 468,
+            "tokens": 4667,
             "sources": 1,
             "clones": 7,
             "duplicatedLines": 81,
             "duplicatedTokens": 907,
-            "percentage": 18.37,
-            "percentageTokens": 20.8,
+            "percentage": 17.31,
+            "percentageTokens": 19.43,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "crates/fennec/src/agent/snapshot.rs": {
-            "lines": 93,
-            "tokens": 857,
+            "lines": 102,
+            "tokens": 970,
             "sources": 1,
             "clones": 1,
             "duplicatedLines": 9,
             "duplicatedTokens": 77,
-            "percentage": 9.68,
-            "percentageTokens": 8.98,
+            "percentage": 8.82,
+            "percentageTokens": 7.94,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9372,11 +9408,11 @@
             "lines": 219,
             "tokens": 2813,
             "sources": 1,
-            "clones": 13,
-            "duplicatedLines": 155,
-            "duplicatedTokens": 1970,
-            "percentage": 70.78,
-            "percentageTokens": 70.03,
+            "clones": 14,
+            "duplicatedLines": 160,
+            "duplicatedTokens": 2039,
+            "percentage": 73.06,
+            "percentageTokens": 72.48,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9489,8 +9525,8 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/ports.rs": {
-            "lines": 176,
-            "tokens": 1396,
+            "lines": 183,
+            "tokens": 1437,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9657,8 +9693,8 @@
             "newClones": 0
           },
           "crates/rules/src/rule.rs": {
-            "lines": 387,
-            "tokens": 3025,
+            "lines": 485,
+            "tokens": 3815,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9682,7 +9718,7 @@
           },
           "crates/rules/src/lib.rs": {
             "lines": 22,
-            "tokens": 171,
+            "tokens": 174,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9729,14 +9765,14 @@
             "newClones": 0
           },
           "crates/fennec/src/worktree.rs": {
-            "lines": 647,
-            "tokens": 7553,
+            "lines": 690,
+            "tokens": 7944,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 28,
-            "duplicatedTokens": 510,
-            "percentage": 4.33,
-            "percentageTokens": 6.75,
+            "clones": 5,
+            "duplicatedLines": 41,
+            "duplicatedTokens": 727,
+            "percentage": 5.94,
+            "percentageTokens": 9.15,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9777,26 +9813,26 @@
             "newClones": 0
           },
           "crates/fennec/src/turn_build.rs": {
-            "lines": 351,
-            "tokens": 3359,
+            "lines": 505,
+            "tokens": 4951,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 15,
-            "duplicatedTokens": 97,
-            "percentage": 4.27,
-            "percentageTokens": 2.89,
+            "clones": 2,
+            "duplicatedLines": 20,
+            "duplicatedTokens": 166,
+            "percentage": 3.96,
+            "percentageTokens": 3.35,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "crates/fennec/src/tools.rs": {
-            "lines": 639,
-            "tokens": 5956,
+            "lines": 453,
+            "tokens": 4252,
             "sources": 1,
-            "clones": 5,
-            "duplicatedLines": 78,
-            "duplicatedTokens": 677,
-            "percentage": 12.21,
-            "percentageTokens": 11.37,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 172,
+            "percentage": 3.53,
+            "percentageTokens": 4.05,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9968,6 +10004,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "crates/fennec/src/modified_files.rs": {
+            "lines": 150,
+            "tokens": 1667,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 13,
+            "duplicatedTokens": 217,
+            "percentage": 8.67,
+            "percentageTokens": 13.02,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "crates/fennec/src/metering.rs": {
             "lines": 543,
             "tokens": 4856,
@@ -9981,20 +10029,20 @@
             "newClones": 0
           },
           "crates/fennec/src/mcp.rs": {
-            "lines": 561,
-            "tokens": 5554,
+            "lines": 546,
+            "tokens": 5427,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 14,
             "duplicatedTokens": 138,
-            "percentage": 2.5,
-            "percentageTokens": 2.48,
+            "percentage": 2.56,
+            "percentageTokens": 2.54,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "crates/fennec/src/main.rs": {
-            "lines": 142,
-            "tokens": 1735,
+            "lines": 143,
+            "tokens": 1740,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10044,11 +10092,11 @@
             "lines": 481,
             "tokens": 4598,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 62,
-            "duplicatedTokens": 505,
-            "percentage": 12.89,
-            "percentageTokens": 10.98,
+            "clones": 4,
+            "duplicatedLines": 106,
+            "duplicatedTokens": 854,
+            "percentage": 22.04,
+            "percentageTokens": 18.57,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10065,8 +10113,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain.rs": {
-            "lines": 87,
-            "tokens": 585,
+            "lines": 88,
+            "tokens": 592,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10378,14 +10426,14 @@
           }
         },
         "total": {
-          "lines": 78653,
-          "tokens": 737029,
-          "sources": 309,
-          "clones": 235,
-          "duplicatedLines": 2742,
-          "duplicatedTokens": 28698,
-          "percentage": 3.49,
-          "percentageTokens": 3.89,
+          "lines": 80172,
+          "tokens": 751212,
+          "sources": 312,
+          "clones": 237,
+          "duplicatedLines": 2719,
+          "duplicatedTokens": 28574,
+          "percentage": 3.39,
+          "percentageTokens": 3.8,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -10505,8 +10553,8 @@
             "newClones": 0
           },
           "crates/fennec/agents/plan.agent.md": {
-            "lines": 52,
-            "tokens": 1881,
+            "lines": 56,
+            "tokens": 2352,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10529,8 +10577,8 @@
             "newClones": 0
           },
           "crates/fennec/agents/builder.agent.md": {
-            "lines": 55,
-            "tokens": 1292,
+            "lines": 61,
+            "tokens": 1649,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10565,8 +10613,8 @@
             "newClones": 0
           },
           "crates/fennec/agents/ask.agent.md": {
-            "lines": 38,
-            "tokens": 334,
+            "lines": 36,
+            "tokens": 473,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10602,8 +10650,8 @@
           }
         },
         "total": {
-          "lines": 822,
-          "tokens": 13216,
+          "lines": 830,
+          "tokens": 14183,
           "sources": 15,
           "clones": 0,
           "duplicatedLines": 0,
@@ -10932,14 +10980,14 @@
       }
     },
     "total": {
-      "lines": 135803,
-      "tokens": 1290973,
-      "sources": 896,
-      "clones": 273,
-      "duplicatedLines": 3680,
-      "duplicatedTokens": 37344,
-      "percentage": 2.71,
-      "percentageTokens": 2.89,
+      "lines": 137684,
+      "tokens": 1309930,
+      "sources": 900,
+      "clones": 275,
+      "duplicatedLines": 3667,
+      "duplicatedTokens": 37310,
+      "percentage": 2.66,
+      "percentageTokens": 2.85,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
@@ -11024,53 +11072,53 @@
       "tokens": 123,
       "firstFile": {
         "name": "web/src/components/ui/Section.tsx",
-        "start": 116,
-        "end": 127,
+        "start": 118,
+        "end": 129,
         "startLoc": {
-          "line": 116,
+          "line": 118,
           "column": 25,
-          "position": 1132
+          "position": 1150
         },
         "endLoc": {
-          "line": 127,
+          "line": 129,
           "column": 66,
-          "position": 1255
+          "position": 1273
         }
       },
       "secondFile": {
         "name": "web/src/components/ui/Section.tsx",
-        "start": 93,
-        "end": 104,
+        "start": 95,
+        "end": 106,
         "startLoc": {
-          "line": 93,
+          "line": 95,
           "column": 17,
-          "position": 876
+          "position": 894
         },
         "endLoc": {
-          "line": 104,
+          "line": 106,
           "column": 78,
-          "position": 999
+          "position": 1017
         }
       }
     },
     {
       "format": "javascript",
-      "lines": 286,
-      "fragment": "}\n      viewBox=\"0 0 24 24\"\n      fill=\"currentColor\"\n      aria-hidden=\"true\"\n    >\n      <rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\" />\n    </svg>\n  );\n}\n\nexport function PauseIcon({ className }: IconProps) {\n  return (\n    <svg\n      className={className}\n      viewBox=\"0 0 24 24\"\n      fill=\"currentColor\"\n      aria-hidden=\"true\"\n    >\n      <rect x=\"6\" y=\"5\" width=\"4\" height=\"14\" rx=\"1\" />\n      <rect x=\"14\" y=\"5\" width=\"4\" height=\"14\" rx=\"1\" />\n    </svg>\n  );\n}\n\nexport function SendIcon({ className }: IconProps) {\n  return (\n    <svg\n      className={className}\n      viewBox=\"0 0 24 24\"\n      fill=\"none\"\n      stroke=\"currentColor\"\n      strokeWidth=\"2.2\"\n      strokeLinecap=\"round\"\n      strokeLinejoin=\"round\"\n      aria-hidden=\"true\"\n    >\n      <path d=\"M12 19V5M5 12l7-7 7 7\" />\n    </svg>\n  );\n}\n\nexport function FolderIcon({ className }: { className?: string }) {\n  return (\n    <Svg className={className}>\n      <path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />\n    </Svg>\n  );\n}\n\nexport function BranchIcon({ className }: { className?: string }) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"6\" cy=\"6\" r=\"2.5\" />\n      <circle cx=\"6\" cy=\"18\" r=\"2.5\" />\n      <circle cx=\"18\" cy=\"6\" r=\"2.5\" />\n      <path d=\"M6 8.5v7\" />\n      <path d=\"M18 8.5a8 8 0 0 1-8 8\" />\n    </Svg>\n  );\n}\n\nexport function RepoIcon({ className }: { className?: string }) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"6\" cy=\"6\" r=\"3\" />\n      <circle cx=\"6\" cy=\"18\" r=\"3\" />\n      <circle cx=\"18\" cy=\"6\" r=\"3\" />\n      <path d=\"M6 9v6\" />\n      <path d=\"M18 9a9 9 0 0 1-9 9\" />\n    </Svg>\n  );\n}\n\nexport function ServerIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"2\" y=\"3\" width=\"20\" height=\"7\" rx=\"2\" />\n      <rect x=\"2\" y=\"14\" width=\"20\" height=\"7\" rx=\"2\" />\n      <path d=\"M6 6.5h.01\" />\n      <path d=\"M6 17.5h.01\" />\n    </Svg>\n  );\n}\n\nexport function PuzzleIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M8 4h3a2 2 0 1 1 4 0h3v4a2 2 0 1 1 0 4v4H8v-4a2 2 0 1 0 0-4V4z\" />\n    </Svg>\n  );\n}\n\nexport function GlobeIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"12\" cy=\"12\" r=\"9\" />\n      <path d=\"M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z\" />\n    </Svg>\n  );\n}\n\nexport function PaperclipIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48\" />\n    </Svg>\n  );\n}\n\nexport function CopyIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\" />\n      <path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\" />\n    </Svg>\n  );\n}\n\nexport function CheckIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M20 6L9 17l-5-5\" />\n    </Svg>\n  );\n}\n\nexport function ReplayIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8\" />\n      <path d=\"M21 3v5h-5\" />\n    </Svg>\n  );\n}\n\n/** Double chevron pointing left: folds a side rail. */\nexport function ChevronsLeftIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M11 17l-5-5 5-5M18 17l-5-5 5-5\" />\n    </Svg>\n  );\n}\n\n/** Double chevron pointing right: unfolds a side rail. */\nexport function ChevronsRightIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M13 17l5-5-5-5M6 17l5-5-5-5\" />\n    </Svg>\n  );\n}\n\n/** Right chevron: the open/close affordance of a `Panel` header. */\nexport function ChevronRightIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M9 18l6-6-6-6\" />\n    </Svg>\n  );\n}\n\n/** Down chevron: jumps a thread back to its latest message. */\nexport function ChevronDownIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M6 9l6 6 6-6\" />\n    </Svg>\n  );\n}\n\n/** Arrow pointing up-right: opens a linked page, here a child session. */\nexport function ExternalIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M7 17L17 7\" />\n      <path d=\"M7 7h10v10\" />\n    </Svg>\n  );\n}\n\n/** A circled \"i\": opens an explanation, its tooltip says it in short. */\nexport function InfoIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"12\" cy=\"12\" r=\"10\" />\n      <path d=\"M12 16v-4\" />\n      <path d=\"M12 8h.01\" />\n    </Svg>\n  );\n}\n\n/** Play triangle: starts an idea. */\nexport function PlayIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M8 5v14l11-7z\" />\n    </Svg>\n  );\n}\n\n/** Curved left arrow: answers a question. */\nexport function ReplyIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M9 14L4 9l5-5\" />\n      <path d=\"M4 9h10a6 6 0 0 1 6 6v1\" />\n    </Svg>\n  );\n}\n\n/** Eye: reviews a session. */\nexport function EyeIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z\" />\n      <circle cx=\"12\" cy=\"12\" r=\"3\" />\n    </Svg>\n  );\n}\n\n/** Moon: night mode, the queue runs with the human away. */\nexport function MoonIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z\" />\n    </Svg>\n  );\n}\n\n/** Up chevron: moves an idea up. */\n/** Circular arrow: reloads the preview. */\nexport function RefreshIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21 12a9 9 0 1 1-2.64-6.36\" />\n      <path d=\"M21 3v6h-6\" />\n    </Svg>\n  );\n}\n\nexport function KeyboardIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"2\" y=\"6\" width=\"20\" height=\"12\" rx=\"2\" />\n      <path d=\"M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01\" />\n      <path d=\"M9 14h6\" />\n    </Svg>\n  );\n}\n\nexport function CompressIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7\" />\n    </Svg>\n  );\n}\n\nexport function SplitIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\" />\n      <path d=\"M12 4v16\" />\n    </Svg>\n  );\n}\n\nexport function LocateIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"12\" cy=\"12\" r=\"10\" />\n      <path d=\"M22 12h-4M6 12H2M12 6V2M12 22v-4\" />\n    </Svg>\n  );\n}\n\nexport function StarIcon({\n  className,\n  filled,\n}: IconProps & { filled?: boolean }) {\n  return (\n    <svg\n      className={className}\n      viewBox=\"0 0 24 24\"\n      fill={filled ",
-      "tokens": 2394,
+      "lines": 296,
+      "fragment": "}\n      viewBox=\"0 0 24 24\"\n      fill=\"currentColor\"\n      aria-hidden=\"true\"\n    >\n      <rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\" />\n    </svg>\n  );\n}\n\nexport function PauseIcon({ className }: IconProps) {\n  return (\n    <svg\n      className={className}\n      viewBox=\"0 0 24 24\"\n      fill=\"currentColor\"\n      aria-hidden=\"true\"\n    >\n      <rect x=\"6\" y=\"5\" width=\"4\" height=\"14\" rx=\"1\" />\n      <rect x=\"14\" y=\"5\" width=\"4\" height=\"14\" rx=\"1\" />\n    </svg>\n  );\n}\n\nexport function SendIcon({ className }: IconProps) {\n  return (\n    <svg\n      className={className}\n      viewBox=\"0 0 24 24\"\n      fill=\"none\"\n      stroke=\"currentColor\"\n      strokeWidth=\"2.2\"\n      strokeLinecap=\"round\"\n      strokeLinejoin=\"round\"\n      aria-hidden=\"true\"\n    >\n      <path d=\"M12 19V5M5 12l7-7 7 7\" />\n    </svg>\n  );\n}\n\nexport function FolderIcon({ className }: { className?: string }) {\n  return (\n    <Svg className={className}>\n      <path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />\n    </Svg>\n  );\n}\n\nexport function BranchIcon({ className }: { className?: string }) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"6\" cy=\"6\" r=\"2.5\" />\n      <circle cx=\"6\" cy=\"18\" r=\"2.5\" />\n      <circle cx=\"18\" cy=\"6\" r=\"2.5\" />\n      <path d=\"M6 8.5v7\" />\n      <path d=\"M18 8.5a8 8 0 0 1-8 8\" />\n    </Svg>\n  );\n}\n\nexport function RepoIcon({ className }: { className?: string }) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"6\" cy=\"6\" r=\"3\" />\n      <circle cx=\"6\" cy=\"18\" r=\"3\" />\n      <circle cx=\"18\" cy=\"6\" r=\"3\" />\n      <path d=\"M6 9v6\" />\n      <path d=\"M18 9a9 9 0 0 1-9 9\" />\n    </Svg>\n  );\n}\n\nexport function ServerIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"2\" y=\"3\" width=\"20\" height=\"7\" rx=\"2\" />\n      <rect x=\"2\" y=\"14\" width=\"20\" height=\"7\" rx=\"2\" />\n      <path d=\"M6 6.5h.01\" />\n      <path d=\"M6 17.5h.01\" />\n    </Svg>\n  );\n}\n\nexport function PuzzleIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M8 4h3a2 2 0 1 1 4 0h3v4a2 2 0 1 1 0 4v4H8v-4a2 2 0 1 0 0-4V4z\" />\n    </Svg>\n  );\n}\n\nexport function GlobeIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"12\" cy=\"12\" r=\"9\" />\n      <path d=\"M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z\" />\n    </Svg>\n  );\n}\n\nexport function PaperclipIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48\" />\n    </Svg>\n  );\n}\n\nexport function CopyIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\" />\n      <path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\" />\n    </Svg>\n  );\n}\n\nexport function CheckIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M20 6L9 17l-5-5\" />\n    </Svg>\n  );\n}\n\nexport function ReplayIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8\" />\n      <path d=\"M21 3v5h-5\" />\n    </Svg>\n  );\n}\n\n/** Double chevron pointing left: folds a side rail. */\nexport function ChevronsLeftIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M11 17l-5-5 5-5M18 17l-5-5 5-5\" />\n    </Svg>\n  );\n}\n\n/** Double chevron pointing right: unfolds a side rail. */\nexport function ChevronsRightIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M13 17l5-5-5-5M6 17l5-5-5-5\" />\n    </Svg>\n  );\n}\n\n/** Right chevron: the open/close affordance of a `Panel` header. */\nexport function ChevronRightIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M9 18l6-6-6-6\" />\n    </Svg>\n  );\n}\n\n/** Down chevron: jumps a thread back to its latest message. */\nexport function ChevronDownIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M6 9l6 6 6-6\" />\n    </Svg>\n  );\n}\n\n/** Arrow pointing up-right: opens a linked page, here a child session. */\nexport function ExternalIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M7 17L17 7\" />\n      <path d=\"M7 7h10v10\" />\n    </Svg>\n  );\n}\n\n/** A circled \"i\": opens an explanation, its tooltip says it in short. */\nexport function InfoIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"12\" cy=\"12\" r=\"10\" />\n      <path d=\"M12 16v-4\" />\n      <path d=\"M12 8h.01\" />\n    </Svg>\n  );\n}\n\n/** Play triangle: starts an idea. */\nexport function PlayIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M8 5v14l11-7z\" />\n    </Svg>\n  );\n}\n\n/** Play triangle with a bar: tests a workflow step by step. */\nexport function StepIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M5 5v14l9-7z\" />\n      <line x1=\"17\" y1=\"5\" x2=\"17\" y2=\"19\" />\n    </Svg>\n  );\n}\n\n/** Curved left arrow: answers a question. */\nexport function ReplyIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M9 14L4 9l5-5\" />\n      <path d=\"M4 9h10a6 6 0 0 1 6 6v1\" />\n    </Svg>\n  );\n}\n\n/** Eye: reviews a session. */\nexport function EyeIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z\" />\n      <circle cx=\"12\" cy=\"12\" r=\"3\" />\n    </Svg>\n  );\n}\n\n/** Moon: night mode, the queue runs with the human away. */\nexport function MoonIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z\" />\n    </Svg>\n  );\n}\n\n/** Up chevron: moves an idea up. */\n/** Circular arrow: reloads the preview. */\nexport function RefreshIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M21 12a9 9 0 1 1-2.64-6.36\" />\n      <path d=\"M21 3v6h-6\" />\n    </Svg>\n  );\n}\n\nexport function KeyboardIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"2\" y=\"6\" width=\"20\" height=\"12\" rx=\"2\" />\n      <path d=\"M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01\" />\n      <path d=\"M9 14h6\" />\n    </Svg>\n  );\n}\n\nexport function CompressIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <path d=\"M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7\" />\n    </Svg>\n  );\n}\n\nexport function SplitIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\" />\n      <path d=\"M12 4v16\" />\n    </Svg>\n  );\n}\n\nexport function LocateIcon({ className }: IconProps) {\n  return (\n    <Svg className={className}>\n      <circle cx=\"12\" cy=\"12\" r=\"10\" />\n      <path d=\"M22 12h-4M6 12H2M12 6V2M12 22v-4\" />\n    </Svg>\n  );\n}\n\nexport function StarIcon({\n  className,\n  filled,\n}: IconProps & { filled?: boolean }) {\n  return (\n    <svg\n      className={className}\n      viewBox=\"0 0 24 24\"\n      fill={filled ",
+      "tokens": 2484,
       "firstFile": {
         "name": "web/src/components/ui/Icons.tsx",
         "start": 145,
-        "end": 430,
+        "end": 440,
         "startLoc": {
           "line": 145,
           "column": 27,
           "position": 1033
         },
         "endLoc": {
-          "line": 430,
+          "line": 440,
           "column": 20,
-          "position": 3427
+          "position": 3517
         }
       },
       "secondFile": {
@@ -11096,17 +11144,17 @@
       "tokens": 2433,
       "firstFile": {
         "name": "web/src/components/ui/Icons.tsx",
-        "start": 450,
-        "end": 734,
+        "start": 460,
+        "end": 744,
         "startLoc": {
-          "line": 450,
+          "line": 460,
           "column": 45,
-          "position": 3561
+          "position": 3651
         },
         "endLoc": {
-          "line": 734,
+          "line": 744,
           "column": 31,
-          "position": 5994
+          "position": 6084
         }
       },
       "secondFile": {
@@ -11132,32 +11180,32 @@
       "tokens": 104,
       "firstFile": {
         "name": "web/src/components/ui/Icons.tsx",
-        "start": 442,
-        "end": 457,
+        "start": 452,
+        "end": 467,
         "startLoc": {
-          "line": 442,
+          "line": 452,
           "column": 26,
-          "position": 3498
+          "position": 3588
         },
         "endLoc": {
-          "line": 457,
+          "line": 467,
           "column": 152,
-          "position": 3602
+          "position": 3692
         }
       },
       "secondFile": {
         "name": "web/src/components/ui/Icons.tsx",
-        "start": 422,
-        "end": 437,
+        "start": 432,
+        "end": 447,
         "startLoc": {
-          "line": 422,
+          "line": 432,
           "column": 25,
-          "position": 3372
+          "position": 3462
         },
         "endLoc": {
-          "line": 437,
+          "line": 447,
           "column": 108,
-          "position": 3476
+          "position": 3566
         }
       }
     },
@@ -11168,32 +11216,32 @@
       "tokens": 74,
       "firstFile": {
         "name": "web/src/components/ui/Icons.tsx",
-        "start": 657,
-        "end": 669,
+        "start": 667,
+        "end": 679,
         "startLoc": {
-          "line": 657,
+          "line": 667,
           "column": 30,
-          "position": 5221
+          "position": 5311
         },
         "endLoc": {
-          "line": 669,
+          "line": 679,
           "column": 12,
-          "position": 5295
+          "position": 5385
         }
       },
       "secondFile": {
         "name": "web/src/components/ui/Icons.tsx",
-        "start": 637,
-        "end": 649,
+        "start": 647,
+        "end": 659,
         "startLoc": {
-          "line": 637,
+          "line": 647,
           "column": 27,
-          "position": 5094
+          "position": 5184
         },
         "endLoc": {
-          "line": 649,
+          "line": 659,
           "column": 12,
-          "position": 5168
+          "position": 5258
         }
       }
     },
@@ -12068,32 +12116,32 @@
       "tokens": 112,
       "firstFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 143,
-        "end": 151,
+        "start": 149,
+        "end": 157,
         "startLoc": {
-          "line": 143,
+          "line": 149,
           "column": 48,
-          "position": 2178
+          "position": 2271
         },
         "endLoc": {
-          "line": 151,
+          "line": 157,
           "column": 57,
-          "position": 2290
+          "position": 2383
         }
       },
       "secondFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 127,
-        "end": 135,
+        "start": 133,
+        "end": 141,
         "startLoc": {
-          "line": 127,
+          "line": 133,
           "column": 67,
-          "position": 1961
+          "position": 2054
         },
         "endLoc": {
-          "line": 135,
+          "line": 141,
           "column": 43,
-          "position": 2073
+          "position": 2166
         }
       }
     },
@@ -12104,32 +12152,32 @@
       "tokens": 77,
       "firstFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 223,
-        "end": 228,
+        "start": 229,
+        "end": 234,
         "startLoc": {
-          "line": 223,
+          "line": 229,
           "column": 71,
-          "position": 3223
+          "position": 3316
         },
         "endLoc": {
-          "line": 228,
+          "line": 234,
           "column": 27,
-          "position": 3300
+          "position": 3393
         }
       },
       "secondFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 80,
-        "end": 85,
+        "start": 86,
+        "end": 91,
         "startLoc": {
-          "line": 80,
+          "line": 86,
           "column": 63,
-          "position": 1259
+          "position": 1352
         },
         "endLoc": {
-          "line": 85,
+          "line": 91,
           "column": 27,
-          "position": 1336
+          "position": 1429
         }
       }
     },
@@ -12140,32 +12188,32 @@
       "tokens": 77,
       "firstFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 258,
-        "end": 263,
+        "start": 264,
+        "end": 269,
         "startLoc": {
-          "line": 258,
+          "line": 264,
           "column": 77,
-          "position": 3607
+          "position": 3700
         },
         "endLoc": {
-          "line": 263,
+          "line": 269,
           "column": 27,
-          "position": 3684
+          "position": 3777
         }
       },
       "secondFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 80,
-        "end": 85,
+        "start": 86,
+        "end": 91,
         "startLoc": {
-          "line": 80,
+          "line": 86,
           "column": 63,
-          "position": 1259
+          "position": 1352
         },
         "endLoc": {
-          "line": 85,
+          "line": 91,
           "column": 27,
-          "position": 1336
+          "position": 1429
         }
       }
     },
@@ -12176,32 +12224,32 @@
       "tokens": 73,
       "firstFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 269,
-        "end": 275,
+        "start": 275,
+        "end": 281,
         "startLoc": {
-          "line": 269,
+          "line": 275,
           "column": 5,
-          "position": 3740
+          "position": 3833
         },
         "endLoc": {
-          "line": 275,
+          "line": 281,
           "column": 23,
-          "position": 3813
+          "position": 3906
         }
       },
       "secondFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 234,
-        "end": 240,
+        "start": 240,
+        "end": 246,
         "startLoc": {
-          "line": 234,
+          "line": 240,
           "column": 5,
-          "position": 3356
+          "position": 3449
         },
         "endLoc": {
-          "line": 240,
+          "line": 246,
           "column": 21,
-          "position": 3429
+          "position": 3522
         }
       }
     },
@@ -12212,32 +12260,32 @@
       "tokens": 83,
       "firstFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 357,
-        "end": 362,
+        "start": 363,
+        "end": 368,
         "startLoc": {
-          "line": 357,
+          "line": 363,
           "column": 63,
-          "position": 4913
+          "position": 5006
         },
         "endLoc": {
-          "line": 362,
+          "line": 368,
           "column": 45,
-          "position": 4996
+          "position": 5089
         }
       },
       "secondFile": {
         "name": "web/src/lib/fold.test.ts",
-        "start": 80,
-        "end": 85,
+        "start": 86,
+        "end": 91,
         "startLoc": {
-          "line": 80,
+          "line": 86,
           "column": 63,
-          "position": 1259
+          "position": 1352
         },
         "endLoc": {
-          "line": 85,
+          "line": 91,
           "column": 46,
-          "position": 1342
+          "position": 1435
         }
       }
     },
@@ -12608,32 +12656,32 @@
       "tokens": 68,
       "firstFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 323,
-        "end": 332,
+        "start": 330,
+        "end": 339,
         "startLoc": {
-          "line": 323,
+          "line": 330,
           "column": 14,
-          "position": 2780
+          "position": 2834
         },
         "endLoc": {
-          "line": 332,
+          "line": 339,
           "column": 43,
-          "position": 2848
+          "position": 2902
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 287,
-        "end": 295,
+        "start": 294,
+        "end": 302,
         "startLoc": {
-          "line": 287,
+          "line": 294,
           "column": 47,
-          "position": 2456
+          "position": 2507
         },
         "endLoc": {
-          "line": 295,
+          "line": 302,
           "column": 35,
-          "position": 2522
+          "position": 2573
         }
       }
     },
@@ -12644,32 +12692,32 @@
       "tokens": 89,
       "firstFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 332,
-        "end": 342,
+        "start": 339,
+        "end": 349,
         "startLoc": {
-          "line": 332,
+          "line": 339,
           "column": 43,
-          "position": 2849
+          "position": 2903
         },
         "endLoc": {
-          "line": 342,
+          "line": 349,
           "column": 30,
-          "position": 2938
+          "position": 2992
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 295,
-        "end": 305,
+        "start": 302,
+        "end": 312,
         "startLoc": {
-          "line": 295,
+          "line": 302,
           "column": 35,
-          "position": 2523
+          "position": 2574
         },
         "endLoc": {
-          "line": 305,
+          "line": 312,
           "column": 29,
-          "position": 2612
+          "position": 2663
         }
       }
     },
@@ -12680,32 +12728,32 @@
       "tokens": 84,
       "firstFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 587,
-        "end": 597,
+        "start": 594,
+        "end": 604,
         "startLoc": {
-          "line": 587,
+          "line": 594,
           "column": 13,
-          "position": 4908
+          "position": 4977
         },
         "endLoc": {
-          "line": 597,
+          "line": 604,
           "column": 18,
-          "position": 4992
+          "position": 5061
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 364,
-        "end": 375,
+        "start": 371,
+        "end": 382,
         "startLoc": {
-          "line": 364,
+          "line": 371,
           "column": 13,
-          "position": 3093
+          "position": 3150
         },
         "endLoc": {
-          "line": 375,
+          "line": 382,
           "column": 17,
-          "position": 3178
+          "position": 3235
         }
       }
     },
@@ -13019,17 +13067,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 235,
-        "end": 243,
+        "start": 242,
+        "end": 250,
         "startLoc": {
-          "line": 235,
+          "line": 242,
           "column": 34,
-          "position": 1990
+          "position": 2035
         },
         "endLoc": {
-          "line": 243,
+          "line": 250,
           "column": 15,
-          "position": 2071
+          "position": 2116
         }
       }
     },
@@ -13040,32 +13088,32 @@
       "tokens": 90,
       "firstFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 398,
-        "end": 405,
+        "start": 412,
+        "end": 419,
         "startLoc": {
-          "line": 398,
+          "line": 412,
           "column": 31,
-          "position": 5033
+          "position": 5209
         },
         "endLoc": {
-          "line": 405,
+          "line": 419,
           "column": 14,
-          "position": 5123
+          "position": 5299
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 362,
-        "end": 369,
+        "start": 376,
+        "end": 383,
         "startLoc": {
-          "line": 362,
+          "line": 376,
           "column": 29,
-          "position": 4627
+          "position": 4803
         },
         "endLoc": {
-          "line": 369,
+          "line": 383,
           "column": 16,
-          "position": 4717
+          "position": 4893
         }
       }
     },
@@ -13076,32 +13124,32 @@
       "tokens": 130,
       "firstFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 412,
-        "end": 422,
+        "start": 426,
+        "end": 436,
         "startLoc": {
-          "line": 412,
+          "line": 426,
           "column": 35,
-          "position": 5220
+          "position": 5396
         },
         "endLoc": {
-          "line": 422,
+          "line": 436,
           "column": 12,
-          "position": 5350
+          "position": 5526
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 391,
-        "end": 401,
+        "start": 405,
+        "end": 415,
         "startLoc": {
-          "line": 391,
+          "line": 405,
           "column": 32,
-          "position": 4952
+          "position": 5128
         },
         "endLoc": {
-          "line": 401,
+          "line": 415,
           "column": 15,
-          "position": 5082
+          "position": 5258
         }
       }
     },
@@ -13112,17 +13160,17 @@
       "tokens": 76,
       "firstFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 470,
-        "end": 475,
+        "start": 484,
+        "end": 489,
         "startLoc": {
-          "line": 470,
+          "line": 484,
           "column": 33,
-          "position": 5964
+          "position": 6140
         },
         "endLoc": {
-          "line": 475,
+          "line": 489,
           "column": 7,
-          "position": 6040
+          "position": 6216
         }
       },
       "secondFile": {
@@ -13224,13 +13272,13 @@
         "end": 10,
         "startLoc": {
           "line": 5,
-          "column": 52,
-          "position": 36
+          "column": 68,
+          "position": 39
         },
         "endLoc": {
           "line": 10,
           "column": 10,
-          "position": 101
+          "position": 104
         }
       },
       "secondFile": {
@@ -13261,12 +13309,12 @@
         "startLoc": {
           "line": 14,
           "column": 35,
-          "position": 155
+          "position": 158
         },
         "endLoc": {
           "line": 22,
           "column": 14,
-          "position": 250
+          "position": 253
         }
       },
       "secondFile": {
@@ -13343,17 +13391,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 771,
-        "end": 778,
+        "start": 785,
+        "end": 792,
         "startLoc": {
-          "line": 771,
+          "line": 785,
           "column": 10,
-          "position": 9382
+          "position": 9558
         },
         "endLoc": {
-          "line": 778,
+          "line": 792,
           "column": 24,
-          "position": 9471
+          "position": 9647
         }
       }
     },
@@ -13467,150 +13515,6 @@
     },
     {
       "format": "rust",
-      "lines": 16,
-      "fragment": ");\n        let settings = Settings {\n            llm: LlmSettings {\n                base_url: Some(\"http://localhost\".into()),\n                api_key: None,\n                defaults: ModelParams {\n                    provider: \"local\".into(),\n                    model: \"test\".into(),\n                    max_tokens: 100,\n                    context_window: 1000,\n                    compact_at: 0.85,\n                    reasoning_effort: None,\n                },\n                listed: Vec::new(),\n            },\n            db_path,",
-      "tokens": 123,
-      "firstFile": {
-        "name": "crates/fennec/src/web/routes/mcp_routes.rs",
-        "start": 244,
-        "end": 259,
-        "startLoc": {
-          "line": 244,
-          "column": 97,
-          "position": 2816
-        },
-        "endLoc": {
-          "line": 259,
-          "column": 21,
-          "position": 2939
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/web/routes/session_delete.rs",
-        "start": 137,
-        "end": 531,
-        "startLoc": {
-          "line": 137,
-          "column": 44,
-          "position": 1724
-        },
-        "endLoc": {
-          "line": 531,
-          "column": 21,
-          "position": 5176
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 28,
-      "fragment": ",\n        };\n        let notifier = Arc::new(Notifier::default());\n        App {\n            turns: Turns::new(settings.clone(), notifier.clone()),\n            settings,\n            port: 0,\n            listen: std::net::Ipv4Addr::LOCALHOST.into(),\n            notifier: notifier.clone(),\n            skill_folds: Mutex::new(HashMap::new()),\n            idea_reports: Mutex::new(HashMap::new()),\n            idea_queues: Mutex::default(),\n            worktree_scan: Mutex::default(),\n            server_runs: Arc::new(Mutex::new(HashMap::new())),\n            plugins: Arc::new(crate::plugins::PluginManager::new(\n                crate::sandbox::Sandbox::Off,\n                std::env::temp_dir(),\n                std::env::temp_dir(),\n                notifier,\n            )),\n            agents_home: std::env::temp_dir(),\n            logins: crate::web::login::Logins::default(),\n            update_check: Default::default(),\n            listings: Default::default(),\n        }\n    }\n\n    /// Reads a full HTTP response (head then body) off one end of a pipe.",
-      "tokens": 317,
-      "firstFile": {
-        "name": "crates/fennec/src/web/routes/mcp_routes.rs",
-        "start": 259,
-        "end": 286,
-        "startLoc": {
-          "line": 259,
-          "column": 20,
-          "position": 2939
-        },
-        "endLoc": {
-          "line": 286,
-          "column": 75,
-          "position": 3256
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/web/views/idea_board.rs",
-        "start": 531,
-        "end": 557,
-        "startLoc": {
-          "line": 531,
-          "column": 47,
-          "position": 5185
-        },
-        "endLoc": {
-          "line": 557,
-          "column": 12,
-          "position": 5501
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 15,
-      "fragment": "],\n            ..Default::default()\n        };\n        prefs.sandbox = SandboxPrefs {\n            enabled: false,\n            network: false,\n        };\n        store.save_preferences(&prefs).unwrap();\n\n        let req = Request {\n            method: \"POST\".into(),\n            path: \"/api/settings/mcp/connect\".into(),\n            query: String::new(),\n            headers: Vec::new(),\n            body: serde_json::to_vec(&json!({ \"name\": \"a\"",
-      "tokens": 134,
-      "firstFile": {
-        "name": "crates/fennec/src/web/routes/mcp_routes.rs",
-        "start": 378,
-        "end": 392,
-        "startLoc": {
-          "line": 378,
-          "column": 13,
-          "position": 4334
-        },
-        "endLoc": {
-          "line": 392,
-          "column": 58,
-          "position": 4468
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/web/routes/mcp_routes.rs",
-        "start": 328,
-        "end": 342,
-        "startLoc": {
-          "line": 328,
-          "column": 14,
-          "position": 3792
-        },
-        "endLoc": {
-          "line": 342,
-          "column": 61,
-          "position": 3926
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 8,
-      "fragment": "})).unwrap(),\n        };\n        let (mut writer, mut reader) = pipe();\n        connect(&app, &req, &mut writer).unwrap();\n        drop(writer);\n        let (status, body) = read_response(&mut reader);\n        assert_eq!(status, 400);\n        assert!(body.contains(\"offered by more than one mcp server\"",
-      "tokens": 101,
-      "firstFile": {
-        "name": "crates/fennec/src/web/routes/mcp_routes.rs",
-        "start": 392,
-        "end": 399,
-        "startLoc": {
-          "line": 392,
-          "column": 59,
-          "position": 4470
-        },
-        "endLoc": {
-          "line": 399,
-          "column": 68,
-          "position": 4571
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/web/routes/mcp_routes.rs",
-        "start": 342,
-        "end": 349,
-        "startLoc": {
-          "line": 342,
-          "column": 62,
-          "position": 3928
-        },
-        "endLoc": {
-          "line": 349,
-          "column": 62,
-          "position": 4029
-        }
-      }
-    },
-    {
-      "format": "rust",
       "lines": 8,
       "fragment": "(app: &App, req: &Request, stream: &mut TcpStream) -> Result<(), HttpError> {\n    let body = req.json()?;\n    let name = body[\"name\"].as_str().unwrap_or(\"\").to_string();\n    if name.is_empty() {\n        return error(stream, 400, \"name is empty\");\n    }\n    let store = app.store()?;\n    let prefs",
       "tokens": 125,
@@ -13641,7 +13545,7 @@
         "endLoc": {
           "line": 129,
           "column": 12,
-          "position": 1403
+          "position": 1376
         }
       }
     },
@@ -13652,32 +13556,32 @@
       "tokens": 99,
       "firstFile": {
         "name": "crates/fennec/src/web/routes/integration.rs",
-        "start": 390,
-        "end": 400,
+        "start": 392,
+        "end": 402,
         "startLoc": {
-          "line": 390,
+          "line": 392,
           "column": 24,
-          "position": 3927
+          "position": 3959
         },
         "endLoc": {
-          "line": 400,
+          "line": 402,
           "column": 7,
-          "position": 4026
+          "position": 4058
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/integration.rs",
-        "start": 337,
-        "end": 347,
+        "start": 339,
+        "end": 349,
         "startLoc": {
-          "line": 337,
+          "line": 339,
           "column": 15,
-          "position": 3391
+          "position": 3423
         },
         "endLoc": {
-          "line": 347,
+          "line": 349,
           "column": 8,
-          "position": 3490
+          "position": 3522
         }
       }
     },
@@ -14552,17 +14456,17 @@
       "tokens": 118,
       "firstFile": {
         "name": "crates/fennec/src/web/jobs/commit_subject.rs",
-        "start": 21,
-        "end": 28,
+        "start": 22,
+        "end": 29,
         "startLoc": {
-          "line": 21,
+          "line": 22,
           "column": 27,
-          "position": 183
+          "position": 191
         },
         "endLoc": {
-          "line": 28,
+          "line": 29,
           "column": 16,
-          "position": 301
+          "position": 309
         }
       },
       "secondFile": {
@@ -14588,17 +14492,17 @@
       "tokens": 163,
       "firstFile": {
         "name": "crates/fennec/src/web/jobs/commit_subject.rs",
-        "start": 28,
-        "end": 43,
+        "start": 29,
+        "end": 44,
         "startLoc": {
-          "line": 28,
-          "column": 72,
-          "position": 320
+          "line": 29,
+          "column": 78,
+          "position": 331
         },
         "endLoc": {
-          "line": 43,
+          "line": 44,
           "column": 7,
-          "position": 483
+          "position": 494
         }
       },
       "secondFile": {
@@ -14660,17 +14564,17 @@
       "tokens": 72,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 185,
-        "end": 192,
+        "start": 202,
+        "end": 209,
         "startLoc": {
-          "line": 185,
+          "line": 202,
           "column": 13,
-          "position": 1528
+          "position": 1706
         },
         "endLoc": {
-          "line": 192,
+          "line": 209,
           "column": 38,
-          "position": 1600
+          "position": 1778
         }
       },
       "secondFile": {
@@ -14696,27 +14600,27 @@
       "tokens": 86,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 216,
-        "end": 226,
+        "start": 233,
+        "end": 243,
         "startLoc": {
-          "line": 216,
+          "line": 233,
           "column": 39,
-          "position": 1796
+          "position": 1974
         },
         "endLoc": {
-          "line": 226,
+          "line": 243,
           "column": 37,
-          "position": 1882
+          "position": 2060
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 182,
+        "start": 199,
         "end": 112,
         "startLoc": {
-          "line": 182,
+          "line": 199,
           "column": 55,
-          "position": 1514
+          "position": 1692
         },
         "endLoc": {
           "line": 112,
@@ -14732,17 +14636,17 @@
       "tokens": 99,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 306,
-        "end": 317,
+        "start": 323,
+        "end": 334,
         "startLoc": {
-          "line": 306,
+          "line": 323,
           "column": 59,
-          "position": 2518
+          "position": 2696
         },
         "endLoc": {
-          "line": 317,
+          "line": 334,
           "column": 11,
-          "position": 2617
+          "position": 2795
         }
       },
       "secondFile": {
@@ -14768,27 +14672,27 @@
       "tokens": 151,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 326,
-        "end": 342,
+        "start": 343,
+        "end": 359,
         "startLoc": {
-          "line": 326,
+          "line": 343,
           "column": 52,
-          "position": 2686
+          "position": 2864
         },
         "endLoc": {
-          "line": 342,
+          "line": 359,
           "column": 18,
-          "position": 2837
+          "position": 3015
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 303,
+        "start": 320,
         "end": 87,
         "startLoc": {
-          "line": 303,
+          "line": 320,
           "column": 44,
-          "position": 2471
+          "position": 2649
         },
         "endLoc": {
           "line": 87,
@@ -14804,27 +14708,27 @@
       "tokens": 88,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 348,
-        "end": 359,
+        "start": 365,
+        "end": 376,
         "startLoc": {
-          "line": 348,
+          "line": 365,
           "column": 40,
-          "position": 2895
+          "position": 3073
         },
         "endLoc": {
-          "line": 359,
+          "line": 376,
           "column": 18,
-          "position": 2983
+          "position": 3161
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 183,
+        "start": 200,
         "end": 114,
         "startLoc": {
-          "line": 183,
+          "line": 200,
           "column": 33,
-          "position": 1521
+          "position": 1699
         },
         "endLoc": {
           "line": 114,
@@ -14840,32 +14744,32 @@
       "tokens": 96,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 365,
-        "end": 378,
+        "start": 382,
+        "end": 395,
         "startLoc": {
-          "line": 365,
+          "line": 382,
           "column": 39,
-          "position": 3040
+          "position": 3218
         },
         "endLoc": {
-          "line": 378,
+          "line": 395,
           "column": 18,
-          "position": 3136
+          "position": 3314
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 348,
-        "end": 229,
+        "start": 365,
+        "end": 246,
         "startLoc": {
-          "line": 348,
+          "line": 365,
           "column": 39,
-          "position": 2894
+          "position": 3072
         },
         "endLoc": {
-          "line": 229,
+          "line": 246,
           "column": 21,
-          "position": 1897
+          "position": 2075
         }
       }
     },
@@ -14876,32 +14780,32 @@
       "tokens": 450,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 397,
-        "end": 449,
+        "start": 414,
+        "end": 466,
         "startLoc": {
-          "line": 397,
+          "line": 414,
           "column": 62,
-          "position": 3252
+          "position": 3430
         },
         "endLoc": {
-          "line": 449,
+          "line": 466,
           "column": 16,
-          "position": 3702
+          "position": 3880
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/workflow/stats.rs",
-        "start": 303,
-        "end": 229,
+        "start": 320,
+        "end": 246,
         "startLoc": {
-          "line": 303,
+          "line": 320,
           "column": 44,
-          "position": 2471
+          "position": 2649
         },
         "endLoc": {
-          "line": 229,
+          "line": 246,
           "column": 21,
-          "position": 1897
+          "position": 2075
         }
       }
     },
@@ -14948,48 +14852,84 @@
       "tokens": 70,
       "firstFile": {
         "name": "crates/fennec/src/domain/preferences/tests.rs",
-        "start": 377,
-        "end": 384,
+        "start": 376,
+        "end": 383,
         "startLoc": {
-          "line": 377,
+          "line": 376,
           "column": 21,
-          "position": 3418
+          "position": 3404
         },
         "endLoc": {
-          "line": 384,
+          "line": 383,
           "column": 16,
-          "position": 3488
+          "position": 3474
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/preferences/tests.rs",
-        "start": 292,
-        "end": 299,
+        "start": 291,
+        "end": 298,
         "startLoc": {
-          "line": 292,
+          "line": 291,
           "column": 22,
-          "position": 2579
+          "position": 2565
         },
         "endLoc": {
-          "line": 299,
+          "line": 298,
           "column": 16,
-          "position": 2649
+          "position": 2635
         }
       }
     },
     {
       "format": "rust",
-      "lines": 24,
-      "fragment": ") -> App {\n    let settings = Settings {\n        llm: LlmSettings {\n            base_url: Some(\"http://localhost\".into()),\n            api_key: None,\n            defaults: ModelParams {\n                provider: \"local\".into(),\n                model: \"test\".into(),\n                max_tokens: 100,\n                context_window: 1000,\n                compact_at: 0.85,\n                reasoning_effort: None,\n            },\n            listed: Vec::new(),\n        },\n        db_path,\n    };\n    let notifier = Arc::new(Notifier::default());\n    App {\n        turns: Turns::new(settings.clone(), notifier.clone()),\n        settings,\n        port: 0,\n        listen: std::net::Ipv4Addr::LOCALHOST.into(),\n        logins",
-      "tokens": 216,
+      "lines": 16,
+      "fragment": ") -> App {\n    let settings = Settings {\n        llm: LlmSettings {\n            base_url: Some(\"http://localhost\".into()),\n            api_key: None,\n            defaults: ModelParams {\n                provider: \"local\".into(),\n                model: \"test\".into(),\n                max_tokens: 100,\n                context_window: 1000,\n                compact_at: 0.85,\n                reasoning_effort: None,\n            },\n            listed: Vec::new(),\n        },\n        db_path,",
+      "tokens": 128,
       "firstFile": {
         "name": "crates/fennec/src/web/test_support.rs",
         "start": 14,
-        "end": 37,
+        "end": 29,
         "startLoc": {
           "line": 14,
           "column": 35,
           "position": 125
+        },
+        "endLoc": {
+          "line": 29,
+          "column": 17,
+          "position": 253
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/web/views/idea_board.rs",
+        "start": 516,
+        "end": 531,
+        "startLoc": {
+          "line": 516,
+          "column": 12,
+          "position": 5048
+        },
+        "endLoc": {
+          "line": 531,
+          "column": 21,
+          "position": 5176
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 9,
+      "fragment": ",\n    };\n    let notifier = Arc::new(Notifier::default());\n    App {\n        turns: Turns::new(settings.clone(), notifier.clone()),\n        settings,\n        port: 0,\n        listen: std::net::Ipv4Addr::LOCALHOST.into(),\n        logins",
+      "tokens": 88,
+      "firstFile": {
+        "name": "crates/fennec/src/web/test_support.rs",
+        "start": 29,
+        "end": 37,
+        "startLoc": {
+          "line": 29,
+          "column": 16,
+          "position": 253
         },
         "endLoc": {
           "line": 37,
@@ -14999,12 +14939,12 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/idea_board.rs",
-        "start": 516,
+        "start": 531,
         "end": 539,
         "startLoc": {
-          "line": 516,
-          "column": 12,
-          "position": 5048
+          "line": 531,
+          "column": 47,
+          "position": 5185
         },
         "endLoc": {
           "line": 539,
@@ -15190,6 +15130,114 @@
           "line": 455,
           "column": 66,
           "position": 4317
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 8,
+      "fragment": "() {\n        let sandbox = Sandbox::Off;\n        let servers = [api_server()];\n        let ctx = ctx(&servers, &sandbox, CommandAccess::ReadWrite);\n        let args = json!({\n            \"server\": \"api\",\n            \"tool\": \"create_issue\",\n            \"arguments\": \"{\\\"title\\\":\\\"x\\\"}\"",
+      "tokens": 85,
+      "firstFile": {
+        "name": "crates/fennec/src/tools/mcp_call.rs",
+        "start": 313,
+        "end": 320,
+        "startLoc": {
+          "line": 313,
+          "column": 43,
+          "position": 2976
+        },
+        "endLoc": {
+          "line": 320,
+          "column": 45,
+          "position": 3061
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/tools/mcp_call.rs",
+        "start": 297,
+        "end": 304,
+        "startLoc": {
+          "line": 297,
+          "column": 42,
+          "position": 2833
+        },
+        "endLoc": {
+          "line": 304,
+          "column": 27,
+          "position": 2918
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 10,
+      "fragment": ")];\n        let ctx = ctx(&servers, &sandbox, CommandAccess::ReadOnly);\n\n        let result = run(\"mcp_call\", &valid_args(), &ctx);\n\n        assert!(error(&result).contains(\"refused in this read-only mode\"));\n    }\n\n    #[test]\n    fn http_read_write_is_not_mode_refused",
+      "tokens": 79,
+      "firstFile": {
+        "name": "crates/fennec/src/tools/mcp_call.rs",
+        "start": 360,
+        "end": 369,
+        "startLoc": {
+          "line": 360,
+          "column": 11,
+          "position": 3436
+        },
+        "endLoc": {
+          "line": 369,
+          "column": 43,
+          "position": 3515
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/tools/mcp_call.rs",
+        "start": 332,
+        "end": 341,
+        "startLoc": {
+          "line": 332,
+          "column": 35,
+          "position": 3164
+        },
+        "endLoc": {
+          "line": 341,
+          "column": 53,
+          "position": 3243
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 7,
+      "fragment": "() {\n        let sandbox = Sandbox::Off;\n        let servers = [api_server()];\n        let ctx = ctx(&servers, &sandbox, CommandAccess::ReadWrite);\n        let args = json!({\n            \"server\": \"api\",\n            \"tools\": [\"nope\"",
+      "tokens": 79,
+      "firstFile": {
+        "name": "crates/fennec/src/tools/mcp_call.rs",
+        "start": 397,
+        "end": 403,
+        "startLoc": {
+          "line": 397,
+          "column": 40,
+          "position": 3806
+        },
+        "endLoc": {
+          "line": 403,
+          "column": 29,
+          "position": 3885
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/tools/mcp_call.rs",
+        "start": 380,
+        "end": 386,
+        "startLoc": {
+          "line": 380,
+          "column": 32,
+          "position": 3625
+        },
+        "endLoc": {
+          "line": 386,
+          "column": 37,
+          "position": 3704
         }
       }
     },
@@ -16280,17 +16328,17 @@
       "tokens": 101,
       "firstFile": {
         "name": "crates/fennec/src/domain/rule_approval.rs",
-        "start": 53,
-        "end": 62,
+        "start": 64,
+        "end": 73,
         "startLoc": {
-          "line": 53,
+          "line": 64,
           "column": 51,
-          "position": 383
+          "position": 501
         },
         "endLoc": {
-          "line": 62,
+          "line": 73,
           "column": 40,
-          "position": 484
+          "position": 602
         }
       },
       "secondFile": {
@@ -16316,17 +16364,17 @@
       "tokens": 111,
       "firstFile": {
         "name": "crates/fennec/src/domain/rule_approval.rs",
-        "start": 136,
-        "end": 150,
+        "start": 147,
+        "end": 161,
         "startLoc": {
-          "line": 136,
+          "line": 147,
           "column": 20,
-          "position": 1131
+          "position": 1249
         },
         "endLoc": {
-          "line": 150,
+          "line": 161,
           "column": 42,
-          "position": 1242
+          "position": 1360
         }
       },
       "secondFile": {
@@ -16388,32 +16436,32 @@
       "tokens": 85,
       "firstFile": {
         "name": "crates/fennec/src/domain/report.rs",
-        "start": 115,
-        "end": 127,
+        "start": 125,
+        "end": 137,
         "startLoc": {
-          "line": 115,
+          "line": 125,
           "column": 74,
-          "position": 942
+          "position": 1036
         },
         "endLoc": {
-          "line": 127,
+          "line": 137,
           "column": 43,
-          "position": 1027
+          "position": 1121
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/event/tests.rs",
-        "start": 124,
-        "end": 136,
+        "start": 125,
+        "end": 137,
         "startLoc": {
-          "line": 124,
+          "line": 125,
           "column": 52,
-          "position": 1029
+          "position": 1041
         },
         "endLoc": {
-          "line": 136,
+          "line": 137,
           "column": 48,
-          "position": 1114
+          "position": 1126
         }
       }
     },
@@ -16496,17 +16544,17 @@
       "tokens": 83,
       "firstFile": {
         "name": "crates/fennec/src/domain/plan.rs",
-        "start": 182,
-        "end": 190,
+        "start": 196,
+        "end": 204,
         "startLoc": {
-          "line": 182,
+          "line": 196,
           "column": 74,
-          "position": 1478
+          "position": 1620
         },
         "endLoc": {
-          "line": 190,
+          "line": 204,
           "column": 53,
-          "position": 1561
+          "position": 1703
         }
       },
       "secondFile": {
@@ -16532,32 +16580,32 @@
       "tokens": 113,
       "firstFile": {
         "name": "crates/fennec/src/domain/plan.rs",
-        "start": 318,
-        "end": 329,
+        "start": 367,
+        "end": 378,
         "startLoc": {
-          "line": 318,
+          "line": 367,
           "column": 17,
-          "position": 2555
+          "position": 2985
         },
         "endLoc": {
-          "line": 329,
+          "line": 378,
           "column": 29,
-          "position": 2668
+          "position": 3098
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/thread_view.rs",
-        "start": 233,
-        "end": 244,
+        "start": 240,
+        "end": 251,
         "startLoc": {
-          "line": 233,
+          "line": 240,
           "column": 39,
-          "position": 1965
+          "position": 2010
         },
         "endLoc": {
-          "line": 244,
+          "line": 251,
           "column": 35,
-          "position": 2077
+          "position": 2122
         }
       }
     },
@@ -16583,17 +16631,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/rule_approval.rs",
-        "start": 107,
-        "end": 120,
+        "start": 118,
+        "end": 131,
         "startLoc": {
-          "line": 107,
+          "line": 118,
           "column": 17,
-          "position": 872
+          "position": 990
         },
         "endLoc": {
-          "line": 120,
+          "line": 131,
           "column": 15,
-          "position": 981
+          "position": 1099
         }
       }
     },
@@ -16964,32 +17012,32 @@
       "tokens": 89,
       "firstFile": {
         "name": "crates/fennec/src/domain/conversation.rs",
-        "start": 634,
-        "end": 644,
+        "start": 635,
+        "end": 645,
         "startLoc": {
-          "line": 634,
+          "line": 635,
           "column": 33,
-          "position": 6046
+          "position": 6058
         },
         "endLoc": {
-          "line": 644,
+          "line": 645,
           "column": 11,
-          "position": 6135
+          "position": 6147
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/event/tests.rs",
-        "start": 292,
-        "end": 302,
+        "start": 293,
+        "end": 303,
         "startLoc": {
-          "line": 292,
+          "line": 293,
           "column": 27,
-          "position": 2325
+          "position": 2337
         },
         "endLoc": {
-          "line": 302,
+          "line": 303,
           "column": 7,
-          "position": 2414
+          "position": 2426
         }
       }
     },
@@ -17000,32 +17048,32 @@
       "tokens": 77,
       "firstFile": {
         "name": "crates/fennec/src/domain/conversation.rs",
-        "start": 763,
-        "end": 772,
+        "start": 764,
+        "end": 773,
         "startLoc": {
-          "line": 763,
+          "line": 764,
           "column": 45,
-          "position": 7316
+          "position": 7328
         },
         "endLoc": {
-          "line": 772,
+          "line": 773,
           "column": 34,
-          "position": 7393
+          "position": 7405
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/conversation.rs",
-        "start": 744,
-        "end": 753,
+        "start": 745,
+        "end": 754,
         "startLoc": {
-          "line": 744,
+          "line": 745,
           "column": 45,
-          "position": 7161
+          "position": 7173
         },
         "endLoc": {
-          "line": 753,
+          "line": 754,
           "column": 35,
-          "position": 7239
+          "position": 7251
         }
       }
     },
@@ -17036,32 +17084,32 @@
       "tokens": 79,
       "firstFile": {
         "name": "crates/fennec/src/domain/conversation.rs",
-        "start": 785,
-        "end": 794,
+        "start": 786,
+        "end": 795,
         "startLoc": {
-          "line": 785,
+          "line": 786,
           "column": 46,
-          "position": 7512
+          "position": 7524
         },
         "endLoc": {
-          "line": 794,
+          "line": 795,
           "column": 37,
-          "position": 7591
+          "position": 7603
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/conversation.rs",
-        "start": 744,
-        "end": 772,
+        "start": 745,
+        "end": 773,
         "startLoc": {
-          "line": 744,
+          "line": 745,
           "column": 45,
-          "position": 7161
+          "position": 7173
         },
         "endLoc": {
-          "line": 772,
+          "line": 773,
           "column": 37,
-          "position": 7395
+          "position": 7407
         }
       }
     },
@@ -17144,17 +17192,17 @@
       "tokens": 98,
       "firstFile": {
         "name": "crates/fennec/src/domain/commit_subject.rs",
-        "start": 190,
-        "end": 201,
+        "start": 209,
+        "end": 220,
         "startLoc": {
-          "line": 190,
+          "line": 209,
           "column": 20,
-          "position": 1835
+          "position": 1997
         },
         "endLoc": {
-          "line": 201,
+          "line": 220,
           "column": 7,
-          "position": 1933
+          "position": 2095
         }
       },
       "secondFile": {
@@ -17427,6 +17475,42 @@
     },
     {
       "format": "rust",
+      "lines": 10,
+      "fragment": "node.label();\n\n    let end = if still_framing(turn, agent, reason, &events[before..]) {\n        nodes::NodeEnd::AgentAsked\n    } else {\n        nodes::agent_end(label, outputs, reason, text, |reminder| {\n            session_send(turn, agent, reminder)\n        })?\n    };\n    Ok",
+      "tokens": 100,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/workflow.rs",
+        "start": 397,
+        "end": 406,
+        "startLoc": {
+          "line": 397,
+          "column": 23,
+          "position": 4101
+        },
+        "endLoc": {
+          "line": 406,
+          "column": 7,
+          "position": 4201
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/workflow.rs",
+        "start": 232,
+        "end": 241,
+        "startLoc": {
+          "line": 232,
+          "column": 17,
+          "position": 2237
+        },
+        "endLoc": {
+          "line": 241,
+          "column": 8,
+          "position": 2337
+        }
+      }
+    },
+    {
+      "format": "rust",
       "lines": 13,
       "fragment": "() {\n        let dir = scratch_dir();\n        let model = Scripted(RefCell::new(vec![\n            reply(\"\", vec![waiver_call()]),\n            reply(\"done\", vec![]),\n        ]));\n        let stop = AtomicBool::new(false);\n        let mut h = Harness::new(Box::new(model), dir.clone(), &stop);\n\n        let reason = run_turn(&mut h.turn(), \"go\", &[]).unwrap();\n        assert_eq!(reason, DoneReason::WaitingForUser);\n\n        answer",
       "tokens": 166,
@@ -17540,32 +17624,32 @@
       "tokens": 87,
       "firstFile": {
         "name": "crates/fennec/src/agent/turn.rs",
-        "start": 178,
-        "end": 185,
+        "start": 179,
+        "end": 186,
         "startLoc": {
-          "line": 178,
+          "line": 179,
           "column": 19,
-          "position": 1591
+          "position": 1602
         },
         "endLoc": {
-          "line": 185,
+          "line": 186,
           "column": 10,
-          "position": 1678
+          "position": 1689
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 633,
-        "end": 639,
+        "start": 647,
+        "end": 653,
         "startLoc": {
-          "line": 633,
+          "line": 647,
           "column": 14,
-          "position": 7793
+          "position": 7969
         },
         "endLoc": {
-          "line": 639,
+          "line": 653,
           "column": 12,
-          "position": 7878
+          "position": 8054
         }
       }
     },
@@ -17576,32 +17660,32 @@
       "tokens": 90,
       "firstFile": {
         "name": "crates/fennec/src/agent/turn.rs",
-        "start": 229,
-        "end": 235,
+        "start": 231,
+        "end": 237,
         "startLoc": {
-          "line": 229,
+          "line": 231,
           "column": 23,
-          "position": 2100
+          "position": 2119
         },
         "endLoc": {
-          "line": 235,
+          "line": 237,
           "column": 79,
-          "position": 2190
+          "position": 2209
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/turn.rs",
-        "start": 162,
-        "end": 168,
+        "start": 163,
+        "end": 169,
         "startLoc": {
-          "line": 162,
+          "line": 163,
           "column": 18,
-          "position": 1392
+          "position": 1403
         },
         "endLoc": {
-          "line": 168,
+          "line": 169,
           "column": 12,
-          "position": 1482
+          "position": 1493
         }
       }
     },
@@ -18095,17 +18179,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 118,
-        "end": 126,
+        "start": 123,
+        "end": 131,
         "startLoc": {
-          "line": 118,
+          "line": 123,
           "column": 26,
-          "position": 793
+          "position": 836
         },
         "endLoc": {
-          "line": 126,
+          "line": 131,
           "column": 17,
-          "position": 904
+          "position": 947
         }
       }
     },
@@ -18131,17 +18215,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 135,
-        "end": 144,
+        "start": 140,
+        "end": 149,
         "startLoc": {
-          "line": 135,
+          "line": 140,
           "column": 32,
-          "position": 985
+          "position": 1028
         },
         "endLoc": {
-          "line": 144,
+          "line": 149,
           "column": 16,
-          "position": 1111
+          "position": 1154
         }
       }
     },
@@ -18167,17 +18251,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 287,
-        "end": 296,
+        "start": 302,
+        "end": 311,
         "startLoc": {
-          "line": 287,
+          "line": 302,
           "column": 34,
-          "position": 2548
+          "position": 2723
         },
         "endLoc": {
-          "line": 296,
+          "line": 311,
           "column": 55,
-          "position": 2645
+          "position": 2820
         }
       }
     },
@@ -18203,17 +18287,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 302,
-        "end": 333,
+        "start": 317,
+        "end": 348,
         "startLoc": {
-          "line": 302,
+          "line": 317,
           "column": 50,
-          "position": 2742
+          "position": 2917
         },
         "endLoc": {
-          "line": 333,
+          "line": 348,
           "column": 64,
-          "position": 3079
+          "position": 3254
         }
       }
     },
@@ -18239,17 +18323,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 380,
-        "end": 390,
+        "start": 395,
+        "end": 405,
         "startLoc": {
-          "line": 380,
+          "line": 395,
           "column": 38,
-          "position": 3673
+          "position": 3848
         },
         "endLoc": {
-          "line": 390,
+          "line": 405,
           "column": 23,
-          "position": 3757
+          "position": 3932
         }
       }
     },
@@ -18275,17 +18359,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 391,
-        "end": 398,
+        "start": 406,
+        "end": 413,
         "startLoc": {
-          "line": 391,
+          "line": 406,
           "column": 70,
-          "position": 3787
+          "position": 3962
         },
         "endLoc": {
-          "line": 398,
+          "line": 413,
           "column": 32,
-          "position": 3863
+          "position": 4038
         }
       }
     },
@@ -18311,17 +18395,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 399,
-        "end": 406,
+        "start": 414,
+        "end": 421,
         "startLoc": {
-          "line": 399,
+          "line": 414,
           "column": 76,
-          "position": 3893
+          "position": 4068
         },
         "endLoc": {
-          "line": 406,
+          "line": 421,
           "column": 34,
-          "position": 3969
+          "position": 4144
         }
       }
     },
@@ -18980,32 +19064,32 @@
       "tokens": 71,
       "firstFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 485,
-        "end": 490,
+        "start": 528,
+        "end": 533,
         "startLoc": {
-          "line": 485,
+          "line": 528,
           "column": 39,
-          "position": 5233
+          "position": 5624
         },
         "endLoc": {
-          "line": 490,
+          "line": 533,
           "column": 17,
-          "position": 5304
+          "position": 5695
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 468,
-        "end": 472,
+        "start": 511,
+        "end": 515,
         "startLoc": {
-          "line": 468,
+          "line": 511,
           "column": 28,
-          "position": 4945
+          "position": 5336
         },
         "endLoc": {
-          "line": 472,
+          "line": 515,
           "column": 26,
-          "position": 5014
+          "position": 5405
         }
       }
     },
@@ -19016,32 +19100,32 @@
       "tokens": 184,
       "firstFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 595,
-        "end": 604,
+        "start": 638,
+        "end": 647,
         "startLoc": {
-          "line": 595,
+          "line": 638,
           "column": 76,
-          "position": 6759
+          "position": 7150
         },
         "endLoc": {
-          "line": 604,
+          "line": 647,
           "column": 12,
-          "position": 6943
+          "position": 7334
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 557,
-        "end": 567,
+        "start": 600,
+        "end": 610,
         "startLoc": {
-          "line": 557,
+          "line": 600,
           "column": 74,
-          "position": 6244
+          "position": 6635
         },
         "endLoc": {
-          "line": 567,
+          "line": 610,
           "column": 19,
-          "position": 6429
+          "position": 6820
         }
       }
     },
@@ -19263,37 +19347,73 @@
     },
     {
       "format": "rust",
+      "lines": 6,
+      "fragment": ") -> rules::Rules {\n            rules::Rules::new(vec![rules::Rule {\n                id: 1,\n                scope: rules::Scope::Global,\n                target: rules::Target::parse(\n                    rules::TargetKind::Path",
+      "tokens": 69,
+      "firstFile": {
+        "name": "crates/fennec/src/turn_build.rs",
+        "start": 448,
+        "end": 453,
+        "startLoc": {
+          "line": 448,
+          "column": 31,
+          "position": 4265
+        },
+        "endLoc": {
+          "line": 453,
+          "column": 44,
+          "position": 4334
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/rule_approval.rs",
+        "start": 55,
+        "end": 59,
+        "startLoc": {
+          "line": 55,
+          "column": 17,
+          "position": 591
+        },
+        "endLoc": {
+          "line": 59,
+          "column": 68,
+          "position": 658
+        }
+      }
+    },
+    {
+      "format": "rust",
       "lines": 9,
       "fragment": "(\n        &self,\n        name: &str,\n        args: &Value,\n        access: CommandAccess,\n        stop: &AtomicBool,\n        on_output: &mut dyn FnMut(OutputStream, &str),\n    ) -> ToolResult {\n        self.dispatch(name, args, access, stop, on_output, true",
       "tokens": 86,
       "firstFile": {
         "name": "crates/fennec/src/tools.rs",
-        "start": 204,
-        "end": 212,
+        "start": 206,
+        "end": 214,
         "startLoc": {
-          "line": 204,
+          "line": 206,
           "column": 24,
-          "position": 1730
+          "position": 1716
         },
         "endLoc": {
-          "line": 212,
+          "line": 214,
           "column": 64,
-          "position": 1816
+          "position": 1802
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/tools.rs",
-        "start": 193,
-        "end": 201,
+        "start": 195,
+        "end": 203,
         "startLoc": {
-          "line": 193,
+          "line": 195,
           "column": 15,
-          "position": 1633
+          "position": 1619
         },
         "endLoc": {
-          "line": 201,
+          "line": 203,
           "column": 65,
-          "position": 1719
+          "position": 1705
         }
       }
     },
@@ -19767,6 +19887,42 @@
     },
     {
       "format": "rust",
+      "lines": 14,
+      "fragment": ", new_id()));\n        let repo = base.join(\"repo\");\n        std::fs::create_dir_all(&repo).unwrap();\n        git(&repo, &[\"init\", \"-q\"], None).unwrap();\n        git(&repo, &[\"config\", \"user.name\", \"human\"], None).unwrap();\n        git(&repo, &[\"config\", \"user.email\", \"human@example.com\"], None).unwrap();\n        std::fs::write(repo.join(\"a.txt\"), \"one\\n\").unwrap();\n        git(&repo, &[\"add\", \"-A\"], None).unwrap();\n        git(&repo, &[\"commit\", \"-q\", \"-m\", \"init\"], None).unwrap();\n        (base, repo)\n    }\n\n    #[test]\n    fn counts_committed_uncommitted_and_untracked_files",
+      "tokens": 217,
+      "firstFile": {
+        "name": "crates/fennec/src/modified_files.rs",
+        "start": 90,
+        "end": 103,
+        "startLoc": {
+          "line": 90,
+          "column": 80,
+          "position": 885
+        },
+        "endLoc": {
+          "line": 103,
+          "column": 56,
+          "position": 1102
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/worktree.rs",
+        "start": 414,
+        "end": 427,
+        "startLoc": {
+          "line": 414,
+          "column": 74,
+          "position": 4049
+        },
+        "endLoc": {
+          "line": 427,
+          "column": 68,
+          "position": 4266
+        }
+      }
+    },
+    {
+      "format": "rust",
       "lines": 15,
       "fragment": "Ok(seq)\n    }\n\n    fn events(&self, session_id: &str) -> Result<Vec<Event>, String> {\n        self.log.events(session_id)\n    }\n\n    fn window(&self, session_id: &str) -> Result<Vec<Event>, String> {\n        self.log.window(session_id)\n    }\n\n    fn events_of(&self, session_id: &str, kinds: &[&str]) -> Result<Vec<Event>, String> {\n        self.log.events_of(session_id, kinds)\n    }\n}",
       "tokens": 156,
@@ -20024,68 +20180,32 @@
       "tokens": 69,
       "firstFile": {
         "name": "crates/fennec/src/mcp.rs",
-        "start": 491,
-        "end": 498,
+        "start": 476,
+        "end": 483,
         "startLoc": {
-          "line": 491,
+          "line": 476,
           "column": 32,
-          "position": 4827
+          "position": 4700
         },
         "endLoc": {
-          "line": 498,
+          "line": 483,
           "column": 49,
-          "position": 4896
+          "position": 4769
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/mcp.rs",
-        "start": 467,
-        "end": 475,
+        "start": 452,
+        "end": 460,
         "startLoc": {
-          "line": 467,
+          "line": 452,
           "column": 38,
-          "position": 4642
+          "position": 4515
         },
         "endLoc": {
-          "line": 475,
+          "line": 460,
           "column": 42,
-          "position": 4713
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 10,
-      "fragment": ",\n            std::process::id(),\n            std::time::SystemTime::now()\n                .duration_since(std::time::UNIX_EPOCH)\n                .unwrap()\n                .as_nanos()\n        ));\n        std::fs::create_dir_all(&dir).unwrap();\n\n        let",
-      "tokens": 78,
-      "firstFile": {
-        "name": "crates/fennec/src/git.rs",
-        "start": 336,
-        "end": 345,
-        "startLoc": {
-          "line": 336,
-          "column": 38,
-          "position": 3173
-        },
-        "endLoc": {
-          "line": 345,
-          "column": 12,
-          "position": 3251
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/tools.rs",
-        "start": 604,
-        "end": 612,
-        "startLoc": {
-          "line": 604,
-          "column": 38,
-          "position": 5596
-        },
-        "endLoc": {
-          "line": 612,
-          "column": 12,
-          "position": 5673
+          "position": 4586
         }
       }
     },
@@ -20110,13 +20230,13 @@
         }
       },
       "secondFile": {
-        "name": "crates/fennec/src/tools.rs",
-        "start": 604,
+        "name": "crates/fennec/src/git.rs",
+        "start": 336,
         "end": 361,
         "startLoc": {
-          "line": 604,
+          "line": 336,
           "column": 38,
-          "position": 5596
+          "position": 3173
         },
         "endLoc": {
           "line": 361,
@@ -20146,13 +20266,13 @@
         }
       },
       "secondFile": {
-        "name": "crates/fennec/src/tools.rs",
-        "start": 604,
+        "name": "crates/fennec/src/git.rs",
+        "start": 336,
         "end": 413,
         "startLoc": {
-          "line": 604,
+          "line": 336,
           "column": 38,
-          "position": 5596
+          "position": 3173
         },
         "endLoc": {
           "line": 413,
@@ -20183,17 +20303,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/turn_build.rs",
-        "start": 301,
-        "end": 316,
+        "start": 332,
+        "end": 347,
         "startLoc": {
-          "line": 301,
+          "line": 332,
           "column": 30,
-          "position": 2905
+          "position": 3231
         },
         "endLoc": {
-          "line": 316,
+          "line": 347,
           "column": 12,
-          "position": 3002
+          "position": 3328
         }
       }
     },
