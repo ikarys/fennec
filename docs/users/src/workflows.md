@@ -153,6 +153,7 @@ A comment you type there is added to the next agent's prompt.
 - An agent step that runs in its own session (fresh context) may ask you a question there. The run shows **Answer it**: open the step's session and reply. Once the step finishes, the run goes on by itself. In a parallel branch, a question still ends the branch **blocked**.
 - An interrupted run can be **Resumed**. It re-runs the step that was running, and it can be stopped.
 - Workflow runs need the browser for their stops. The `fennec` command line does not run them.
+- Once the run has ended, the workflow chip goes back to none. A message you send then is a plain turn on the same branch, for a quick fix without the plan and test gates, and the review gate still checks it. To run the workflow again, pick it in the chip.
 
 ## If something goes wrong
 

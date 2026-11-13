@@ -15,6 +15,8 @@ interface UseProjectOptionsArgs {
   launchWorkflow: LaunchWorkflow | null;
   /** The workflow of the session's latest run: the chip shows what the session runs. */
   runWorkflowId: string | null | undefined;
+  /** The session's latest run has ended: a follow-up message is a plain turn, not a new run. */
+  runFinished: boolean;
   /** A backlog idea framed from the project page: no workflow for a framing session. */
   frameIdeaId: string | null;
   /** The session is framing a backlog idea: its messages must not start a workflow. */
@@ -34,6 +36,7 @@ export function useProjectOptions({
   projectId,
   launchWorkflow,
   runWorkflowId,
+  runFinished,
   frameIdeaId,
   framingIdea,
   mode,
@@ -123,8 +126,10 @@ export function useProjectOptions({
     // The chip shows the workflow the session runs, not the agent's default;
     // an agent that only talks still starts none.
     const ran = selection.workflowId && runWorkflowId && workflows.some((workflow) => workflow.id === runWorkflowId) ? runWorkflowId : selection.workflowId;
-    setWorkflowSelection({ ...selection, workflowId: frameIdeaId ? null : ran });
-  }, [workflows, agents, mode, launchId, launchStepByStep, runWorkflowId, frameIdeaId]);
+    // After a finished run, a one-line fix must not restart the whole workflow
+    // with its gates: the human picks the workflow again to rerun it.
+    setWorkflowSelection({ ...selection, workflowId: frameIdeaId || runFinished ? null : ran });
+  }, [workflows, agents, mode, launchId, launchStepByStep, runWorkflowId, runFinished, frameIdeaId]);
 
   // A session framing a backlog idea only talks: its messages must not start
   // the default build workflow (a 'go on' there once ran a whole build).
