@@ -42,16 +42,13 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
   const t = useT();
   const lang = useLang();
   const display = useDisplayPrefs();
-  const [open, setOpen] = useState(display.toolResultsOpen);
-
-  useEffect(() => {
-    if (tool.name === 'run_command' && tool.status === 'running') {
-      setOpen(true);
-    }
-    if ((tool.name === 'propose_plan' || tool.name === 'submit_report') && tool.status === 'error') {
-      setOpen(true);
-    }
-  }, [tool.name, tool.status]);
+  const [manual, setManual] = useState<boolean | null>(null);
+  // Open while a command runs (live output) or a plan/report errors; otherwise the
+  // "open by default" setting, until the human clicks the toggle.
+  const forceOpen =
+    (tool.name === 'run_command' && tool.status === 'running') ||
+    ((tool.name === 'propose_plan' || tool.name === 'submit_report') && tool.status === 'error');
+  const open = manual ?? (forceOpen || display.toolResultsOpen);
 
   const arg =
     tool.name === 'ask_user'
@@ -94,7 +91,7 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
         <button
           type="button"
           aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => setManual(!open)}
           className="flex min-w-0 grow items-center gap-2.5"
         >
           {icon}
