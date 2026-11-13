@@ -347,4 +347,9 @@ Which servers are active is told by an appended catalog notice (servers, tools, 
 re-sent only when its text changes, so turning a server on or off mid-session keeps the frozen tool list and the
 prompt cache. A call to a server that is off is refused, arguments are checked against the cached schema (the
 error carries it), and the human's per-tool rules see the call as `{server}_{tool}`. A session frozen with the
-older per-tool definitions re-freezes once (`domain/mcp.rs`, `domain/mcp_notice.rs`, `tools/mcp_call.rs`).
+older per-tool definitions re-freezes once (`crates/mcp-lite`, `domain/mcp_notice.rs`, `tools/mcp_call.rs`).
+
+MCP crate, done: the client (stdio and streamable HTTP, no async runtime), the lazy layer and the OAuth flow
+live in the reusable crate `crates/mcp-lite` (core without I/O always on, `client` default, `oauth` optional),
+fennec keeps the sandboxed spawn, the tool cache and the Vault that seals tokens; automatic token refresh now
+opens the sealed refresh token first (`crates/mcp-lite`, `mcp.rs`, `mcp/oauth.rs`).

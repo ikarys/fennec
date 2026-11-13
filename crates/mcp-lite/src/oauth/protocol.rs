@@ -1,21 +1,23 @@
 //! Pure OAuth 2.1 / MCP authorization helpers. No I/O: randomness and the
 //! clock are passed in, so the flow can be tested without a network.
 
+use std::fmt;
+
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ring::digest::{SHA256, digest};
 use serde::{Deserialize, Serialize};
 
-/// The parts of a `WWW-Authenticate: Bearer ...` challenge fennec needs.
+/// The parts of a `WWW-Authenticate: Bearer ...` challenge the flow needs.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Challenge {
+pub(crate) struct Challenge {
     pub resource_metadata: Option<String>,
     pub scope: Option<String>,
 }
 
 /// Parse the quoted parameters of a `WWW-Authenticate` header. Parameter names
 /// are case-insensitive; values are kept as-is after removing quotes.
-pub fn parse_www_authenticate(header: &str) -> Challenge {
+pub(crate) fn parse_www_authenticate(header: &str) -> Challenge {
     let mut out = Challenge::default();
     for part in split_params(header) {
         let part = part.trim();
@@ -44,13 +46,13 @@ pub fn parse_www_authenticate(header: &str) -> Challenge {
 }
 
 /// The protected-resource metadata URL for an MCP server URL.
-pub fn well_known_resource_url(server_url: &str) -> Option<String> {
+pub(crate) fn well_known_resource_url(server_url: &str) -> Option<String> {
     let origin = origin_of(server_url)?;
     Some(format!("{origin}/.well-known/oauth-protected-resource"))
 }
 
 /// The two well-known authorization-server metadata URLs, in fallback order.
-pub fn well_known_as_urls(issuer: &str) -> [String; 2] {
+pub(crate) fn well_known_as_urls(issuer: &str) -> [String; 2] {
     let issuer = issuer.trim_end_matches('/');
     [
         format!("{issuer}/.well-known/oauth-authorization-server"),
@@ -59,28 +61,40 @@ pub fn well_known_as_urls(issuer: &str) -> [String; 2] {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResourceMetadata {
+pub(crate) struct ResourceMetadata {
     pub resource: Option<String>,
     pub authorization_servers: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AuthServerMetadata {
+pub(crate) struct AuthServerMetadata {
     pub authorization_endpoint: String,
     pub token_endpoint: String,
     #[serde(default)]
     pub registration_endpoint: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Registration {
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct Registration {
     pub client_id: String,
     #[serde(default)]
     pub client_secret: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TokenResponse {
+impl fmt::Debug for Registration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Registration")
+            .field("client_id", &self.client_id)
+            .field(
+                "client_secret",
+                &self.client_secret.as_ref().map(|_| "<redacted>"),
+            )
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct TokenResponse {
     pub access_token: String,
     #[serde(default)]
     pub refresh_token: Option<String>,
@@ -88,16 +102,29 @@ pub struct TokenResponse {
     pub expires_in: Option<u64>,
 }
 
+impl fmt::Debug for TokenResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TokenResponse")
+            .field("access_token", &"<redacted>")
+            .field(
+                "refresh_token",
+                &self.refresh_token.as_ref().map(|_| "<redacted>"),
+            )
+            .field("expires_in", &self.expires_in)
+            .finish()
+    }
+}
+
 /// PKCE S256 pair. The verifier is base64url(random bytes); the challenge is
 /// base64url(SHA-256(verifier)).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Pkce {
+pub(crate) struct Pkce {
     pub verifier: String,
     pub challenge: String,
 }
 
 impl Pkce {
-    pub fn from_random(bytes: &[u8; 32]) -> Pkce {
+    pub(crate) fn from_random(bytes: &[u8; 32]) -> Pkce {
         let verifier = URL_SAFE_NO_PAD.encode(bytes);
         let challenge = challenge_for(&verifier);
         Pkce {
@@ -108,12 +135,12 @@ impl Pkce {
 }
 
 /// The S256 challenge for a PKCE verifier.
-pub fn challenge_for(verifier: &str) -> String {
+pub(crate) fn challenge_for(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(digest(&SHA256, verifier.as_bytes()).as_ref())
 }
 
 /// RFC 3986 percent-encoding, keeping the unreserved characters.
-pub fn percent_encode(s: &str) -> String {
+fn percent_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for byte in s.as_bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
@@ -127,7 +154,7 @@ pub fn percent_encode(s: &str) -> String {
 
 /// Build an authorization URL. Values are percent-encoded; the first parameter
 /// uses `?` unless the endpoint already has a query string.
-pub fn authorize_url(endpoint: &str, params: &[(&str, &str)]) -> String {
+pub(crate) fn authorize_url(endpoint: &str, params: &[(&str, &str)]) -> String {
     let mut out = endpoint.to_string();
     let mut separator = if endpoint.contains('?') { "&" } else { "?" };
     for (key, value) in params {
@@ -140,9 +167,10 @@ pub fn authorize_url(endpoint: &str, params: &[(&str, &str)]) -> String {
     out
 }
 
-/// OAuth credentials for one MCP server. The token fields are sealed strings;
-/// the store never sees clear tokens.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// OAuth credentials for one MCP server. The token fields hold whatever the
+/// caller puts there: clear values from this crate; a caller may seal them
+/// before storing.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpCredentials {
     pub client_id: String,
@@ -154,8 +182,28 @@ pub struct McpCredentials {
     pub expires_at_ms: Option<u64>,
 }
 
+impl fmt::Debug for McpCredentials {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("McpCredentials")
+            .field("client_id", &self.client_id)
+            .field(
+                "client_secret",
+                &self.client_secret.as_ref().map(|_| "<redacted>"),
+            )
+            .field("token_endpoint", &self.token_endpoint)
+            .field("resource", &self.resource)
+            .field("access_token", &"<redacted>")
+            .field(
+                "refresh_token",
+                &self.refresh_token.as_ref().map(|_| "<redacted>"),
+            )
+            .field("expires_at_ms", &self.expires_at_ms)
+            .finish()
+    }
+}
+
 /// The expiry time for a token response, in milliseconds.
-pub fn expires_at(now_ms: u64, expires_in: Option<u64>) -> Option<u64> {
+pub(crate) fn expires_at(now_ms: u64, expires_in: Option<u64>) -> Option<u64> {
     expires_in.map(|seconds| now_ms.saturating_add(seconds.saturating_mul(1000)))
 }
 
@@ -310,5 +358,29 @@ mod tests {
             ..fresh
         };
         assert!(!unknown.needs_refresh(1_000_000));
+    }
+
+    #[test]
+    fn mcp_credentials_debug_redacts_secret_fields() {
+        let credentials = McpCredentials {
+            client_id: "client".into(),
+            client_secret: Some("client-secret".into()),
+            token_endpoint: "https://id.example/token".into(),
+            resource: Some("resource".into()),
+            access_token: "access-token".into(),
+            refresh_token: Some("refresh-token".into()),
+            expires_at_ms: Some(123),
+        };
+        let debug = format!("{credentials:?}");
+        assert!(debug.contains("client_id: \"client\""));
+        assert!(debug.contains("client_secret: Some(\"<redacted>\")"));
+        assert!(debug.contains("token_endpoint: \"https://id.example/token\""));
+        assert!(debug.contains("resource: Some(\"resource\")"));
+        assert!(debug.contains("access_token: \"<redacted>\""));
+        assert!(debug.contains("refresh_token: Some(\"<redacted>\")"));
+        assert!(debug.contains("expires_at_ms: Some(123)"));
+        assert!(!debug.contains("client-secret"));
+        assert!(!debug.contains("access-token"));
+        assert!(!debug.contains("refresh-token"));
     }
 }

@@ -141,7 +141,7 @@ pub(crate) fn connect(app: &App, req: &Request, stream: &mut TcpStream) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::mcp::{McpServer, McpTool, McpTransport};
+    use mcp_lite::{McpServer, McpTool, McpTransport};
 
     fn server(name: &str, tools: &[&str]) -> McpServer {
         let mut server = McpServer {

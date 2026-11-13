@@ -1,23 +1,17 @@
-//! OAuth 2.1 authorization for HTTP MCP servers: discovery, dynamic client
-//! registration, PKCE, the local redirect callback, and token refresh.
+//! OAuth 2.1 authorization for HTTP MCP servers: storage and sealing of MCP
+//! OAuth credentials; the protocol lives in `mcp_lite::oauth`.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
-use std::time::Duration;
 
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use llm_providers_connector::MasterKey;
-use ring::rand::{SecureRandom, SystemRandom};
-use serde_json::json;
+use mcp_lite::oauth::{self, McpCredentials};
 
 use crate::domain::clock::now_ms;
 use crate::domain::mcp::{McpServer, McpTransport};
-use crate::domain::mcp_oauth::{
-    self as domain, AuthServerMetadata, McpCredentials, Pkce, Registration, ResourceMetadata,
-    TokenResponse,
-};
+use crate::locks::lock;
+use crate::mcp::INFO;
 use crate::sandbox::Sandbox;
 use crate::store::SqliteStore;
 
@@ -30,17 +24,7 @@ pub struct Vault {
 
 /// A pending authorization, keyed by the PKCE `state`.
 // ponytail: in memory, lost on restart; the human clicks again.
-struct Pending {
-    server_name: String,
-    verifier: String,
-    redirect: String,
-    client_id: String,
-    client_secret: Option<String>,
-    token_endpoint: String,
-    resource: Option<String>,
-}
-
-static PENDING: LazyLock<Mutex<HashMap<String, Pending>>> =
+static PENDING: LazyLock<Mutex<HashMap<String, (String, oauth::Pending)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 impl Vault {
@@ -63,13 +47,13 @@ impl Vault {
             return Ok(server.clone());
         };
         if credentials.needs_refresh(now_ms()) {
-            let Some(refresh_token) = credentials.refresh_token.clone() else {
+            if credentials.refresh_token.is_none() {
                 return Err(format!(
                     "mcp {}: the authorization expired; authorize it again on the Settings page",
                     server.name
                 ));
-            };
-            credentials = self.refresh(&server.name, &credentials, &refresh_token)?;
+            }
+            credentials = self.refresh(&server.name, &credentials)?;
         }
         let access_token = self.open_secret(&credentials.access_token)?;
         let mut out = server.clone();
@@ -97,311 +81,82 @@ impl Vault {
         MasterKey::load_or_create(&self.secret)
     }
 
-    fn seal(&self, value: &str) -> Result<String, String> {
-        Ok(self.master_key()?.seal(value))
-    }
-
     fn open_secret(&self, value: &str) -> Result<String, String> {
         self.master_key()?.open(value)
+    }
+
+    /// Seal every secret field of clear credentials.
+    fn seal_credentials(&self, credentials: &McpCredentials) -> Result<McpCredentials, String> {
+        let key = self.master_key()?;
+        map_secrets(credentials, |value| Ok(key.seal(value)))
+    }
+
+    /// Open every secret field of sealed credentials.
+    fn open_credentials(&self, credentials: &McpCredentials) -> Result<McpCredentials, String> {
+        let key = self.master_key()?;
+        map_secrets(credentials, |value| key.open(value))
     }
 
     fn refresh(
         &self,
         server: &str,
         credentials: &McpCredentials,
-        refresh_token: &str,
     ) -> Result<McpCredentials, String> {
-        let client_secret = match &credentials.client_secret {
-            Some(sealed) => Some(self.open_secret(sealed)?),
-            None => None,
-        };
-        let mut form: Vec<(&str, String)> = vec![
-            ("grant_type", "refresh_token".to_string()),
-            ("refresh_token", refresh_token.to_string()),
-            ("client_id", credentials.client_id.clone()),
-        ];
-        if let Some(resource) = &credentials.resource {
-            form.push(("resource", resource.clone()));
-        }
-        if let Some(secret) = client_secret {
-            form.push(("client_secret", secret));
-        }
-        let form_refs: Vec<(&str, &str)> = form
-            .iter()
-            .map(|(key, value)| (*key, value.as_str()))
-            .collect();
-        let response = token_request(&credentials.token_endpoint, &form_refs)?;
-        let mut out = credentials.clone();
-        out.access_token = self.seal(&response.access_token)?;
-        out.refresh_token = match response.refresh_token {
-            Some(new_refresh) => Some(self.seal(&new_refresh)?),
-            None => credentials.refresh_token.clone(),
-        };
-        out.expires_at_ms = domain::expires_at(now_ms(), response.expires_in);
-        self.save_credentials(server, &out)?;
-        Ok(out)
+        let clear = self.open_credentials(credentials)?;
+        let refreshed = oauth::refresh(&clear).map_err(|e| e.to_string())?;
+        let sealed = self.seal_credentials(&refreshed)?;
+        self.save_credentials(server, &sealed)?;
+        Ok(sealed)
     }
 }
 
 /// Start the OAuth flow for one saved HTTP MCP server and return the URL the
 /// human opens in a browser.
 pub fn begin(server: &McpServer, redirect: &str) -> Result<String, String> {
-    if server.transport != McpTransport::Http {
-        return Err("only an http server uses OAuth".into());
-    }
-    let url = server
-        .url
-        .as_deref()
-        .filter(|url| !url.trim().is_empty())
-        .ok_or("mcp http: no url")?;
-
-    let challenge = discover_challenge(server, url)?;
-    let resource_metadata_url = challenge
-        .resource_metadata
-        .ok_or("mcp oauth: no resource metadata")?;
-    let resource_metadata = get_json::<ResourceMetadata>(&resource_metadata_url)?;
-    let authorization_server = resource_metadata
-        .authorization_servers
-        .first()
-        .cloned()
-        .ok_or("mcp oauth: no authorization server")?;
-    let as_metadata = get_auth_server_metadata(&authorization_server)?;
-    let registration_endpoint = as_metadata
-        .registration_endpoint
-        .ok_or("this server does not support dynamic client registration")?;
-
-    let registration = register(&registration_endpoint, redirect)?;
-    let pkce = random_pkce()?;
-    let state = random_state()?;
-
-    let pending = Pending {
-        server_name: server.name.clone(),
-        verifier: pkce.verifier.clone(),
-        redirect: redirect.to_string(),
-        client_id: registration.client_id.clone(),
-        client_secret: registration.client_secret.clone(),
-        token_endpoint: as_metadata.token_endpoint.clone(),
-        resource: resource_metadata.resource.clone(),
-    };
-    crate::locks::lock(&PENDING).insert(state.clone(), pending);
-
-    let mut params: Vec<(&str, &str)> = vec![
-        ("response_type", "code"),
-        ("client_id", registration.client_id.as_str()),
-        ("redirect_uri", redirect),
-        ("code_challenge", pkce.challenge.as_str()),
-        ("code_challenge_method", "S256"),
-        ("state", state.as_str()),
-    ];
-    if let Some(resource) = &resource_metadata.resource {
-        params.push(("resource", resource));
-    }
-    if let Some(scope) = &challenge.scope {
-        params.push(("scope", scope));
-    }
-    Ok(domain::authorize_url(
-        &as_metadata.authorization_endpoint,
-        &params,
-    ))
+    let authorization = oauth::begin(server, redirect, &INFO).map_err(|e| e.to_string())?;
+    lock(&PENDING).insert(
+        authorization.state.clone(),
+        (server.name.clone(), authorization.pending),
+    );
+    Ok(authorization.url)
 }
 
 /// Complete the OAuth flow after the browser redirects back: exchange the code,
 /// store sealed credentials, and run the shared connect/cache logic.
 pub fn finish(state: &str, code: &str, vault: &Vault) -> Result<McpServer, String> {
-    let pending = take_pending(state)
+    let (server_name, pending) = take_pending(state)
         .ok_or("unknown or expired authorization; start again from the Settings page")?;
-    let response = exchange_code(&pending, code)?;
-
-    let client_secret = match &pending.client_secret {
-        Some(secret) => Some(vault.seal(secret)?),
-        None => None,
-    };
-    let credentials = McpCredentials {
-        client_id: pending.client_id.clone(),
-        client_secret,
-        token_endpoint: pending.token_endpoint.clone(),
-        resource: pending.resource.clone(),
-        access_token: vault.seal(&response.access_token)?,
-        refresh_token: response
-            .refresh_token
-            .as_deref()
-            .map(|token| vault.seal(token))
-            .transpose()?,
-        expires_at_ms: domain::expires_at(now_ms(), response.expires_in),
-    };
-    vault.save_credentials(&pending.server_name, &credentials)?;
+    let clear = oauth::finish(pending, code).map_err(|e| e.to_string())?;
+    let credentials = vault.seal_credentials(&clear)?;
+    vault.save_credentials(&server_name, &credentials)?;
 
     let store = vault.store()?;
     let mut prefs = store.preferences().map_err(|e| e.to_string())?;
     let index = prefs
         .mcp
         .iter()
-        .position(|server| server.name == pending.server_name)
+        .position(|server| server.name == server_name)
         .ok_or("no such mcp server")?;
     let sandbox = Sandbox::for_store(&prefs.sandbox, &vault.db);
     crate::mcp::connect_and_cache(&store, &mut prefs, index, &sandbox, vault)
         .map_err(|(_, message)| message)
 }
 
-fn take_pending(state: &str) -> Option<Pending> {
-    crate::locks::lock(&PENDING).remove(state)
-}
-
-fn discover_challenge(server: &McpServer, url: &str) -> Result<domain::Challenge, String> {
-    let agent = agent();
-    let body = json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "protocolVersion": "2025-06-18",
-            "capabilities": {},
-            "clientInfo": { "name": "fennec", "version": env!("CARGO_PKG_VERSION") },
-        },
-    });
-    let response = agent
-        .post(url)
-        .header("content-type", "application/json")
-        .header("accept", "application/json, text/event-stream")
-        .send_json(&body)
-        .map_err(|e| format!("mcp oauth: discovery request failed: {e}"))?;
-    let status = response.status();
-    if status != 401 {
-        return Err(format!(
-            "mcp {}: the server did not return a 401 challenge",
-            server.name
-        ));
-    }
-    let header = response
-        .headers()
-        .get("www-authenticate")
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_string);
-    let challenge = header
-        .as_deref()
-        .map(domain::parse_www_authenticate)
-        .unwrap_or_default();
-    let resource_metadata = challenge
-        .resource_metadata
-        .or_else(|| domain::well_known_resource_url(url))
-        .ok_or("mcp oauth: no resource metadata")?;
-    Ok(domain::Challenge {
-        resource_metadata: Some(resource_metadata),
-        scope: challenge.scope,
+/// The credentials with `f` applied to the client secret and both tokens.
+fn map_secrets(
+    credentials: &McpCredentials,
+    f: impl Fn(&str) -> Result<String, String>,
+) -> Result<McpCredentials, String> {
+    Ok(McpCredentials {
+        client_secret: credentials.client_secret.as_deref().map(&f).transpose()?,
+        access_token: f(&credentials.access_token)?,
+        refresh_token: credentials.refresh_token.as_deref().map(&f).transpose()?,
+        ..credentials.clone()
     })
 }
 
-fn get_auth_server_metadata(issuer: &str) -> Result<AuthServerMetadata, String> {
-    for url in domain::well_known_as_urls(issuer) {
-        if let Ok(metadata) = get_json::<AuthServerMetadata>(&url) {
-            return Ok(metadata);
-        }
-    }
-    Err("mcp oauth: no authorization server metadata".into())
-}
-
-fn register(endpoint: &str, redirect: &str) -> Result<Registration, String> {
-    let body = json!({
-        "client_name": "fennec",
-        "redirect_uris": [redirect],
-        "grant_types": ["authorization_code", "refresh_token"],
-        "response_types": ["code"],
-        "token_endpoint_auth_method": "none",
-    });
-    let response = agent()
-        .post(endpoint)
-        .header("content-type", "application/json")
-        .send_json(&body)
-        .map_err(|_| "mcp oauth: registration request failed")?;
-    let status = response.status();
-    let text = response
-        .into_body()
-        .read_to_string()
-        .map_err(|_| "mcp oauth: registration response body failed")?;
-    if !status.is_success() {
-        return Err(format!(
-            "mcp oauth: registration endpoint returned {status}"
-        ));
-    }
-    serde_json::from_str(&text).map_err(|_| "mcp oauth: invalid registration response".into())
-}
-
-fn exchange_code(pending: &Pending, code: &str) -> Result<TokenResponse, String> {
-    let mut form: Vec<(&str, String)> = vec![
-        ("grant_type", "authorization_code".to_string()),
-        ("code", code.to_string()),
-        ("redirect_uri", pending.redirect.clone()),
-        ("client_id", pending.client_id.clone()),
-        ("code_verifier", pending.verifier.clone()),
-    ];
-    if let Some(resource) = &pending.resource {
-        form.push(("resource", resource.clone()));
-    }
-    if let Some(secret) = &pending.client_secret {
-        form.push(("client_secret", secret.clone()));
-    }
-    let form_refs: Vec<(&str, &str)> = form
-        .iter()
-        .map(|(key, value)| (*key, value.as_str()))
-        .collect();
-    token_request(&pending.token_endpoint, &form_refs)
-}
-
-fn token_request(endpoint: &str, form: &[(&str, &str)]) -> Result<TokenResponse, String> {
-    let response = agent()
-        .post(endpoint)
-        .send_form(form.iter().copied())
-        .map_err(|_| "mcp oauth: token request failed")?;
-    let status = response.status();
-    let text = response
-        .into_body()
-        .read_to_string()
-        .map_err(|_| "mcp oauth: token response body failed")?;
-    if !status.is_success() {
-        return Err(format!("mcp oauth: token endpoint returned {status}"));
-    }
-    serde_json::from_str(&text).map_err(|_| "mcp oauth: invalid token response".into())
-}
-
-fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
-    let response = agent()
-        .get(url)
-        .header("accept", "application/json")
-        .call()
-        .map_err(|e| format!("mcp oauth: metadata request failed: {e}"))?;
-    let status = response.status();
-    let text = response
-        .into_body()
-        .read_to_string()
-        .map_err(|_| "mcp oauth: metadata response body failed")?;
-    if !status.is_success() {
-        return Err(format!("mcp oauth: metadata endpoint returned {status}"));
-    }
-    serde_json::from_str(&text).map_err(|_| "mcp oauth: invalid metadata response".into())
-}
-
-fn agent() -> ureq::Agent {
-    ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(30)))
-        .http_status_as_error(false)
-        .build()
-        .into()
-}
-
-fn random_pkce() -> Result<Pkce, String> {
-    let mut bytes = [0u8; 32];
-    SystemRandom::new()
-        .fill(&mut bytes)
-        .map_err(|_| "mcp oauth: random bytes failed")?;
-    Ok(Pkce::from_random(&bytes))
-}
-
-fn random_state() -> Result<String, String> {
-    let mut bytes = [0u8; 16];
-    SystemRandom::new()
-        .fill(&mut bytes)
-        .map_err(|_| "mcp oauth: random bytes failed")?;
-    Ok(URL_SAFE_NO_PAD.encode(bytes))
+fn take_pending(state: &str) -> Option<(String, oauth::Pending)> {
+    lock(&PENDING).remove(state)
 }
 
 #[cfg(test)]
@@ -422,5 +177,133 @@ mod tests {
         };
         let out = vault.authorize(&server).unwrap();
         assert_eq!(out, server);
+    }
+
+    #[test]
+    fn seal_and_open_credentials_round_trip() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let vault = Vault {
+            db: std::env::temp_dir().join(format!("fennec-oauth-vault-seal-test-{nanos}.db")),
+            secret: std::env::temp_dir().join(format!("fennec-oauth-vault-seal-test-{nanos}.key")),
+        };
+        let clear = McpCredentials {
+            client_id: "client".into(),
+            client_secret: Some("client-secret".into()),
+            token_endpoint: "https://id.example/token".into(),
+            resource: Some("resource".into()),
+            access_token: "access-token".into(),
+            refresh_token: Some("refresh-token".into()),
+            expires_at_ms: Some(123),
+        };
+        let sealed = vault.seal_credentials(&clear).unwrap();
+        assert_ne!(sealed.access_token, clear.access_token);
+        assert_ne!(sealed.client_secret.as_deref(), Some("client-secret"));
+        assert_ne!(sealed.refresh_token.as_deref(), Some("refresh-token"));
+        let opened = vault.open_credentials(&sealed).unwrap();
+        assert_eq!(opened, clear);
+        let _ = std::fs::remove_file(&vault.db);
+        let _ = std::fs::remove_file(&vault.secret);
+    }
+
+    fn token_server(reply: &'static str) -> (String, std::sync::mpsc::Receiver<String>) {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = Vec::new();
+            let mut byte = [0u8; 1];
+            while !buf.ends_with(b"\r\n\r\n") {
+                if stream.read(&mut byte).unwrap() == 0 {
+                    break;
+                }
+                buf.push(byte[0]);
+            }
+            let header_end = buf.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+            let headers = String::from_utf8_lossy(&buf[..header_end]).to_string();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let mut parts = line.splitn(2, ':');
+                    let key = parts.next()?.trim().to_ascii_lowercase();
+                    let value = parts.next()?.trim();
+                    (key == "content-length").then(|| value.parse::<usize>().ok())
+                })
+                .flatten()
+                .unwrap_or(0);
+            let mut body = vec![0u8; content_length];
+            let mut read = 0;
+            while read < content_length {
+                let n = stream.read(&mut body[read..]).unwrap();
+                if n == 0 {
+                    break;
+                }
+                read += n;
+            }
+            if read < content_length {
+                body.truncate(read);
+            }
+            tx.send(String::from_utf8_lossy(&body).to_string()).unwrap();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                reply.len(),
+                reply
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+            stream.flush().unwrap();
+        });
+
+        (format!("http://127.0.0.1:{port}/token"), rx)
+    }
+
+    #[test]
+    fn an_expired_authorization_refreshes_with_the_clear_refresh_token() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let vault = Vault {
+            db: std::env::temp_dir().join(format!("fennec-oauth-vault-refresh-test-{nanos}.db")),
+            secret: std::env::temp_dir()
+                .join(format!("fennec-oauth-vault-refresh-test-{nanos}.key")),
+        };
+        let reply = r#"{"access_token":"new-access","token_type":"Bearer","expires_in":60}"#;
+        let (url, body_rx) = token_server(reply);
+        let clear = McpCredentials {
+            client_id: "client".into(),
+            client_secret: None,
+            token_endpoint: url,
+            resource: None,
+            access_token: "old".into(),
+            refresh_token: Some("r1".into()),
+            expires_at_ms: Some(0),
+        };
+        let sealed = vault.seal_credentials(&clear).unwrap();
+        vault.save_credentials("api", &sealed).unwrap();
+
+        let server = McpServer {
+            name: "api".into(),
+            transport: McpTransport::Http,
+            url: Some("http://127.0.0.1:1/mcp".into()),
+            ..Default::default()
+        };
+        let authorized = vault.authorize(&server).unwrap();
+        assert_eq!(authorized.auth_token.as_deref(), Some("new-access"));
+        let body = body_rx.recv().unwrap();
+        assert!(body.contains("refresh_token=r1"));
+
+        let stored = vault.load_credentials("api").unwrap().unwrap();
+        assert_ne!(stored.access_token, "new-access");
+        let opened = vault.open_credentials(&stored).unwrap();
+        assert_eq!(opened.access_token, "new-access");
+
+        std::fs::remove_file(&vault.db).ok();
+        std::fs::remove_file(&vault.secret).ok();
     }
 }
