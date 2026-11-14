@@ -663,6 +663,10 @@
       margin: 0 0 24px;
     }
 
+    .story .walls {
+      margin-bottom: 24px;
+    }
+
     .story p:last-child {
       color: var(--dune);
     }
@@ -982,8 +986,8 @@
 
         <article class="feature">
           <div class="feature-text">
-            <h2>Ideas run at night, you decide in the morning.</h2>
-            <p>Night mode runs your ready ideas unattended, within per-idea caps on time and tokens. ask_user answers itself, the agent records each decision with its reason, and changing the acceptance criteria is refused. In the morning a report lists each idea with its duration, tokens, criteria passed and files changed. Integrating stays your click, one idea at a time.</p>
+            <h2>Tasks run at night, you decide in the morning.</h2>
+            <p>Night mode runs your ready tasks unattended, within per-task caps on time and tokens. ask_user answers itself, the agent records each decision with its reason, and changing the acceptance criteria is refused. In the morning a report lists each task with its duration, tokens, criteria passed and files changed. Integrating stays your click, one task at a time.</p>
             <p><a href="docs/tasks.html">The queue and night mode in the guide</a></p>
           </div>
           <div class="feature-media">
@@ -1027,7 +1031,7 @@
           <p><a href="docs/sandbox.html">What the sandbox blocks, and how to work with it</a></p>
         </div>
         <ul class="walls">
-          <li><strong>Its own worktree</strong><span>The system is read-only. A session writes only its git worktree, on its own branch; your checkout stays untouched until you integrate.</span></li>
+          <li><strong>Its own folder</strong><span>The system is read-only. A workflow or a task writes only its git worktree, on its own branch, and your checkout stays untouched until you integrate. A direct session writes your project folder, never <code>.git</code>.</span></li>
           <li><strong>Secrets hidden</strong><span><code>~/.ssh</code>, <code>~/.aws</code>, <code>~/.config/gh</code>, credentials and fennec's own database are invisible to commands.</span></li>
           <li><strong>No network by default</strong><span>Builds and tests run offline from your caches. You turn the network on when a step needs it.</span></li>
           <li><strong>Protected files</strong><span>Lockfiles, CI config, <code>AGENTS.md</code>, accepted ADRs and <code>.git</code> are read-only. Changing one takes your waiver.</span></li>
@@ -1079,8 +1083,17 @@
 
     <section class="story" aria-labelledby="story-title">
       <div class="container">
-        <h2 id="story-title">Why another coding agent?</h2>
-        <p class="story-large">Most coding agents optimise for writing code fast. fennec is for professional developers who want to stay the authors of their software: you frame the work, the agent loop runs the steps, then waits for your review. Nothing is integrated without a human decision.</p>
+        <h2 id="story-title">Why fennec rather than Claude Code or Codex?</h2>
+        <p class="story-large">Claude Code and Codex optimise how fast an agent writes code. fennec optimises you staying the author of that code: a different job, not a better one.</p>
+        <ul class="walls">
+          <li><strong>Nothing lands without you</strong><span>The model cannot commit: <code>.git</code> is read-only. Workflows and tasks work in their own worktree, and only your "Integrate" click, after the review gate, brings the work to your branch. Elsewhere, permissions decide, and they can be switched off.</span></li>
+          <li><strong>Checked, not trusted</strong><span>The plan's "Done when" checks run as commands fennec executes itself. Fresh agents that did not write the code review it, and the gate flags silenced tests and removed assertions.</span></li>
+          <li><strong>You know what to trust</strong><span>Everything the UI shows is marked verified, computed by fennec, or indicative, written by a model.</span></li>
+          <li><strong>Built for local models</strong><span>Any OpenAI-compatible endpoint, a local model included, is first-class. The prompt only grows, so the inference cache is reused turn after turn; budgets cap paid models.</span></li>
+          <li><strong>Night runs with a paper trail</strong><span>The queue runs ready tasks at night within time and token caps. Every decision is recorded with its reason, and you integrate one task at a time in the morning.</span></li>
+          <li><strong>Yours, on your machine</strong><span>One Rust binary with an embedded web UI and SQLite, under AGPL-3.0.</span></li>
+        </ul>
+        <p>With a frontier model, Claude Code and Codex are more mature and polished, with a larger ecosystem, and more direct for a quick change. fennec has a direct Builder agent for that, but its strength is framed, checked work. It is early, and runs on Windows only through WSL2.</p>
         <p>fennec is built with AI assistance itself, in the open. Each commit names the models that wrote it, and the checks are ones anyone can re-run.</p>
       </div>
     </section>

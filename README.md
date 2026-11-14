@@ -28,21 +28,24 @@ Status: early. Linux and macOS; on Windows, through WSL2.
 
 AI assistance: fennec is largely written with AI models, openly. What was used, how every change is reviewed and how to re-run the checks: [VIBECODING.md](VIBECODING.md) and [VERIFICATION.md](VERIFICATION.md).
 
-## Why fennec
+## Why fennec rather than Claude Code or Codex?
 
-- **Nothing integrates without a human decision.** The "Intégrer" click runs only after a review gate; its blockers are accepted one by one.
-- **Provenance is shown.** Everything the UI shows is marked *verified* (computed by fennec, deterministic) or *indicative* (produced by a model). You always know what to trust.
-- **The approved plan is a contract.** Its "Done when" criteria are checked by commands fennec runs itself, not by the model's word, then reviewed by fresh agents that did not write the code.
-- **Guards catch a model gaming the gate.** Protected files, silenced lints/tests, removed assertions, architecture rules, and ADRs can block integration until the human accepts them.
-- **Sandbox by default.** Commands run in bwrap with a read-only system, hidden secrets, and no network by default; every workflow gets its own git worktree.
-- **Decisions are recorded, even at night.** Agents record each choice with its reason and the alternatives. A night mode runs your ready ideas unattended, within per-idea caps on time and tokens, and leaves a report for the morning.
-- **Local-first and frugal.** Any OpenAI-compatible endpoint works, a local model included. The prompt only grows, so the inference cache is reused turn after turn. fennec ships as one Rust binary with an embedded UI and SQLite.
+Claude Code and Codex optimise how fast an agent writes code. fennec optimises you staying the author of that code: a different job, not a better one.
+
+- **No commit reaches your branch without you.** The model cannot commit: `.git` is read-only in its sandbox. Workflows and tasks run in their own `fennec/` worktree, and only your "Integrate" click, after the review gate, cherry-picks the work. In other tools the agent works in your checkout and permissions decide, and they can be switched off. A direct Builder session edits your files in place, but still cannot commit.
+- **Checked, not trusted.** The approved plan's "Done when" criteria run as commands fennec executes itself, and fresh agents that did not write the code verify and review it. The review gate flags silenced lints or tests, removed assertions, protected files touched, and architecture rule violations.
+- **Provenance is shown.** Everything the UI shows is marked *verified* (computed by fennec) or *indicative* (written by a model).
+- **Local-first and frugal.** Any OpenAI-compatible endpoint, a local model included, is a first-class target. The prompt only grows, so the inference cache is reused turn after turn. A usage ledger and per-project monthly budgets keep paid models in check.
+- **Tasks and night runs leave a paper trail.** A queue runs your ready tasks unattended at night, within per-task caps on time and tokens. Every decision is recorded with its reason, a morning report follows, and integrating stays your click, one task at a time.
+- **Yours.** One Rust binary with an embedded web UI and SQLite, running on your machine, under AGPL-3.0.
+
+**When to pick something else.** With a frontier model, Claude Code and Codex are more mature and more polished agents, with a larger ecosystem. For a quick change you want done now they are more direct; fennec has a direct Builder agent for that, but its strength is framed, checked work. fennec is early, and runs on Windows only through WSL2.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  A["Idea"] --> B["Frame (plan, read-only)"]
+  A["Task"] --> B["Frame (plan, read-only)"]
   B --> C["Approve plan & criteria"]
   C --> D["Build (worktree, sandbox)"]
   D --> E["Checks & fresh-context review"]
@@ -50,7 +53,7 @@ flowchart LR
   F --> G["Integrate (human click)"]
 ```
 
-An idea is framed in a read-only plan session, then the human approves the plan and its "Done when" criteria. The builder works in a dedicated worktree and sandbox. fennec runs the criterion checks, verifies the result in a fresh context, and presents findings at a review gate. Integration happens only on the human's "Intégrer" click.
+A task is framed in a read-only plan session, then the human approves the plan and its "Done when" criteria. The builder works in a dedicated worktree and sandbox. fennec runs the criterion checks, verifies the result in a fresh context, and presents findings at a review gate. Integration happens only on the human's "Integrate" click.
 
 ## Features
 
@@ -78,23 +81,23 @@ An idea is framed in a read-only plan session, then the human approves the plan 
 
 - Criteria: the approved plan's "Done when" list is the run's contract; a `criteria` node runs each `check:` command itself, and agent nodes with `verdicts` judge the others.
 - Protected files: fennec defaults and project `.agents/protected` are refused to file tools and mounted read-only in the sandbox.
-- Integration: the "Intégrer" button runs a cherry-pick of a session's worktree branch into the human's repository after a review gate. Git hooks do not run on it (see "Security model").
+- Integration: the "Integrate" button runs a cherry-pick of a session's worktree branch into the human's repository after a review gate. Git hooks do not run on it (see "Security model").
 - Review gate blockers include commits, files, criteria, protected files touched, architecture violations, and bypass detection.
 - Bypass detection flags added lines that silence a lint, type check, or test, and tests or assertions removed on balance.
 - Architecture guard: `.agents/architecture` rules are checked on lines an integration adds; a violation is a blocker.
 - ADRs: MADR files in `docs/adr/` are listed and protected.
 - Protected tests: an unchecked "Protéger les tests intégrés" box in the integration dialog appends integrated test files to `.agents/protected`.
 
-### Ideas & night mode
+### Tasks & night mode
 
 ![The Tasks tab after a night: the board, the queue bar and the night report](site/images/night-report.png)
 
-- The project page keeps the human's ideas; "Cadrer" opens a plan session tied to the idea; the approved plan marks the idea ready, verbatim.
-- "Lancer la file" runs the ready ideas one at a time, oldest first, each through the default workflow (plan, build, criteria checks, fresh-context verify and review) in its own session and git worktree.
-- Night mode ("Mode nuit" box): the queue runs with the human away; `ask_user` answers itself, the agent decides and records the decision with its reason, and changing the acceptance criteria is refused.
-- Per-idea caps on duration and tokens (Settings) stop an idea; the queue goes on with the next one.
-- In the morning: a night report lists each idea run with its duration, tokens, criteria passed, decisions taken and files changed, until marked read; integrating stays the human's click, one idea at a time.
-- The board groups ideas by stage (to decide, running, ready, done) with one next action per idea, computed by the server; a cross-project backlog and a "à regarder" counter in the top bar point to what needs the human's eye.
+- The project's **Tasks** board turns an idea into a task with a sheet: objective, context, constraints, out of scope, deliverable and "Done when" criteria; the agent can frame it with you and apply its plan to the sheet.
+- **Start the queue** runs the ready tasks one at a time, oldest first, each through the default workflow (plan, build, criteria checks, fresh-context verify and review) in its own session and git worktree.
+- Night mode: the queue runs with the human away; the agent answers its own questions and records each decision with its reason, changing the acceptance criteria is refused, and a task that would delete tests, publish, push or handle credentials is halted, not started.
+- Per-task caps on duration and tokens (Settings) halt a task; the queue goes on with the next one.
+- In the morning: a night report lists each task run with its duration, tokens, criteria passed, decisions taken and files changed, until marked read; integrating stays the human's click, one task at a time.
+- The board groups work by stage (to decide, ready, drafts, done) with one next action per task, computed by the server; a cross-project backlog and a counter in the top bar point to what needs the human's eye.
 
 ### Project understanding
 
