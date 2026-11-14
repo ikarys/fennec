@@ -302,11 +302,11 @@ graph LR
   m48 -->|3| m54
   m53 -->|1| m42
   m53 -->|2| m48
-  m53 -->|25| m46
+  m53 -->|27| m46
   m53 -->|2| m47
-  m53 -->|26| m55
-  m53 -->|23| m52
-  m53 -->|1| m54
+  m53 -->|28| m55
+  m53 -->|25| m52
+  m53 -->|3| m54
   m46 -->|2| m47
   m46 -->|5| m55
   m46 -->|2| m52
@@ -408,7 +408,7 @@ graph LR
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
 | `web/src/lib` | 50 | 19 |  |  |
-| `web/src/components/settings` | 26 | 0 |  |  |
+| `web/src/components/settings` | 28 | 0 |  |  |
 | `web/src/lib/api` | 21 | 0 |  |  |
 | `web/src/i18n` | 5 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
