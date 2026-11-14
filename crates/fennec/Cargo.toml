@@ -11,6 +11,7 @@ token-usage = { path = "../token-usage" }
 backlog = { path = "../backlog" }
 rules = { path = "../rules" }
 canvas = { path = "../canvas" }
+mcp-lite = { version = "0.1", features = ["oauth"] }
 ring = "0.17"
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

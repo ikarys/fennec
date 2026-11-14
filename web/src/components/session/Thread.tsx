@@ -184,7 +184,6 @@ export function ThreadItemView({
   showHeader,
   onReplay,
   pendingCallId,
-  latest = false,
   waitingStatus,
 }: {
   item: ThreadItem;
@@ -193,7 +192,6 @@ export function ThreadItemView({
   showHeader: boolean;
   onReplay?: (messageId: string) => void;
   pendingCallId?: string;
-  latest?: boolean;
   waitingStatus?: SessionStatus;
 }) {
   const t = useT();
@@ -269,6 +267,6 @@ export function ThreadItemView({
   }
 
   if (item.kind === 'workflow-end') {
-    return <RunEndCard item={item} latest={latest} />;
+    return <RunEndCard item={item} />;
   }
 }

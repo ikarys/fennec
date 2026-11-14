@@ -42,7 +42,7 @@ pub fn needed(events: &[Event], servers: &[McpServer]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::mcp::McpTool;
+    use mcp_lite::McpTool;
     use serde_json::json;
 
     fn server(name: &str) -> McpServer {

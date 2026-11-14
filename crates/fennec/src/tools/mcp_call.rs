@@ -122,10 +122,10 @@ fn call(
         },
         None => server.clone(),
     };
-    match crate::mcp::Client::connect(&server, sandbox, workdir) {
+    match crate::mcp::connect(&server, sandbox, workdir) {
         Ok(mut client) => match client.call_tool(tool, arguments) {
             Ok(text) => ToolResult::success(text, false),
-            Err(error) => ToolResult::failure(error),
+            Err(error) => ToolResult::failure(crate::mcp::message(error)),
         },
         Err(error) => ToolResult::failure(error),
     }
@@ -187,8 +187,8 @@ fn arguments(args: &Value) -> Value {
 mod tests {
     use super::{McpContext, ToolResult, rule_name, run};
     use crate::domain::agent::CommandAccess;
-    use crate::domain::mcp::{McpServer, McpTool, McpToolAnnotations, McpTransport};
     use crate::sandbox::Sandbox;
+    use mcp_lite::{McpServer, McpTool, McpToolAnnotations, McpTransport};
     use serde_json::{Value, json};
     use std::path::Path;
 

@@ -378,10 +378,10 @@ graph LR
 | `crates/fennec/src/agent/turn` | 2 | 2 |  | The multi-turn loop. Each round streams the model (`round`), then runs its tool calls, until it answers without one. |
 | `crates/fennec/src/domain/workflow` | 6 | 5 |  | The workflow domain: definitions, templates, validation, and the run state folded from events. |
 | `crates/canvas/src` | 6 | 5 | yes | Storage and model for canvas artifacts. |
-| `crates/fennec/src/mcp` | 2 | 2 |  | The synchronous MCP client: JSON-RPC 2.0 over stdio (a child process in the sandbox world) and streamable HTTP (ureq). Only `initialize`, `tools/list` and `tools/call`. No async runtime: fennec is std::thread, so a hanging server is bounded by a per-call timeout that kills the child. |
+| `crates/fennec/src/mcp` | 2 | 2 |  | fennec's side of MCP: connecting a configured server through the sandbox, and caching its tools in the preferences; the protocol lives in `mcp-lite`. |
 | `crates/fennec/src/sandbox` | 3 | 3 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
 | `crates/fennec/src/store` | 12 | 12 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
-| `crates/fennec/src/domain` | 80 | 78 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/fennec/src/domain` | 79 | 77 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
 | `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
 | `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
@@ -402,7 +402,7 @@ graph LR
 | `web/src/components/workflow/nodes` | 2 | 0 |  |  |
 | `web/src/components/ui` | 27 | 0 |  |  |
 | `web/src/hooks` | 35 | 1 |  |  |
-| `web/src/components/session` | 63 | 1 |  |  |
+| `web/src/components/session` | 64 | 2 |  |  |
 | `web/src/components/workflow/session` | 9 | 1 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |

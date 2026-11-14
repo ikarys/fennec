@@ -1611,7 +1611,6 @@ export const fr: Record<MsgKey, string> = {
   portListAddPlaceholder: 'Ajouter…',
   // components/session/CopyButton.tsx
   copyButton: 'Copier',
-  runEndTryHint: "Le changement tourne dans son worktree — essayez-le avant d'intégrer.",
   serverAdd: "Ajouter un serveur",
   serverEdit: "Modifier {name}",
   serverNameTaken: "Le nom est déjà utilisé par un autre serveur",
