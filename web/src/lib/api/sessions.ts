@@ -235,6 +235,8 @@ export interface ContextView {
   title: string;
   /** The Context section's collapsed summary: "31 % · 165,9k left". */
   summary: string;
+  /** The context's size, "12,3k", for the composer's re-read warning; null before any measure. */
+  tokens: string | null;
   /** Null while nothing is measured. */
   composition: ContextComposition | null;
 }

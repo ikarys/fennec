@@ -8,11 +8,13 @@ export function EffortPicker({
   effort,
   accepted,
   defaultEffort,
+  contextTokens,
   onChange
 }: {
   effort: ReasoningEffort | null;
   accepted: ReasoningEffort[];
   defaultEffort: ReasoningEffort | null;
+  contextTokens?: string | null;
   onChange: (effort: ReasoningEffort | null) => void;
 }) {
   const t = useT();
@@ -20,11 +22,14 @@ export function EffortPicker({
   const defaultLabel = defaultEffort
     ? t('effortDefault', { effort: defaultEffort })
     : t('effortAutoShort');
+  const title = contextTokens
+    ? t('sessionEffortTitle') + ' ' + t('rereadWarning', { tokens: contextTokens })
+    : t('sessionEffortTitle');
 
   return (
     <ChoiceMenu
       label={t('sessionEffort')}
-      title={t('sessionEffortTitle')}
+      title={title}
       align="right"
       width="w-40"
       groups={[
