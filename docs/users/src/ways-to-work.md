@@ -52,8 +52,9 @@ In a project session, choose a workflow in the **Workflow** picker of the compos
 1. A planner proposes the plan and its criteria; the run waits for your approval.
 2. Tests are written from the criteria; you approve them.
 3. The builder works in the session's own worktree.
-4. fennec runs the criteria checks itself, then a fresh agent verifies the other criteria and reviews the diff. Findings go back to the builder, up to two rounds.
-5. What is left comes to you, and the run ends at the review gate. Integrating is your click.
+4. fennec runs the criteria checks itself, then a fresh agent judges the criteria that have no check, and another reviews the diff once.
+5. If the review finds something, you choose: **Fix** (name the findings to take in your comment) or **Accept**. After a fix, fennec runs the criteria checks again, without a second review.
+6. The run ends at the review gate. Integrating is your click.
 
 **Step by step** pauses the run before every node, so you can follow or redirect each step. **Quick build**, **Write documentation** and **Write a training course** are the other embedded workflows, and the **Workflows** page lets you draw your own. See [workflows](workflows.md).
 

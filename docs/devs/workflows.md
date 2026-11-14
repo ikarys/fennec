@@ -49,6 +49,11 @@ file tools to test files), then a human node asks to validate them. "Validate" r
 test files written so far; from the next turn on they are protected for the rest of the session, like the paths of
 `.agents/protected`, so the builder cannot weaken them. "Rework" sends the human's comment back to the `tests` agent.
 
+Its checks cost tokens, so each runs once. `verify` judges only the criteria without a check command, and the
+kernel skips it when every criterion has one. `review` reads the diff once against the plan; its findings go to the
+human node "Review findings", where the human picks what `fix-review` fixes. After the fix only the criteria checks
+run again (`recheck`), with no second verify or review.
+
 `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the file name. The editor
 saves into the project's or the global folder; an embedded default is
 copied on its first save.

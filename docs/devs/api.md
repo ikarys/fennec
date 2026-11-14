@@ -684,7 +684,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   messages it typed, first-seen order) and those still in the model's view
   (not dropped by a compaction, not cut by a replay); 404 if no session
 - `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, completionTokens, cachePercent, cost, costDetail, inputCost, cachedCost, outputCost, lastGenerationSpeed}`:
-  the session's model calls from the usage ledger (`usage.db`, crate `token-usage`), which outlives the log;
+  the model calls of the session and of its workflow's child sessions (verify, review) from the usage ledger
+  (`usage.db`, crate `token-usage`), which outlives the log;
   `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call;
   `cost` is the estimate at each model's price (Settings, models), `—` when none has one, indicative;
   `costDetail` says how or why not; `inputCost` (all prompt tokens, as `promptTokens`), `cachedCost` and

@@ -664,6 +664,55 @@ fn verdicts_record_indicative_only_for_unchecked_criteria() {
 }
 
 #[test]
+fn verdicts_node_with_every_criterion_checked_runs_no_model() {
+    let model = Scripted(RefCell::new(vec![reply(
+        "## Done when\n- first — check: `true`",
+        vec![],
+    )]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    *commands.exit_codes.lock().unwrap() = vec![0];
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let mut workflow = verdicts_workflow();
+    for node in &mut workflow.nodes {
+        if node.id == "verify"
+            && let NodeKind::Agent { outputs, .. } = &mut node.kind
+        {
+            *outputs = vec!["pass".into()];
+        }
+    }
+    for edge in &mut workflow.edges {
+        if edge.from == "verify" {
+            edge.port = "pass".into();
+        }
+    }
+    let reason = run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(reason, DoneReason::Complete);
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::WorkflowNodeFinished { node_id, port, .. }
+            if node_id == "verify" && port == "pass"
+    )));
+}
+
+#[test]
 fn shell_success_and_failure() {
     let workflow = Workflow {
         id: "w".into(),
