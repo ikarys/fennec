@@ -17,6 +17,13 @@ export function serverBadge(
     case 'ready':
       return { text: t(lang, 'serverReady'), tone: 'ok', pulse: true };
     case 'exited':
+      if (server.exitSignal !== null) {
+        return {
+          text: t(lang, 'serverSignaled', { signal: server.exitSignal }),
+          tone: 'attention',
+          pulse: false,
+        };
+      }
       if (server.exitCode === 0) {
         return { text: t(lang, 'serverEnded'), tone: 'neutral', pulse: false };
       }
@@ -28,6 +35,16 @@ export function serverBadge(
         tone: 'err',
         pulse: false,
       };
+  }
+}
+
+/** The short label for a server URL: its port when present, the URL otherwise. */
+export function portLabel(url: string): string {
+  try {
+    const port = new URL(url).port;
+    return port === '' ? url : `:${port}`;
+  } catch {
+    return url;
   }
 }
 

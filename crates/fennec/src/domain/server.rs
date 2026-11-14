@@ -113,6 +113,55 @@ pub fn url_port(url: &str) -> Option<u16> {
     port.parse().ok()
 }
 
+/// Where a running server answers, from the ports its process group listens on.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Address {
+    pub url: String,
+    pub ready: bool,
+    pub extra_urls: Vec<String>,
+    pub port_ignored: bool,
+}
+
+/// Chooses the URL and ready state from the given port, the listening ports, and an announced URL.
+pub fn address(given: u16, listening: &[u16], announced: Option<String>) -> Address {
+    let ready = !listening.is_empty();
+    let port_ignored = ready && !listening.contains(&given);
+    let announced_port = announced.as_ref().and_then(|url| url_port(url));
+
+    // The announced port if it listens, else $PORT, else the lowest listening port; while
+    // nothing listens yet, where the server says or was told to be.
+    let main = announced_port
+        .filter(|port| listening.contains(port))
+        .or_else(|| listening.contains(&given).then_some(given))
+        .or_else(|| listening.iter().copied().min())
+        .or(announced_port)
+        .unwrap_or(given);
+
+    let url = if announced_port == Some(main) {
+        announced.unwrap_or_else(|| format!("http://127.0.0.1:{main}"))
+    } else {
+        format!("http://127.0.0.1:{main}")
+    };
+
+    let mut other = listening
+        .iter()
+        .copied()
+        .filter(|port| *port != main)
+        .collect::<Vec<_>>();
+    other.sort_unstable();
+    let extra_urls = other
+        .into_iter()
+        .map(|port| format!("http://127.0.0.1:{port}"))
+        .collect();
+
+    Address {
+        url,
+        ready,
+        extra_urls,
+        port_ignored,
+    }
+}
+
 /// Project files used to guess a default dev command.
 pub struct ProjectFiles<'a> {
     pub justfile: Option<&'a str>,
@@ -361,5 +410,49 @@ mod tests {
             cargo_toml: false,
         };
         assert_eq!(guess_command(&files), None);
+    }
+    #[test]
+    fn address_prefers_an_announced_port_that_is_listening() {
+        let addr = address(41398, &[5180, 8080], Some("http://127.0.0.1:5180".into()));
+
+        assert!(addr.ready);
+        assert_eq!(addr.url, "http://127.0.0.1:5180");
+        assert_eq!(addr.extra_urls, vec!["http://127.0.0.1:8080"]);
+        assert!(addr.port_ignored);
+    }
+
+    #[test]
+    fn address_uses_the_given_port_when_it_is_listening() {
+        let addr = address(41398, &[41398], None);
+
+        assert!(addr.ready);
+        assert_eq!(addr.url, "http://127.0.0.1:41398");
+        assert!(addr.extra_urls.is_empty());
+        assert!(!addr.port_ignored);
+    }
+
+    #[test]
+    fn address_is_not_ready_when_nothing_listens() {
+        let announced = address(41398, &[], Some("http://127.0.0.1:5180".into()));
+        assert!(!announced.ready);
+        assert_eq!(announced.url, "http://127.0.0.1:5180");
+        assert!(announced.extra_urls.is_empty());
+        assert!(!announced.port_ignored);
+
+        let given = address(41398, &[], None);
+        assert!(!given.ready);
+        assert_eq!(given.url, "http://127.0.0.1:41398");
+        assert!(given.extra_urls.is_empty());
+        assert!(!given.port_ignored);
+    }
+
+    #[test]
+    fn address_uses_the_given_port_when_the_announced_port_is_not_listening() {
+        let addr = address(41398, &[41398, 8080], Some("http://127.0.0.1:5180".into()));
+
+        assert!(addr.ready);
+        assert_eq!(addr.url, "http://127.0.0.1:41398");
+        assert_eq!(addr.extra_urls, vec!["http://127.0.0.1:8080"]);
+        assert!(!addr.port_ignored);
     }
 }

@@ -7,7 +7,6 @@ export interface ServerDef {
   command: string;
 }
 /** A server's state in this session: `starting` until its port answers. */
-/** A server's state in this session:  until its port answers. */
 export type ServerState = 'stopped' | 'starting' | 'ready' | 'exited';
 
 /** A server with its running state in this session. */
@@ -18,6 +17,14 @@ export interface ServerView extends ServerDef {
   url: string | null;
   exitCode: number | null;
   output: string[];
+  /** The free PORT fennec handed the server (null unless running). */
+  port: number | null;
+  /** Other loopback URLs the server listens on besides `url` (e.g. its API), [] unless running. */
+  extraUrls: string[];
+  /** The server listens, but not on `port` (its command ignores $PORT, so two sessions may collide on the same hard-coded port); false unless running. */
+  portIgnored: boolean;
+  /** The signal that ended an exited server (null unless exited by a signal). */
+  exitSignal: number | null;
 }
 
 export function getServers(id: string): Promise<ServerView[]> {

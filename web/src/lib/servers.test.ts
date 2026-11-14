@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ServerView } from './api';
-import { serverBadge, serversPollMs } from './servers';
+import { portLabel, serverBadge, serversPollMs } from './servers';
 
 function server(overrides: Partial<ServerView> = {}): ServerView {
   return {
@@ -12,6 +12,10 @@ function server(overrides: Partial<ServerView> = {}): ServerView {
     url: null,
     exitCode: null,
     output: [],
+    port: null,
+    extraUrls: [],
+    portIgnored: false,
+    exitSignal: null,
     ...overrides,
   };
 }
@@ -65,8 +69,30 @@ describe('serverBadge', () => {
     });
   });
 
+  it('shows exited by a signal as attention', () => {
+    expect(serverBadge('en', server({ state: 'exited', exitSignal: 15 }))).toEqual({
+      text: 'stopped by signal 15',
+      tone: 'attention',
+      pulse: false,
+    });
+  });
+
   it('uses the requested language', () => {
     expect(serverBadge('fr', server({ state: 'ready' })).text).toBe('prêt');
+  });
+});
+
+describe('portLabel', () => {
+  it('returns the port when the URL has one', () => {
+    expect(portLabel('http://127.0.0.1:5180/')).toBe(':5180');
+  });
+
+  it('returns the URL when it has no explicit port', () => {
+    expect(portLabel('http://example.test/')).toBe('http://example.test/');
+  });
+
+  it('returns the input when it does not parse', () => {
+    expect(portLabel('not a url')).toBe('not a url');
   });
 });
 

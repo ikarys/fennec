@@ -645,16 +645,21 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `{"kind":"table","columns":[…],"rows":[[…]]}` (at most 100 rows, no row longer than `columns`); `tone` is
   `none`, `info`, `success`, `warning` or `danger`. An update with a non-http link, a non-finite progress or an
   oversized table is dropped with the rest of its content, as one beyond the caps (200 elements, 32 KiB).
-- `GET /api/sessions/{id}/servers` → `[{name, command, suggested, state, running, url, exitCode, output}]`:
+- `GET /api/sessions/{id}/servers` →
+  `[{name, command, suggested, state, running, url, port, extraUrls, portIgnored, exitCode, exitSignal, output}]`:
   the project's servers (`.agents/servers.json`) and their state in this session. When the file
   lists none, one `dev` server guessed from the project (a Justfile `dev` recipe, a package.json
   `dev` script, a Makefile `dev` or `run` target, else `cargo run` with a Cargo.toml) comes back
   with `suggested: true`; the UI saves it on the human's confirmation. `state` is `stopped`,
-  `starting` (the process lives, its port does not answer yet), `ready` (the port answers) or
-  `exited` (it ended on its own; `exitCode`, `null` when killed by a signal). `url` is the last
-  loopback URL the server printed, else `http://127.0.0.1:{PORT}`, `null` unless it runs;
-  `running` is `starting` or `ready`. `output` is the last 40 lines of its stdout and stderr,
-  without ANSI escapes (fennec keeps 200). 404 if no session.
+  `starting` (the process lives, nothing in its process group listens yet), `ready` (a process of
+  its group listens on a TCP port, read from `/proc` on Linux and `lsof` on macOS, else a connect
+  to the expected port) or `exited` (it ended on its own; `exitCode`, or `exitSignal` when a
+  signal ended it). `url` is the loopback URL the server printed (searched over the 200 kept
+  lines) when that port listens, else `$PORT` when it listens, else its lowest listening port;
+  `null` unless it runs. `extraUrls` are its other listening ports. `port` is the `$PORT` fennec
+  gave it; `portIgnored` is true when it listens but not on `$PORT` (its command hard-codes its
+  ports, so two sessions collide). `running` is `starting` or `ready`. `output` is the last 40
+  lines of its stdout and stderr, without ANSI escapes (fennec keeps 200). 404 if no session.
 - `POST /api/sessions/{id}/servers` `{servers: [{name, command}]}` → the same list:
   saves the project's servers to `.agents/servers.json`. 400 on an empty name/command or a
   duplicate name, 404 if no session.

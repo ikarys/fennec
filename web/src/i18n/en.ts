@@ -1095,6 +1095,8 @@ export const en = {
   serverExited: 'exited ({code})',
   serverExitedNoCode: 'exited',
   serverEnded: 'ended',
+  serverSignaled: 'stopped by signal {signal}',
+  serverPortIgnored: 'Ignores $PORT ({port}): it listens on its own ports, so sessions can collide.',
   useThisCommand: 'Use this command',
   openTerminalInWorktree: 'Open a terminal in the worktree',
   openTerminalInProject: 'Open a terminal in the project',
