@@ -192,3 +192,21 @@ pub(super) fn record_verdicts(
 
     Ok(())
 }
+
+/// A verdicts node whose criteria all have a check has nothing to judge:
+/// fennec ran every check, a model would only repeat them. Its `pass` port.
+pub(super) fn nothing_to_judge(node: &NodeKind, state: &run::RunState) -> Option<String> {
+    let NodeKind::Agent {
+        verdicts, outputs, ..
+    } = node
+    else {
+        return None;
+    };
+    let all_checked = !state.criteria.is_empty()
+        && state
+            .criteria
+            .iter()
+            .all(|state| state.criterion.check.is_some());
+    (*verdicts && all_checked && outputs.iter().any(|output| output == "pass"))
+        .then(|| "pass".to_string())
+}

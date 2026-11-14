@@ -376,15 +376,16 @@ pub(crate) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
     require_session(&store, id)?;
     let ledger =
         token_usage::Ledger::open(&app.settings.usage_path()).map_err(|e| e.to_string())?;
-    let filter = token_usage::Filter {
-        run_id: Some(id.to_string()),
-        ..Default::default()
-    };
-    let summary = ledger.summary(&filter).map_err(|e| e.to_string())?;
-    let latest = ledger.latest(&filter).map_err(|e| e.to_string())?;
-    let rows = ledger
-        .series(&filter, token_usage::GroupBy::Model)
-        .map_err(|e| e.to_string())?;
+    let calls = session_rows(&ledger, &store.events(id)?, id)?;
+    let filter = token_usage::Filter::default();
+    let summary = token_usage::summary_from_rows(&calls, &filter);
+    let latest = calls.last().map(|call| token_usage::LatestCall {
+        at_ms: call.at_ms,
+        model: call.model.clone(),
+        prefill_speed: call.prefill_speed,
+        generation_speed: call.generation_speed,
+    });
+    let rows = token_usage::group_rows(&calls, &filter, token_usage::GroupBy::Model);
     // The usage panel's cost text follows the human's display language.
     let preferences = store.preferences()?;
     let lang = preferences.display.language;
@@ -400,6 +401,34 @@ pub(crate) fn serve_usage(app: &App, stream: &mut TcpStream, id: &str) -> Result
             lang
         )),
     )
+}
+
+/// The calls of the session and of its child sessions (verify, review), oldest first.
+fn session_rows(
+    ledger: &token_usage::Ledger,
+    events: &[crate::domain::event::Event],
+    id: &str,
+) -> Result<Vec<token_usage::CallRow>, String> {
+    rows_of(
+        ledger,
+        std::iter::once(id.to_string()).chain(workflow_usage::child_ids(events)),
+    )
+}
+
+fn rows_of(
+    ledger: &token_usage::Ledger,
+    ids: impl IntoIterator<Item = String>,
+) -> Result<Vec<token_usage::CallRow>, String> {
+    let mut rows = Vec::new();
+    for id in ids {
+        let filter = token_usage::Filter {
+            run_id: Some(id),
+            ..Default::default()
+        };
+        rows.extend(ledger.rows(&filter).map_err(|e| e.to_string())?);
+    }
+    rows.sort_by_key(|row| (row.at_ms, row.id));
+    Ok(rows)
 }
 
 pub(crate) fn serve_usage_calls(
@@ -761,6 +790,45 @@ mod tests {
     use super::*;
     use crate::web::test_support::app;
     use std::net::TcpListener;
+
+    fn call(run_id: &str, at_ms: i64) -> token_usage::Call {
+        token_usage::Call {
+            external_id: None,
+            at_ms,
+            product: Default::default(),
+            group_id: Default::default(),
+            group_name: Default::default(),
+            run_id: run_id.into(),
+            kind: Default::default(),
+            model: "model".into(),
+            usage: token_usage::Usage {
+                prompt_tokens: 1,
+                cached_tokens: 0,
+                completion_tokens: 1,
+            },
+            total_secs: 1.0,
+            prefill_speed: 1.0,
+            generation_speed: 1.0,
+            breakdown: Default::default(),
+            savings: Default::default(),
+            labels: Default::default(),
+        }
+    }
+
+    #[test]
+    fn session_rows_include_child_sessions() {
+        let ledger = token_usage::Ledger::open_in_memory().unwrap();
+        ledger.record(&call("parent", 2)).unwrap();
+        ledger.record(&call("child", 1)).unwrap();
+        ledger.record(&call("other", 3)).unwrap();
+
+        let rows = rows_of(&ledger, ["parent".to_string(), "child".to_string()]).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows.iter().map(|row| row.at_ms).collect::<Vec<i64>>(),
+            vec![1, 2]
+        );
+    }
 
     #[test]
     fn create_session_routes_chat_id_to_the_scratch_project() {

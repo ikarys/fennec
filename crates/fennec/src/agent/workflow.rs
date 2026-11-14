@@ -292,6 +292,17 @@ fn run_node(
         .map(|open| open.pass)
         .unwrap_or_else(|| state.node_passes.get(node_id).copied().unwrap_or(0) + 1);
     let mut resumed = resumed_child(env, state, node_id)?;
+    if resumed.is_none()
+        && let Some(port) = criteria::nothing_to_judge(&node.kind, state)
+    {
+        append_node_started(turn, state, node_id, pass, &via, None)?;
+        let end = nodes::NodeEnd::Finished {
+            port,
+            output: "Every criterion has a check and fennec ran it: nothing left to judge.".into(),
+            exit_code: None,
+        };
+        return record(turn, state, node_id, end, Some(0));
+    }
     let child = match (&node.kind, &resumed) {
         (_, Some((child, _))) => Some(child.clone()),
         (
