@@ -1,12 +1,12 @@
 {
   "color": "yellow",
   "label": "vibecoding",
-  "message": "level 2 · checked 2026-11-13 · 76cd2eb",
+  "message": "level 2 · checked 2026-11-14 · e9a6474",
   "schemaVersion": 1,
   "vibecoding": {
     "checked_by": "vibecheck 0.4.0",
-    "commit": "76cd2eb",
-    "date": "2026-11-13",
+    "commit": "e9a6474",
+    "date": "2026-11-14",
     "evidence": {
       "audit": "audit/evidence/audit.json",
       "coverage": "audit/evidence/coverage.txt",
@@ -15,11 +15,11 @@
     },
     "level": 2,
     "metrics": {
-      "coverage": 83.23,
+      "coverage": 83.78,
       "file_max": 2643,
       "function_max": 106,
       "markers": 134,
-      "outdated": 8
+      "outdated": 2
     },
     "open_findings": {
       "BLOCKER": 0,

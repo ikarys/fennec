@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-13T09:22:46.091Z",
+    "detectionDate": "2026-11-14T07:45:14.288Z",
     "formats": {
       "typescript": {
         "sources": {
@@ -1145,8 +1145,8 @@
             "newClones": 0
           },
           "web/src/hooks/useSessionDecisions.ts": {
-            "lines": 102,
-            "tokens": 1284,
+            "lines": 101,
+            "tokens": 1280,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1374,8 +1374,8 @@
           }
         },
         "total": {
-          "lines": 12997,
-          "tokens": 130036,
+          "lines": 12996,
+          "tokens": 130032,
           "sources": 114,
           "clones": 16,
           "duplicatedLines": 128,
@@ -1425,8 +1425,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunEndCard.tsx": {
-            "lines": 152,
-            "tokens": 1205,
+            "lines": 136,
+            "tokens": 1073,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2456,6 +2456,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/session/runEndIntegration.test.tsx": {
+            "lines": 22,
+            "tokens": 254,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/session/markdownComponents.tsx": {
             "lines": 29,
             "tokens": 559,
@@ -2517,8 +2529,8 @@
             "newClones": 0
           },
           "web/src/components/session/TryOrIntegrate.tsx": {
-            "lines": 11,
-            "tokens": 97,
+            "lines": 9,
+            "tokens": 63,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2553,8 +2565,8 @@
             "newClones": 0
           },
           "web/src/components/session/Thread.tsx": {
-            "lines": 237,
-            "tokens": 2714,
+            "lines": 235,
+            "tokens": 2692,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2589,8 +2601,8 @@
             "newClones": 0
           },
           "web/src/components/session/SessionThreadPane.tsx": {
-            "lines": 38,
-            "tokens": 293,
+            "lines": 36,
+            "tokens": 278,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2613,8 +2625,8 @@
             "newClones": 0
           },
           "web/src/components/session/SessionProviders.tsx": {
-            "lines": 10,
-            "tokens": 113,
+            "lines": 9,
+            "tokens": 102,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2914,7 +2926,7 @@
           },
           "web/src/components/session/IntegrationDecision.tsx": {
             "lines": 16,
-            "tokens": 101,
+            "tokens": 95,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3777,8 +3789,8 @@
             "newClones": 0
           },
           "web/src/pages/SessionPage.tsx": {
-            "lines": 143,
-            "tokens": 1154,
+            "lines": 142,
+            "tokens": 1144,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3922,9 +3934,9 @@
           }
         },
         "total": {
-          "lines": 14544,
-          "tokens": 138127,
-          "sources": 211,
+          "lines": 14542,
+          "tokens": 138151,
+          "sources": 212,
           "clones": 3,
           "duplicatedLines": 608,
           "duplicatedTokens": 5161,
@@ -3973,8 +3985,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunEndCard.tsx": {
-            "lines": 329,
-            "tokens": 2772,
+            "lines": 318,
+            "tokens": 2639,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5064,6 +5076,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/session/runEndIntegration.test.tsx": {
+            "lines": 55,
+            "tokens": 622,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/session/markdownComponents.tsx": {
             "lines": 88,
             "tokens": 1320,
@@ -5125,8 +5149,8 @@
             "newClones": 0
           },
           "web/src/components/session/TryOrIntegrate.tsx": {
-            "lines": 35,
-            "tokens": 258,
+            "lines": 33,
+            "tokens": 221,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5161,8 +5185,8 @@
             "newClones": 0
           },
           "web/src/components/session/Thread.tsx": {
-            "lines": 274,
-            "tokens": 3174,
+            "lines": 272,
+            "tokens": 3152,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5197,8 +5221,8 @@
             "newClones": 0
           },
           "web/src/components/session/SessionThreadPane.tsx": {
-            "lines": 103,
-            "tokens": 795,
+            "lines": 100,
+            "tokens": 741,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5221,8 +5245,8 @@
             "newClones": 0
           },
           "web/src/components/session/SessionProviders.tsx": {
-            "lines": 76,
-            "tokens": 648,
+            "lines": 71,
+            "tokens": 599,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5521,8 +5545,8 @@
             "newClones": 0
           },
           "web/src/components/session/IntegrationInvite.tsx": {
-            "lines": 12,
-            "tokens": 100,
+            "lines": 5,
+            "tokens": 34,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5546,7 +5570,7 @@
           },
           "web/src/components/session/IntegrationDecision.tsx": {
             "lines": 40,
-            "tokens": 259,
+            "tokens": 253,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6469,8 +6493,8 @@
             "newClones": 0
           },
           "web/src/pages/SessionPage.tsx": {
-            "lines": 429,
-            "tokens": 3836,
+            "lines": 428,
+            "tokens": 3826,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6638,9 +6662,9 @@
           }
         },
         "total": {
-          "lines": 28392,
-          "tokens": 270313,
-          "sources": 225,
+          "lines": 28416,
+          "tokens": 270558,
+          "sources": 226,
           "clones": 19,
           "duplicatedLines": 212,
           "duplicatedTokens": 2112,
@@ -7090,7 +7114,7 @@
           },
           "crates/fennec/src/web/routes/mcp_routes.rs": {
             "lines": 225,
-            "tokens": 2532,
+            "tokens": 2526,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8050,13 +8074,13 @@
           },
           "crates/fennec/src/store/mcp_credentials.rs": {
             "lines": 91,
-            "tokens": 810,
+            "tokens": 804,
             "sources": 1,
             "clones": 1,
             "duplicatedLines": 5,
             "duplicatedTokens": 114,
             "percentage": 5.49,
-            "percentageTokens": 14.07,
+            "percentageTokens": 14.18,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8169,14 +8193,14 @@
             "newClones": 0
           },
           "crates/fennec/src/mcp/oauth.rs": {
-            "lines": 426,
-            "tokens": 4389,
+            "lines": 309,
+            "tokens": 3471,
             "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
+            "clones": 2,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 180,
+            "percentage": 3.88,
+            "percentageTokens": 5.19,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8756,21 +8780,9 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "crates/fennec/src/domain/mcp_oauth.rs": {
-            "lines": 314,
-            "tokens": 2455,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
           "crates/fennec/src/domain/mcp_notice.rs": {
             "lines": 109,
-            "tokens": 1046,
+            "tokens": 1040,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8781,8 +8793,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/mcp.rs": {
-            "lines": 825,
-            "tokens": 7040,
+            "lines": 96,
+            "tokens": 874,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10029,14 +10041,14 @@
             "newClones": 0
           },
           "crates/fennec/src/mcp.rs": {
-            "lines": 546,
-            "tokens": 5427,
+            "lines": 80,
+            "tokens": 702,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 14,
-            "duplicatedTokens": 138,
-            "percentage": 2.56,
-            "percentageTokens": 2.54,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10113,8 +10125,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain.rs": {
-            "lines": 88,
-            "tokens": 592,
+            "lines": 87,
+            "tokens": 585,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10426,14 +10438,14 @@
           }
         },
         "total": {
-          "lines": 80172,
-          "tokens": 751212,
-          "sources": 312,
+          "lines": 78545,
+          "tokens": 736923,
+          "sources": 311,
           "clones": 237,
-          "duplicatedLines": 2719,
-          "duplicatedTokens": 28574,
-          "percentage": 3.39,
-          "percentageTokens": 3.8,
+          "duplicatedLines": 2718,
+          "duplicatedTokens": 28595,
+          "percentage": 3.46,
+          "percentageTokens": 3.88,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -10929,8 +10941,8 @@
             "newClones": 0
           },
           "crates/fennec/Cargo.toml": {
-            "lines": 21,
-            "tokens": 201,
+            "lines": 22,
+            "tokens": 224,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10966,8 +10978,8 @@
           }
         },
         "total": {
-          "lines": 78,
-          "tokens": 569,
+          "lines": 79,
+          "tokens": 592,
           "sources": 5,
           "clones": 0,
           "duplicatedLines": 0,
@@ -10980,14 +10992,14 @@
       }
     },
     "total": {
-      "lines": 137684,
-      "tokens": 1309930,
-      "sources": 900,
+      "lines": 136079,
+      "tokens": 1295929,
+      "sources": 901,
       "clones": 275,
-      "duplicatedLines": 3667,
-      "duplicatedTokens": 37310,
-      "percentage": 2.66,
-      "percentageTokens": 2.85,
+      "duplicatedLines": 3666,
+      "duplicatedTokens": 37331,
+      "percentage": 2.69,
+      "percentageTokens": 2.88,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
@@ -15577,12 +15589,12 @@
         "startLoc": {
           "line": 44,
           "column": 46,
-          "position": 367
+          "position": 364
         },
         "endLoc": {
           "line": 49,
           "column": 22,
-          "position": 481
+          "position": 478
         }
       },
       "secondFile": {
@@ -16138,6 +16150,42 @@
           "line": 181,
           "column": 29,
           "position": 1844
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 7,
+      "fragment": "() {\n        let nanos = std::time::SystemTime::now()\n            .duration_since(std::time::UNIX_EPOCH)\n            .map(|duration| duration.as_nanos())\n            .unwrap_or(0);\n        let vault = Vault {\n            db: std::env::temp_dir().join(format!(\"fennec-oauth-vault-refresh-test-{nanos}.db\"",
+      "tokens": 90,
+      "firstFile": {
+        "name": "crates/fennec/src/mcp/oauth.rs",
+        "start": 266,
+        "end": 272,
+        "startLoc": {
+          "line": 266,
+          "column": 71,
+          "position": 2959
+        },
+        "endLoc": {
+          "line": 272,
+          "column": 95,
+          "position": 3049
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/mcp/oauth.rs",
+        "start": 183,
+        "end": 189,
+        "startLoc": {
+          "line": 183,
+          "column": 44,
+          "position": 1900
+        },
+        "endLoc": {
+          "line": 189,
+          "column": 92,
+          "position": 1990
         }
       }
     },
@@ -20170,42 +20218,6 @@
           "line": 252,
           "column": 12,
           "position": 2346
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 8,
-      "fragment": ".into()),\n            ..Default::default()\n        };\n        server\n            .headers\n            .insert(\"authorization\".into(), \"Bearer manual\".into());\n        let headers = http_headers(&server);\n        assert_eq!(headers.get(\"Authorization\"),",
-      "tokens": 69,
-      "firstFile": {
-        "name": "crates/fennec/src/mcp.rs",
-        "start": 476,
-        "end": 483,
-        "startLoc": {
-          "line": 476,
-          "column": 32,
-          "position": 4700
-        },
-        "endLoc": {
-          "line": 483,
-          "column": 49,
-          "position": 4769
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/mcp.rs",
-        "start": 452,
-        "end": 460,
-        "startLoc": {
-          "line": 452,
-          "column": 38,
-          "position": 4515
-        },
-        "endLoc": {
-          "line": 460,
-          "column": 42,
-          "position": 4586
         }
       }
     },
