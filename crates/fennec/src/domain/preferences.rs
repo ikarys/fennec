@@ -250,6 +250,16 @@ impl Preferences {
             .retain(|f| f.provider == LOCAL_PROVIDER || known.contains(&f.provider));
     }
 
+    /// Spaces and hyphens in an MCP server's name become underscores: the name
+    /// prefixes its tools (`{server}_{tool}`), and the human may type "trilium NAS".
+    pub fn normalize_mcp_names(&mut self) {
+        for server in &mut self.mcp {
+            server.name = server
+                .name
+                .replace(|c: char| c.is_whitespace() || c == '-', "_");
+        }
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if let Some(selected) = &self.selected {
             if selected.model.is_empty() {
@@ -316,7 +326,7 @@ impl Preferences {
             }
             seen_mcp.push(server.name.clone());
             if let Some(problem) = server.problems().into_iter().next() {
-                return Err(problem);
+                return Err(format!("mcp server {:?}: {problem}", server.name));
             }
         }
         super::shortcut::check(&self.shortcuts)?;

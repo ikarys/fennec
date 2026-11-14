@@ -421,6 +421,32 @@ fn validate_accepts_a_well_formed_mcp_server() {
 }
 
 #[test]
+fn validate_rejects_an_mcp_server_name_with_a_space() {
+    let mut p = valid();
+    p.mcp = vec![McpServer {
+        name: "trilium NAS".into(),
+        command: Some("trilium-nas".into()),
+        ..Default::default()
+    }];
+    let error = p.validate().unwrap_err();
+    assert!(error.contains("trilium NAS"));
+    assert!(error.contains("spaces"));
+}
+
+#[test]
+fn normalize_mcp_names_turns_spaces_and_hyphens_into_underscores() {
+    let mut p = valid();
+    p.mcp = vec![McpServer {
+        name: "trilium NAS-home".into(),
+        command: Some("trilium-nas".into()),
+        ..Default::default()
+    }];
+    p.normalize_mcp_names();
+    assert_eq!(p.mcp[0].name, "trilium_NAS_home");
+    assert!(p.validate().is_ok());
+}
+
+#[test]
 fn preferences_round_trip_and_empty_json_loads() {
     let mut models = BTreeMap::new();
     models.insert(
