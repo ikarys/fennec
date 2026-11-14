@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/ikarys/fennec/compare/v0.5.0...v0.5.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **mcp:** follow tools/list pagination and keep non-text content ([#409](https://github.com/ikarys/fennec/issues/409)) ([e98b2c6](https://github.com/ikarys/fennec/commit/e98b2c64f237f73aeca31b34ac51f63e7de7b676))
+* **ui:** offer a finished run's work once, in the decision bar ([#410](https://github.com/ikarys/fennec/issues/410)) ([a57f926](https://github.com/ikarys/fennec/commit/a57f9265e531b35b42c09aa46641be279555697a))
+
 ## [0.5.0](https://github.com/ikarys/fennec/compare/v0.4.1...v0.5.0) (2026-11-13)
 
 

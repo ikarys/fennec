@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "backlog"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -40,7 +40,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "canvas"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "rusqlite",
  "serde",
@@ -193,7 +193,7 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fennec"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "backlog",
  "base64",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "rules"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "rusqlite",
  "serde",
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "token-usage"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "rusqlite",
  "serde",
