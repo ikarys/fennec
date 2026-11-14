@@ -252,11 +252,23 @@ impl Preferences {
 
     /// Spaces and hyphens in an MCP server's name become underscores: the name
     /// prefixes its tools (`{server}_{tool}`), and the human may type "trilium NAS".
-    pub fn normalize_mcp_names(&mut self) {
+    /// A token pasted with its `Bearer ` scheme loses it: the client adds the
+    /// scheme itself, and "Bearer Bearer …" is refused.
+    pub fn normalize_mcp(&mut self) {
         for server in &mut self.mcp {
             server.name = server
                 .name
                 .replace(|c: char| c.is_whitespace() || c == '-', "_");
+            if let Some(token) = &mut server.auth_token {
+                let trimmed = token.trim();
+                let bare = match trimmed.get(..7) {
+                    Some(scheme) if scheme.eq_ignore_ascii_case("bearer ") => {
+                        trimmed[7..].trim_start()
+                    }
+                    _ => trimmed,
+                };
+                *token = bare.to_string();
+            }
         }
     }
 

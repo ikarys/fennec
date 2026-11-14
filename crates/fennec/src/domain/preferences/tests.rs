@@ -441,9 +441,22 @@ fn normalize_mcp_names_turns_spaces_and_hyphens_into_underscores() {
         command: Some("trilium-nas".into()),
         ..Default::default()
     }];
-    p.normalize_mcp_names();
+    p.normalize_mcp();
     assert_eq!(p.mcp[0].name, "trilium_NAS_home");
     assert!(p.validate().is_ok());
+}
+
+#[test]
+fn normalize_mcp_strips_a_pasted_bearer_scheme() {
+    let mut p = valid();
+    p.mcp = vec![McpServer {
+        name: "trilium".into(),
+        url: Some("https://trilium.example/mcp".into()),
+        auth_token: Some(" bearer  secret ".into()),
+        ..Default::default()
+    }];
+    p.normalize_mcp();
+    assert_eq!(p.mcp[0].auth_token.as_deref(), Some("secret"));
 }
 
 #[test]
