@@ -28,6 +28,8 @@ For code that reads outside input (a parser, an import, an API client), cover mo
 
 Run the tests to show they fail for the right reason. Do not weaken a test to make it pass.
 
+Before you end, run the project's formatter and linter on your test files and fix what they report: once validated the files are protected, and the builder cannot even reformat them without asking the human.
+
 The human validates these tests; once validated they are protected and the builder cannot change them.
 
 End with exactly:
