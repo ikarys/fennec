@@ -194,7 +194,9 @@ dialog keeps its own "Try it" section. They start the project's servers in the s
 its port answers, ready, exited with its code), the URL it printed and its last output lines; a terminal opens in the
 worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
 Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
-copied, and servers share the project's Cargo target (`web/os/servers.rs`, `domain/server.rs`).
+copied, and servers share the project's Cargo target. Servers survive a fennec restart: output goes to a log file and
+live runs are recorded, then adopted at startup when their pid still has the same start time (`web/os/servers.rs`,
+`domain/server.rs`, `server_runs.rs`, `server_log.rs`).
 Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, Mermaid, JSON, images, PDF), pinned from the
 preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
