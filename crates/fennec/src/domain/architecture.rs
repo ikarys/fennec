@@ -152,7 +152,7 @@ impl Rules {
                 if path.starts_with(&rule.prefix) && line.contains(&rule.forbidden) {
                     violations.push(Violation {
                         path: path.to_string(),
-                        line: line.to_string(),
+                        line: super::excerpt::around(line, &rule.forbidden),
                         prefix: rule.prefix.clone(),
                         forbidden: rule.forbidden.clone(),
                     });

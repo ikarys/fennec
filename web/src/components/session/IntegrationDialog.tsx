@@ -338,7 +338,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                   <div className="flex flex-col gap-1.5">
                     {preview.blockers.map((blocker) => (
                       <div key={blocker.kind} className="flex items-start justify-between gap-2 text-xs">
-                        <span className="grow break-words text-text">{blockerSentence(lang, blocker)}</span>
+                        <span className="min-w-0 grow wrap-anywhere text-text">{blockerSentence(lang, blocker)}</span>
                         {blocker.kind === 'conflict' && (
                           <Button
                             variant="primary"

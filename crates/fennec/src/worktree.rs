@@ -159,14 +159,17 @@ fn record_origin(top: &Path, wt: &Worktree) -> Result<(), String> {
 
 /// What the model looked at or used as input, not work to integrate: the
 /// browser's captures, the files an idea pinned, and the dependency links
-/// `link_dependencies` makes. The human would cherry-pick them otherwise
-/// (`.gitignore`'s `node_modules/` does not match a symlink, which git sees
-/// as a file).
+/// `link_dependencies` makes, or the directories an install in the worktree
+/// fills when the project ignores neither. The human would cherry-pick them
+/// otherwise (`.gitignore`'s `node_modules/` does not match a symlink, which
+/// git sees as a file; a glob without `/**` matches only that link).
 const EXCLUDED_INPUTS: &[&str] = &[
     ":(exclude,glob)**/.playwright-cli/**",
     ":(exclude,glob)**/.fennec/**",
     ":(exclude,glob)**/node_modules",
+    ":(exclude,glob)**/node_modules/**",
     ":(exclude,glob)**/.venv",
+    ":(exclude,glob)**/.venv/**",
 ];
 
 /// Commits everything in the worktree (`git add -A`) but the model's inputs,
@@ -540,6 +543,11 @@ mod tests {
         std::fs::create_dir_all(wt.workdir.join(".fennec/assets")).unwrap();
         std::fs::write(wt.workdir.join(".fennec/assets/design.zip"), "zip").unwrap();
         assert_eq!(commit(&wt, "idea assets only"), Ok(false));
+        std::fs::create_dir_all(wt.workdir.join("web/node_modules/vite")).unwrap();
+        std::fs::write(wt.workdir.join("web/node_modules/vite/index.js"), "js").unwrap();
+        std::fs::create_dir_all(wt.workdir.join(".venv/lib")).unwrap();
+        std::fs::write(wt.workdir.join(".venv/lib/site.py"), "py").unwrap();
+        assert_eq!(commit(&wt, "installed dependencies only"), Ok(false));
         let range = format!("{}..{}", wt.base, wt.branch);
         assert_eq!(
             text(&wt.path, &["log", "--format=%s", &range]).trim(),
