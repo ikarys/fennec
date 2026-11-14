@@ -43,11 +43,9 @@ export function ToolCard({ tool, awaiting = false }: { tool: ToolCallView; await
   const lang = useLang();
   const display = useDisplayPrefs();
   const [manual, setManual] = useState<boolean | null>(null);
-  // Open while a command runs (live output) or a plan/report errors; otherwise the
-  // "open by default" setting, until the human clicks the toggle.
-  const forceOpen =
-    (tool.name === 'run_command' && tool.status === 'running') ||
-    ((tool.name === 'propose_plan' || tool.name === 'submit_report') && tool.status === 'error');
+  // Open while a command runs (live output); otherwise the "open by default" setting,
+  // until the human clicks the toggle. An error shows in the header, not by opening.
+  const forceOpen = tool.name === 'run_command' && tool.status === 'running';
   const open = manual ?? (forceOpen || display.toolResultsOpen);
 
   const arg =

@@ -39,6 +39,16 @@ const finishedCommand: ToolCallView = {
   exitCode: 0
 };
 
+const failedReport: ToolCallView = {
+  id: 't-report',
+  name: 'submit_report',
+  args: {},
+  status: 'error',
+  stdout: '',
+  stderr: '',
+  output: "step 1 has no non-empty 'title' string."
+};
+
 const thinkingItem: AssistantItem = {
   kind: 'assistant',
   id: 'a-1',
@@ -69,6 +79,10 @@ describe('tool results open by default', () => {
 
   it('a finished command is closed when the setting is off', () => {
     expect(expanded(renderTool(finishedCommand, false))).toBe(false);
+  });
+
+  it('a failed report is closed when the setting is off', () => {
+    expect(expanded(renderTool(failedReport, false))).toBe(false);
   });
 
   it('a finished command is open when the setting is on', () => {

@@ -402,7 +402,7 @@ graph LR
 | `web/src/components/workflow/nodes` | 2 | 0 |  |  |
 | `web/src/components/ui` | 27 | 0 |  |  |
 | `web/src/hooks` | 35 | 1 |  |  |
-| `web/src/components/session` | 64 | 2 |  |  |
+| `web/src/components/session` | 65 | 3 |  |  |
 | `web/src/components/workflow/session` | 9 | 1 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
