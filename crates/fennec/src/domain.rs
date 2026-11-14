@@ -28,6 +28,7 @@ pub mod diff;
 pub mod drift;
 pub mod editor;
 pub mod event;
+pub mod excerpt;
 pub mod frontmatter;
 pub mod home;
 pub mod id;
