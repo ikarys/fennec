@@ -11,6 +11,7 @@ interface McpPickerProps {
   view: McpSessionView | null;
   onToggle: (name: string, active: boolean) => void;
   disabled?: boolean;
+  contextTokens?: string | null;
 }
 
 /**
@@ -18,7 +19,7 @@ interface McpPickerProps {
  * and the token cost of their tools. Toggling a server records the session's
  * disabled set; the dropdown only lists the servers the human showed.
  */
-export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
+export function McpPicker({ view, onToggle, disabled, contextTokens }: McpPickerProps) {
   const t = useT();
   const lang = useLang();
   const [open, setOpen] = useState(false);
@@ -52,6 +53,9 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
     view && visible.length > 0
       ? `${activeCount} MCP${view.totalTokens > 0 ? ` (${formatTokens(lang, view.totalTokens)})` : ''}`
       : 'MCP';
+  const title = contextTokens
+    ? `${t('mcpSessionTitle')}. ${t('rereadWarning', { tokens: contextTokens })}`
+    : t('mcpSessionTitle');
 
   function row(server: McpServerView) {
     return (
@@ -78,7 +82,7 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
         variant="ghost"
         size="sm"
         disabled={disabled}
-        title={t('mcpSessionTitle')}
+        title={title}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="flex items-center gap-1.5">

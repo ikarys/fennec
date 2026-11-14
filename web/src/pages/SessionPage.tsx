@@ -353,6 +353,7 @@ export function SessionPage({
               acceptedEfforts={acceptedEfforts}
               defaultEffort={defaultEffort}
               onEffortChange={(next) => void handleEffortChange(next)}
+              contextTokens={context?.tokens}
               error={sendError}
               textareaRef={textareaRef}
               placeholder={

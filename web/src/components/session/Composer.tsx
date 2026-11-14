@@ -62,6 +62,7 @@ interface ComposerProps {
   onWorkflowSelectionChange?: (selection: WorkflowSelection) => void;
   mcpView?: McpSessionView | null;
   onMcpToggle?: (name: string, active: boolean) => void;
+  contextTokens?: string | null;
 }
 
 export function Composer({
@@ -94,6 +95,7 @@ export function Composer({
   onWorkflowSelectionChange,
   mcpView,
   onMcpToggle,
+  contextTokens,
 }: ComposerProps) {
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -330,7 +332,11 @@ export function Composer({
             />
           )}
           {mcpView && onMcpToggle && (
-            <McpPicker view={mcpView} onToggle={onMcpToggle} />
+            <McpPicker
+              view={mcpView}
+              onToggle={onMcpToggle}
+              contextTokens={contextTokens}
+            />
           )}
           <div className="ml-auto flex items-center gap-1.5 px-1.5 text-xs text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />
@@ -339,6 +345,7 @@ export function Composer({
                 effort={effort ?? null}
                 accepted={acceptedEfforts ?? []}
                 defaultEffort={defaultEffort ?? null}
+                contextTokens={contextTokens}
                 onChange={onEffortChange}
               />
             )}
