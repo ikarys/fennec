@@ -28,7 +28,7 @@ lands, add its paragraph to `docs/devs/components.md`.
 - A root file named like a domain file is its adapter: `domain/budget.rs` decides, `budget.rs`
   reads the store for it. `main.rs` and `turn_build.rs` are the composition roots.
 - A reusable, fennec-free concern gets its own crate (`crates/backlog`, `rules`, `canvas`,
-  `token-usage`, and llm-providers-connector on crates.io for talking to models).
+  `token-usage`, and on crates.io llm-providers-connector for talking to models, mcp-lite for MCP).
 - One responsibility per file. No god file, no catch-all module (`utils`, `misc`, `common`,
   `helpers`). A Rust root file is an adapter or a composition root; `web/src` holds only
   `main.tsx` and `App.tsx` at its root.
