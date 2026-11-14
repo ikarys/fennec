@@ -32,50 +32,48 @@ graph LR
   m24["crates/fennec/src/mcp"]
   m25["crates/fennec/src/sandbox"]
   m26["crates/fennec/src/store"]
-  m27["crates/mcp-lite/src/oauth"]
-  m28["crates/fennec/src/domain"]
-  m29["crates/rules/src"]
-  m30["crates/fennec/src/domain/preferences"]
-  m31["crates/mcp-lite/src"]
-  m32["crates/fennec/src/domain/module_map"]
-  m33["crates/fennec/src/domain/event"]
-  m34["crates/token-usage/src"]
-  m35["crates/backlog/src"]
-  m36["web/src"]
-  m37["web/src/components/layout"]
-  m38["web/src/pages"]
-  m39["web/src/components/agents"]
-  m40["web/src/components/editor"]
-  m41["web/src/components/project"]
-  m42["web/src/components/project/ideas"]
-  m43["web/src/components/workflow"]
-  m44["web/src/components/plugins"]
-  m45["web/src/components/rules"]
-  m46["web/src/components/workflow/fields"]
-  m47["web/src/components/workflow/nodes"]
-  m48["web/src/components/ui"]
-  m49["web/src/hooks"]
-  m50["web/src/components/session"]
-  m51["web/src/components/workflow/session"]
-  m52["web/src/components/canvas"]
-  m53["web/src/components/preview"]
-  m54["web/src/lib"]
-  m55["web/src/components/settings"]
-  m56["web/src/lib/api"]
-  m57["web/src/i18n"]
-  m58["crates/fennec"]
-  m59["crates/token-usage/tests"]
-  m60["docs/users/theme"]
-  m61["web"]
-  m62["web/scripts"]
-  m14 -->|1| m35
+  m27["crates/fennec/src/domain"]
+  m28["crates/rules/src"]
+  m29["crates/fennec/src/domain/preferences"]
+  m30["crates/fennec/src/domain/module_map"]
+  m31["crates/fennec/src/domain/event"]
+  m32["crates/token-usage/src"]
+  m33["crates/backlog/src"]
+  m34["web/src"]
+  m35["web/src/components/layout"]
+  m36["web/src/pages"]
+  m37["web/src/components/agents"]
+  m38["web/src/components/editor"]
+  m39["web/src/components/project"]
+  m40["web/src/components/project/ideas"]
+  m41["web/src/components/workflow"]
+  m42["web/src/components/plugins"]
+  m43["web/src/components/rules"]
+  m44["web/src/components/workflow/fields"]
+  m45["web/src/components/workflow/nodes"]
+  m46["web/src/components/ui"]
+  m47["web/src/hooks"]
+  m48["web/src/components/session"]
+  m49["web/src/components/workflow/session"]
+  m50["web/src/components/canvas"]
+  m51["web/src/components/preview"]
+  m52["web/src/lib"]
+  m53["web/src/components/settings"]
+  m54["web/src/lib/api"]
+  m55["web/src/i18n"]
+  m56["crates/fennec"]
+  m57["crates/token-usage/tests"]
+  m58["docs/users/theme"]
+  m59["web"]
+  m60["web/scripts"]
+  m14 -->|1| m33
   m14 -->|3| m19
   m14 -->|1| m21
   m14 -->|1| m18
-  m14 -->|20| m28
-  m14 -->|3| m33
-  m14 -->|2| m32
+  m14 -->|20| m27
+  m14 -->|3| m31
   m14 -->|2| m30
+  m14 -->|2| m29
   m14 -->|1| m16
   m14 -->|1| m22
   m14 -->|1| m15
@@ -84,86 +82,82 @@ graph LR
   m14 -->|4| m26
   m14 -->|1| m20
   m14 -->|4| m17
-  m14 -->|1| m29
-  m14 -->|3| m34
+  m14 -->|1| m28
+  m14 -->|3| m32
   m19 -->|1| m21
-  m19 -->|16| m28
-  m19 -->|20| m33
-  m19 -->|2| m30
+  m19 -->|16| m27
+  m19 -->|20| m31
+  m19 -->|2| m29
   m19 -->|1| m22
   m19 -->|1| m20
-  m19 -->|3| m29
+  m19 -->|3| m28
   m0 -->|1| m19
+  m0 -->|1| m27
+  m0 -->|1| m31
   m0 -->|1| m28
-  m0 -->|1| m33
-  m0 -->|1| m29
-  m21 -->|1| m28
-  m21 -->|1| m33
-  m21 -->|1| m30
+  m21 -->|1| m27
+  m21 -->|1| m31
+  m21 -->|1| m29
   m13 -->|1| m19
   m13 -->|3| m21
-  m13 -->|3| m28
-  m13 -->|4| m33
+  m13 -->|3| m27
+  m13 -->|4| m31
   m13 -->|4| m22
-  m18 -->|2| m28
+  m18 -->|2| m27
   m1 -->|6| m14
   m1 -->|1| m19
   m1 -->|1| m21
   m1 -->|1| m18
-  m1 -->|5| m28
-  m1 -->|2| m33
+  m1 -->|5| m27
+  m1 -->|2| m31
   m1 -->|2| m26
-  m28 -->|2| m35
-  m28 -->|9| m33
-  m28 -->|1| m32
-  m28 -->|1| m30
-  m28 -->|1| m31
-  m28 -->|4| m29
-  m28 -->|2| m34
-  m22 -->|3| m28
-  m22 -->|2| m33
+  m27 -->|2| m33
+  m27 -->|9| m31
+  m27 -->|1| m30
+  m27 -->|1| m29
+  m27 -->|4| m28
+  m27 -->|2| m32
+  m22 -->|3| m27
+  m22 -->|2| m31
   m15 -->|2| m14
   m15 -->|1| m19
-  m15 -->|1| m28
-  m15 -->|1| m33
+  m15 -->|1| m27
+  m15 -->|1| m31
   m24 -->|1| m14
-  m24 -->|2| m28
-  m24 -->|1| m30
+  m24 -->|2| m27
+  m24 -->|1| m29
   m24 -->|2| m25
   m24 -->|2| m26
-  m24 -->|1| m31
-  m24 -->|1| m27
   m7 -->|3| m14
-  m7 -->|4| m28
+  m7 -->|4| m27
   m7 -->|2| m25
   m7 -->|2| m26
-  m25 -->|1| m30
-  m26 -->|1| m35
+  m25 -->|1| m29
+  m26 -->|1| m33
   m26 -->|1| m14
   m26 -->|1| m19
-  m26 -->|9| m28
-  m26 -->|3| m33
-  m26 -->|1| m30
-  m26 -->|1| m27
+  m26 -->|9| m27
+  m26 -->|3| m31
+  m26 -->|1| m29
   m20 -->|1| m23
   m20 -->|2| m14
   m20 -->|2| m19
-  m20 -->|8| m28
-  m20 -->|8| m33
-  m20 -->|1| m30
+  m20 -->|8| m27
+  m20 -->|8| m31
+  m20 -->|1| m29
   m20 -->|1| m24
   m20 -->|1| m25
-  m20 -->|2| m29
-  m2 -->|3| m33
+  m20 -->|2| m28
+  m2 -->|3| m31
   m2 -->|2| m25
-  m3 -->|1| m33
+  m3 -->|1| m31
   m5 -->|5| m14
   m5 -->|2| m19
   m5 -->|2| m21
   m5 -->|1| m13
-  m5 -->|4| m28
-  m5 -->|2| m33
-  m5 -->|1| m30
+  m5 -->|4| m27
+  m5 -->|2| m31
+  m5 -->|1| m29
   m5 -->|1| m22
   m5 -->|1| m7
   m5 -->|1| m25
@@ -171,31 +165,31 @@ graph LR
   m5 -->|1| m20
   m5 -->|2| m6
   m5 -->|1| m17
-  m12 -->|3| m35
+  m12 -->|3| m33
   m12 -->|4| m14
   m12 -->|4| m19
   m12 -->|1| m13
-  m12 -->|5| m28
-  m12 -->|2| m33
-  m12 -->|3| m30
+  m12 -->|5| m27
+  m12 -->|2| m31
+  m12 -->|3| m29
   m12 -->|2| m22
   m12 -->|3| m15
   m12 -->|5| m26
   m12 -->|1| m5
-  m12 -->|1| m34
+  m12 -->|1| m32
   m8 -->|1| m14
-  m8 -->|2| m28
+  m8 -->|2| m27
   m8 -->|3| m5
   m8 -->|1| m17
-  m6 -->|5| m35
+  m6 -->|5| m33
   m6 -->|4| m23
   m6 -->|24| m14
   m6 -->|12| m19
   m6 -->|2| m13
   m6 -->|5| m18
-  m6 -->|30| m28
-  m6 -->|10| m33
-  m6 -->|4| m30
+  m6 -->|30| m27
+  m6 -->|10| m31
+  m6 -->|4| m29
   m6 -->|2| m22
   m6 -->|2| m24
   m6 -->|1| m7
@@ -208,14 +202,14 @@ graph LR
   m6 -->|7| m11
   m6 -->|1| m10
   m6 -->|4| m17
-  m6 -->|4| m29
-  m6 -->|3| m34
-  m4 -->|2| m35
+  m6 -->|4| m28
+  m6 -->|3| m32
+  m4 -->|2| m33
   m4 -->|2| m14
   m4 -->|2| m19
   m4 -->|1| m18
-  m4 -->|2| m28
-  m4 -->|1| m33
+  m4 -->|2| m27
+  m4 -->|1| m31
   m4 -->|2| m22
   m4 -->|1| m25
   m4 -->|1| m26
@@ -226,137 +220,136 @@ graph LR
   m4 -->|2| m17
   m9 -->|2| m14
   m9 -->|1| m19
-  m9 -->|1| m28
+  m9 -->|1| m27
   m9 -->|2| m26
   m9 -->|2| m5
   m9 -->|1| m12
   m9 -->|1| m17
-  m9 -->|1| m34
-  m11 -->|3| m35
+  m9 -->|1| m32
+  m11 -->|3| m33
   m11 -->|2| m14
-  m11 -->|8| m28
-  m11 -->|5| m33
+  m11 -->|8| m27
+  m11 -->|5| m31
   m11 -->|1| m22
   m11 -->|2| m26
   m11 -->|3| m5
   m11 -->|1| m12
-  m11 -->|7| m34
-  m10 -->|1| m33
+  m11 -->|7| m32
+  m10 -->|1| m31
   m10 -->|1| m22
   m17 -->|2| m14
   m17 -->|2| m25
-  m27 -->|1| m31
-  m36 -->|1| m37
-  m36 -->|1| m41
-  m36 -->|1| m49
-  m36 -->|1| m57
-  m36 -->|2| m54
-  m39 -->|2| m48
-  m39 -->|2| m57
-  m39 -->|2| m56
-  m52 -->|1| m53
-  m52 -->|3| m48
-  m52 -->|3| m57
-  m52 -->|2| m54
-  m52 -->|3| m56
-  m40 -->|1| m50
-  m40 -->|4| m48
-  m40 -->|4| m57
-  m40 -->|3| m54
-  m37 -->|1| m44
-  m37 -->|2| m50
-  m37 -->|9| m48
-  m37 -->|3| m49
-  m37 -->|10| m57
-  m37 -->|9| m54
-  m37 -->|1| m38
-  m44 -->|3| m48
-  m44 -->|1| m57
-  m44 -->|2| m54
-  m44 -->|1| m56
-  m53 -->|2| m52
-  m53 -->|2| m50
-  m53 -->|1| m48
-  m53 -->|1| m49
-  m53 -->|5| m57
-  m53 -->|4| m54
-  m53 -->|2| m56
-  m41 -->|1| m52
+  m34 -->|1| m35
+  m34 -->|1| m39
+  m34 -->|1| m47
+  m34 -->|1| m55
+  m34 -->|2| m52
+  m37 -->|2| m46
+  m37 -->|2| m55
+  m37 -->|2| m54
+  m50 -->|1| m51
+  m50 -->|3| m46
+  m50 -->|3| m55
+  m50 -->|2| m52
+  m50 -->|3| m54
+  m38 -->|1| m48
+  m38 -->|4| m46
+  m38 -->|4| m55
+  m38 -->|3| m52
+  m35 -->|1| m42
+  m35 -->|2| m48
+  m35 -->|9| m46
+  m35 -->|3| m47
+  m35 -->|10| m55
+  m35 -->|9| m52
+  m35 -->|1| m36
+  m42 -->|3| m46
+  m42 -->|1| m55
+  m42 -->|2| m52
+  m42 -->|1| m54
+  m51 -->|2| m50
+  m51 -->|2| m48
+  m51 -->|1| m46
+  m51 -->|1| m47
+  m51 -->|5| m55
+  m51 -->|4| m52
+  m51 -->|2| m54
+  m39 -->|1| m50
+  m39 -->|1| m42
+  m39 -->|1| m43
+  m39 -->|4| m48
+  m39 -->|23| m46
+  m39 -->|7| m47
+  m39 -->|24| m55
+  m39 -->|19| m52
+  m39 -->|5| m54
+  m40 -->|17| m46
+  m40 -->|1| m47
+  m40 -->|17| m55
+  m40 -->|17| m52
+  m43 -->|1| m46
+  m43 -->|1| m55
+  m43 -->|1| m54
+  m48 -->|3| m50
+  m48 -->|2| m42
+  m48 -->|4| m51
+  m48 -->|51| m46
+  m48 -->|3| m49
+  m48 -->|3| m47
+  m48 -->|54| m55
+  m48 -->|51| m52
+  m48 -->|3| m54
+  m53 -->|1| m42
+  m53 -->|2| m48
+  m53 -->|25| m46
+  m53 -->|2| m47
+  m53 -->|26| m55
+  m53 -->|23| m52
+  m53 -->|1| m54
+  m46 -->|2| m47
+  m46 -->|5| m55
+  m46 -->|2| m52
+  m41 -->|7| m46
   m41 -->|1| m44
   m41 -->|1| m45
-  m41 -->|4| m50
-  m41 -->|23| m48
-  m41 -->|7| m49
-  m41 -->|24| m57
-  m41 -->|19| m54
-  m41 -->|5| m56
-  m42 -->|17| m48
-  m42 -->|1| m49
-  m42 -->|17| m57
-  m42 -->|17| m54
-  m45 -->|1| m48
-  m45 -->|1| m57
-  m45 -->|1| m56
-  m50 -->|3| m52
-  m50 -->|2| m44
-  m50 -->|4| m53
-  m50 -->|51| m48
-  m50 -->|3| m51
-  m50 -->|3| m49
-  m50 -->|54| m57
-  m50 -->|51| m54
-  m50 -->|3| m56
-  m55 -->|1| m44
-  m55 -->|2| m50
-  m55 -->|25| m48
-  m55 -->|2| m49
-  m55 -->|26| m57
-  m55 -->|23| m54
-  m55 -->|1| m56
-  m48 -->|2| m49
-  m48 -->|5| m57
-  m48 -->|2| m54
-  m43 -->|7| m48
-  m43 -->|1| m46
-  m43 -->|1| m47
-  m43 -->|10| m57
-  m43 -->|9| m54
-  m46 -->|5| m48
-  m46 -->|4| m43
-  m46 -->|5| m57
-  m46 -->|5| m54
+  m41 -->|10| m55
+  m41 -->|9| m52
+  m44 -->|5| m46
+  m44 -->|4| m41
+  m44 -->|5| m55
+  m44 -->|5| m52
+  m45 -->|2| m52
+  m49 -->|4| m48
+  m49 -->|7| m46
+  m49 -->|6| m55
+  m49 -->|8| m52
+  m47 -->|2| m35
+  m47 -->|3| m48
+  m47 -->|4| m49
+  m47 -->|10| m55
+  m47 -->|27| m52
   m47 -->|2| m54
-  m51 -->|4| m50
-  m51 -->|7| m48
-  m51 -->|6| m57
-  m51 -->|8| m54
-  m49 -->|2| m37
-  m49 -->|3| m50
-  m49 -->|4| m51
-  m49 -->|10| m57
-  m49 -->|27| m54
-  m49 -->|2| m56
-  m54 -->|1| m55
-  m54 -->|2| m48
-  m54 -->|9| m57
-  m54 -->|3| m56
-  m56 -->|4| m54
-  m38 -->|1| m39
-  m38 -->|1| m40
-  m38 -->|2| m37
-  m38 -->|1| m53
-  m38 -->|4| m41
-  m38 -->|1| m42
-  m38 -->|1| m45
-  m38 -->|5| m50
-  m38 -->|1| m55
-  m38 -->|11| m48
-  m38 -->|1| m43
-  m38 -->|1| m51
-  m38 -->|5| m49
-  m38 -->|12| m57
-  m38 -->|12| m54
-  m38 -->|1| m56
+  m52 -->|1| m53
+  m52 -->|2| m46
+  m52 -->|9| m55
+  m52 -->|3| m54
+  m54 -->|4| m52
+  m36 -->|1| m37
+  m36 -->|1| m38
+  m36 -->|2| m35
+  m36 -->|1| m51
+  m36 -->|4| m39
+  m36 -->|1| m40
+  m36 -->|1| m43
+  m36 -->|5| m48
+  m36 -->|1| m53
+  m36 -->|11| m46
+  m36 -->|1| m41
+  m36 -->|1| m49
+  m36 -->|5| m47
+  m36 -->|12| m55
+  m36 -->|12| m52
+  m36 -->|1| m54
 ```
 
 | Module | Files | Tests | Entry point | What it is |
@@ -388,11 +381,9 @@ graph LR
 | `crates/fennec/src/mcp` | 2 | 2 |  | fennec's side of MCP: connecting a configured server through the sandbox, and caching its tools in the preferences; the protocol lives in `mcp-lite`. |
 | `crates/fennec/src/sandbox` | 3 | 3 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
 | `crates/fennec/src/store` | 12 | 12 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
-| `crates/mcp-lite/src/oauth` | 3 | 2 |  | OAuth 2.1 authorization for HTTP MCP servers. |
 | `crates/fennec/src/domain` | 79 | 77 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
 | `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
 | `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
-| `crates/mcp-lite/src` | 5 | 3 | yes | A small synchronous Model Context Protocol (MCP) client. |
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |
 | `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
 | `crates/token-usage/src` | 5 | 5 | yes | Append-only SQLite ledger for LLM calls. |

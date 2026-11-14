@@ -7,7 +7,7 @@ date: "2026-11-13"
 
 ## Context and problem statement
 
-fennec talks to MCP servers through a synchronous client on ureq, now the `crates/mcp-lite` crate (then `crates/fennec/src/mcp.rs`)
+fennec talks to MCP servers through a synchronous client on ureq, now the `mcp-lite` crate on crates.io (then `crates/fennec/src/mcp.rs`)
 (stdio and streamable HTTP; `initialize`, `tools/list`, `tools/call`). `rmcp`, the official Rust
 SDK, covers the whole protocol and is maintained by others. Reuse comes first, so rmcp was tried
 on a branch behind the same synchronous API (a current-thread tokio runtime per connection).
