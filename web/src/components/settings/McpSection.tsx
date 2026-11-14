@@ -441,10 +441,18 @@ export function McpSection({
     }
   }
 
+  // The group's save state is shown once above the cards: the servers save together, so
+  // every card's header would flash at each edit.
+  const shownError = error ?? save?.auto?.error ?? null;
+  const cardSave = save?.auto ? { ...save, dirty: false, auto: { saving: false, error: null } } : save;
+
   return (
     <div className="flex flex-col gap-6">
       <InfoBar>{t('mcpHint')}</InfoBar>
-      {error ? <p className="m-0 text-xs text-err">{error}</p> : null}
+      {/* Always rendered: a status line that comes and goes would shift every card. */}
+      <p className={`m-0 min-h-4 text-xs ${shownError ? 'text-err' : 'text-muted'}`}>
+        {shownError ?? (save?.auto?.saving ? t('sectionSaving') : null)}
+      </p>
       {value.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">
           {t('noMcpServers')}
@@ -457,7 +465,7 @@ export function McpSection({
             server={server}
             connecting={connecting === index}
             views={toolViews[server.name] ?? []}
-            save={save}
+            save={cardSave}
             onPatch={(p) => patch(index, p)}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}

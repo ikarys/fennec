@@ -284,6 +284,7 @@ pub fn save_settings(app: &App, req: &Request, stream: &mut TcpStream) -> Result
     };
     prefs.migrate();
     prefs.forget_orphan_favorites();
+    prefs.normalize_mcp_names();
     if let Err(e) = prefs.validate() {
         return error(stream, 400, &e);
     }
