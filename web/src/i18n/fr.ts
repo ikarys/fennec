@@ -1130,6 +1130,8 @@ export const fr: Record<MsgKey, string> = {
   serverExited: 'arrêté ({code})',
   serverExitedNoCode: 'arrêté',
   serverEnded: 'terminé',
+  serverSignaled: 'arrêté par le signal {signal}',
+  serverPortIgnored: "Ignore $PORT ({port}) : il écoute sur ses propres ports, des sessions peuvent entrer en conflit.",
   useThisCommand: 'Utiliser cette commande',
   openTerminalInWorktree: 'Ouvrir un terminal dans le worktree',
   openTerminalInProject: 'Ouvrir un terminal dans le projet',

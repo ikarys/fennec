@@ -3,7 +3,8 @@
 //! kept as the last lines, and the URL is read from that output. A human
 //! action (trust zone 1), so it runs on the host, not in the sandbox.
 
-use crate::domain::server::{ServerDef, announced_url, strip_ansi, url_port, validate};
+use crate::domain::server::{ServerDef, address, announced_url, strip_ansi, url_port, validate};
+use crate::listening;
 use crate::servers;
 use crate::web::App;
 use crate::web::http::HttpError;
@@ -13,6 +14,7 @@ use serde_json::{Value, json};
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -31,10 +33,17 @@ pub(crate) struct RunningServer {
     pub(crate) output: Arc<Mutex<Output>>,
 }
 
+/// A server's exit state.
+#[derive(Clone, Copy)]
+pub(crate) struct Exit {
+    code: Option<i32>,
+    signal: Option<i32>,
+}
+
 /// Recent server output and exit state.
 pub(crate) struct Output {
     lines: VecDeque<String>,
-    exit: Option<Option<i32>>,
+    exit: Option<Exit>,
 }
 
 /// `{sessionId}/{name}`: one running server per (session, server).
@@ -70,53 +79,67 @@ pub fn list(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError
         .into_iter()
         .zip(snapshots)
         .map(|((def, suggested), snap)| {
-            let (state, url, exit_code, output) = match snap {
-                None => ("stopped", None, None, Vec::new()),
-                Some(Snapshot {
-                    exit: Some(code),
-                    lines,
-                    ..
-                }) => ("exited", None, code, lines),
-                Some(Snapshot { port, lines, .. }) => {
-                    let url =
-                        announced_url(&lines).unwrap_or_else(|| format!("http://127.0.0.1:{port}"));
-                    let state = if port_is_ready(&url, port) {
-                        "ready"
-                    } else {
-                        "starting"
-                    };
-                    (state, Some(url), None, lines)
-                }
-            };
-            json!({
-                "name": def.name,
-                "command": def.command,
-                "suggested": suggested,
-                "state": state,
-                "running": url.is_some(),
-                "url": url,
-                "exitCode": exit_code,
-                "output": output,
-            })
+            let mut row = run_state(snap);
+            row["name"] = json!(def.name);
+            row["command"] = json!(def.command);
+            row["suggested"] = json!(suggested);
+            row
         })
         .collect();
     send_json(stream, 200, &Value::Array(out))
 }
 
+/// The run-dependent fields of one server row: state, where it listens, how it ended.
+fn run_state(snap: Option<Snapshot>) -> Value {
+    let Some(snap) = snap else {
+        return json!({
+            "state": "stopped", "running": false, "url": null, "port": null, "extraUrls": [],
+            "portIgnored": false, "exitCode": null, "exitSignal": null, "output": [],
+        });
+    };
+    if let Some(exit) = snap.exit {
+        return json!({
+            "state": "exited", "running": false, "url": null, "port": null, "extraUrls": [],
+            "portIgnored": false, "exitCode": exit.code, "exitSignal": exit.signal,
+            "output": snap.lines,
+        });
+    }
+    let listening = listening::group_ports(snap.pid)
+        .unwrap_or_else(|| connect_probe(snap.port, snap.announced.as_deref()));
+    let addr = address(snap.port, &listening, snap.announced);
+    json!({
+        "state": if addr.ready { "ready" } else { "starting" },
+        "running": true,
+        "url": addr.url,
+        "port": snap.port,
+        "extraUrls": addr.extra_urls,
+        "portIgnored": addr.port_ignored,
+        "exitCode": null,
+        "exitSignal": null,
+        "output": snap.lines,
+    })
+}
+
 /// What `list` reads of a run under the lock.
 struct Snapshot {
+    pid: u32,
     port: u16,
     lines: Vec<String>,
-    exit: Option<Option<i32>>,
+    announced: Option<String>,
+    exit: Option<Exit>,
 }
 
 impl Snapshot {
     fn of(run: &RunningServer) -> Self {
-        let out = crate::locks::lock(&run.output);
-        let skip = out.lines.len().saturating_sub(SHOWN_LINES);
+        let mut out = crate::locks::lock(&run.output);
+        let all = out.lines.make_contiguous();
+        let announced = announced_url(all);
+        let lines = all[all.len().saturating_sub(SHOWN_LINES)..].to_vec();
         Snapshot {
+            pid: run.pid,
             port: run.port,
-            lines: out.lines.iter().skip(skip).cloned().collect(),
+            lines,
+            announced,
             exit: out.exit,
         }
     }
@@ -219,12 +242,16 @@ pub fn start(app: &App, req: &Request, stream: &mut TcpStream, id: &str) -> Resu
     // visible with its output.
     let runs = app.server_runs.clone();
     std::thread::spawn(move || {
-        let code = child.wait().ok().and_then(|status| status.code());
+        let status = child.wait().ok();
+        let exit = Some(Exit {
+            code: status.and_then(|status| status.code()),
+            signal: status.and_then(|status| status.signal()),
+        });
         let mut runs = crate::locks::lock(&runs);
         if let Some(run) = runs.get_mut(&k)
             && run.pid == pid
         {
-            crate::locks::lock(&run.output).exit = Some(code);
+            crate::locks::lock(&run.output).exit = exit;
         }
     });
 
@@ -328,11 +355,15 @@ fn read_pipe<R: std::io::Read + Send + 'static>(reader: R, output: Arc<Mutex<Out
     }
 }
 
-/// Checks whether the URL's port answers on loopback within 150 ms.
-fn port_is_ready(url: &str, fallback: u16) -> bool {
-    let port = url_port(url).unwrap_or(fallback);
+/// Where `group_ports` cannot see the sockets: the one port that accepts a connection.
+fn connect_probe(given: u16, announced: Option<&str>) -> Vec<u16> {
+    let port = announced.and_then(url_port).unwrap_or(given);
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
+    if TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok() {
+        vec![port]
+    } else {
+        Vec::new()
+    }
 }
 
 /// Kills the server's whole process group; ignores an already-gone process.

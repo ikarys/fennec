@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ServerView } from '../../lib/api';
 import { getServers, saveServers, startServer, stopServer } from '../../lib/api';
-import { serverBadge, serversPollMs } from '../../lib/servers';
+import { portLabel, serverBadge, serversPollMs } from '../../lib/servers';
 import { EditIcon, PlayIcon, ServerIcon, SpinnerIcon, StopIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -154,16 +154,6 @@ export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
         const stopLabel = t('stopServer', { name: server.name });
         const startLabel = t('startServer', { name: server.name });
         const url = server.url;
-        let portLabel: string | null = null;
-
-        if (url !== null && server.state === 'ready') {
-          try {
-            const port = new URL(url).port;
-            portLabel = port === '' ? url : `:${port}`;
-          } catch {
-            portLabel = url;
-          }
-        }
 
         return (
           <div key={server.name} className="flex flex-col gap-1">
@@ -198,7 +188,7 @@ export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
                 </Badge>
               )}
 
-              {portLabel !== null && url !== null && (
+              {url !== null && server.state === 'ready' && (
                 <a
                   href={url}
                   target="_blank"
@@ -207,10 +197,26 @@ export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
                   className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-soft"
                 >
                   <Badge tone="info" appearance="pill">
-                    {portLabel}
+                    {portLabel(url)}
                   </Badge>
                 </a>
               )}
+
+              {server.state === 'ready' &&
+                server.extraUrls.map((extraUrl) => (
+                  <a
+                    key={extraUrl}
+                    href={extraUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={t('openUrl', { url: extraUrl })}
+                    className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-soft"
+                  >
+                    <Badge tone="info" appearance="pill">
+                      {portLabel(extraUrl)}
+                    </Badge>
+                  </a>
+                ))}
 
               <div className="ml-auto flex items-center gap-0.5">
                 {server.suggested ? (
@@ -283,6 +289,12 @@ export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
             >
               {server.command}
             </div>
+
+            {server.portIgnored && server.port !== null && (
+              <p className="m-0 pl-5 text-[11px] text-attention">
+                {t('serverPortIgnored', { port: server.port })}
+              </p>
+            )}
 
             {server.suggested && (
               <p className="m-0 pl-5 text-[11px] text-muted">{t('suggestedCommand')}</p>
