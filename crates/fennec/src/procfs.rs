@@ -37,6 +37,22 @@ pub fn parse_stat(text: &str) -> Option<ProcStat> {
     })
 }
 
+/// The process start time (field 22) of a `/proc/<pid>/stat` row.
+#[cfg(any(target_os = "linux", test))]
+pub fn parse_start_time(text: &str) -> Option<u64> {
+    let open = text.find('(')?;
+    let close = text.rfind(')')?;
+    if close <= open {
+        return None;
+    }
+
+    // After the command name: state, ppid, pgrp, ...; starttime is the 20th field.
+    text[close + 1..]
+        .split_whitespace()
+        .nth(19)
+        .and_then(|field| field.parse::<u64>().ok())
+}
+
 /// One `/proc/net/tcp` or `/proc/net/tcp6` row: local address, remote address, socket inode.
 #[cfg(any(target_os = "linux", test))]
 pub fn parse_tcp_row(line: &str) -> Option<(SocketAddr, SocketAddr, u64)> {
@@ -157,6 +173,13 @@ mod tests {
     }
 
     #[test]
+    fn parse_start_time_reads_field_22_from_a_stat_line() {
+        let text =
+            "42 (my (cool) app) S 7 8 9 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 1 0 12345 1000 10";
+        assert_eq!(parse_start_time(text), Some(12345));
+    }
+
+    #[test]
     fn parse_tcp_row_parses_an_ipv4_row() {
         let line = "  1: 0100007F:A1B2 0100007F:1E61 01 00000000:00000000 00:00000000 00000000  1000        0 123456 1 0000000000000000 20 4 30 10 -1";
         let local = "127.0.0.1:41394".parse::<SocketAddr>().unwrap();
@@ -182,7 +205,7 @@ mod tests {
 
     #[test]
     fn parse_listen_row_accepts_an_ipv6_listen_row() {
-        let line = "  1: 00000000000000000000000001000000:A1B2 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 654321 1 0000000000000000 20 4 30 10 -1";
+        let line = "  1: 00000000000000000000000001000000:A1B2 00000000000000000000000001000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 654321 1 0000000000000000 20 4 30 10 -1";
         assert_eq!(parse_listen_row(line), Some((41394, 654321)));
     }
 

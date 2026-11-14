@@ -654,12 +654,13 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `starting` (the process lives, nothing in its process group listens yet), `ready` (a process of
   its group listens on a TCP port, read from `/proc` on Linux and `lsof` on macOS, else a connect
   to the expected port) or `exited` (it ended on its own; `exitCode`, or `exitSignal` when a
-  signal ended it). `url` is the loopback URL the server printed (searched over the 200 kept
-  lines) when that port listens, else `$PORT` when it listens, else its lowest listening port;
+  signal ended it). `url` is the loopback URL the server printed (searched over the last 200
+  lines of its log) when that port listens, else `$PORT` when it listens, else its lowest listening port;
   `null` unless it runs. `extraUrls` are its other listening ports. `port` is the `$PORT` fennec
   gave it; `portIgnored` is true when it listens but not on `$PORT` (its command hard-codes its
   ports, so two sessions collide). `running` is `starting` or `ready`. `output` is the last 40
-  lines of its stdout and stderr, without ANSI escapes (fennec keeps 200). 404 if no session.
+  lines of its stdout and stderr, without ANSI escapes, read from its log file
+  (`<data>/servers/<key>.log`, the last 64 KiB). 404 if no session.
 - `POST /api/sessions/{id}/servers` `{servers: [{name, command}]}` → the same list:
   saves the project's servers to `.agents/servers.json`. 400 on an empty name/command or a
   duplicate name, 404 if no session.
@@ -668,11 +669,15 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   linking its missing dependency directories and its gitignored `.env*` files to the main
   checkout's (links, never copies); otherwise in the project's directory. It passes a free `PORT`,
   the project's shared `CARGO_TARGET_DIR` (so a worktree does not rebuild from scratch), and runs
-  as `setsid sh -c <command>`, so a stop frees the port by killing the whole process group.
+  as `setsid sh -c <command>`, so a stop frees the port by killing the whole process group. Under
+  systemd it is wrapped in `systemd-run --user --scope`, its own scope. Live runs are recorded in
+  `<data>/servers/runs.json`, so a restarted fennec takes them back: a record is kept only while
+  its pid still has the recorded start time (a recycled pid is dropped, never killed).
   Outside the sandbox: the human's action. 404 for an unknown server, 409 if it already runs (an
   exited one restarts), 500 if it cannot start.
 - `POST /api/sessions/{id}/servers/stop` `{name}` → `{}`: stops the server by killing its
-  process group, or forgets an exited one. 404 if it is not running.
+  process group (an adopted run only while its pid keeps the recorded start time), or forgets
+  an exited one, and deletes its log. 404 if it is not running.
 - `POST /api/sessions/delete` `{ids}` → `{deleted: [id], failed: [{id, error}]}`: deletes top-level sessions with their child sessions and logs, and removes each one's worktree, branch and refs (work not integrated is lost; the UI warns). 400 for an empty list or a child session, 404 for an unknown id, 409 `{error, running}` when one of them runs a turn (nothing is deleted then). A session whose worktree cannot be removed is kept and listed in `failed`. The usage ledger keeps the calls.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`
