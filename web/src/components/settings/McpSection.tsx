@@ -1,18 +1,11 @@
-// Settings' MCP tab: framed server cards with connection form, toggles, and cached tools.
-import { useState } from 'react';
-import { Section, type SectionSave } from '../ui/Section';
-import { FieldRow, Select, TextInput } from '../ui/Field';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { ListCard } from '../ui/ListCard';
-import { Switch } from '../ui/Switch';
-import { Tabs } from '../ui/Tabs';
+// Settings' MCP tab: accordion server list, connect/save state, and per-card actions.
+import { useEffect, useRef, useState } from 'react';
 import { authorizeMcp, connectMcp, type McpServer } from '../../lib/api';
-import type { McpToolSummary, ToolAccess } from '../../lib/api/settings';
-import { EditIcon, KeyIcon, RefreshIcon, ServerIcon, SpinnerIcon, TrashIcon } from '../ui/Icons';
+import type { McpToolSummary } from '../../lib/api/settings';
+import type { SectionSave } from '../ui/Section';
 import { InfoBar } from '../ui/InfoBar';
-import { useLang, useT } from '../../i18n';
-import { formatTokens } from '../../lib/format';
+import { McpServerCard } from './McpServerCard';
+import { useT } from '../../i18n';
 
 export function emptyServer(): McpServer {
   return {
@@ -23,358 +16,12 @@ export function emptyServer(): McpServer {
     env: {},
     url: '',
     headers: {},
-    disabled: false,
+    disabled: true,
     visible: true,
     disabledTools: [],
     cachedTools: [],
     timeout: 0
   };
-}
-
-/** The description's first sentence, for the one-line summary of a tool row. */
-function firstSentence(text: string): string {
-  return text.split(/(?<=\.) |\n/)[0].trim();
-}
-
-/** The tab order: the access classes a server's tools can declare. */
-const ACCESS_ORDER: ToolAccess[] = ['read', 'write', 'destructive', 'undeclared'];
-
-/** i18n label key per access tab. */
-const LABEL: Record<
-  ToolAccess,
-  'mcpAccessRead' | 'mcpAccessWrite' | 'mcpAccessDestructive' | 'mcpAccessUndeclared'
-> = {
-  read: 'mcpAccessRead',
-  write: 'mcpAccessWrite',
-  destructive: 'mcpAccessDestructive',
-  undeclared: 'mcpAccessUndeclared'
-};
-
-function ServerCard({
-  index,
-  server,
-  connecting,
-  views,
-  save,
-  onPatch,
-  onRemove,
-  onConnect,
-  onAuthorize
-}: {
-  index: number;
-  server: McpServer;
-  connecting: boolean;
-  views: McpToolSummary[];
-  save?: SectionSave;
-  onPatch: (patch: Partial<McpServer>) => void;
-  onRemove: () => void;
-  onConnect: () => void;
-  onAuthorize: () => void;
-}) {
-  function toggleTool(name: string) {
-    const disabled = server.disabledTools.includes(name)
-      ? server.disabledTools.filter((tool) => tool !== name)
-      : [...server.disabledTools, name];
-    onPatch({ disabledTools: disabled });
-  }
-
-  const t = useT();
-  const lang = useLang();
-  const [tab, setTab] = useState<ToolAccess | null>(null);
-  const [editing, setEditing] = useState(false);
-
-  // The backend view is the source for access and token cost; a missing entry
-  // means the tool was not listed by the settings route, so it is undeclared.
-  const viewByName = new Map(views.map((view) => [view.name, view] as [string, McpToolSummary]));
-  const tools = server.cachedTools.map((tool) => {
-    const view = viewByName.get(tool.name);
-    return {
-      tool,
-      access: view?.access ?? 'undeclared',
-      tokens: view?.tokens ?? 0
-    };
-  });
-  const present = ACCESS_ORDER.filter((access) => tools.some((entry) => entry.access === access));
-  const activeTab = tab && present.includes(tab) ? tab : present[0] ?? null;
-  const toolsOf = (access: ToolAccess) => tools.filter((entry) => entry.access === access);
-  const enabled = tools.filter((entry) => !server.disabledTools.includes(entry.tool.name)).length;
-  const enabledTokens = tools.reduce(
-    (sum, entry) => (server.disabledTools.includes(entry.tool.name) ? sum : sum + entry.tokens),
-    0
-  );
-  const activeTools = activeTab ? toolsOf(activeTab) : [];
-  const tabEnabledTokens = activeTools.reduce(
-    (sum, entry) => (server.disabledTools.includes(entry.tool.name) ? sum : sum + entry.tokens),
-    0
-  );
-  const allTabEnabled =
-    activeTools.length > 0 &&
-    activeTools.every((entry) => !server.disabledTools.includes(entry.tool.name));
-  const someTabEnabled = activeTools.some(
-    (entry) => !server.disabledTools.includes(entry.tool.name)
-  );
-
-  function toggleTab(access: ToolAccess) {
-    const names = toolsOf(access).map((entry) => entry.tool.name);
-    const allEnabled = names.every((name) => !server.disabledTools.includes(name));
-    if (allEnabled) {
-      // Disable every tool in the tab: keep the existing disabled order, then
-      // append the tools that were still enabled.
-      const missing = names.filter((name) => !server.disabledTools.includes(name));
-      onPatch({ disabledTools: [...server.disabledTools, ...missing] });
-    } else {
-      // Enable every tool in the tab: remove only those names, keeping order.
-      onPatch({ disabledTools: server.disabledTools.filter((name) => !names.includes(name)) });
-    }
-  }
-
-  return (
-    <Section
-      Icon={ServerIcon}
-      flush
-      title={<span className="font-mono">{server.name || t('newServer')}</span>}
-      description={
-        <span className="font-mono">
-          {server.transport === 'http' ? server.url : [server.command, ...server.args].join(' ')}
-        </span>
-      }
-      save={save}
-      actions={
-        <>
-          <Badge tone="neutral" appearance="pill">
-            {server.transport}
-          </Badge>
-          {server.cachedTools.length > 0 ? (
-            <Badge tone="accent" appearance="pill">
-              {t('mcpToolCount', { count: server.cachedTools.length })}
-            </Badge>
-          ) : null}
-          <Switch
-            checked={!server.disabled}
-            onChange={(on) => onPatch({ disabled: !on })}
-            label={t('mcpActive')}
-          />
-          <Switch
-            checked={server.visible}
-            onChange={(on) => onPatch({ visible: on })}
-            label={t('mcpShown')}
-          />
-          {server.transport === 'http' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={onAuthorize}
-              disabled={connecting || server.name === ''}
-              title={t('mcpAuthorize')}
-              aria-label={t('mcpAuthorize')}
-            >
-              <KeyIcon className="h-4 w-4" />
-            </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={onConnect}
-            disabled={connecting || server.name === ''}
-            aria-label={connecting ? t('mcpConnecting') : t('mcpConnect')}
-            title={connecting ? t('mcpConnecting') : t('mcpConnect')}
-          >
-            {connecting ? <SpinnerIcon className="h-3.5 w-3.5" /> : <RefreshIcon className="h-3.5 w-3.5" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-pressed={editing}
-            aria-label={t('mcpEdit')}
-            title={t('mcpEdit')}
-            onClick={() => setEditing((current) => !current)}
-          >
-            <EditIcon className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            iconOnly
-            aria-label={t('mcpRemove')}
-            title={t('mcpRemove')}
-            onClick={onRemove}
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-          </Button>
-        </>
-      }
-    >
-      {(editing || server.name === '') && (
-        <div className="grid gap-3 p-4 sm:grid-cols-2 border-b border-border">
-          <FieldRow label={t('mcpNameLabel')}>
-            <TextInput
-              value={server.name}
-              onChange={(event) => onPatch({ name: event.target.value })}
-              placeholder={t('mcpNamePlaceholder')}
-              className="w-full"
-              aria-label={t('mcpNameLabel')}
-            />
-          </FieldRow>
-
-          <FieldRow label={t('mcpTransportLabel')}>
-            <Select
-              value={server.transport}
-              onChange={(event) => onPatch({ transport: event.target.value as McpServer['transport'] })}
-              className="w-full"
-              aria-label={t('mcpTransportLabel')}
-            >
-              <option value="stdio">stdio</option>
-              <option value="http">http</option>
-            </Select>
-          </FieldRow>
-
-          {server.transport === 'stdio' ? (
-            <>
-              <FieldRow label={t('mcpCommandLabel')}>
-                <TextInput
-                  value={server.command ?? ''}
-                  onChange={(event) => onPatch({ command: event.target.value })}
-                  placeholder={t('mcpCommandPlaceholder')}
-                  className="w-full"
-                  aria-label={t('mcpCommandLabel')}
-                />
-              </FieldRow>
-
-              <FieldRow label={t('mcpArgsLabel')}>
-                <TextInput
-                  value={server.args.join(' ')}
-                  onChange={(event) =>
-                    onPatch({ args: event.target.value.split(/\s+/).filter((part) => part !== '') })
-                  }
-                  placeholder={t('mcpArgsPlaceholder')}
-                  className="w-full"
-                  aria-label={t('mcpArgsLabel')}
-                />
-              </FieldRow>
-            </>
-          ) : (
-            <div className="sm:col-span-2">
-              <FieldRow label={t('mcpUrlLabel')}>
-                <TextInput
-                  value={server.url ?? ''}
-                  onChange={(event) => onPatch({ url: event.target.value })}
-                  placeholder={t('mcpUrlPlaceholder')}
-                  className="w-full"
-                  aria-label={t('mcpUrlLabel')}
-                />
-              </FieldRow>
-            </div>
-          )}
-
-          <div className="sm:col-span-2">
-            <FieldRow
-              label={t('mcpAuthTokenLabel')}
-              hint={server.transport === 'http' ? t('mcpAuthTokenBearer') : t('mcpAuthTokenEnv')}
-              htmlFor={`mcp-auth-${index}`}
-            >
-              <TextInput
-                id={`mcp-auth-${index}`}
-                type="password"
-                value={server.authToken ?? ''}
-                onChange={(event) => onPatch({ authToken: event.target.value || null })}
-                placeholder={t('mcpAuthTokenPlaceholder')}
-                className="w-full"
-                aria-label={t('mcpAuthTokenLabel')}
-              />
-            </FieldRow>
-          </div>
-        </div>
-      )}
-
-      {server.cachedTools.length > 0 && (
-        <div className="p-4">
-          <ListCard
-            folded
-            title={t('mcpTools')}
-            count={`${enabled}/${server.cachedTools.length} · ${t('mcpTokens', { count: formatTokens(lang, enabledTokens) })}`}
-          >
-            {activeTab ? (
-              <div
-                className="border-b border-border px-3 pt-1"
-                title={t('mcpAccessDeclared')}
-              >
-                <Tabs
-                  label={t('mcpToolsByAccess')}
-                  orientation="horizontal"
-                  tabs={present.map((access) => ({
-                    id: access,
-                    label: t(LABEL[access]),
-                    count: toolsOf(access).length
-                  }))}
-                  active={activeTab}
-                  onSelect={setTab}
-                  trailing={
-                    <label className="flex items-center gap-2 text-xs text-muted">
-                      <input
-                        type="checkbox"
-                        checked={allTabEnabled}
-                        onChange={() => toggleTab(activeTab)}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someTabEnabled && !allTabEnabled;
-                        }}
-                        className="h-4 w-4"
-                        aria-label={t('mcpToggleTab')}
-                      />
-                      <span className="tabular-nums">
-                        {t('mcpTokens', { count: formatTokens(lang, tabEnabledTokens) })}
-                      </span>
-                    </label>
-                  }
-                />
-              </div>
-            ) : null}
-            {activeTools.map((entry, toolIndex) => {
-              const disabled = server.disabledTools.includes(entry.tool.name);
-              return (
-                <details key={entry.tool.name} className={toolIndex > 0 ? 'border-t border-border' : undefined}>
-                  <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 hover:bg-accent/5">
-                    <input
-                      type="checkbox"
-                      checked={!disabled}
-                      onChange={() => toggleTool(entry.tool.name)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="h-4 w-4"
-                      aria-label={entry.tool.name}
-                    />
-                    <span
-                      className={
-                        disabled
-                          ? 'shrink-0 font-mono text-xs text-faint line-through'
-                          : 'shrink-0 font-mono text-xs text-text'
-                      }
-                    >
-                      {entry.tool.name}
-                    </span>
-                    {entry.tool.description ? (
-                      <span className="min-w-0 flex-1 truncate text-xs text-faint">
-                        {firstSentence(entry.tool.description)}
-                      </span>
-                    ) : null}
-                    <span className="shrink-0 text-xs tabular-nums text-faint">
-                      ~{formatTokens(lang, entry.tokens)}
-                    </span>
-                  </summary>
-                  {entry.tool.description ? (
-                    <p className="whitespace-pre-wrap px-3 pb-2 pl-9 text-xs text-muted">
-                      {entry.tool.description}
-                    </p>
-                  ) : null}
-                </details>
-              );
-            })}
-          </ListCard>
-        </div>
-      )}
-    </Section>
-  );
 }
 
 export function McpSection({
@@ -395,7 +42,18 @@ export function McpSection({
 }) {
   const t = useT();
   const [connecting, setConnecting] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ index: number; message: string } | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
+  const prevLength = useRef(value.length);
+
+  useEffect(() => {
+    if (value.length > prevLength.current) {
+      setOpen(value.length - 1);
+    } else if (value.length < prevLength.current) {
+      setOpen(null);
+    }
+    prevLength.current = value.length;
+  }, [value.length]);
 
   function patch(index: number, p: Partial<McpServer>) {
     onChange(value.map((server, i) => (i === index ? { ...server, ...p } : server)));
@@ -416,7 +74,7 @@ export function McpSection({
       await connectMcp(name);
       await onConnected();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError({ index, message: e instanceof Error ? e.message : String(e) });
     } finally {
       setConnecting(null);
     }
@@ -432,40 +90,45 @@ export function McpSection({
       const { url } = await authorizeMcp(value[index].name);
       // The consent happens in another tab; when the human comes back, the
       // tokens are stored and a connect loads the tools into this form.
-      window.addEventListener('focus', () => void connect(index), { once: true });
+      window.addEventListener('focus', () => void connect(index), {
+        once: true
+      });
       if (tab) tab.location.href = url;
       else window.open(url, '_blank', 'noopener');
     } catch (e) {
       tab?.close();
-      setError(e instanceof Error ? e.message : String(e));
+      setError({ index, message: e instanceof Error ? e.message : String(e) });
     }
   }
 
-  // The group's save state is shown once above the cards: the servers save together, so
-  // every card's header would flash at each edit.
-  const shownError = error ?? save?.auto?.error ?? null;
-  const cardSave = save?.auto ? { ...save, dirty: false, auto: { saving: false, error: null } } : save;
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-2">
       <InfoBar>{t('mcpHint')}</InfoBar>
-      {/* Always rendered: a status line that comes and goes would shift every card. */}
-      <p className={`m-0 min-h-4 text-xs ${shownError ? 'text-err' : 'text-muted'}`}>
-        {shownError ?? (save?.auto?.saving ? t('sectionSaving') : null)}
-      </p>
+      {/* An open card shows its own save state; a switch flipped on a closed row reports here. */}
+      {open === null && save?.auto?.error ? <p className="m-0 text-xs text-err">{save.auto.error}</p> : null}
       {value.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted">
           {t('noMcpServers')}
         </p>
       ) : (
         value.map((server, index) => (
-          <ServerCard
+          <McpServerCard
             key={index}
             index={index}
             server={server}
+            open={open === index}
+            onToggle={() => setOpen(open === index ? null : index)}
             connecting={connecting === index}
             views={toolViews[server.name] ?? []}
-            save={cardSave}
+            saveState={
+              open === index
+                ? {
+                    saving: save?.auto?.saving ?? false,
+                    error: save?.auto?.error ?? null
+                  }
+                : { saving: false, error: null }
+            }
+            actionError={error?.index === index ? error.message : null}
             onPatch={(p) => patch(index, p)}
             onRemove={() => onChange(value.filter((_, i) => i !== index))}
             onConnect={() => connect(index)}
