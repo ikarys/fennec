@@ -15,7 +15,7 @@ Type the request in the message box ①.
 
 Use this example: `Add an add_todo(title) function to src/main.py that stores the to-do in an in-memory list, and make list_todos return that list.`
 
-The workflow ② is **Plan, build, verify**. Keep it.
+② says what you want: **Change** (plan, build, verify). Keep it. **Ask** answers about the project and changes nothing; **Quick change** builds a small change without a plan. A chat (**New chat** in the top bar) has no project and no branch.
 
 ③ shows the model that will answer. Click it to choose another.
 
@@ -99,4 +99,4 @@ Close the dialog.
 - A step fails. The run stops and says why. Ask again in the message box.
 - You do not want the work. Delete the session from the session list. Your branch never changed.
 
-Done. Next: [use fennec from another machine](remote-access.md), or see [ways to work](ways-to-work.md).
+Done. Next: [use fennec from another machine](remote-access.md), or see [projects and sessions](sessions.md).

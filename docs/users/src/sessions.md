@@ -18,8 +18,8 @@ Click a row to reopen a session, or click **New session** ③ to start one.
 
 ![Inside a session: thread, composer, context rail](images/sessions-2.png)
 
-1. In the composer ② at the bottom, choose the agent: **Plan** (explores and agrees on a plan, changes nothing), **Builder** (changes the code and verifies it) or **Question** (answers about the project with sources, read-only).
-2. Optional: change the workflow (**Plan, build, verify** here; **No workflow** talks to the agent directly, see [workflows](workflows.md)), the reasoning effort (**auto**) or the model, in the pickers next to it.
+1. In the composer ② at the bottom, **What do you want?** offers **Ask** (answers about the project with sources, changes nothing), **Change** (the **Plan, build, verify** workflow) or **Quick change** (a small change built and checked without a plan). **More** lists the other agents and workflows, **No workflow** (talk to the agent directly), **Step by step** and **Draw your own…**; see [workflows](workflows.md).
+2. Optional: change the model next to it; **⋯** shows the MCP servers and the reasoning effort (**auto**).
 3. Type your message: `@` points to a file, `/` opens commands and skills.
 4. Press `Enter` to send, or press `Shift+Enter` to add a line.
 
@@ -68,7 +68,7 @@ The composer menu groups agents by phase: **Start**, **Frame**, **Build**, **Und
 | Builder | Implement the task and verify it | Write allowed |
 | Question | Answer a project question with sources | Read-only |
 
-Switch the session agent from the composer's **Session agent** picker. The **Mode** picker shows the current mode. You can also change the model and the **Reasoning effort** for a session from the composer. The **Reasoning effort** picker offers **Auto (no effort)** and the efforts the session's model accepts. The choice wins over the agent's and the model's effort; a choice the current model does not accept falls back to auto. Changing it can make a local server re-read the whole context. Agents marked **Subagent** run only inside workflow nodes and are not offered as free session modes.
+Switch the session agent from the composer's **What do you want?** picker, under **More** for the agents that are not one of the three main choices. You can also change the model and the **Reasoning effort** for a session from the composer; **⋯** shows the **Reasoning effort** picker. It offers **Auto (no effort)** and the efforts the session's model accepts. The choice wins over the agent's and the model's effort; a choice the current model does not accept falls back to auto. Changing it can make a local server re-read the whole context. Agents marked **Subagent** run only inside workflow nodes and are not offered as free session modes.
 
 See [extending](extending.md) for writing your own agents.
 

@@ -295,7 +295,7 @@ graph LR
   m48 -->|2| m42
   m48 -->|4| m51
   m48 -->|51| m46
-  m48 -->|3| m49
+  m48 -->|4| m49
   m48 -->|3| m47
   m48 -->|54| m55
   m48 -->|51| m52
@@ -321,8 +321,8 @@ graph LR
   m44 -->|5| m52
   m45 -->|2| m52
   m49 -->|4| m48
-  m49 -->|7| m46
-  m49 -->|6| m55
+  m49 -->|6| m46
+  m49 -->|5| m55
   m49 -->|8| m52
   m47 -->|2| m35
   m47 -->|3| m48
@@ -403,7 +403,7 @@ graph LR
 | `web/src/components/workflow/nodes` | 2 | 0 |  |  |
 | `web/src/components/ui` | 27 | 0 |  |  |
 | `web/src/hooks` | 35 | 1 |  |  |
-| `web/src/components/session` | 65 | 3 |  |  |
+| `web/src/components/session` | 66 | 4 |  |  |
 | `web/src/components/workflow/session` | 9 | 1 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |

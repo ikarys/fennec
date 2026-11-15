@@ -20,15 +20,12 @@ import {
   StopIcon,
 } from "../ui/Icons";
 import { matchCommands, SlashMenu } from "./SlashMenu";
-import { ModePicker } from "./ModePicker";
+import { IntentPicker } from "./IntentPicker";
 import { McpPicker } from "./McpPicker";
 import { ModelPicker, modelShortName } from "./ModelPicker";
 import { EffortPicker } from "./EffortPicker";
 import { Button } from "../ui/Button";
-import {
-  WorkflowPicker,
-  type WorkflowSelection,
-} from "../workflow/session/WorkflowPicker";
+import type { WorkflowSelection } from "../workflow/session/workflowSelection";
 import { useT } from "../../i18n";
 
 interface ComposerProps {
@@ -99,11 +96,13 @@ export function Composer({
 }: ComposerProps) {
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = useT();
   const matches = matchCommands(text, commands ?? []);
   const menuOpen = matches.length > 0 && !dismissed;
   const matchKey = matches.map((command) => command.name).join("\n");
+  const settingsAvailable = Boolean((mcpView && onMcpToggle) || onEffortChange);
 
   useEffect(() => {
     setDismissed(false);
@@ -317,30 +316,26 @@ export function Composer({
               />
             </>
           )}
-          {agents && onModeChange && (
-            <ModePicker
+          {agents && onModeChange && workflows && workflowSelection && onWorkflowSelectionChange && (
+            <IntentPicker
               agents={agents}
               mode={mode ?? null}
-              onChange={onModeChange}
-            />
-          )}
-          {workflows && onWorkflowSelectionChange && workflowSelection && (
-            <WorkflowPicker
+              onModeChange={onModeChange}
               workflows={workflows}
               selection={workflowSelection}
-              onChange={onWorkflowSelectionChange}
-            />
-          )}
-          {mcpView && onMcpToggle && (
-            <McpPicker
-              view={mcpView}
-              onToggle={onMcpToggle}
-              contextTokens={contextTokens}
+              onWorkflowSelectionChange={onWorkflowSelectionChange}
             />
           )}
           <div className="ml-auto flex items-center gap-1.5 px-1.5 text-xs text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />
-            {onEffortChange && (
+            {showSettings && mcpView && onMcpToggle && (
+              <McpPicker
+                view={mcpView}
+                onToggle={onMcpToggle}
+                contextTokens={contextTokens}
+              />
+            )}
+            {showSettings && onEffortChange && (
               <EffortPicker
                 effort={effort ?? null}
                 accepted={acceptedEfforts ?? []}
@@ -348,6 +343,18 @@ export function Composer({
                 contextTokens={contextTokens}
                 onChange={onEffortChange}
               />
+            )}
+            {settingsAvailable && (
+              <Button
+                variant="ghost"
+                iconOnly
+                aria-label={t("composerMoreSettings")}
+                title={t("composerMoreSettings")}
+                aria-expanded={showSettings}
+                onClick={() => setShowSettings((value) => !value)}
+              >
+                ⋯
+              </Button>
             )}
             {onModelChange ? (
               <ModelPicker

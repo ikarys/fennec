@@ -444,7 +444,6 @@ async function tour(page) {
   const newChat = bar.getByRole('button', { name: 'New chat', exact: true });
   await newChat.waitFor();
   await idle();
-  await shot(page, 'ways-1', [[newChat, 1, 3, true], [bar.getByRole('button', { name: 'Projects', exact: true }), 2, 3, true], [bar.getByRole('button', { name: 'Tasks', exact: true }), 3, 3, true], [bar.getByRole('button', { name: 'Workflows', exact: true }), 4, 3, true]]);
 
   await page.goto(`${BASE}/#/project/${project.id}/sessions`);
   const sessionsTab = page.getByRole('tab', { name: /^Sessions/ });
