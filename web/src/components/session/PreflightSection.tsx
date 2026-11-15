@@ -25,6 +25,11 @@ const VERDICTS: Record<PreflightResultView['verdict'], { tone: 'ok' | 'err'; lab
     tone: 'err',
     label: 'verdictCannotLabel',
     title: 'verdictCannotTitle'
+  },
+  ranNothing: {
+    tone: 'ok',
+    label: 'verdictRanNothingLabel',
+    title: 'verdictRanNothingTitle'
   }
 };
 

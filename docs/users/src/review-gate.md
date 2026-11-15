@@ -31,7 +31,7 @@ The dialog shows the commits, the files, the criteria and the security scanners.
 ![Integrate: commit message, To accept, Integrate](images/first-session-5.png)
 
 1. Read the commit message ①. A model proposed it, so it is marked indicative. Change it if you want.
-2. If a **To accept** box appears, read each item (a protected file, a sensitive zone, a file outside the plan, a weakened test…). Tick **I accept it** ② for each one you agree with. **Integrate** stays off until every item is accepted.
+2. If a **To accept** box appears, read each item (a protected file, a sensitive zone, a file outside the plan, a weakened test…) ②. The button then reads **Integrate and accept the point above** (or **the N points above**): clicking it accepts them. A security scanner finding is the exception: tick **I accept it** for it, **Integrate** stays off until you do.
 3. Optional: **Narrate** opens an agent that walks you through the change, **Understand** one that answers your questions.
 4. Click **Integrate** ③.
 
@@ -53,7 +53,7 @@ Or answer the agent in the session to ask for a change before you integrate.
 
 - **Conflict with your branch**: your branch changed the same lines since the run started; see Conflicts below.
 - **Uncommitted changes would be overwritten**: commit or stash your own changes in those files. Then integrate.
-- **Integrate** stays off: an item in **To accept** is not ticked yet.
+- **Integrate** stays off: a security finding in **To accept** is not ticked yet, or a conflict, local changes or a running scan block it.
 
 ---
 
@@ -87,7 +87,7 @@ The gate can block integration for any of these reasons:
 | **The run started from** | Your branch moved, including a detached HEAD, so the commits would go elsewhere. |
 | **Uncommitted changes would be overwritten** | Your folder has uncommitted changes in files the integration would touch. |
 
-You accept each blocker one by one with **I accept it**. The **To accept** list shows what remains.
+**Integrate** accepts every item listed in **To accept** and says so on its label; a security finding needs its own **I accept it**.
 
 ### File signals
 
@@ -107,11 +107,11 @@ The review map lists the branch's files riskiest first. Each file can carry sign
 
 Signals are computed from git and the gate's checks where possible. They help you read the diff in the right order.
 
-### Protected files and waivers
+### Protected files
 
 Protected files include fennec's defaults (`.agents`, `AGENTS.md`/`CLAUDE.md`, lockfiles in your checkout, CI config, `.githooks`, accepted ADRs in `docs/adr`) and the paths in your project's `.agents/protected`.
 
-File tools refuse protected files, and the sandbox mounts them read-only. If an agent needs a protected file, it asks for a **Waiver**. The card shows the path and the **Reason (indicative)**. You choose a **Waiver duration** of 1, 8, or 24 hours, then **Grant** or **Refuse**.
+File tools refuse protected files, and the sandbox mounts them read-only. If an agent needs a protected file, it asks for permission. The card, **An agent asks to change a protected file**, shows the path and the **Reason (indicative)**. You choose how long it is **Allowed for**: 1, 8, or 24 hours, then **Grant** or **Refuse**.
 
 A grant exempts exactly that path, in that session, until it expires. fennec writes a MADR file to the session's `docs/adr/`, and that file goes with the branch to the gate. With you away, a waiver request is refused.
 
@@ -164,6 +164,17 @@ Make your dev server read `$PORT` so several sessions can run side by side. The 
 **Integrate** cherry-picks the session's worktree branch into your repository. Nothing is integrated without your click.
 
 The **Commit message** starts from a subject the model proposes. It is **indicative** and you can edit it. The result is one commit, in your name, with the session as provenance (`fennec-Session`). If **Name the AI models in the commit** is on in [settings](settings.md), the commit also names the models that answered in the session.
+
+When the run had criteria, the message ends with what fennec verified, written by fennec itself rather than a model, so a reader of the history can check it:
+
+```
+Verified by fennec:
+- C1 add_todo stores the item: `cargo test add_todo_stores` passed
+- C3 docs updated: judged by the model, passed
+Tests protected: 2, waivers: 0. Files outside the plan: none.
+```
+
+Each criterion says whether fennec ran its check (the command) or a model judged it (indicative). The block stays under ten lines and you can edit it like the rest of the message. Turn it off with **Add the verification block to commits** in [settings](settings.md). The run's end card shows the same figures in the thread, with a button to copy the block.
 
 Git hooks do not run on fennec's own git commands. Your hooks still run on your own `git commit`. If a check you rely on lives in a hook, run it after integrating or make it a `check:` command in the plan.
 

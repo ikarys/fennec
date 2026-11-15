@@ -1,9 +1,8 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Lang, MsgKey } from "../../../i18n/messages";
 import type { ThreadItem, WorkflowNodeStat } from "../../../lib/fold";
 import { formatClockTime, formatDuration } from "../../../lib/format";
 import {
-  ActivityIcon,
   AlertIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -16,11 +15,11 @@ import {
   WandIcon,
 } from "../../ui/Icons";
 import { Badge } from "../../ui/Badge";
-import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
 import { Tile } from "../../ui/Tile";
 import { useRunUsage } from "../../session/CallUsage";
 import { useLang, useT } from "../../../i18n";
+import { RunVerification, useRunVerification } from "./RunVerification";
 
 type WorkflowEndItem = Extract<ThreadItem, { kind: "workflow-end" }>;
 
@@ -121,8 +120,8 @@ export function RunEndCard({
   const outcome = outcomeView(item.outcome, t);
   const stats = item.stats;
   const usage = useRunUsage(item.runId);
-  // Most runs need only the outcome: the numbers wait behind an icon until asked for.
-  const [showStats, setShowStats] = useState(false);
+  const verification = useRunVerification(item.runId);
+  // The run's numbers are shown as soon as the server has folded them.
 
   const startAt = stats?.startedAt;
   const endAt = stats?.finishedAt;
@@ -182,18 +181,6 @@ export function RunEndCard({
               {t("verified")}
             </Badge>
           )}
-          {stats && (
-            <Button
-              variant="icon"
-              iconOnly
-              className="ml-auto"
-              title={t(showStats ? "runEndHideStats" : "runEndShowStats")}
-              aria-pressed={showStats}
-              onClick={() => setShowStats((shown) => !shown)}
-            >
-              <ActivityIcon />
-            </Button>
-          )}
         </div>
         {startAt != null && endAt != null && (
           <div
@@ -217,7 +204,7 @@ export function RunEndCard({
         <div className="px-4 pt-2.5 text-sm text-muted">{item.reason}</div>
       )}
 
-      {stats && showStats && (
+      {stats && (
         <div className="flex flex-col">
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
             <Tile
@@ -313,6 +300,7 @@ export function RunEndCard({
         </div>
       )}
 
+      {verification && <RunVerification verification={verification} />}
     </Card>
   );
 }

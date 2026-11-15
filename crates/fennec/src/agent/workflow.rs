@@ -7,6 +7,7 @@ mod fork;
 mod jobs;
 mod nodes;
 mod outcome;
+mod test_gate;
 
 #[cfg(test)]
 mod tests;
@@ -292,6 +293,17 @@ fn run_node(
         .map(|open| open.pass)
         .unwrap_or_else(|| state.node_passes.get(node_id).copied().unwrap_or(0) + 1);
     let mut resumed = resumed_child(env, state, node_id)?;
+    if resumed.is_none()
+        && let Some(port) = criteria::nothing_to_judge(&node.kind, state)
+    {
+        append_node_started(turn, state, node_id, pass, &via, None)?;
+        let end = nodes::NodeEnd::Finished {
+            port,
+            output: "Every criterion has a check and fennec ran it: nothing left to judge.".into(),
+            exit_code: None,
+        };
+        return record(turn, state, node_id, end, Some(0));
+    }
     let child = match (&node.kind, &resumed) {
         (_, Some((child, _))) => Some(child.clone()),
         (
@@ -310,14 +322,26 @@ fn run_node(
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
     if let NodeKind::Human { question, choices } = &node.kind {
         let (state, files) = folded_after_start(turn)?;
+        let mut question = render(
+            question,
+            &|name| run::variable(&state, node_id, &files, name),
+            false,
+        );
+        if !turn.always_validate_tests && jobs::fed_by_tests_agent(&state.workflow, node_id) {
+            match test_gate::prove(env, &state.criteria, turn.stop) {
+                test_gate::Proof::Holds(output) => {
+                    return jobs::answer_by_proof(turn, choices, &output).map(Step::Go);
+                }
+                test_gate::Proof::Missing(reason) => {
+                    question.push_str(&format!("\n\nfennec stopped here: {reason}."));
+                }
+                test_gate::Proof::Stopped => return Ok(Step::Exit(DoneReason::Stopped)),
+            }
+        }
         turn.append(Event::WorkflowHumanAsked {
             run_id: state.run_id.clone(),
             node_id: node_id.to_string(),
-            question: render(
-                question,
-                &|name| run::variable(&state, node_id, &files, name),
-                false,
-            ),
+            question,
         })?;
         // Night mode: the kernel, never the model, takes the forward choice
         // and records it as a decision the human reviews in the morning.

@@ -259,6 +259,10 @@ pub fn serve(
         notifier.clone(),
     ));
     let logins = login::Logins::new(password);
+    // Servers started before a restart are still running: take them back.
+    let server_runs = Arc::new(Mutex::new(crate::web::os::servers::adopt(
+        &settings.db_path,
+    )));
     let app = Arc::new(App {
         turns: Turns::new(settings.clone(), notifier.clone()),
         settings,
@@ -270,7 +274,7 @@ pub fn serve(
         idea_reports: Mutex::new(HashMap::new()),
         idea_queues: Mutex::default(),
         worktree_scan: Mutex::default(),
-        server_runs: Arc::new(Mutex::new(HashMap::new())),
+        server_runs,
         plugins: plugins.clone(),
         agents_home,
         update_check: Mutex::default(),

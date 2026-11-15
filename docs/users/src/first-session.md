@@ -7,6 +7,8 @@ fennec plans, writes the tests, builds and checks. You decide at each gate. Noth
 - A connected model: [connect a model](connect-model.md).
 - An open project: [open a project](open-project.md).
 
+> **From the terminal:** `fennec run --workflow plan-build-verify "<task>"` runs the same steps in your shell and asks the gates there; integration stays in the browser. See [command line](cli.md#run-a-workflow).
+
 ## Step 1: ask for the change
 
 Click **New session**.
@@ -15,7 +17,7 @@ Type the request in the message box ①.
 
 Use this example: `Add an add_todo(title) function to src/main.py that stores the to-do in an in-memory list, and make list_todos return that list.`
 
-The workflow ② is **Plan, build, verify**. Keep it.
+② is the mode: **Plan** (plan, build, verify). Keep it. **Ask** answers about the project and changes nothing; **Build** builds a small change without a plan. A chat (**New chat** in the top bar) has no project and no branch.
 
 ③ shows the model that will answer. Click it to choose another.
 
@@ -27,7 +29,7 @@ Press Enter.
 
 After a few seconds the plan appears: its steps, then **Done when** ①, the criteria that say the work is finished (C1, C2…).
 
-Under them, **Preflight** runs each criterion's check before any work. **fails before the work** is expected: it proves the check really tests the change. It is marked **verified**: fennec ran it, no model judged it.
+Under them, **Checked before the work** runs each criterion's check before any work. **fails before the work** is expected: it proves the check really tests the change. It is marked **verified**: fennec ran it, no model judged it.
 
 The question **Go with this plan?** waits for you.
 
@@ -37,17 +39,19 @@ Click **Revise** ③ to send the plan back with your comment, or **Go** ④ to s
 
 ![The plan, its Done when criteria and the Go button](images/first-session-2.png)
 
-## Step 3: validate the tests
+## Step 3: the tests, usually nothing to do
 
 The agent writes the tests first ①. It writes them before any code. The left rail shows where the run is.
 
-Read the list. Each test says which criterion it covers. **Not covered by a test** lists what is left uncovered.
+fennec then runs every criterion's check. When each one runs a test that fails before the work, the tests are validated without you: the step **Validate the tests** shows **Validate** ② and the run goes on. Its **Details** say **Validated by fennec** and list the checks it ran.
 
-Once validated, the tests are protected. The builder cannot change them without asking you. It asks for a waiver that you grant or refuse.
+Otherwise fennec stops and says why, for example **C2 has no check** or **C1's check passes before the work**. Read the list. Each test says which criterion it covers. **Not covered by a test** lists what is left uncovered. Not happy with them? Type a comment and click **Rework**. Otherwise click **Validate**.
 
-Not happy with them? Type a comment and click **Rework** ②. Otherwise click **Validate** ③.
+Either way, the validated tests are protected. The builder cannot change them without asking you. It asks for a waiver that you grant or refuse.
 
-![Validate the tests: the test list, Rework and Validate](images/first-session-3.png)
+To read the tests every time, turn on **Always validate the tests** in Settings > Workflows.
+
+![The tests step, validated by fennec](images/first-session-3.png)
 
 ## Step 4: wait for the run to finish
 
@@ -69,15 +73,15 @@ Click **Review and integrate…** ②.
 
 The dialog shows the commits, the files, the criteria and the security scanners.
 
-The commit message ① is proposed by the model. It is marked indicative. Read it. Change it if you want.
+The commit message ① is proposed by the model. It is marked indicative. Read its first line; click it to change it.
 
 It becomes one commit, in your name, on your branch.
 
-A **To accept** box appears when something needs your eye. It can be a file no plan step names. Check **I accept it** ② once you agree.
+A **To accept** box ② appears when something needs your eye. It can be a file no plan step names. Read it: the button then says **Integrate and accept the point above**, so the click is your acceptance.
 
-Want to understand the change first? **Narrate** opens an agent that walks you through it, **Understand** one that answers your questions.
+Want to understand the change first? The eye icon (**Narrate**) opens an agent that walks you through it, the speech bubble (**Understand**) one that answers your questions.
 
-Click **Integrate** ③.
+Read, then click **Integrate** ③.
 
 ![Integrate into main: commit message, accept, Integrate](images/first-session-5.png)
 
@@ -97,4 +101,4 @@ Close the dialog.
 - A step fails. The run stops and says why. Ask again in the message box.
 - You do not want the work. Delete the session from the session list. Your branch never changed.
 
-Done. Next: [use fennec from another machine](remote-access.md), or see [ways to work](ways-to-work.md).
+Done. Next: [use fennec from another machine](remote-access.md), or see [projects and sessions](sessions.md).

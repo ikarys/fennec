@@ -1,37 +1,54 @@
-// The home page: a welcoming dashboard of what's running, what needs the human,
-// recent sessions, favorite projects and quick stats.
-import type { ReactNode } from 'react';
+// The home page: the shared header, setup checklist, attention list, and the Home filter sections.
 import { useT, useLang } from '../i18n';
-import { getHome, getBacklog, getInsight, getWorktreeSummary, type AttentionItem } from '../lib/api';
+import { getHome, getBacklog, getInsight, getWorktreeSummary, type AttentionItem, type Project } from '../lib/api';
 import { useLoaded } from '../hooks/useLoaded';
-import { formatRelative, formatBytes } from '../lib/format';
-import { ActivityIcon, PlusIcon, FolderIcon, CheckIcon, CoinIcon, BacklogIcon, HardDriveIcon, InboxIcon, ChatIcon, StarIcon } from '../components/ui/Icons';
+import { formatBytes } from '../lib/format';
+import { HOME_FILTERS, type HomeFilter } from '../lib/route';
+import { ActivityIcon, PlusIcon, FolderIcon, CheckIcon, BacklogIcon, HardDriveIcon, InboxIcon } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ListCard, listRowClass } from '../components/ui/ListCard';
 import { Badge } from '../components/ui/Badge';
+import { Tabs } from '../components/ui/Tabs';
 import { SetupChecklist } from '../components/project/SetupChecklist';
-import { SessionStateIcon } from '../components/session/SessionStateIcon';
 import { attentionKindLabel } from '../components/layout/AttentionBell';
+import { HomeOverview, type HomeStatTile } from '../components/home/HomeOverview';
+import { ProjectsSection } from '../components/home/ProjectsSection';
+import { ChatsSection } from '../components/home/ChatsSection';
+import { NightQueueSection } from '../components/home/NightQueueSection';
 
 interface HomePageProps {
+  filter: HomeFilter;
   projectCount: number;
   attention: AttentionItem[];
   refreshKey: number;
+  projects: Project[];
+  projectsLoading: boolean;
+  projectsError: string | null;
   onOpenProjectDialog: () => void;
   onNewChat: (() => void) | null;
   onNewSession: (projectId: string) => void;
   onOpenSession: (sessionId: string) => void;
+  onSessionsDeleted: (ids: string[]) => void;
+  onToggleFavorite: (projectId: string, favorite: boolean) => void;
+  onFilter: (filter: HomeFilter) => void;
 }
 
 export function HomePage({
+  filter,
   projectCount,
   attention,
   refreshKey,
+  projects,
+  projectsLoading,
+  projectsError,
   onOpenProjectDialog,
   onNewChat,
   onNewSession,
-  onOpenSession
+  onOpenSession,
+  onSessionsDeleted,
+  onToggleFavorite,
+  onFilter
 }: HomePageProps) {
   const t = useT();
   const lang = useLang();
@@ -51,21 +68,8 @@ export function HomePage({
 
   const running = home.data?.running ?? 0;
 
-  // Each stat only renders when its data is loaded; a missing one is skipped.
-  const stats: { key: string; href: string; icon: ReactNode; value: string; label: string; alert: boolean }[] = [];
-  if (insight.data) {
-    const costCard = insight.data.cards.find((card) => card.kind === 'cost');
-    if (costCard) {
-      stats.push({
-        key: 'cost',
-        href: '#/insight',
-        icon: <CoinIcon className="h-4 w-4" />,
-        value: costCard.value,
-        label: t('homeStatCost'),
-        alert: false
-      });
-    }
-  }
+  // The overview's stat tiles: the ready queue and worktree usage.
+  const stats: HomeStatTile[] = [];
   if (backlog.data) {
     stats.push({
       key: 'ready',
@@ -144,99 +148,43 @@ export function HomePage({
           )}
         </ListCard>
 
-        {home.loading ? (
-          <div className="text-sm text-muted">{t('loading')}</div>
-        ) : home.error ? (
-          <p className="m-0 text-err">{home.error}</p>
-        ) : home.data ? (
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <ListCard Icon={ChatIcon} title={t('homeRecentSessions')} count={home.data.recent.length}>
-              {home.data.recent.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-muted">{t('homeNoRecentSessions')}</div>
-              ) : (
-                <>
-                  {home.data.recent.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => onOpenSession(s.id)}
-                      className={listRowClass({}, 'w-full text-left border-t border-border first:border-t-0')}
-                    >
-                      <SessionStateIcon state={s.state} className="h-4 w-4" />
-                      <span className="min-w-0 grow truncate text-sm font-medium text-text">{s.title}</span>
-                      <Badge tone={s.chat ? 'info' : 'neutral'} appearance="pill">
-                        {s.chat ? t('homeChat') : s.projectName}
-                      </Badge>
-                      <span className="shrink-0 text-xs text-faint tabular-nums">{formatRelative(lang, s.updatedAt)}</span>
-                    </button>
-                  ))}
-                  <div className="flex gap-4 border-t border-border px-4 py-2 text-xs">
-                    <a href="#/projects" className="text-accent hover:text-accent-strong">
-                      {t('homeAllProjects')}
-                    </a>
-                    <a href="#/chats" className="text-accent hover:text-accent-strong">
-                      {t('homeAllChats')}
-                    </a>
-                  </div>
-                </>
-              )}
-            </ListCard>
+        <Tabs<HomeFilter>
+          orientation="horizontal"
+          label={t('homeFilterLabel')}
+          tabs={HOME_FILTERS.map((entry) => ({ id: entry.filter, label: t(entry.titleKey) }))}
+          active={filter}
+          onSelect={onFilter}
+        />
 
-            <ListCard Icon={StarIcon} title={t('homeFavoriteProjects')} count={home.data.favorites.length}>
-              {home.data.favorites.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-muted">{t('homeNoFavorites')}</div>
-              ) : (
-                home.data.favorites.map((p) => (
-                  <div
-                    key={p.id}
-                    className={listRowClass({}, 'border-t border-border first:border-t-0')}
-                  >
-                    <a href={'#/project/' + encodeURIComponent(p.id)} className="min-w-0 grow">
-                      <span className="block text-sm font-medium text-text truncate">{p.name}</span>
-                      <span className="block font-mono text-xs text-faint truncate">{p.workdir}</span>
-                    </a>
-                    <Badge appearance="pill" tone={p.running > 0 ? 'accent' : 'neutral'}>
-                      {t('homeSessionCount', { count: p.sessions })}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      onClick={() => onNewSession(p.id)}
-                      title={t('newSession')}
-                      aria-label={t('newSession')}
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </ListCard>
-          </div>
-        ) : null}
-
-        {stats.length > 0 && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {stats.map((stat) => (
-              <a
-                key={stat.key}
-                href={stat.href}
-                className={`flex items-center gap-3 rounded-xl border border-border bg-panel px-4 py-3 hover:border-accent/40 hover:bg-accent-soft ${
-                  stat.alert ? 'border-attention/50' : ''
-                }`}
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
-                  {stat.icon}
-                </span>
-                <span className="min-w-0">
-                  <span className={`block text-lg font-semibold tabular-nums ${stat.alert ? 'text-attention' : 'text-text'}`}>
-                    {stat.value}
-                  </span>
-                  <span className="block text-xs text-muted">{stat.label}</span>
-                </span>
-              </a>
-            ))}
-          </div>
+        {filter === 'overview' ? (
+          <HomeOverview
+            home={home}
+            insight={insight.data}
+            stats={stats}
+            lang={lang}
+            onOpenSession={onOpenSession}
+            onNewSession={onNewSession}
+          />
+        ) : filter === 'projects' ? (
+          <ProjectsSection
+            projects={projects}
+            loading={projectsLoading}
+            error={projectsError}
+            onNewSession={onNewSession}
+            onOpenSession={onOpenSession}
+            onSessionsDeleted={onSessionsDeleted}
+            onToggleFavorite={onToggleFavorite}
+          />
+        ) : filter === 'chats' ? (
+          <ChatsSection
+            projects={projects}
+            loading={projectsLoading}
+            error={projectsError}
+            onOpenSession={onOpenSession}
+            onSessionsDeleted={onSessionsDeleted}
+          />
+        ) : (
+          <NightQueueSection />
         )}
       </div>
     </main>

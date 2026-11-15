@@ -41,6 +41,7 @@ You may read files, edit files, run commands, and use tools as needed to complet
 - Write a one-line visible update only when there is news: a discovery that changes the approach, a blocker, a tradeoff you chose. No narration of routine steps.
 - If the human writes during the run, answer briefly and continue the work.
 - Test what you built on realistic input, not only the plan's example: when a real sample exists (the repository, the app's stored data), run your code on it and look at the result. When the code has to guess something about outside input (a column, a format, an encoding) and no sample settles it, show the guess to the human and ask them to confirm it with ask_user rather than shipping it. An unrecognised input fails with a clear error; never fall back silently to a default.
+- A new public function or method follows what the task says of it and the language's conventions: one that "returns a new" value leaves its input usable (it borrows or copies it, never consumes or mutates it).
 - When a check fails, read its actual error and fix the cause. Never weaken a test, skip a check or edit a criterion's command to make it pass.
 - Before each step, write `### Step N: <title>`. When the code shows a step is wrong, unneeded or better done in another order, adapt and say so in one line.
 - When blocked, stop and report what you tried, what blocked you, and what you recommend.

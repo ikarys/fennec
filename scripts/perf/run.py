@@ -23,7 +23,15 @@ import model as model_module
 import report as report_module
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-FAILED_STATES = {"waiting_for_user", "error", "truncated"}
+# A real model ends a turn in `waiting_for_user` when it asks a question (a normal,
+# finished turn); only the scripted fake model guarantees it never happens.
+FAILED_STATES = {"error", "truncated"}
+FAKE_FAILED_STATES = {"waiting_for_user", "error", "truncated"}
+
+
+def failed_states(mode: str) -> set[str]:
+    """The session states that fail a turn, by mode."""
+    return FAKE_FAILED_STATES if mode == "fake" else FAILED_STATES
 
 
 def main() -> int:
@@ -54,6 +62,7 @@ def main() -> int:
         rss_rest_mb = proc_field_mb(server.pid, "VmRSS")
 
         turn_timeout_s = 120.0 if args.mode == "fake" else 900.0
+        failed = failed_states(args.mode)
         project_id = create_project(port, project)
         first_sid = ""
         turn_walls_ms: list[float] = []
@@ -61,7 +70,7 @@ def main() -> int:
 
         for index in range(args.sessions):
             before = fake_model.snapshot()
-            sid, wall_s = start_session(port, project_id, f"Read the README, write a note and list the files (session {index})", turn_timeout_s)
+            sid, wall_s = start_session(port, project_id, f"Read the README, write a note and list the files (session {index})", turn_timeout_s, failed)
             after = fake_model.snapshot()
             record_turn(wall_s, before, after, turn_walls_ms, kernel_overheads_ms)
             if index == 0:
@@ -74,11 +83,11 @@ def main() -> int:
                 status, _ = http_request(port, "POST", f"/api/sessions/{sid}/messages", {"content": "Continue"}, 30.0)
                 if status not in (200, 202):
                     fail(f"message POST returned {status}")
-                wall_s = wait_turn(port, sid, turn_timeout_s, started, done_before)
+                wall_s = wait_turn(port, sid, turn_timeout_s, started, done_before, failed)
                 after = fake_model.snapshot()
                 record_turn(wall_s, before, after, turn_walls_ms, kernel_overheads_ms)
 
-        compaction_ms = run_compaction(port, first_sid, turn_timeout_s)
+        compaction_ms = run_compaction(port, first_sid, turn_timeout_s, failed)
         workflow_ms = run_workflow(port, project_id, turn_timeout_s)
         page_metrics = measure_pages(port, project_id, first_sid, args.samples)
 
@@ -308,7 +317,7 @@ def create_project(port: int, project: Path) -> str:
     return str(project_id)
 
 
-def start_session(port: int, project_id: str, prompt: str, timeout_s: float) -> tuple[str, float]:
+def start_session(port: int, project_id: str, prompt: str, timeout_s: float, failed: set[str]) -> tuple[str, float]:
     """Create a normal session, wait for its first turn, and return id and wall time."""
     started = time.perf_counter()
     status, body = http_request(
@@ -323,7 +332,7 @@ def start_session(port: int, project_id: str, prompt: str, timeout_s: float) -> 
     sid = body.get("id")
     if not sid:
         fail("session creation response has no id")
-    wall_s = wait_turn(port, str(sid), timeout_s, started, 0)
+    wall_s = wait_turn(port, str(sid), timeout_s, started, 0, failed)
     return str(sid), wall_s
 
 
@@ -340,14 +349,14 @@ def record_turn(
     kernel_overheads_ms.append(max(0.0, wall_s - busy_delta_s) * 1000.0)
 
 
-def run_compaction(port: int, sid: str, timeout_s: float) -> float:
+def run_compaction(port: int, sid: str, timeout_s: float, failed: set[str]) -> float:
     """Compact the first session and return elapsed milliseconds."""
     done_before = chat_done_count(port, sid)
     started = time.perf_counter()
     status, body = http_request(port, "POST", f"/api/sessions/{sid}/compact", {}, 30.0)
     if status not in (200, 202):
         fail(f"compaction returned {status}: {body.get('error', 'unknown error')}")
-    return wait_turn(port, sid, timeout_s, started, done_before) * 1000.0
+    return wait_turn(port, sid, timeout_s, started, done_before, failed) * 1000.0
 
 
 def run_workflow(port: int, project_id: str, timeout_s: float) -> float:
@@ -372,16 +381,23 @@ def run_workflow(port: int, project_id: str, timeout_s: float) -> float:
         fail("workflow session creation response has no id")
 
     deadline = started + timeout_s
+    answered = 0
     while time.perf_counter() < deadline:
-        status, runs = http_request(port, "GET", f"/api/sessions/{sid}/workflow/run", None, 5.0)
-        if status == 200 and isinstance(runs, list):
-            for item in runs:
-                event = item.get("event", {}) if isinstance(item, dict) else {}
-                if event.get("type") == "workflow.finished":
-                    outcome = (event.get("data") or {}).get("outcome")
-                    if outcome != "done":
-                        fail(f"workflow finished with outcome {outcome!r}")
-                    return (time.perf_counter() - started) * 1000.0
+        status, view = http_request(port, "GET", f"/api/sessions/{sid}/workflow/run/view", None, 5.0)
+        if status == 200 and isinstance(view, dict):
+            finished = view.get("finished")
+            if isinstance(finished, dict) and finished.get("outcome"):
+                outcome = finished["outcome"]
+                if outcome != "done":
+                    fail(f"workflow finished with outcome {outcome!r}")
+                return (time.perf_counter() - started) * 1000.0
+        # A real model may end an agent turn with a question; answer it (bounded) so the run finishes.
+        if answered < 3:
+            status, session = http_request(port, "GET", f"/api/sessions/{sid}", None, 5.0)
+            if status == 200 and session.get("state") == "waiting_for_user":
+                status, body = http_request(port, "POST", f"/api/sessions/{sid}/messages", {"content": "Continue"}, 30.0)
+                if status in (200, 202):
+                    answered += 1
         time.sleep(0.05)
 
     fail("workflow did not finish in time")
@@ -566,7 +582,7 @@ def chat_done_count(port: int, sid: str) -> int:
     return len(chat_dones(port, sid))
 
 
-def wait_turn(port: int, sid: str, timeout_s: float, started: float, done_before: int) -> float:
+def wait_turn(port: int, sid: str, timeout_s: float, started: float, done_before: int, failed: set[str]) -> float:
     """Poll until the turn started at `started` has ended and return its duration in seconds.
 
     The state alone is ambiguous right after a POST (the previous turn's "complete"), so the
@@ -580,7 +596,7 @@ def wait_turn(port: int, sid: str, timeout_s: float, started: float, done_before
         state = body.get("state", "error") if status == 200 else "error"
         dones = chat_dones(port, sid) if state != "running" else []
         if len(dones) > done_before:
-            if state in FAILED_STATES:
+            if state in failed:
                 fail(f"session {sid} ended in state {state}")
             duration_ms = dones[-1].get("durationMs")
             if isinstance(duration_ms, (int, float)):

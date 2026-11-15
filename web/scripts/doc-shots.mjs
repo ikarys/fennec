@@ -11,6 +11,7 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const FENNEC_BIN = process.env.FENNEC_BIN ?? join(repo, 'target/release/fennec');
 const MODEL_URL = process.env.DOC_SHOTS_MODEL_URL ?? 'http://127.0.0.1:8000/v1';
 const OUT = process.env.DOC_SHOTS_OUT ?? join(repo, 'docs/users/src/images');
+const SITE_OUT = process.env.DOC_SHOTS_SITE_OUT ?? join(repo, 'site/images');
 const PORT = 7799;
 const BASE = `http://127.0.0.1:${PORT}`;
 
@@ -55,6 +56,14 @@ async function shot(page, name, items = []) {
   await page.screenshot({ path });
   await clearMarks(page);
   console.log(path);
+}
+
+// A landing-site image: the page as it is, unannotated, at the site's 1600x1000.
+async function siteShot(page, name) {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: join(SITE_OUT, `${name}.png`) });
+  await page.setViewportSize({ width: 1440, height: 900 });
 }
 
 async function connectModel(page) {
@@ -170,7 +179,7 @@ async function firstSession(page) {
   const composer = page.getByPlaceholder('Describe the workflow task…');
   await composer.waitFor();
   await composer.fill('Add an add_todo(title) function to src/main.py that stores the to-do in an in-memory list, and make list_todos return that list.');
-  const workflow = page.getByText('Plan, build, verify', { exact: true }).last();
+  const workflow = page.getByRole('button', { name: 'What do you want?', exact: true });
   const model = page.locator('button[title*=" · "]').last(); // title: provider · model
   await shot(page, 'first-session-1', [[composer, 1], [workflow, 2], [model, 3]]);
   await composer.press('Enter');
@@ -182,11 +191,17 @@ async function firstSession(page) {
   await shot(page, 'first-session-2', [[page.getByText('C1', { exact: true }).first(), 1], [page.getByPlaceholder('Comment (optional)…'), 2], [page.getByRole('button', { name: 'Revise', exact: true }), 3], [go, 4]]);
   await go.click();
 
-  const validate = page.getByRole('button', { name: 'Validate', exact: true });
-  await validate.waitFor({ timeout: 900_000 });
-  await page.waitForTimeout(1000);
-  await shot(page, 'first-session-3', [[page.getByText('Validate the tests', { exact: true }).first(), 1], [page.getByRole('button', { name: 'Rework', exact: true }), 2], [validate, 3]]);
-  await validate.click();
+  // Usually fennec validates the tests itself; when it stops, the guide takes Validate and keeps the old picture.
+  const validated = page.getByText('Validate', { exact: true }).first(); // the rail's answer chip
+  const rework = page.getByRole('button', { name: 'Rework', exact: true });
+  await validated.or(rework).waitFor({ timeout: 900_000 });
+  if (await rework.isVisible()) {
+    console.warn('fennec stopped at the tests gate: first-session-3 not taken');
+    await page.getByRole('button', { name: 'Validate', exact: true }).click();
+  } else {
+    await page.waitForTimeout(1000);
+    await shot(page, 'first-session-3', [[page.getByText('Write the tests', { exact: true }).first(), 1], [validated, 2]]);
+  }
 
   const review = page.getByRole('button', { name: 'Review and integrate…', exact: true }).last(); // the decision bar's
   // The builder may ask to touch a protected test; the guide keeps the tests as validated.
@@ -199,15 +214,18 @@ async function firstSession(page) {
   await shot(page, 'first-session-4', [[runRail, 1], [review, 2]]);
   await review.click();
   const dialog = page.getByRole('dialog');
-  const integrate = dialog.getByRole('button', { name: 'Integrate', exact: true });
-  const message = dialog.getByRole('textbox').first();
+  // With a point to accept the button reads "Integrate and accept…": clicking it is the acceptance.
+  const integrate = dialog.getByRole('button', { name: /^Integrate/ });
+  const message = dialog.getByTitle('Edit the commit message');
   await message.waitFor();
   await page.waitForTimeout(2000); // the preview and its blockers load
-  // A real run may touch files no plan step names: the human accepts them, here on the guide's behalf.
-  const accepts = await dialog.getByLabel('I accept it').all();
-  for (const box of accepts) await box.check();
+  // A point that needs a tick is ticked here on the guide's behalf; the others are framed.
+  const ticks = await dialog.getByLabel('I accept it').all();
+  for (const box of ticks) await box.check();
+  const toAccept = dialog.getByText('To accept', { exact: true });
+  const accepts = ticks.length > 0 ? ticks.map((box) => [box, 2]) : (await toAccept.isVisible()) ? [[toAccept.locator('..'), 2]] : [];
   await integrate.click({ trial: true, timeout: 300_000 }); // enabled once the server's checks are in
-  await shot(page, 'first-session-5', [[message, 1], ...accepts.map((box) => [box, 2]), [integrate, 3]]);
+  await shot(page, 'first-session-5', [[message, 1], ...accepts, [integrate, 3]]);
   await changesPage(page);
   await integrate.click();
   const result = page.getByText(/^Integrated:/);
@@ -250,12 +268,15 @@ async function zoom(page, at, deltaY) {
 
 // Pick a workflow in the composer, read the embedded one, then draw and test a new one.
 async function workflows(page) {
+  const project = await page.evaluate(async () => (await (await fetch('/api/projects')).json()).find((p) => p.name === 'todo-api'));
+  await page.goto(`${BASE}/#/project/${project.id}`);
   await page.locator('button', { hasText: 'New session' }).first().click();
-  const picker = page.getByText('Plan, build, verify', { exact: true }).last();
+  const picker = page.getByRole('button', { name: 'What do you want?', exact: true });
   await picker.waitFor();
   await picker.click();
   await page.waitForTimeout(300);
-  await shot(page, 'workflows-1', [[picker, 1], [page.getByText('Quick build', { exact: true }).last(), 2]]);
+  const item = (name) => page.getByText(name, { exact: true }).last(); // the popover renders after the chip
+  await shot(page, 'workflows-1', [[item('Plan'), 1], [item('Build'), 2], [item('Expert'), 3]]);
   await page.keyboard.press('Escape');
 
   await page.goto(`${BASE}/#/workflows`);
@@ -336,7 +357,7 @@ async function workflows(page) {
   await test.click();
   const stepByStep = page.getByText('Step by step ✕', { exact: true });
   await stepByStep.waitFor();
-  await shot(page, 'workflows-11', [[page.getByText('build-and-test', { exact: true }).last(), 1], [stepByStep, 2]]);
+  await shot(page, 'workflows-11', [[page.getByText('Mode: build-and-test', { exact: true }).last(), 1], [stepByStep, 2]]);
 }
 
 async function tasks(page) {
@@ -374,6 +395,7 @@ async function tasks(page) {
   await page.waitForTimeout(1200); // the sheet saves after a pause in typing
   const ready = page.getByRole('button', { name: 'Ready', exact: true }).last();
   await shot(page, 'tasks-5', [[criterion, 1], [page.getByPlaceholder('Check'), 2], [ready, 3]]);
+  await siteShot(page, 'task-sheet');
 
   await page.getByRole('tab', { name: 'Framing' }).click();
   const frame = page.getByRole('button', { name: 'Frame with the agent' });
@@ -434,6 +456,21 @@ async function plugins(page) {
   await shot(page, 'plugins-2', [[page.getByText('Enabled', { exact: true }).first(), 1], [page.getByText('Turnstats', { exact: true }).locator('../..'), 2], [ram.locator('..'), 3]]);
 }
 
+// The landing site's hero: the finished run, unannotated, once per theme.
+async function siteHero(page) {
+  await clearMarks(page);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const thread = page.getByRole('main').locator('div.overflow-y-auto').first();
+  await thread.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  for (const theme of ['nuit', 'jour', 'ardoise', 'cyber']) {
+    await page.evaluate((id) => { document.documentElement.dataset.theme = id; }, theme);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(SITE_OUT, `workflow-${theme}.png`) });
+  }
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'nuit'; });
+  await page.setViewportSize({ width: 1440, height: 900 });
+}
+
 // The screens of the tour pages, on the state firstSession leaves: one session, one plan, one integration.
 async function tour(page) {
   const project = await page.evaluate(async () => (await (await fetch('/api/projects')).json()).find((p) => p.name === 'todo-api'));
@@ -444,12 +481,12 @@ async function tour(page) {
   const newChat = bar.getByRole('button', { name: 'New chat', exact: true });
   await newChat.waitFor();
   await idle();
-  await shot(page, 'ways-1', [[newChat, 1, 3, true], [bar.getByRole('button', { name: 'Projects', exact: true }), 2, 3, true], [bar.getByRole('button', { name: 'Tasks', exact: true }), 3, 3, true], [bar.getByRole('button', { name: 'Workflows', exact: true }), 4, 3, true]]);
 
   await page.goto(`${BASE}/#/project/${project.id}/sessions`);
-  const sessionsTab = page.getByRole('tab', { name: /^Sessions/ });
+  const sessionsTab = page.getByRole('tab', { name: 'Sessions' }); // the project page's left menu
   const row = page.locator('li.cursor-pointer').first();
   await row.waitFor();
+  await row.scrollIntoViewIfNeeded();
   await idle();
   await shot(page, 'sessions-1', [[sessionsTab, 1], [row, 2], [page.getByRole('button', { name: 'New session', exact: true }), 3]]);
 
@@ -463,6 +500,7 @@ async function tour(page) {
   await page.waitForTimeout(1500);
   await idle();
   await shot(page, 'sessions-2', [[page.getByRole('main').locator('div.overflow-y-auto').first(), 1], [composerBox, 2], [(() => { const tabs = page.getByRole('navigation', { name: 'Session context' }).getByRole('button'); return [tabs, tabs]; })(), 3, 2]]);
+  await siteHero(page);
 
   const follow = page.getByRole('switch', { name: /auto-follow/i });
   if (await follow.count()) await follow.uncheck();
@@ -484,19 +522,19 @@ async function tour(page) {
   const own = await page.evaluate(async (workdir) => (await fetch('/api/projects', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workdir }) })).json(), clone);
 
   await page.goto(`${BASE}/#/project/${own.id}/map`);
-  const mapTab = page.getByRole('tab', { name: 'Module map' });
+  const mapTab = page.getByRole('tab', { name: 'Module map' }); // the project page's left menu
   await page.getByText('Modules', { exact: true }).first().waitFor();
   await page.getByText(/^[1-9]\d* entry point/).waitFor({ timeout: 60_000 });
   await idle();
   await shot(page, 'understanding-1', [[mapTab, 1], [page.locator('section').first(), 2]]);
 
   await page.goto(`${BASE}/#/project/${own.id}/risks`);
-  const risksTab = page.getByRole('tab', { name: 'Risks' });
-  const zones = page.getByText('Risk zones', { exact: true }).locator('../../..');
+  const risksTitle = page.getByText('Risk zones', { exact: true });
+  const zones = risksTitle.locator('../../..');
   await zones.waitFor();
   await page.waitForTimeout(1500);
   await idle();
-  await shot(page, 'understanding-2', [[risksTab, 1], [zones, 2]]);
+  await shot(page, 'understanding-2', [[risksTitle, 1], [zones, 2]]);
 
   await page.goto(`${BASE}/#/edit/${project.id}/${encodeURIComponent('src/main.py')}`);
   const tree = page.getByRole('navigation', { name: 'Files' });
@@ -519,9 +557,10 @@ async function tour(page) {
   await message.fill('docs: mention add_todo');
   await idle();
   await shot(page, 'files-2', [[page.getByRole('button', { name: 'Back to reading', exact: true }), 1], [changed.locator('..'), 2], [message, 3], [page.getByRole('button', { name: 'Commit', exact: true }), 4]]);
+  await siteShot(page, 'editor');
   await page.getByRole('button', { name: 'Reset to the last commit', exact: true }).click();
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
-  await page.getByText('No changed file.').waitFor();
+  await changed.waitFor({ state: 'detached' }); // the workflow drawn earlier stays untracked: wait for README.md only
 
   await page.goto(`${BASE}/#/insight`);
   const projectSelect = page.getByRole('combobox');
@@ -555,7 +594,13 @@ const main = async () => {
     browser = await chromium.launch();
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, colorScheme: 'dark' });
     const page = await context.newPage();
-    for (const scene of scenes) await scene(page);
+    try {
+      for (const scene of scenes) await scene(page);
+    } catch (err) {
+      // What the page showed when a step timed out: the selector to fix is usually visible.
+      await page.screenshot({ path: join(OUT, 'failed.png') });
+      throw err;
+    }
   } finally {
     if (browser) await browser.close();
     server.kill();

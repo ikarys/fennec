@@ -232,7 +232,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   than the version the human last looked at, up to `current`. The first call records `current`, so a fresh install
   has nothing new.
 - `POST /api/changelog/seen` `{}` → `{unseen: 0}`: the human looked at the changelog of the running version.
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools, shortcuts}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, scanners, sandboxHealth, mcpTools, shortcuts}`
   (`listings` may be the last listing the endpoint answered, refreshed in the background)
   - `shortcuts`: `[{action, combo, default}]`, every keyboard shortcut in the Settings page's order, the stored override applied (an empty combo: disabled). A combo is `Mod`/`Alt`/`Shift` (in that order) then a `KeyboardEvent.code`, e.g. `Alt+Shift+Digit1`; matching by code keeps a shortcut on the same key whatever the layout.
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
@@ -256,8 +256,6 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     set; `contextWindow`/`compactAt` are local).
   - `defaults`: `{provider, model, maxTokens, contextWindow, compactAt, reasoningEffort}`
     from the environment/built-in defaults
-  - `optInWorkflows`: `[{id, name, description}]`, the embedded workflows that stay off
-    until their id is in `preferences.enabledWorkflows`
 - `POST /api/settings` with a full `Preferences` body → 200 with the same body
   as `GET /api/settings`; 400 with the validation message if invalid
 - `POST /api/settings/providers/list` with `{provider, baseUrl, apiKey}` → a
@@ -570,7 +568,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   the worktree's.
 - `GET /api/sessions/{id}/diff?path=<path>` → `{path, binary, truncated, hunks: [{header, lines: [{kind, old, new, text}]}], editorUrl}`: one file the session's branch changed, over the range the integration takes; `path` as in the integration's `files[].path`, `kind` is `context`, `added` or `removed`, `old`/`new` the line numbers (null on the side the line is absent from), `truncated` past 5000 lines, `editorUrl` opens the worktree's file in the IDE of `display.editor` (verified: read from git). 400 without `path`, 404 when the session does not exist or the branch did not change the path, 409 without a worktree or a git repository.
 - `POST /api/sessions/{id}/understanding` `{dialogueId}` → `{understanding}`: records that the session `dialogueId`, created just before by the UI, is the comprehension dialogue of the session `id` on its branch's current head (`understanding.started`); 400 when `dialogueId` is missing or belongs to another project, 404 when it does not exist, 409 when the branch has no commit. `understanding` in the integration preview is `{state: "none"}`, `{state: "started", sessionId}` (opened, the human has not answered yet) or `{state: "held", sessionId}` (the human answered at least once after the opening brief): verified, folded from the two logs; a dialogue on an older head does not count.
-- `POST /api/sessions/{id}/integration/message` → `{message}`: an English Conventional Commit subject the model proposes for the integration (indicative; `null` when the model fails or answers no valid subject; `defaultMessage` stays the fallback). The body is `{}`.
+- `POST /api/sessions/{id}/integration/message` → `{message}`: an English Conventional Commit subject the model proposes for the integration (indicative; `null` when the model fails or answers no valid subject; `defaultMessage` stays the fallback). The body is `{}`. `defaultMessage` and the suggestion end with the verification block when `integration.verificationBlock` (default true) is on.
+- `GET /api/sessions/{id}/verification` → `{runId, criteria, testsProtected, waiversAsked, waiversGranted, outsidePlan, block}`: the latest run's verification, folded from the log (verified); `runId` is that run (null before any run); `criteria` is one `{id, description, outcome}` per criterion, `outcome.kind` is `verified {command, exitCode, passed}`, `judged {passed}` (indicative) or `pending`; `testsProtected` counts the test files the human validated, `waiversAsked`/`waiversGranted` the waivers asked and granted; `outsidePlan` lists the changed files the plan did not name (null without a worktree or a git repository); `block` is the text appended to commit messages (null without criteria), returned whatever `integration.verificationBlock` says. 404 when the session does not exist.
 - `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message, protectTests?, removeWorktree?}` → `{head, commits, protectedTests, protectError, worktreeRemoved, removeError}`:
   the human's decision. The server recomputes the gate and answers 400 on a
   blank `message`, 409 while a turn runs, while the human has staged changes,
@@ -645,16 +644,22 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `{"kind":"table","columns":[…],"rows":[[…]]}` (at most 100 rows, no row longer than `columns`); `tone` is
   `none`, `info`, `success`, `warning` or `danger`. An update with a non-http link, a non-finite progress or an
   oversized table is dropped with the rest of its content, as one beyond the caps (200 elements, 32 KiB).
-- `GET /api/sessions/{id}/servers` → `[{name, command, suggested, state, running, url, exitCode, output}]`:
+- `GET /api/sessions/{id}/servers` →
+  `[{name, command, suggested, state, running, url, port, extraUrls, portIgnored, exitCode, exitSignal, output}]`:
   the project's servers (`.agents/servers.json`) and their state in this session. When the file
   lists none, one `dev` server guessed from the project (a Justfile `dev` recipe, a package.json
   `dev` script, a Makefile `dev` or `run` target, else `cargo run` with a Cargo.toml) comes back
   with `suggested: true`; the UI saves it on the human's confirmation. `state` is `stopped`,
-  `starting` (the process lives, its port does not answer yet), `ready` (the port answers) or
-  `exited` (it ended on its own; `exitCode`, `null` when killed by a signal). `url` is the last
-  loopback URL the server printed, else `http://127.0.0.1:{PORT}`, `null` unless it runs;
-  `running` is `starting` or `ready`. `output` is the last 40 lines of its stdout and stderr,
-  without ANSI escapes (fennec keeps 200). 404 if no session.
+  `starting` (the process lives, nothing in its process group listens yet), `ready` (a process of
+  its group listens on a TCP port, read from `/proc` on Linux and `lsof` on macOS, else a connect
+  to the expected port) or `exited` (it ended on its own; `exitCode`, or `exitSignal` when a
+  signal ended it). `url` is the loopback URL the server printed (searched over the last 200
+  lines of its log) when that port listens, else `$PORT` when it listens, else its lowest listening port;
+  `null` unless it runs. `extraUrls` are its other listening ports. `port` is the `$PORT` fennec
+  gave it; `portIgnored` is true when it listens but not on `$PORT` (its command hard-codes its
+  ports, so two sessions collide). `running` is `starting` or `ready`. `output` is the last 40
+  lines of its stdout and stderr, without ANSI escapes, read from its log file
+  (`<data>/servers/<key>.log`, the last 64 KiB). 404 if no session.
 - `POST /api/sessions/{id}/servers` `{servers: [{name, command}]}` → the same list:
   saves the project's servers to `.agents/servers.json`. 400 on an empty name/command or a
   duplicate name, 404 if no session.
@@ -663,24 +668,29 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   linking its missing dependency directories and its gitignored `.env*` files to the main
   checkout's (links, never copies); otherwise in the project's directory. It passes a free `PORT`,
   the project's shared `CARGO_TARGET_DIR` (so a worktree does not rebuild from scratch), and runs
-  as `setsid sh -c <command>`, so a stop frees the port by killing the whole process group.
+  as `setsid sh -c <command>`, so a stop frees the port by killing the whole process group. Under
+  systemd it is wrapped in `systemd-run --user --scope`, its own scope. Live runs are recorded in
+  `<data>/servers/runs.json`, so a restarted fennec takes them back: a record is kept only while
+  its pid still has the recorded start time (a recycled pid is dropped, never killed).
   Outside the sandbox: the human's action. 404 for an unknown server, 409 if it already runs (an
   exited one restarts), 500 if it cannot start.
 - `POST /api/sessions/{id}/servers/stop` `{name}` → `{}`: stops the server by killing its
-  process group, or forgets an exited one. 404 if it is not running.
+  process group (an adopted run only while its pid keeps the recorded start time), or forgets
+  an exited one, and deletes its log. 404 if it is not running.
 - `POST /api/sessions/delete` `{ids}` → `{deleted: [id], failed: [{id, error}]}`: deletes top-level sessions with their child sessions and logs, and removes each one's worktree, branch and refs (work not integrated is lost; the UI warns). 400 for an empty list or a child session, 404 for an unknown id, 409 `{error, running}` when one of them runs a turn (nothing is deleted then). A session whose worktree cannot be removed is kept and listed in `failed`. The usage ledger keeps the calls.
 - `GET /api/sessions/{id}/skills` → `{loaded: [ids], active: [ids]}`: the
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view
   (not dropped by a compaction, not cut by a replay); 404 if no session
 - `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, completionTokens, cachePercent, cost, costDetail, inputCost, cachedCost, outputCost, lastGenerationSpeed}`:
-  the session's model calls from the usage ledger (`usage.db`, crate `token-usage`), which outlives the log;
+  the model calls of the session and of its workflow's child sessions (verify, review) from the usage ledger
+  (`usage.db`, crate `token-usage`), which outlives the log;
   `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call;
   `cost` is the estimate at each model's price (Settings, models), `—` when none has one, indicative;
   `costDetail` says how or why not; `inputCost` (all prompt tokens, as `promptTokens`), `cachedCost` and
   `outputCost` are the parts' costs, null when no model has a price; 404 if no session
-- `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title, summary, composition}`: the header's gauge and the Session drawer's Context section (`summary`, its collapsed line), from
-  the last `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off);
+- `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title, summary, tokens, composition}`: the header's gauge and the Session drawer's Context section (`summary`, its collapsed line), from
+  the last `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off, `tokens` the size (`12,3k`), null before any measure);
   events without `compactAt` and sessions without a measure use the current settings. `composition` (null while
   nothing is measured) is what the context holds: `kinds` `[{kind, label, tokens, percent}]` for the stacked bar
   (`kind` `prompt`/`conversation`/`tools`, fixed order), `parts` `[{kind, label, tokens, percent}]` largest first

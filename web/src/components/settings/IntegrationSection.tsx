@@ -24,6 +24,13 @@ export function IntegrationSection({ value, onChange, save }: IntegrationSection
           label={t('modelTrailersLabel')}
         />
       </SettingRow>
+      <SettingRow label={t('verificationBlockLabel')} hint={t('verificationBlockHint')}>
+        <Switch
+          checked={value.verificationBlock}
+          onChange={(checked) => onChange({ ...value, verificationBlock: checked })}
+          label={t('verificationBlockLabel')}
+        />
+      </SettingRow>
     </Section>
   );
 }

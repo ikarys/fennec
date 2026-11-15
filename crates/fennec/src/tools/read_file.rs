@@ -8,7 +8,7 @@ use super::path_guard::{Outside, not_found, resolve_for_reading};
 use crate::domain::attachment::{data_url, sniff_image};
 use crate::domain::event::{ToolResult, ToolResultMetadata};
 use serde_json::{Value, json};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const READ_MAX_LINES: i64 = 2000;
 const READ_MAX_BYTES: usize = 100_000;
@@ -43,6 +43,16 @@ pub(super) fn definition() -> Value {
     })
 }
 
+/// The folders outside the workdir `read_file` reads by absolute path: skill
+/// packages and the web cache.
+pub(super) fn own_roots(workdir: &Path, cache: &Path) -> Vec<PathBuf> {
+    crate::skills::discover(workdir)
+        .into_iter()
+        .filter_map(|skill| skill.directory)
+        .chain([cache.to_path_buf()])
+        .collect()
+}
+
 /// `cache` is readable by absolute path: it holds the pages `web_fetch` saved.
 pub(super) fn run(args: &Value, workdir: &Path, cache: &Path, outside: &Outside) -> ToolResult {
     try_run(args, workdir, cache, outside).unwrap_or_else(ToolResult::failure)
@@ -58,13 +68,7 @@ fn try_run(
     let offset = args::number(args, "offset", 1)?;
     let limit = args::number(args, "limit", READ_MAX_LINES)?;
 
-    let packages = || {
-        crate::skills::discover(workdir)
-            .into_iter()
-            .filter_map(|skill| skill.directory)
-            .chain([cache.to_path_buf()])
-            .collect()
-    };
+    let packages = || own_roots(workdir, cache);
     let full_path = resolve_for_reading(workdir, packages, outside, path)?;
     let metadata = std::fs::metadata(&full_path).map_err(|_| not_found(path))?;
 

@@ -3,6 +3,14 @@
 
 const MAX_HEADINGS: usize = 80;
 const FIRST_LINES: usize = 20;
+/// A page can be one huge line (minified JSON, a single-line HTML dump): the
+/// pointer stays small whatever the page's shape.
+const MAX_LINE_BYTES: usize = 200;
+const FIRST_LINES_BYTES: usize = 2048;
+
+fn clip(line: &str, bytes: usize) -> &str {
+    &line[..line.floor_char_boundary(bytes)]
+}
 
 /// `(line, heading)` for each ATX heading outside fenced code blocks.
 fn headings(markdown: &str) -> Vec<(usize, &str)> {
@@ -33,7 +41,7 @@ pub(super) fn outline(markdown: &str) -> String {
     }
     let mut text = String::from("Outline (line: heading):");
     for (line, heading) in all.iter().take(MAX_HEADINGS) {
-        text.push_str(&format!("\n{line}: {heading}"));
+        text.push_str(&format!("\n{line}: {}", clip(heading, MAX_LINE_BYTES)));
     }
     if all.len() > MAX_HEADINGS {
         text.push_str(&format!("\n… {} more headings", all.len() - MAX_HEADINGS));
@@ -42,11 +50,13 @@ pub(super) fn outline(markdown: &str) -> String {
 }
 
 pub(super) fn first_lines(markdown: &str) -> String {
-    markdown
+    let lines = markdown
         .lines()
         .take(FIRST_LINES)
+        .map(|line| clip(line, MAX_LINE_BYTES))
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    clip(&lines, FIRST_LINES_BYTES).to_string()
 }
 
 #[cfg(test)]
@@ -82,5 +92,14 @@ mod tests {
     fn first_lines_are_capped() {
         let md: String = (0..30).map(|n| format!("l{n}\n")).collect();
         assert_eq!(first_lines(&md).lines().count(), 20);
+    }
+
+    #[test]
+    fn a_single_huge_line_keeps_the_pointer_small() {
+        let md = format!("# {}\n{}", "é".repeat(500), "x".repeat(400_000));
+        assert!(outline(&md).len() < MAX_LINE_BYTES + 40);
+        assert!(first_lines(&md).len() <= FIRST_LINES_BYTES);
+        let wide: String = (0..20).map(|_| format!("{}\n", "y".repeat(150))).collect();
+        assert!(first_lines(&wide).len() <= FIRST_LINES_BYTES);
     }
 }

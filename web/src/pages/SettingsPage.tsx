@@ -276,8 +276,8 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
   }
 
-  function updateEnabledWorkflows(enabledWorkflows: string[]) {
-    setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
+  function updateAlwaysValidateTests(alwaysValidateTests: boolean) {
+    setForm((previous) => (previous ? { ...previous, alwaysValidateTests } : previous));
   }
 
   /** Saves one change at once on top of the stored preferences: the form's other unsaved edits stay pending. */
@@ -330,6 +330,8 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
     [settings]
   );
   const current = useMemo(() => (settings && form ? buildPreferences(form, settings) : null), [settings, form]);
+  // The form whose autosave the server refused: not retried until the human edits it.
+  const failedCurrent = useRef<Preferences | null>(null);
 
   function isDirty(group: SaveGroup): boolean {
     return (
@@ -361,14 +363,18 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
   // at a time; the stored copy it returns re-runs this effect if edits came in meanwhile.
   useEffect(() => {
     const groups = (Object.keys(SAVE_GROUPS) as SaveGroup[]).filter(isDirty);
-    if (groups.length === 0 || autoSave.saving) return;
+    if (groups.length === 0 || autoSave.saving || current === failedCurrent.current) return;
     const timer = window.setTimeout(() => {
       setAutoSave({ saving: true, error: null });
       saveGroups(groups)
-        .then(() => setAutoSave({ saving: false, error: null }))
-        .catch((err) =>
-          setAutoSave({ saving: false, error: err instanceof Error ? err.message : t('settingsSaveError') })
-        );
+        .then(() => {
+          failedCurrent.current = null;
+          setAutoSave({ saving: false, error: null });
+        })
+        .catch((err) => {
+          failedCurrent.current = current;
+          setAutoSave({ saving: false, error: err instanceof Error ? err.message : t('settingsSaveError') });
+        });
     }, AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `current` and `baseline` carry every edit
@@ -495,9 +501,8 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
           {active === 'workflows' && (
             <WorkflowsSection
               save={groupSave('workflows')}
-              workflows={settings.optInWorkflows}
-              value={form.enabledWorkflows}
-              onChange={updateEnabledWorkflows}
+              alwaysValidateTests={form.alwaysValidateTests}
+              onAlwaysValidateTestsChange={updateAlwaysValidateTests}
             />
           )}
 

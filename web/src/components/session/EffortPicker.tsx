@@ -1,5 +1,4 @@
 import { ChoiceMenu } from '../ui/ChoiceMenu';
-import { CpuIcon } from '../ui/Icons';
 import { REASONING_EFFORTS, type ReasoningEffort } from '../../lib/api';
 import { useT } from '../../i18n';
 
@@ -8,11 +7,13 @@ export function EffortPicker({
   effort,
   accepted,
   defaultEffort,
+  contextTokens,
   onChange
 }: {
   effort: ReasoningEffort | null;
   accepted: ReasoningEffort[];
   defaultEffort: ReasoningEffort | null;
+  contextTokens?: string | null;
   onChange: (effort: ReasoningEffort | null) => void;
 }) {
   const t = useT();
@@ -20,11 +21,14 @@ export function EffortPicker({
   const defaultLabel = defaultEffort
     ? t('effortDefault', { effort: defaultEffort })
     : t('effortAutoShort');
+  const title = contextTokens
+    ? t('sessionEffortTitle') + ' ' + t('rereadWarning', { tokens: contextTokens })
+    : t('sessionEffortTitle');
 
   return (
     <ChoiceMenu
       label={t('sessionEffort')}
-      title={t('sessionEffortTitle')}
+      title={title}
       align="right"
       width="w-40"
       groups={[
@@ -37,12 +41,7 @@ export function EffortPicker({
       ]}
       value={effort ?? 'auto'}
       onChange={(value) => onChange(value === 'auto' ? null : (value as ReasoningEffort))}
-      trigger={
-        <>
-          <CpuIcon className="h-3.5 w-3.5" />
-          {effort ?? defaultEffort ?? t('effortAutoShort')}
-        </>
-      }
+      trigger={effort ?? defaultEffort ?? t('effortAutoShort')}
     />
   );
 }

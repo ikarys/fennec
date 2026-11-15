@@ -1,9 +1,5 @@
-// Project page overview tab: the server's dashboard tiles and recent sessions.
+// Project page work tab, top: the server's dashboard tiles and plugins.
 import { type ReactNode } from 'react';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Section } from '../ui/Section';
-import { listRowClass } from '../ui/ListCard';
 import { Tile } from '../ui/Tile';
 import {
   ClockIcon,
@@ -14,12 +10,9 @@ import {
   TokensIcon,
 } from '../ui/Icons';
 import { getProjectDashboard, type DashboardIcon } from '../../lib/api';
-import { formatDateTime, formatRelative } from '../../lib/format';
-import { BudgetTile } from './BudgetTile';
-import { DiskSection } from './DiskSection';
 import { ProjectRulesTile } from '../rules/RulesSection';
 import { PluginsSection } from './PluginsSection';
-import { useT, useLang } from '../../i18n';
+import { useT } from '../../i18n';
 import { useLoaded } from '../../hooks/useLoaded';
 
 const ICONS: Record<DashboardIcon, ReactNode> = {
@@ -31,14 +24,7 @@ const ICONS: Record<DashboardIcon, ReactNode> = {
   decisions: <DecisionIcon />,
 };
 
-export function DashboardSection({
-  projectId,
-  onOpenSession,
-}: {
-  projectId: string;
-  onOpenSession: (sessionId: string) => void;
-}) {
-  const lang = useLang();
+export function DashboardSection({ projectId }: { projectId: string }) {
   const t = useT();
 
   const { data, error, loading } = useLoaded(() => getProjectDashboard(projectId), [projectId], `dashboard:${projectId}`);
@@ -70,65 +56,9 @@ export function DashboardSection({
           );
         })}
         <ProjectRulesTile projectId={projectId} />
-        <BudgetTile projectId={projectId} />
       </div>
 
       <PluginsSection projectId={projectId} />
-
-      <Section
-        Icon={ClockIcon}
-        title={t('recentSessions')}
-        flush
-        actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              window.location.hash = '#/project/' + encodeURIComponent(projectId) + '/sessions';
-            }}
-          >
-            {t('allSessions')}
-          </Button>
-        }
-      >
-        {data.recent.length === 0 ? (
-          <p className="m-0 px-4 py-6 text-center text-sm text-muted">{t('noSessions')}</p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {data.recent.map((session) => (
-              <li key={session.id}>
-                <button
-                  type="button"
-                  className={listRowClass({ bar: true }, 'group w-full text-left cursor-pointer')}
-                  onClick={() => onOpenSession(session.id)}
-                >
-                  <span
-                    className="min-w-0 grow truncate text-sm text-text group-hover:text-accent-strong"
-                    title={session.title}
-                  >
-                    {session.title}
-                  </span>
-                  <span className="w-28 shrink-0">
-                    {session.running ? (
-                      <Badge tone="accent" dot pulse>{t('running')}</Badge>
-                    ) : session.awaiting ? (
-                      <Badge tone="accent" appearance="solid">{t('toIntegrateBadge')}</Badge>
-                    ) : null}
-                  </span>
-                  <span
-                    className="w-24 shrink-0 text-right font-mono text-xs text-faint tabular-nums"
-                    title={formatDateTime(lang, session.updatedAt)}
-                  >
-                    {formatRelative(lang, session.updatedAt)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <DiskSection projectId={projectId} onOpenSession={onOpenSession} />
     </div>
   );
 }

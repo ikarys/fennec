@@ -441,7 +441,7 @@ export function createThreadFold(lang: Lang = 'en'): ThreadFold {
           const command = typeof result.command === 'string' ? result.command : undefined;
           const verdict = result.verdict;
           if (criterionId === undefined || command === undefined) continue;
-          if (verdict !== 'fails' && verdict !== 'passesAlready' && verdict !== 'cannotRun') continue;
+          if (verdict !== 'fails' && verdict !== 'passesAlready' && verdict !== 'cannotRun' && verdict !== 'ranNothing') continue;
           results.push({
             criterionId,
             command,

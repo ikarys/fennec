@@ -6,7 +6,7 @@ use crate::domain::protection::Protection;
 use crate::tools::path_guard;
 use rules::{Access, Decision, Proposal, Request, Rules};
 use serde_json::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub(super) fn check<'r>(
     rules: &'r Rules,
@@ -15,6 +15,7 @@ pub(super) fn check<'r>(
     protection: &Protection,
     name: &str,
     args: &Value,
+    own_roots: &dyn Fn() -> Vec<PathBuf>,
 ) -> RuleCheck<'r> {
     let mut check = RuleCheck {
         decision: rules.decide(&Request::Tool(name)),
@@ -57,6 +58,10 @@ pub(super) fn check<'r>(
             .relative
             .as_deref()
             .is_some_and(|relative| protection.is_exempt(relative))
+        // The tool's own folders need no grant for reads.
+        && !(matches!(access, Access::Read)
+            && request.relative.is_none()
+            && in_own_root(path, own_roots))
     {
         weigh(
             rules.decide(&Request::Path(&request)),
@@ -71,6 +76,14 @@ pub(super) fn check<'r>(
     }
 
     check
+}
+
+/// True when an absolute path stays inside one of the tool's own roots.
+fn in_own_root(path: &str, own_roots: &dyn Fn() -> Vec<PathBuf>) -> bool {
+    Path::new(path).is_absolute()
+        && own_roots()
+            .iter()
+            .any(|root| path_guard::resolve_in_workdir(root, path).is_ok())
 }
 
 /// `Decision::worst` keeps the left decision on a tie. An explicit rule is
@@ -154,6 +167,7 @@ mod tests {
             &Protection::default(),
             "run_command",
             &json!({"command": "cd x && rm -fr y"}),
+            &Vec::new,
         );
         assert!(matches!(
             refused.decision,
@@ -168,6 +182,7 @@ mod tests {
             &Protection::default(),
             "run_command",
             &json!({"command": "ls"}),
+            &Vec::new,
         );
         assert_eq!(allowed.decision, Decision::Allow(None));
 
@@ -186,6 +201,7 @@ mod tests {
             &Protection::default(),
             "web_search",
             &json!({}),
+            &Vec::new,
         );
         assert!(matches!(
             refused.decision,
@@ -208,6 +224,7 @@ mod tests {
             &Protection::default(),
             "write_file",
             &json!({"path": "secrets/a.txt"}),
+            &Vec::new,
         );
         assert!(matches!(
             relative.decision,
@@ -222,6 +239,7 @@ mod tests {
             &Protection::default(),
             "write_file",
             &json!({"path": workdir.join("secrets/a.txt").to_string_lossy()}),
+            &Vec::new,
         );
         assert!(matches!(
             absolute.decision,
@@ -236,6 +254,7 @@ mod tests {
             &Protection::default(),
             "write_file",
             &json!({"path": "src/a.rs"}),
+            &Vec::new,
         );
         assert_eq!(other.decision, Decision::Allow(None));
 
@@ -256,6 +275,7 @@ mod tests {
             &Protection::default(),
             "read_file",
             &json!({"path": outside.to_string_lossy()}),
+            &Vec::new,
         );
         assert_eq!(check.decision, Decision::Ask(None));
         assert_eq!(
@@ -269,6 +289,60 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&outside);
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn a_read_in_an_own_root_needs_no_approval() {
+        let workdir = temp_workdir();
+        let root = std::env::temp_dir().join(format!("fennec-rules-own-{}", new_id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let file = root.join("page.html");
+        std::fs::write(&file, "page").unwrap();
+        let rules = Rules::default();
+
+        let check = check(
+            &rules,
+            &workdir,
+            None,
+            &Protection::default(),
+            "read_file",
+            &json!({"path": file.to_string_lossy()}),
+            &|| vec![root.clone()],
+        );
+        assert_eq!(check.decision, Decision::Allow(None));
+
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&workdir);
+    }
+
+    #[test]
+    fn a_traversal_out_of_an_own_root_still_asks() {
+        let workdir = temp_workdir();
+        let root = std::env::temp_dir().join(format!("fennec-rules-own-{}", new_id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let outside = std::env::temp_dir().join(format!("fennec-rules-outside-{}", new_id()));
+        std::fs::write(&outside, "outside").unwrap();
+        let rules = Rules::default();
+
+        let check = check(
+            &rules,
+            &workdir,
+            None,
+            &Protection::default(),
+            "read_file",
+            &json!({
+                "path": root
+                    .join("..")
+                    .join(outside.file_name().unwrap())
+                    .to_string_lossy()
+            }),
+            &|| vec![root.clone()],
+        );
+        assert_eq!(check.decision, Decision::Ask(None));
+
+        let _ = std::fs::remove_file(&outside);
+        let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&workdir);
     }
 
@@ -287,6 +361,7 @@ mod tests {
             &Protection::default(),
             "read_file",
             &json!({"path": home.join(".ssh").join("config").to_string_lossy()}),
+            &Vec::new,
         );
         assert!(matches!(
             check.decision,
@@ -310,6 +385,7 @@ mod tests {
             &protection,
             "write_file",
             &json!({"path": "todo/cli.py"}),
+            &Vec::new,
         );
         assert_eq!(waived.decision, Decision::Allow(None));
 
@@ -320,6 +396,7 @@ mod tests {
             &protection,
             "write_file",
             &json!({"path": "todo/other.py"}),
+            &Vec::new,
         );
         assert!(matches!(
             other.decision,

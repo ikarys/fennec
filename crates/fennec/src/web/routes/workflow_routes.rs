@@ -20,8 +20,7 @@ use std::path::Path;
 
 pub fn list_workflows(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let project = require_project(&app.store()?, id)?;
-    let enabled = &app.store()?.preferences()?.enabled_workflows;
-    let found = workflows::discover(Path::new(&project.workdir), enabled);
+    let found = workflows::discover(Path::new(&project.workdir));
     let out: Vec<Value> = found
         .iter()
         .map(|f| {
@@ -43,8 +42,7 @@ pub fn get_workflow(
     wid: &str,
 ) -> Result<(), HttpError> {
     let project = require_project(&app.store()?, id)?;
-    let enabled = &app.store()?.preferences()?.enabled_workflows;
-    let Some(found) = workflows::find(Path::new(&project.workdir), wid, enabled) else {
+    let Some(found) = workflows::find(Path::new(&project.workdir), wid) else {
         return error(stream, 404, "no such workflow");
     };
     send_json(
@@ -82,8 +80,7 @@ pub fn save_workflow(
         );
     }
     let path = workflows::save(Path::new(&project.workdir), origin, raw)?;
-    let enabled = &app.store()?.preferences()?.enabled_workflows;
-    let found = workflows::find(Path::new(&project.workdir), wid, enabled)
+    let found = workflows::find(Path::new(&project.workdir), wid)
         .ok_or_else(|| format!("saved workflow not found at {}", path.display()))?;
     send_json(
         stream,
@@ -146,8 +143,7 @@ pub fn start_workflow(
     let store = app.store()?;
     let (session, project) = app.require_session(id)?;
     let workflow_id = body["workflowId"].as_str().unwrap_or("");
-    let enabled = &store.preferences()?.enabled_workflows;
-    let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id, enabled) else {
+    let Some(found) = workflows::find(Path::new(&project.workdir), workflow_id) else {
         return error(stream, 404, "no such workflow");
     };
     let attachments = match crate::web::routes::session_routes::parse_attachments(&body) {

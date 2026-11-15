@@ -5,21 +5,19 @@ use std::net::SocketAddr;
 
 #[cfg(any(target_os = "linux", test))]
 use std::collections::{HashMap, HashSet};
-#[cfg(any(target_os = "linux", test))]
-use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// True when the TCP client socket of `peer -> server` belongs to a sandbox fennec launched.
 #[cfg(target_os = "linux")]
 pub fn is_sandboxed(peer: SocketAddr, server: SocketAddr) -> bool {
-    let Some(processes) = process_table() else {
+    let Some(processes) = crate::procfs::process_table() else {
         return false;
     };
 
     let my_pid = std::process::id();
     let roots = processes
         .iter()
-        .filter(|(_, comm, ppid)| *ppid == my_pid && comm == "bwrap")
-        .map(|(pid, _, _)| *pid)
+        .filter(|process| process.ppid == my_pid && process.comm == "bwrap")
+        .map(|process| process.pid)
         .collect::<Vec<_>>();
 
     if roots.is_empty() {
@@ -28,7 +26,7 @@ pub fn is_sandboxed(peer: SocketAddr, server: SocketAddr) -> bool {
 
     let parents = processes
         .iter()
-        .map(|(pid, _, ppid)| (*pid, *ppid))
+        .map(|process| (process.pid, process.ppid))
         .collect::<Vec<_>>();
     let descendants = descendants(&roots, &parents);
 
@@ -43,59 +41,6 @@ pub fn is_sandboxed(peer: SocketAddr, server: SocketAddr) -> bool {
 #[cfg(not(target_os = "linux"))]
 pub fn is_sandboxed(_: SocketAddr, _: SocketAddr) -> bool {
     false
-}
-
-/// One `/proc/<pid>/stat` row: pid, command name, and parent pid.
-#[cfg(any(target_os = "linux", test))]
-fn parse_stat(text: &str) -> Option<(u32, String, u32)> {
-    let open = text.find('(')?;
-    let close = text.rfind(')')?;
-    if close <= open {
-        return None;
-    }
-
-    let pid = text[..open].trim().parse::<u32>().ok()?;
-    let comm = text[open + 1..close].to_string();
-    let ppid = text[close + 1..]
-        .split_whitespace()
-        .nth(1)?
-        .parse::<u32>()
-        .ok()?;
-
-    Some((pid, comm, ppid))
-}
-
-/// One `/proc/net/tcp` or `/proc/net/tcp6` row: local address, remote address, socket inode.
-#[cfg(any(target_os = "linux", test))]
-fn parse_tcp_row(line: &str) -> Option<(SocketAddr, SocketAddr, u64)> {
-    let parts = line.split_whitespace().collect::<Vec<_>>();
-    let local = parse_addr(parts.get(1)?)?;
-    let remote = parse_addr(parts.get(2)?)?;
-    let inode = parts.get(9)?.parse::<u64>().ok()?;
-
-    Some((local, remote, inode))
-}
-
-/// A `host:port` address as printed by `/proc/net/tcp` and `/proc/net/tcp6`.
-#[cfg(any(target_os = "linux", test))]
-fn parse_addr(text: &str) -> Option<SocketAddr> {
-    let (host, port) = text.split_once(':')?;
-    let port = u16::from_str_radix(port, 16).ok()?;
-
-    if host.len() == 8 {
-        let value = u32::from_str_radix(host, 16).ok()?;
-        let bytes = value.to_le_bytes();
-        Some(SocketAddr::new(Ipv4Addr::from(bytes).into(), port))
-    } else if host.len() == 32 {
-        let mut octets = [0u8; 16];
-        for i in 0..4 {
-            let word = u32::from_str_radix(&host[i * 8..i * 8 + 8], 16).ok()?;
-            octets[i * 4..i * 4 + 4].copy_from_slice(&word.to_le_bytes());
-        }
-        Some(SocketAddr::new(Ipv6Addr::from(octets).into(), port))
-    } else {
-        None
-    }
 }
 
 /// All pids in `roots` and every process that descends from them through `parents`.
@@ -122,29 +67,6 @@ fn descendants(roots: &[u32], parents: &[(u32, u32)]) -> HashSet<u32> {
     seen
 }
 
-#[cfg(target_os = "linux")]
-fn process_table() -> Option<Vec<(u32, String, u32)>> {
-    let mut rows = Vec::new();
-    let entries = std::fs::read_dir("/proc").ok()?;
-
-    // A process may exit mid-scan: skip it, never give up (that would fail open).
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.is_empty() || !name.bytes().all(|b| b.is_ascii_digit()) {
-            continue;
-        }
-
-        let Ok(text) = std::fs::read_to_string(entry.path().join("stat")) else {
-            continue;
-        };
-        if let Some(row) = parse_stat(&text) {
-            rows.push(row);
-        }
-    }
-
-    Some(rows)
-}
-
 /// The same endpoint, an IPv4 address and its IPv4-mapped IPv6 form being one.
 #[cfg(target_os = "linux")]
 fn same_addr(a: SocketAddr, b: SocketAddr) -> bool {
@@ -163,7 +85,7 @@ fn socket_inode(peer: SocketAddr, server: SocketAddr) -> Option<u64> {
     std::fs::read_to_string(file)
         .ok()?
         .lines()
-        .filter_map(parse_tcp_row)
+        .filter_map(crate::procfs::parse_tcp_row)
         .find(|(local, remote, inode)| {
             *inode != 0 && same_addr(*local, peer) && same_addr(*remote, server)
         })
@@ -197,30 +119,6 @@ fn fd_has_inode(pids: &HashSet<u32>, inode: u64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_stat_keeps_a_comm_with_spaces_and_parentheses() {
-        let text = "42 (my (cool) app) S 7 8 9";
-        assert_eq!(parse_stat(text), Some((42, "my (cool) app".to_string(), 7)));
-    }
-
-    #[test]
-    fn parse_tcp_row_parses_an_ipv4_row() {
-        let line = "  1: 0100007F:A1B2 0100007F:1E61 01 00000000:00000000 00:00000000 00000000  1000        0 123456 1 0000000000000000 20 4 30 10 -1";
-        let local = "127.0.0.1:41394".parse::<SocketAddr>().unwrap();
-        let remote = "127.0.0.1:7777".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(parse_tcp_row(line), Some((local, remote, 123456)));
-    }
-
-    #[test]
-    fn parse_tcp_row_parses_an_ipv6_loopback_row() {
-        let line = "  1: 00000000000000000000000001000000:A1B2 00000000000000000000000001000000:1E61 01 00000000:00000000 00:00000000 00000000  1000        0 654321 1 0000000000000000 20 4 30 10 -1";
-        let local = "[::1]:41394".parse::<SocketAddr>().unwrap();
-        let remote = "[::1]:7777".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(parse_tcp_row(line), Some((local, remote, 654321)));
-    }
 
     #[test]
     fn descendants_include_grandchildren_and_exclude_unrelated_pids() {

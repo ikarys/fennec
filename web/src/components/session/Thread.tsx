@@ -27,14 +27,15 @@ import type { SessionStatus } from '../../lib/sessionStatus';
 const ThinkingSegment = memo(function ThinkingSegment({ content }: { content: string }) {
   const t = useT();
   const display = useDisplayPrefs();
-  const [open, setOpen] = useState(display.reasoningOpen);
+  const [manual, setManual] = useState<boolean | null>(null);
+  const open = manual ?? display.reasoningOpen;
   if (!content) return null;
   return (
     <div className="flex flex-col gap-2">
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setManual(!open)}
         className="flex min-h-8 items-center gap-2 self-start rounded-lg border border-dashed border-info/50 bg-transparent px-2.5 text-sm text-muted"
       >
         <BulbIcon className="h-3.5 w-3.5 text-info" />

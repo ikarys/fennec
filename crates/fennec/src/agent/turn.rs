@@ -87,6 +87,9 @@ pub struct Turn<'a> {
     /// is sent once, shared by the turn-end text path and the `propose_plan`
     /// tool.
     pub preflight_sent_back: bool,
+    /// The human asked to read the tests at every tests gate, even when
+    /// fennec proves each check fails before the work.
+    pub always_validate_tests: bool,
     /// Set by the human to stop the turn: checked between rounds, while
     /// streaming and while a command runs.
     pub stop: &'a AtomicBool,

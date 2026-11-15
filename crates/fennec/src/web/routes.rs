@@ -271,6 +271,9 @@ pub fn handle(app: &Arc<App>, req: &Request, stream: &mut TcpStream) -> Result<(
             integration::get_integration(app, stream, id)
         }
         ("GET", ["api", "sessions", id, "diff"]) => diff_routes::get_diff(app, req, stream, id),
+        ("GET", ["api", "sessions", id, "verification"]) => {
+            integration::get_verification(app, stream, id)
+        }
         ("POST", ["api", "sessions", id, "integration", "message"]) => {
             integration::suggest_message(app, stream, id)
         }

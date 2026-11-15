@@ -32,6 +32,8 @@ pub struct ContextView {
     pub title: String,
     /// The Context section's collapsed summary: `31 % · 165,9k left`.
     pub summary: String,
+    /// The context's size, `12,3k`, for the composer's re-read warning; none before any measure.
+    pub tokens: Option<String>,
     pub composition: Option<CompositionView>,
 }
 
@@ -165,6 +167,7 @@ pub fn context_view(events: &[Event], window: u64, compact_at: f64, lang: Lang) 
         line,
         title,
         summary,
+        tokens: (current > 0).then(|| tokens(current, lang.locale())),
         composition,
     }
 }
@@ -299,6 +302,7 @@ mod tests {
         assert_eq!(view.tone, Tone::Ok);
         assert_eq!(view.compact_mark, Some(85));
         assert_eq!(view.line, "0 %");
+        assert_eq!(view.tokens, None);
     }
 
     #[test]
@@ -311,6 +315,7 @@ mod tests {
         assert_eq!(view.line, "85 %");
         assert!(view.summary.starts_with("85 % · "), "{}", view.summary);
         assert!(view.summary.ends_with(" restants"), "{}", view.summary);
+        assert!(view.tokens.is_some());
     }
 
     #[test]

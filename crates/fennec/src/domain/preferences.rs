@@ -49,8 +49,9 @@ pub struct Preferences {
     pub integration: IntegrationPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
-    /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
-    pub enabled_workflows: Vec<String>,
+    /// `alwaysValidateTests`: stop at every tests gate, even when fennec proves
+    /// each check fails before the work. Off: fennec answers those gates.
+    pub always_validate_tests: bool,
     /// MCP servers, configured on the Settings page.
     pub mcp: Vec<McpServer>,
     /// The human's keyboard shortcut overrides, action id → combo (`shortcut::ACTIONS`); an
@@ -108,12 +109,15 @@ impl Default for SandboxPrefs {
 #[serde(rename_all = "camelCase", default)]
 pub struct IntegrationPrefs {
     pub model_trailers: bool,
+    /// `integration.verificationBlock`: the verification block in the proposed commit message; on by default.
+    pub verification_block: bool,
 }
 
 impl Default for IntegrationPrefs {
     fn default() -> Self {
         Self {
             model_trailers: true,
+            verification_block: true,
         }
     }
 }
@@ -250,6 +254,28 @@ impl Preferences {
             .retain(|f| f.provider == LOCAL_PROVIDER || known.contains(&f.provider));
     }
 
+    /// Spaces and hyphens in an MCP server's name become underscores: the name
+    /// prefixes its tools (`{server}_{tool}`), and the human may type "trilium NAS".
+    /// A token pasted with its `Bearer ` scheme loses it: the client adds the
+    /// scheme itself, and "Bearer Bearer …" is refused.
+    pub fn normalize_mcp(&mut self) {
+        for server in &mut self.mcp {
+            server.name = server
+                .name
+                .replace(|c: char| c.is_whitespace() || c == '-', "_");
+            if let Some(token) = &mut server.auth_token {
+                let trimmed = token.trim();
+                let bare = match trimmed.get(..7) {
+                    Some(scheme) if scheme.eq_ignore_ascii_case("bearer ") => {
+                        trimmed[7..].trim_start()
+                    }
+                    _ => trimmed,
+                };
+                *token = bare.to_string();
+            }
+        }
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if let Some(selected) = &self.selected {
             if selected.model.is_empty() {
@@ -316,7 +342,7 @@ impl Preferences {
             }
             seen_mcp.push(server.name.clone());
             if let Some(problem) = server.problems().into_iter().next() {
-                return Err(problem);
+                return Err(format!("mcp server {:?}: {problem}", server.name));
             }
         }
         super::shortcut::check(&self.shortcuts)?;

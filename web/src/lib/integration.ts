@@ -86,10 +86,23 @@ export function blockerSentence(lang: Lang, blocker: Blocker): string {
   }
 }
 
-/** The blocker kinds the human accepted, as the server expects them. */
+/** Blockers the human ticks one by one; the others are accepted by the Integrate button. */
+const TICKED: readonly BlockerKind[] = ['securityFindings'];
+
+/** The blockers the Integrate button accepts without a checkbox. */
+function acceptedByIntegrate(blocker: Blocker): boolean {
+  return blocker.acknowledgeable && !TICKED.includes(blocker.kind);
+}
+
+/** The blockers the human must tick before integrating. */
+export function needsTick(blocker: Blocker): boolean {
+  return blocker.acknowledgeable && TICKED.includes(blocker.kind);
+}
+
+/** The blocker kinds the human accepted, as the server expects them: ticked ones plus the ones the Integrate button accepts. */
 export function acknowledgedKinds(preview: IntegrationPreview, acknowledged: Acknowledged): BlockerKind[] {
   return preview.blockers
-    .filter((blocker) => blocker.acknowledgeable && acknowledged[blocker.kind])
+    .filter((blocker) => acceptedByIntegrate(blocker) || (needsTick(blocker) && acknowledged[blocker.kind]))
     .map((blocker) => blocker.kind);
 }
 
@@ -106,11 +119,19 @@ export function gateState({ preview, acknowledged, result, message, busy }: Gate
   const hasCommits = (preview?.commits.length ?? 0) > 0;
   const hasUncheckedBlocker =
     preview?.blockers.some(
-      (blocker) => blocker.kind !== 'noCommits' && (!blocker.acknowledgeable || !acknowledged[blocker.kind]),
+      (blocker) => blocker.kind !== 'noCommits' && (!blocker.acknowledgeable || (needsTick(blocker) && !acknowledged[blocker.kind])),
     ) ?? false;
   const integrateDisabled = busy || (result === null && (!hasCommits || hasUncheckedBlocker || message.trim() === ''));
   const canFinish = preview !== null && result === null && !hasCommits && preview.idea !== null;
   return { integrateDisabled, canFinish };
+}
+
+/** The primary button's label: it says when the click also accepts the listed blockers. */
+export function integrateLabel(lang: Lang, preview: IntegrationPreview | null): string {
+  const count = preview?.blockers.filter(acceptedByIntegrate).length ?? 0;
+  if (count === 0) return t(lang, 'integrate');
+  if (count === 1) return t(lang, 'integrateAcceptingOne');
+  return t(lang, 'integrateAcceptingMany', { count });
 }
 
 /** One badge per gate scanner: its state in words and the tone that carries it. */

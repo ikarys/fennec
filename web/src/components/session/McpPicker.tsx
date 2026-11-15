@@ -11,6 +11,7 @@ interface McpPickerProps {
   view: McpSessionView | null;
   onToggle: (name: string, active: boolean) => void;
   disabled?: boolean;
+  contextTokens?: string | null;
 }
 
 /**
@@ -18,7 +19,7 @@ interface McpPickerProps {
  * and the token cost of their tools. Toggling a server records the session's
  * disabled set; the dropdown only lists the servers the human showed.
  */
-export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
+export function McpPicker({ view, onToggle, disabled, contextTokens }: McpPickerProps) {
   const t = useT();
   const lang = useLang();
   const [open, setOpen] = useState(false);
@@ -47,11 +48,13 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
 
   const visible = view ? view.servers.filter((server) => server.visible) : [];
   const activeCount = visible.filter((server) => server.active).length;
-  const anyActive = activeCount > 0;
   const label =
     view && visible.length > 0
       ? `${activeCount} MCP${view.totalTokens > 0 ? ` (${formatTokens(lang, view.totalTokens)})` : ''}`
       : 'MCP';
+  const title = contextTokens
+    ? `${t('mcpSessionTitle')}. ${t('rereadWarning', { tokens: contextTokens })}`
+    : t('mcpSessionTitle');
 
   function row(server: McpServerView) {
     return (
@@ -78,17 +81,10 @@ export function McpPicker({ view, onToggle, disabled }: McpPickerProps) {
         variant="ghost"
         size="sm"
         disabled={disabled}
-        title={t('mcpSessionTitle')}
+        title={title}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="flex items-center gap-1.5">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: anyActive ? 'var(--ok)' : 'var(--border)' }}
-            aria-hidden
-          />
-          {label}
-        </span>
+        {label}
       </Button>
       {open && (
         <Card className="absolute bottom-full right-0 z-10 mb-1 w-80 max-h-80 overflow-y-auto p-2">

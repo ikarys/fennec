@@ -4,9 +4,9 @@ A session is a conversation with an agent on one project; fennec keeps every ses
 
 ## Step 1: open the project's sessions
 
-1. Click the **Projects** icon in the top bar.
+1. On the home page, open the **Projects** tab.
 2. Click your project.
-3. Click **Sessions** ① in its left menu.
+3. Click **Sessions** ① under **Work** in its left menu.
 
 ![A project's Sessions tab: the list and New session](images/sessions-1.png)
 
@@ -18,8 +18,8 @@ Click a row to reopen a session, or click **New session** ③ to start one.
 
 ![Inside a session: thread, composer, context rail](images/sessions-2.png)
 
-1. In the composer ② at the bottom, choose the agent: **Plan** (explores and agrees on a plan, changes nothing), **Builder** (changes the code and verifies it) or **Question** (answers about the project with sources, read-only).
-2. Optional: change the workflow (**Plan, build, verify** here; **No workflow** talks to the agent directly, see [workflows](workflows.md)), the reasoning effort (**auto**) or the model, in the pickers next to it.
+1. In the composer ② at the bottom, the mode button (**Mode: Plan**) lists under **Workflows** **Plan** (the **Plan, build, verify** workflow), **Build** (a small change built and checked without a plan) and the project's other workflows; under **Agents** **Ask** (answers about the project with sources, changes nothing); and in the folded **Expert** group the other agents and **No workflow** (talk to the agent directly); see [workflows](workflows.md).
+2. Optional: change the model next to it; **⋯** holds **Step by step** (the workflow stops before each step and waits for you; offered when a workflow is chosen), the reasoning effort (**auto**) and the MCP tools.
 3. Type your message: `@` points to a file, `/` opens commands and skills.
 4. Press `Enter` to send, or press `Shift+Enter` to add a line.
 
@@ -48,9 +48,9 @@ A workflow session also shows the **Run** rail on the left: the workflow's steps
 
 ### Projects and sessions
 
-The home page shows what needs you, recent sessions, and your favorite projects. Use **New chat** to start a conversation without a project, folder, or git. A chat can switch agents like a session; workflows stay hidden because they need a project.
+The home page shows what needs you, then one list in tabs: **Overview** (recent sessions, favorite projects, this week's usage), **Projects**, **Chats** and **Night queue**. Use **New chat** to start a conversation without a project, folder, or git. A chat can switch agents like a session; workflows stay hidden because they need a project.
 
-Open a project from the home page or the **Projects** page. The project page shows **Recent sessions** and **All sessions**, and offers **New session in this project**. The session list shows the title, status, modified time, and agent. A session with unintegrated work shows **to integrate**.
+Open a project from the home page, under **Overview** or the **Projects** tab. The project page shows **Recent sessions** and **All sessions**, and offers **New session in this project**. The session list shows the title, status, modified time, and agent. A session with unintegrated work shows **to integrate**.
 
 Session titles appear in the top bar tabs and the project session list. The top bar keeps open session tabs. You can close a tab, use split view, and open the command palette to search a session, project, page, command, or skill. Themes and display options are on **Settings** > **Appearance**.
 
@@ -60,7 +60,7 @@ Session states include **Running**, **Complete**, **Stopped**, **Error**, **Trun
 
 An agent is a session mode: its method and the tools it may use. fennec provides embedded agents, you can add yours in `~/.agents/agents`, and a project can define agents in `.agents/agents`.
 
-The composer menu groups agents by phase: **Start**, **Frame**, **Build**, **Understand**, and **Check**.
+The composer's mode menu offers three main choices: **Plan** (the Plan agent inside **Plan, build, verify**), **Build** (the Builder inside **Quick build**) and **Ask** (the Question agent). **Expert** lists every other agent and workflow.
 
 | Agent | Use | Access |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ The composer menu groups agents by phase: **Start**, **Frame**, **Build**, **Und
 | Builder | Implement the task and verify it | Write allowed |
 | Question | Answer a project question with sources | Read-only |
 
-Switch the session agent from the composer's **Session agent** picker. The **Mode** picker shows the current mode. You can also change the model and the **Reasoning effort** for a session from the composer. The **Reasoning effort** picker offers **Auto (no effort)** and the efforts the session's model accepts. The choice wins over the agent's and the model's effort; a choice the current model does not accept falls back to auto. Changing it can make a local server re-read the whole context. Agents marked **Subagent** run only inside workflow nodes and are not offered as free session modes.
+Switch the session agent from the composer's mode button, under **Expert** for the agents that are not one of the three main choices. You can also change the model and the **Reasoning effort** for a session from the composer; **⋯** holds the **Reasoning effort** picker. It offers **Auto (no effort)** and the efforts the session's model accepts. The choice wins over the agent's and the model's effort; a choice the current model does not accept falls back to auto. Changing it can make a local server re-read the whole context. Agents marked **Subagent** run only inside workflow nodes and are not offered as free session modes.
 
 See [extending](extending.md) for writing your own agents.
 

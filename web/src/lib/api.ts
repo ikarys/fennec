@@ -4,6 +4,7 @@ export * from "./api/request";
 export * from "./api/settings";
 export * from "./api/sessions";
 export * from "./api/integration";
+export * from "./api/verification";
 export * from "./api/mcp";
 export * from "./api/projectServers";
 export * from "./api/projects";

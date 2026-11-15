@@ -43,7 +43,7 @@ const MARKERS: &[&str] = &[
 ];
 
 /// One per added line that contains a marker (the first marker of MARKERS that
-/// matches), trimmed line.
+/// matches), trimmed line cut around the marker.
 pub fn suppressions(path: &str, added: &[String]) -> Vec<Suppression> {
     let mut out = Vec::new();
 
@@ -52,7 +52,7 @@ pub fn suppressions(path: &str, added: &[String]) -> Vec<Suppression> {
         if let Some(marker) = MARKERS.iter().find(|&&marker| line.contains(marker)) {
             out.push(Suppression {
                 path: path.to_string(),
-                line: line.to_string(),
+                line: super::excerpt::around(line, marker),
                 marker: marker.to_string(),
             });
         }

@@ -1,7 +1,6 @@
 //! Workflow discovery: embedded defaults, then `~/.agents/workflows`, then
 //! the project's `.agents/workflows`, which overrides a workflow of the same
-//! id. Like `agents.rs`. Opt-in embedded defaults are only discovered when
-//! enabled in preferences.
+//! id. Like `agents.rs`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -25,49 +24,27 @@ pub struct Found {
     pub raw: Value,
 }
 
-/// `(file name, content, opt-in)`: an opt-in default stays off until the
-/// human enables it on the Settings page (niche workflows).
-const DEFAULTS: [(&str, &str, bool); 4] = [
+const DEFAULTS: [(&str, &str); 2] = [
     (
         "plan-build-verify.workflow.json",
         include_str!("../workflows/plan-build-verify.workflow.json"),
-        false,
     ),
     (
         "quick.workflow.json",
         include_str!("../workflows/quick.workflow.json"),
-        false,
-    ),
-    (
-        "write-docs.workflow.json",
-        include_str!("../workflows/write-docs.workflow.json"),
-        true,
-    ),
-    (
-        "write-training.workflow.json",
-        include_str!("../workflows/write-training.workflow.json"),
-        true,
     ),
 ];
 
 /// The workflows a session in `workdir` can use.
-pub fn discover(workdir: &Path, enabled: &[String]) -> Vec<Found> {
+pub fn discover(workdir: &Path) -> Vec<Found> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
-    discover_in(home.as_deref(), workdir, enabled)
+    discover_in(home.as_deref(), workdir)
 }
 
-fn discover_in(home: Option<&Path>, workdir: &Path, enabled: &[String]) -> Vec<Found> {
+fn discover_in(home: Option<&Path>, workdir: &Path) -> Vec<Found> {
     let mut found = Vec::new();
 
-    for (file_name, content, opt_in) in DEFAULTS {
-        if opt_in {
-            let id = file_name
-                .strip_suffix(".workflow.json")
-                .unwrap_or(file_name);
-            if !enabled.iter().any(|enabled_id| enabled_id == id) {
-                continue;
-            }
-        }
+    for (file_name, content) in DEFAULTS {
         if let Some(workflow) = load_workflow(file_name, content, Origin::Default) {
             insert_or_override(&mut found, workflow);
         }
@@ -87,16 +64,6 @@ fn discover_in(home: Option<&Path>, workdir: &Path, enabled: &[String]) -> Vec<F
 
     found.sort_by(|a, b| a.workflow.name.cmp(&b.workflow.name));
     found
-}
-
-/// The opt-in embedded workflows, for the Settings page.
-pub fn opt_in_defaults() -> Vec<Workflow> {
-    DEFAULTS
-        .iter()
-        .filter(|(_, _, opt_in)| *opt_in)
-        .filter_map(|(file_name, content, _)| load_workflow(file_name, content, Origin::Default))
-        .map(|found| found.workflow)
-        .collect()
 }
 
 /// Missing dir → empty, as in `agents.rs`.
@@ -177,9 +144,9 @@ fn insert_or_override(found: &mut Vec<Found>, new: Found) {
     }
 }
 
-pub fn find(workdir: &Path, id: &str, enabled: &[String]) -> Option<Found> {
+pub fn find(workdir: &Path, id: &str) -> Option<Found> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
-    discover_in(home.as_deref(), workdir, enabled)
+    discover_in(home.as_deref(), workdir)
         .into_iter()
         .find(|found| found.workflow.id == id)
 }
@@ -265,9 +232,7 @@ mod tests {
         write_workflow(&home_dir, "plan-build-verify", "Global PBC");
         write_workflow(&work_dir, "plan-build-verify", "Project PBC");
         write_workflow(&work_dir, "custom", "Custom");
-        let enabled = vec!["write-docs".to_string(), "write-training".to_string()];
-
-        let found = discover_in(Some(&home), &workdir, &enabled);
+        let found = discover_in(Some(&home), &workdir);
         let pbc = found
             .iter()
             .find(|f| f.workflow.id == "plan-build-verify")
@@ -277,16 +242,7 @@ mod tests {
         let custom = found.iter().find(|f| f.workflow.id == "custom").unwrap();
         assert_eq!(custom.origin, Origin::Project);
         let names: Vec<_> = found.iter().map(|f| f.workflow.name.clone()).collect();
-        assert_eq!(
-            names,
-            vec![
-                "Custom",
-                "Project PBC",
-                "Quick build",
-                "Write a training course",
-                "Write documentation"
-            ]
-        );
+        assert_eq!(names, vec!["Custom", "Project PBC", "Quick build"]);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -296,7 +252,7 @@ mod tests {
         let home_dir = workflows_dir(&home);
         write_workflow(&home_dir, "plan-build-verify", "Global PBC");
 
-        let found = discover_in(Some(&home), &workdir, &[]);
+        let found = discover_in(Some(&home), &workdir);
         let pbc = found
             .iter()
             .find(|f| f.workflow.id == "plan-build-verify")
@@ -317,20 +273,9 @@ mod tests {
         .unwrap();
         std::fs::write(work_dir.join("broken.workflow.json"), "{ not json").unwrap();
 
-        let found = discover_in(Some(&home), &workdir, &[]);
+        let found = discover_in(Some(&home), &workdir);
         assert!(found.iter().all(|f| f.workflow.id != "mismatch"));
         assert!(found.iter().all(|f| f.workflow.id != "broken"));
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn an_opt_in_default_is_only_discovered_when_enabled() {
-        let (root, _home, workdir) = fixture();
-        let absent = discover_in(None, &workdir, &[]);
-        assert!(absent.iter().all(|f| f.workflow.id != "write-docs"));
-        let enabled = vec!["write-docs".to_string()];
-        let present = discover_in(None, &workdir, &enabled);
-        assert!(present.iter().any(|f| f.workflow.id == "write-docs"));
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -350,7 +295,7 @@ mod tests {
             ]
         });
         save(&workdir, Origin::Project, &raw).unwrap();
-        let found = find(&workdir, "my-flow", &[]).unwrap();
+        let found = find(&workdir, "my-flow").unwrap();
         assert_eq!(found.origin, Origin::Project);
         assert_eq!(
             found.raw["unknownField"]["nested"],
@@ -363,7 +308,7 @@ mod tests {
     fn the_embedded_defaults_validate() {
         let (_root, _home, workdir) = fixture();
         let agents = crate::agents::discover(&workdir);
-        for (file_name, content, _) in DEFAULTS {
+        for (file_name, content) in DEFAULTS {
             let default = load_workflow(file_name, content, Origin::Default).unwrap();
             let issues = crate::domain::workflow::validate::validate(&default.workflow, &agents);
             assert!(issues.is_empty(), "{file_name} issues: {issues:?}");

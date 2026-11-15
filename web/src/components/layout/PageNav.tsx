@@ -1,36 +1,25 @@
-// The header's page navigation: one icon per fixed page, lit when its tab is active.
+// The header's page navigation: the fixed page icons that stay in the bar.
 import { useT } from '../../i18n';
 import type { MsgKey } from '../../i18n/messages';
 import type { PageId } from '../../lib/route';
-import { BacklogIcon, ChatIcon, FolderIcon, InsightIcon, SettingsIcon, WorkflowsIcon } from '../ui/Icons';
+import { InsightIcon, SettingsIcon, WorkflowsIcon } from '../ui/Icons';
 import { buttonClass } from '../ui/Button';
 
 export type { PageId };
 
 /** The fixed pages, in the bar's order; `PageIcon` draws each. */
 const PAGES: { page: PageId; title: MsgKey }[] = [
-  { page: 'projects', title: 'paletteProjects' },
-  { page: 'chats', title: 'homeChat' },
-  { page: 'backlog', title: 'tasks' },
-  { page: 'workflows', title: 'workflows' },
-  { page: 'insight', title: 'insight' },
   { page: 'settings', title: 'settings' }
 ];
 
 export function PageIcon({ page, className }: { page: PageId; className?: string }) {
   switch (page) {
-    case 'projects':
-      return <FolderIcon className={className} />;
-    case 'chats':
-      return <ChatIcon className={className} />;
     case 'settings':
       return <SettingsIcon className={className} />;
     case 'insight':
       return <InsightIcon className={className} />;
     case 'workflows':
       return <WorkflowsIcon className={className} />;
-    case 'backlog':
-      return <BacklogIcon className={className} />;
   }
 }
 

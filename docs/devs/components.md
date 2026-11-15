@@ -194,7 +194,9 @@ dialog keeps its own "Try it" section. They start the project's servers in the s
 its port answers, ready, exited with its code), the URL it printed and its last output lines; a terminal opens in the
 worktree for CLI projects. With no `.agents/servers.json`, a command guessed from the project (Justfile, package.json,
 Makefile, Cargo) is saved on the human's confirmation; the main checkout's gitignored `.env*` files are linked, never
-copied, and servers share the project's Cargo target (`web/os/servers.rs`, `domain/server.rs`).
+copied, and servers share the project's Cargo target. Servers survive a fennec restart: output goes to a log file and
+live runs are recorded, then adopted at startup when their pid still has the same start time (`web/os/servers.rs`,
+`domain/server.rs`, `server_runs.rs`, `server_log.rs`).
 Canvas, done: a document the human and the agent iterate on (HTML, Markdown, SVG, Mermaid, JSON, images, PDF), pinned from the
 preview pane or a message's ```html/```md block, each version kept and browsable in a side pane; the human annotates
 the whole page, a quote or a drawn region, and the note lands in the composer as text the agent reads. The `canvas`
@@ -219,6 +221,9 @@ Test gate, done (C4): the default workflow writes the tests before the code: onc
 from the "Done when" criteria, and a human node asks to validate them. "Validate" records `tests.approved` with the test files
 written so far (the kernel's choice, at the human's click); from the next turn on they are protected for the rest of the session
 like `.agents/protected` (`domain/test_files.rs`, `turn_build.rs`), so the builder makes them pass without weakening them.
+fennec answers that node itself when every criterion's check runs a test that fails before the work (`agent/workflow/test_gate.rs`;
+a runner that selects no test is caught by `domain/test_selection.rs`, and fails a criteria check too); otherwise it asks and says
+why. Settings > Workflows > Always validate the tests turns that off.
 
 Update, done: `fennec update [--check]` and the top bar's arrow read the latest GitHub release (`/releases/latest`'s
 redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on the human's click only, run the
@@ -353,3 +358,15 @@ MCP crate, done: the client (stdio and streamable HTTP, no async runtime), the l
 live in the reusable crate `mcp-lite`, in its own repository and on crates.io (core without I/O always on, `client` default, `oauth` optional),
 fennec keeps the sandboxed spawn, the tool cache and the Vault that seals tokens; automatic token refresh now
 opens the sealed refresh token first (`mcp-lite`, `mcp.rs`, `mcp/oauth.rs`).
+
+One choice in the composer, done: one picker, "What do you want?", replaces the agent and workflow pickers. Ask
+(the `ask` agent, no workflow), Change (`plan`, Plan, build, verify) and Quick change (`builder`, Quick build) come
+first; More holds the other agents and workflows, No workflow, Step by step and Draw your own. A chat shows no picker.
+The MCP and effort pickers sit behind a ⋯ toggle next to the model (`components/session/IntentPicker.tsx`, `Composer.tsx`).
+
+The run proves itself, done: `domain/verification.rs` folds the latest run's log into its criteria (verified by
+a command and its exit, judged by a model, or not checked), the tests the human protected, the waivers asked and
+granted, and the changed files outside the plan. `GET /api/sessions/{id}/verification` serves it; the run end card
+shows it with the run's numbers, no click needed, and copies its text block. The same block, capped at ten lines with
+model text kept to one line per criterion, ends the proposed commit message unless `integration.verificationBlock`
+is off.

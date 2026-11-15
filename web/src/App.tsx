@@ -45,8 +45,6 @@ export default function App() {
     route.name === 'home' ||
     route.name === 'project' ||
     route.name === 'editor' ||
-    route.name === 'projects' ||
-    route.name === 'chats' ||
     paletteOpen;
   const chatProjectId = projects.find((project) => project.chat)?.id ?? null;
 
@@ -241,6 +239,7 @@ export default function App() {
             onHome={goHome}
             onOpenPage={openPage}
             onOpenProject={openProject}
+            onNavigate={navigate}
           />
         </div>
 

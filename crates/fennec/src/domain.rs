@@ -28,6 +28,7 @@ pub mod diff;
 pub mod drift;
 pub mod editor;
 pub mod event;
+pub mod excerpt;
 pub mod frontmatter;
 pub mod home;
 pub mod id;
@@ -80,7 +81,9 @@ pub mod stats;
 pub mod task_proposal;
 
 pub mod test_files;
+pub mod test_selection;
 pub mod understanding;
+pub mod verification;
 pub mod vision;
 pub mod waiver;
 pub mod workdir_notice;

@@ -235,6 +235,8 @@ export interface ContextView {
   title: string;
   /** The Context section's collapsed summary: "31 % · 165,9k left". */
   summary: string;
+  /** The context's size, "12,3k", for the composer's re-read warning; null before any measure. */
+  tokens: string | null;
   /** Null while nothing is measured. */
   composition: ContextComposition | null;
 }
@@ -343,7 +345,7 @@ export interface ServedPendingPlan {
   callId: string;
   plan: PlanProposal;
   markdown: string;
-  preflight: { criterionId: string; command: string; verdict: 'fails' | 'passesAlready' | 'cannotRun'; exitCode: number | null; output: string; existenceOnly: boolean }[];
+  preflight: { criterionId: string; command: string; verdict: 'fails' | 'passesAlready' | 'cannotRun' | 'ranNothing'; exitCode: number | null; output: string; existenceOnly: boolean }[];
 }
 
 /** The session's blocks folded by the server: the UI computes none. */

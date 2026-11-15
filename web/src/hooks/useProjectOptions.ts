@@ -6,7 +6,7 @@ import { listAgents, listCommands, listWorkflows } from '../lib/api';
 import {
   defaultWorkflowSelection,
   type WorkflowSelection,
-} from '../components/workflow/session/WorkflowPicker';
+} from '../components/workflow/session/workflowSelection';
 
 interface UseProjectOptionsArgs {
   /** The project the options belong to: the session's, or the one the new session targets. */

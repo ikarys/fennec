@@ -12,7 +12,6 @@
 
 # Working with fennec
 
-- [Three ways to work](ways-to-work.md)
 - [Projects and sessions](sessions.md)
 - [Files and the editor](files.md)
 - [Workflows](workflows.md)

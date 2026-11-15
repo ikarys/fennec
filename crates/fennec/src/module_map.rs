@@ -9,7 +9,7 @@ use crate::domain::module_map::{self, ModuleMap, SourceFile};
 /// Larger files are generated or vendored: not worth reading for imports.
 const MAX_FILE_BYTES: u64 = 1 << 20;
 
-/// The map of the project's tracked files; empty outside a git repository.
+/// The map of the project's source files; empty outside a git repository.
 pub fn load(workdir: &Path) -> ModuleMap {
     module_map::build(&tracked_files(workdir))
 }
@@ -34,8 +34,17 @@ pub fn write_map_file(workdir: &Path, map: &ModuleMap) -> std::io::Result<()> {
     std::fs::write(path, map_doc::render(map))
 }
 
+/// The files git tracks, plus the new ones it would add: a module not yet
+/// committed is already part of the code.
 pub(crate) fn tracked_files(workdir: &Path) -> Vec<SourceFile> {
-    let Some(out) = crate::git::stdout(workdir, &["ls-files", "-z"]) else {
+    let args = [
+        "ls-files",
+        "-z",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+    ];
+    let Some(out) = crate::git::stdout(workdir, &args) else {
         return Vec::new();
     };
     out.split('\0')
@@ -77,10 +86,16 @@ mod tests {
     #[test]
     fn this_repository_commits_a_current_map() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let map = load(&root);
+        // Locally the test keeps the file current; CI, which cannot commit,
+        // only checks it.
+        if std::env::var_os("CI").is_none() {
+            write_map_file(&root, &map).unwrap();
+        }
         assert_eq!(
-            map_file_state(&root, &load(&root)),
+            map_file_state(&root, &map),
             MapFileState::Current,
-            "docs/map.md is stale: regenerate it (project page, Map, \"Write docs/map.md\")"
+            "docs/map.md is stale: run `just test` and commit it"
         );
     }
 }

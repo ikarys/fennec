@@ -2,7 +2,7 @@
 
 Configure fennec from the **Settings** page. Changes apply from the next turn, no restart, except server settings that need a restart.
 
-The page opens as sub-pages in a side navigation, grouped under **General**, **Models**, **Agents**, **Security**, **Extensions**, and **About**.
+The page opens as sub-pages in a side navigation, grouped under **Models**, **Safety**, **Extensions**, and **Display**.
 
 ## Appearance
 
@@ -61,11 +61,11 @@ Use **New agent**, **Edit**, **Duplicate**, or delete an agent to manage agents.
 
 ## Workflows
 
-**Available workflows** lists embedded workflows. **Optional workflows** enables the ones that are disabled by default. When checked, they appear in the list of each project's workflows.
+**Always validate the tests**: off, fennec validates the tests itself when every criterion has a check that runs a test failing before the work. On, you read them every time.
 
 ## Autonomy
 
-**Integration commit** can **Name the AI models in the commit**. When on, the integration commit adds one `Assisted-by: fennec:<model>` line per model that answered in the session. When off, it keeps only the `Fennec-Session` line.
+**Integration commit** can **Name the AI models in the commit**. When on, the integration commit adds one `Assisted-by: fennec:<model>` line per model that answered in the session. When off, it keeps only the `Fennec-Session` line. **Add the verification block to commits**, on by default, ends the proposed message with what fennec verified ([review gate](review-gate.md)).
 
 **Night mode** controls unattended queue runs. Set **Max duration per idea (minutes)** and **Max tokens per idea**. A value of 0 means no limit. See [tasks](tasks.md).
 

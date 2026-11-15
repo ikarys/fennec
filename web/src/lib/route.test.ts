@@ -1,3 +1,4 @@
+// The route parser and tab helpers, tested without a browser.
 import {
   describe,
   it,
@@ -12,8 +13,10 @@ import {
   tabIdForRoute,
   splitPath,
   parsePaneToken,
+  projectSection,
   paneToken,
   PAGE_TABS,
+  HOME_FILTERS,
   loadTabs,
   loadActiveTab,
   changesPath,
@@ -23,6 +26,26 @@ import {
   rememberEditorHash,
   withTask,
 } from './route';
+
+describe('projectSection', () => {
+  it('keeps a known section', () => {
+    expect(projectSection('tasks')).toBe('tasks');
+    expect(projectSection('map')).toBe('map');
+    expect(projectSection('health')).toBe('health');
+  });
+
+  it('opens the first section of an old group name', () => {
+    expect(projectSection('work')).toBe('overview');
+    expect(projectSection('understand')).toBe('map');
+    expect(projectSection('indicators')).toBe('health');
+  });
+
+  it('defaults unknown or null to the overview', () => {
+    expect(projectSection(null)).toBe('overview');
+    expect(projectSection('nope')).toBe('overview');
+    expect(projectSection('constructor')).toBe('overview');
+  });
+});
 
 describe('changes', () => {
   it('parses the changes page of a session', () => {
@@ -68,11 +91,11 @@ afterEach(() => {
 
 describe('parseRoute', () => {
   it('parses empty hash as home', () => {
-    expect(parseRoute('')).toEqual({ name: 'home' });
+    expect(parseRoute('')).toEqual({ name: 'home', filter: 'overview' });
   });
 
   it('parses root hash as home', () => {
-    expect(parseRoute('#/')).toEqual({ name: 'home' });
+    expect(parseRoute('#/')).toEqual({ name: 'home', filter: 'overview' });
   });
 
   it('parses settings route with null tab', () => {
@@ -93,8 +116,8 @@ describe('parseRoute', () => {
     expect(parseRoute('#/insight')).toEqual({ name: 'insight' });
   });
 
-  it('parses backlog route', () => {
-    expect(parseRoute('#/backlog')).toEqual({ name: 'backlog' });
+  it('parses backlog route as the home queue filter', () => {
+    expect(parseRoute('#/backlog')).toEqual({ name: 'home', filter: 'queue' });
   });
 
   it('decodes project id with slash', () => {
@@ -306,8 +329,8 @@ describe('tabIdForRoute', () => {
     expect(tabIdForRoute({ name: 'insight' })).toBe('page:insight');
   });
 
-  it('returns backlog page id', () => {
-    expect(tabIdForRoute({ name: 'backlog' })).toBe('page:backlog');
+  it('returns null for a home route with a filter', () => {
+    expect(tabIdForRoute({ name: 'home', filter: 'queue' })).toBeNull();
   });
 
   it('returns workflows page id', () => {
@@ -322,7 +345,7 @@ describe('tabIdForRoute', () => {
   });
 
   it('returns null for home route', () => {
-    expect(tabIdForRoute({ name: 'home' })).toBeNull();
+    expect(tabIdForRoute({ name: 'home', filter: 'overview' })).toBeNull();
   });
 
   it('returns null for project route', () => {
@@ -434,14 +457,17 @@ describe('loadActiveTab', () => {
   });
 });
 
-describe('page routes', () => {
-  it('parses #/projects and maps it to its tab id', () => {
-    expect(parseRoute('#/projects')).toEqual({ name: 'projects' });
-    expect(tabIdForRoute({ name: 'projects' })).toBe('page:projects');
+describe('home filters', () => {
+  it('opens home with the filter of an old page route', () => {
+    expect(parseRoute('#/projects')).toEqual({ name: 'home', filter: 'projects' });
+    expect(parseRoute('#/chats')).toEqual({ name: 'home', filter: 'chats' });
+    expect(parseRoute('#/backlog')).toEqual({ name: 'home', filter: 'queue' });
+    expect(tabIdForRoute({ name: 'home', filter: 'projects' })).toBeNull();
   });
 
-  it('parses #/chats and maps it to its tab id', () => {
-    expect(parseRoute('#/chats')).toEqual({ name: 'chats' });
-    expect(tabIdForRoute({ name: 'chats' })).toBe('page:chats');
+  it('parses each filter path back to its filter', () => {
+    for (const entry of HOME_FILTERS) {
+      expect(parseRoute(entry.path)).toEqual({ name: 'home', filter: entry.filter });
+    }
   });
 });

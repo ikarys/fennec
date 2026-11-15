@@ -1,15 +1,13 @@
 // The page the current route shows: the route-to-page switch, with the heavy pages loaded on demand.
 import { lazy, Suspense, type ReactNode } from 'react';
 import type { Project, ProviderListing, SettingsResponse } from '../../lib/api';
-import type { Route } from '../../lib/route';
+import { HOME_FILTERS, type Route } from '../../lib/route';
 import type { ThemeId } from '../../lib/theme';
 import type { PageId } from '../../lib/route';
 import type { useSplitView } from '../../hooks/useSplitView';
 import type { useTurnNotices } from '../../hooks/useTurnNotices';
 import { useT } from '../../i18n';
 import { HomePage } from '../../pages/HomePage';
-import { ProjectsPage } from '../../pages/ProjectsPage';
-import { ChatsPage } from '../../pages/ChatsPage';
 import { SessionPage } from '../../pages/SessionPage';
 import { SplitPage } from '../../pages/SplitPage';
 import { SettingsPage } from '../../pages/SettingsPage';
@@ -18,7 +16,6 @@ import { setProjectFavorite } from '../../lib/api';
 
 const WorkflowsPage = lazy(() => import('../../pages/WorkflowsPage'));
 const ProjectPage = lazy(() => import('../../pages/ProjectPage'));
-const BacklogPage = lazy(() => import('../../pages/BacklogPage'));
 const ChangesPage = lazy(() => import('../../pages/ChangesPage'));
 const EditorPage = lazy(() => import('../../pages/EditorPage'));
 
@@ -58,6 +55,7 @@ interface RouteViewProps {
   onHome: () => void;
   onOpenPage: (page: PageId) => void;
   onOpenProject: (projectId: string) => void;
+  onNavigate: (path: string) => void;
 }
 
 export function RouteView(props: RouteViewProps) {
@@ -66,37 +64,20 @@ export function RouteView(props: RouteViewProps) {
     case 'home':
       return (
         <HomePage
+          filter={route.filter}
           projectCount={projects.filter((project) => !project.chat).length}
           attention={attention}
           refreshKey={props.homeRefreshKey}
+          projects={projects}
+          projectsLoading={props.projectsLoading}
+          projectsError={props.projectsError}
           onOpenProjectDialog={onOpenProjectDialog}
           onNewChat={props.chatProjectId ? () => onNewSession(props.chatProjectId ?? undefined) : null}
           onNewSession={onNewSession}
           onOpenSession={onOpenSession}
-        />
-      );
-    case 'projects':
-      return (
-        <ProjectsPage
-          projects={projects}
-          loading={props.projectsLoading}
-          error={props.projectsError}
-          onOpenProjectDialog={onOpenProjectDialog}
-          onNewSession={onNewSession}
-          onOpenSession={onOpenSession}
           onSessionsDeleted={onSessionsDeleted}
           onToggleFavorite={(projectId, favorite) => void setProjectFavorite(projectId, favorite).then(onRefreshProjects)}
-        />
-      );
-    case 'chats':
-      return (
-        <ChatsPage
-          projects={projects}
-          loading={props.projectsLoading}
-          error={props.projectsError}
-          onNewSession={onNewSession}
-          onOpenSession={onOpenSession}
-          onSessionsDeleted={onSessionsDeleted}
+          onFilter={(filter) => props.onNavigate(HOME_FILTERS.find((entry) => entry.filter === filter)?.path ?? '#/')}
         />
       );
     case 'settings':
@@ -140,12 +121,6 @@ export function RouteView(props: RouteViewProps) {
       );
     case 'insight':
       return <InsightPage />;
-    case 'backlog':
-      return (
-        <Lazy>
-          <BacklogPage />
-        </Lazy>
-      );
     case 'split':
       return (
         <SplitPage

@@ -9,6 +9,7 @@ use crate::domain::criteria::{
     parse_verdicts,
 };
 use crate::domain::event::Event;
+use crate::domain::test_selection;
 use crate::domain::workflow::definition::{DEFAULT_SHELL_TIMEOUT_SECS, NodeKind};
 use crate::domain::workflow::run::{self as run, RunOutcome};
 use std::time::Duration;
@@ -78,8 +79,14 @@ pub(super) fn run(
             });
         }
 
-        let output = outcome::last_bytes(&result.output, 4 * 1024);
-        let status = if result.exit_code == Some(0) {
+        let mut output = outcome::last_bytes(&result.output, 4 * 1024);
+        // A selector matching no test exits 0 under most runners: that
+        // proves nothing, so it is a failed check, not a false "verified".
+        let ran_nothing = test_selection::ran_no_test(&result.output);
+        if ran_nothing {
+            output.insert_str(0, "fennec: this check ran no test.\n");
+        }
+        let status = if result.exit_code == Some(0) && !ran_nothing {
             CriterionStatus::Passed {
                 provenance: Provenance::Verified {
                     command: command.clone(),
@@ -191,4 +198,22 @@ pub(super) fn record_verdicts(
     }
 
     Ok(())
+}
+
+/// A verdicts node whose criteria all have a check has nothing to judge:
+/// fennec ran every check, a model would only repeat them. Its `pass` port.
+pub(super) fn nothing_to_judge(node: &NodeKind, state: &run::RunState) -> Option<String> {
+    let NodeKind::Agent {
+        verdicts, outputs, ..
+    } = node
+    else {
+        return None;
+    };
+    let all_checked = !state.criteria.is_empty()
+        && state
+            .criteria
+            .iter()
+            .all(|state| state.criterion.check.is_some());
+    (*verdicts && all_checked && outputs.iter().any(|output| output == "pass"))
+        .then(|| "pass".to_string())
 }

@@ -16,15 +16,13 @@ export type SettingsPageId =
   | 'search'
   | 'about';
 
-export type SettingsGroupId = 'general' | 'models' | 'agents' | 'security' | 'extensions' | 'about';
+export type SettingsGroupId = 'models' | 'security' | 'extensions' | 'display';
 
 export const SETTINGS_GROUPS: readonly { id: SettingsGroupId; pages: readonly SettingsPageId[] }[] = [
-  { id: 'general', pages: ['display', 'shortcuts'] },
   { id: 'models', pages: ['providers'] },
-  { id: 'agents', pages: ['instructions', 'agents', 'skills', 'workflows', 'autonomy'] },
-  { id: 'security', pages: ['sandbox', 'rules', 'scanners'] },
-  { id: 'extensions', pages: ['plugins', 'mcp', 'search'] },
-  { id: 'about', pages: ['about'] }
+  { id: 'security', pages: ['sandbox', 'rules', 'scanners', 'autonomy'] },
+  { id: 'extensions', pages: ['agents', 'skills', 'workflows', 'plugins', 'mcp', 'search', 'instructions'] },
+  { id: 'display', pages: ['display', 'shortcuts', 'about'] }
 ];
 
 const LEGACY_PAGES: Record<string, SettingsPageId> = {

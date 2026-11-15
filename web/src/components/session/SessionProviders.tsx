@@ -1,6 +1,6 @@
 // The contexts a session's subtree reads: previews, canvas, file links, pending plan and usage.
 import { useMemo, type ReactNode } from 'react';
-import type { SessionDetail, WorkflowUsage } from '../../lib/api';
+import type { SessionDetail, Verification, WorkflowUsage } from '../../lib/api';
 import type { CallUsage } from '../../lib/api';
 import { changesPath, editorPath } from '../../lib/route';
 import { CanvasOpenerContext, CanvasSessionContext } from '../canvas/CanvasContext';
@@ -10,6 +10,7 @@ import {
   type PreviewTarget,
 } from '../preview/PreviewContext';
 import { CallUsageContext, WorkflowUsageContext } from './CallUsage';
+import { VerificationContext } from '../workflow/session/RunVerification';
 import { FileLinkContext } from './FileLinkContext';
 import { PendingPlanContext } from './PendingPlan';
 
@@ -24,6 +25,7 @@ interface SessionProvidersProps {
   pendingPlanCallId: string | null;
   calls: ReadonlyMap<string, CallUsage>;
   workflowUsage: WorkflowUsage;
+  verification: Verification | null;
   children: ReactNode;
 }
 
@@ -37,6 +39,7 @@ export function SessionProviders({
   pendingPlanCallId,
   calls,
   workflowUsage,
+  verification,
   children,
 }: SessionProvidersProps) {
   const hasCommits = detail?.worktree?.commits;
@@ -58,7 +61,9 @@ export function SessionProviders({
               <PendingPlanContext.Provider value={pendingPlanCallId}>
                 <CallUsageContext.Provider value={calls}>
                   <WorkflowUsageContext.Provider value={workflowUsage}>
-                    {children}
+                    <VerificationContext.Provider value={verification}>
+                      {children}
+                    </VerificationContext.Provider>
                   </WorkflowUsageContext.Provider>
                 </CallUsageContext.Provider>
               </PendingPlanContext.Provider>
