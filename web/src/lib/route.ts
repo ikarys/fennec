@@ -24,6 +24,30 @@ export type Route =
   | { name: 'editor'; projectId: string; path: string | null; session: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
+export type ProjectTab = 'work' | 'understand' | 'health';
+
+type ProjectSection = { tab: ProjectTab; anchor: string | null };
+
+const PROJECT_TABS: Record<string, ProjectSection> = {
+  work: { tab: 'work', anchor: null },
+  understand: { tab: 'understand', anchor: null },
+  health: { tab: 'health', anchor: null },
+  overview: { tab: 'work', anchor: null },
+  tasks: { tab: 'work', anchor: 'tasks' },
+  sessions: { tab: 'work', anchor: 'sessions' },
+  indicators: { tab: 'health', anchor: null },
+  map: { tab: 'understand', anchor: 'map' },
+  risks: { tab: 'understand', anchor: 'risks' },
+  decisions: { tab: 'understand', anchor: 'decisions' },
+  analyses: { tab: 'understand', anchor: 'analyses' },
+  canvas: { tab: 'understand', anchor: 'canvas' },
+};
+
+/** A project tab from the URL; old tab names still open, as their new tab plus the section to scroll to. */
+export function projectTab(tab: string | null): ProjectSection {
+  return (tab !== null && Object.hasOwn(PROJECT_TABS, tab) ? PROJECT_TABS[tab] : null) ?? PROJECT_TABS.work;
+}
+
 export const TABS_KEY = 'fennec.tabs';
 export const ACTIVE_TAB_KEY = 'fennec.activeTab';
 

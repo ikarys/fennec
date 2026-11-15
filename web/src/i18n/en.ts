@@ -704,7 +704,9 @@ export const en = {
   stageDone: 'Done',
   noReadyTasks: 'No ready task: frame an idea from the backlog.',
   tasksTabOverview: 'Overview',
-  indicatorsTab: 'Indicators',
+  projectTabWork: 'Work',
+  projectTabUnderstand: 'Understand',
+  projectTabHealth: 'Health',
   indicatorsTitle: 'Indicators',
   indicatorsHint: 'Measured from what fennec recorded (integrations, dialogues, git, the usage ledger), never from what a model says.',
   tasksTabYours: 'To decide',
@@ -846,7 +848,6 @@ export const en = {
   projectTasksAria: 'Project tasks',
   addFavorite: 'Add to favorites',
   // Project: dashboard and sessions
-  recentSessions: 'Recent sessions',
   allSessions: 'All sessions',
   noSessions: 'No session.',
   toIntegrateBadge: 'to integrate',

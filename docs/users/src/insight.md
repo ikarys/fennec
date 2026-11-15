@@ -32,7 +32,7 @@ In a session, the **Session tokens** panel shows the same for that session: **Ca
 ## Step 2: set a monthly budget for a project
 
 1. Open the project.
-2. On its page, click the tile **Set the monthly budget**.
+2. On its page, click **Health** in the left menu, then the tile **Set the monthly budget**.
 3. Type an amount in **Monthly budget in $**.
 4. Click **Save the budget**.
 
@@ -40,7 +40,7 @@ In a session, the **Session tokens** panel shows the same for that session: **Ca
 
 ## What the project measures by itself
 
-The project's **Indicators** tab measures the project from recorded facts only: integrations, dialogues, git, and the usage ledger. It never measures what a model says. It shows, among others, AI commits made outside fennec, sensitive integrations without a comprehension dialogue, module rule breaks, the month's cost per integration, and integrations tied to an approved plan. See [Understanding the project](understanding.md) for the map and risk zones.
+The project's **Health** tab holds the budget and the indicators. The indicators measure the project from recorded facts only: integrations, dialogues, git, and the usage ledger. It never measures what a model says. It shows, among others, AI commits made outside fennec, sensitive integrations without a comprehension dialogue, module rule breaks, the month's cost per integration, and integrations tied to an approved plan. See [Understanding the project](understanding.md) for the map and risk zones.
 
 ## If something goes wrong
 

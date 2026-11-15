@@ -13,6 +13,7 @@ import {
   tabIdForRoute,
   splitPath,
   parsePaneToken,
+  projectTab,
   paneToken,
   PAGE_TABS,
   HOME_FILTERS,
@@ -25,6 +26,25 @@ import {
   rememberEditorHash,
   withTask,
 } from './route';
+
+describe('projectTab', () => {
+  it('maps new tab names', () => {
+    expect(projectTab('work')).toEqual({ tab: 'work', anchor: null });
+    expect(projectTab('understand')).toEqual({ tab: 'understand', anchor: null });
+    expect(projectTab('health')).toEqual({ tab: 'health', anchor: null });
+  });
+
+  it('maps old tab names to new tab with anchor', () => {
+    expect(projectTab('tasks')).toEqual({ tab: 'work', anchor: 'tasks' });
+    expect(projectTab('sessions')).toEqual({ tab: 'work', anchor: 'sessions' });
+    expect(projectTab('map')).toEqual({ tab: 'understand', anchor: 'map' });
+  });
+
+  it('defaults unknown or null to work', () => {
+    expect(projectTab(null)).toEqual({ tab: 'work', anchor: null });
+    expect(projectTab('nope')).toEqual({ tab: 'work', anchor: null });
+  });
+});
 
 describe('changes', () => {
   it('parses the changes page of a session', () => {

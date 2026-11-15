@@ -735,7 +735,9 @@ export const fr: Record<MsgKey, string> = {
   stageDone: 'Terminées',
   noReadyTasks: 'Aucune tâche prête : cadre une idée du backlog.',
   tasksTabOverview: 'Vue d’ensemble',
-  indicatorsTab: 'Indicateurs',
+  projectTabWork: 'Travail',
+  projectTabUnderstand: 'Comprendre',
+  projectTabHealth: 'Santé',
   indicatorsTitle: 'Indicateurs',
   indicatorsHint: 'Mesurés à partir de ce que fennec a enregistré (intégrations, dialogues, git, registre d’usage), jamais de ce que dit un modèle.',
   tasksTabYours: 'À décider',
@@ -878,7 +880,6 @@ export const fr: Record<MsgKey, string> = {
   projectTasksAria: 'Tâches du projet',
   addFavorite: 'Mettre en favori',
   // Project: dashboard and sessions
-  recentSessions: 'Sessions récentes',
   allSessions: 'Toutes les sessions',
   noSessions: 'Aucune session.',
   toIntegrateBadge: 'à intégrer',
