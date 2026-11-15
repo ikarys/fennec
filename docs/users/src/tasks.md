@@ -6,7 +6,7 @@ The Tasks board turns ideas into tasks with a sheet, then a queue runs the ready
 
 ![The Tasks tab of a project](images/tasks-1.png)
 
-Open your project. Click **Tasks** in its section bar. Their tabs are **Overview**, **To decide**, **Ready**, **Drafts** and **Done**. Click **New idea** ①. ② is the queue card: **0 ready** for now.
+Open your project. Click **Tasks** under **Work** in its left menu. Their tabs are **Overview**, **To decide**, **Ready**, **Drafts** and **Done**. Click **New idea** ①. ② is the queue card: **0 ready** for now.
 
 ![Type the idea, then Add the idea](images/tasks-2.png)
 

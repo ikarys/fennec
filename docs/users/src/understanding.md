@@ -1,13 +1,13 @@
 # Understanding the project
 
-The **Understand** group of the project page's section bar shows how the code is built and where it is fragile, computed from the code and git, not by a model. Use it before you hand work to an agent, and to know what to read first.
+The **Understand** group of the project page's left menu shows how the code is built and where it is fragile, computed from the code and git, not by a model. Use it before you hand work to an agent, and to know what to read first.
 
 **Before you start**: the module map reads Rust, TypeScript and JavaScript only. On a project in another language the map and risk zones stay empty.
 
 ## Step 1: read the module map
 
 1. Open the project page.
-2. Click **Module map** ① in the **Understand** group of its section bar. The group's other entries are the risk zones, the decisions, the analyses and the canvases.
+2. Click **Module map** ① under **Understand** in its left menu. The group's other entries are the risk zones, the decisions, the analyses and the canvases.
 
 ![The Module map of a project](images/understanding-1.png)
 
