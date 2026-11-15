@@ -28,6 +28,9 @@ pub struct PreflightResult {
 }
 
 // ponytail: heuristic; extend it when a new environment failure shows up.
+// "read-only file system" is not one: the preflight runs in the planner's
+// read-only workdir, which the builder can write (`cargo test` writing its
+// lockfile), so it says nothing about the builder's sandbox.
 const CANNOT_RUN_MARKERS: &[&str] = &[
     "command not found",
     "could not resolve host",
@@ -37,7 +40,6 @@ const CANNOT_RUN_MARKERS: &[&str] = &[
     "temporary failure in name resolution",
     "cannot connect to the docker daemon",
     "connection refused",
-    "read-only file system",
 ];
 
 pub fn exit_code(tool_output: &str) -> Option<i32> {
@@ -212,6 +214,12 @@ mod tests {
     fn classify_marks_everything_else_as_fails() {
         assert_eq!(classify(Some(1), "boom"), PreflightVerdict::Fails);
         assert_eq!(classify(Some(2), ""), PreflightVerdict::Fails);
+    }
+
+    #[test]
+    fn classify_does_not_blame_the_planners_read_only_workdir() {
+        let cargo = "error: failed to open: /work/Cargo.lock\n\nCaused by:\n  Read-only file system (os error 30)";
+        assert_eq!(classify(Some(101), cargo), PreflightVerdict::Fails);
     }
 
     #[test]
