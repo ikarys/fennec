@@ -46,20 +46,19 @@ One-time, done with `gh api`:
 - Delete branch on merge: off. Without branch protection it would delete `develop` when a promote PR merges; delete feature branches by hand.
 - Allow Actions to create PRs (release-please needs it).
 
-## When fennec goes public
+## Branch rulesets
 
-Add branch protection/rulesets for `main` and `develop`:
+`main` and `develop` each have a GitHub ruleset: no deletion, no force-push. The admin role
+bypasses them.
 
-- Require PR.
-- Require the `guard`, `check` and `tests` status checks. `guard` (secrets, PR title) runs on every
-  pull request; on documentation-only changes `check` and `tests` are skipped by a job condition,
-  which a required check accepts.
-- Let GitHub Actions bypass the "Require PR" rule: `convention.yml` pushes the evidence to `main`
-  and the back-merge in `release-please.yml` pushes to `develop`.
-- No force-push.
-- No deletion.
+The rulesets neither require a pull request nor require status checks. Workflows push to both
+branches with `GITHUB_TOKEN`: `convention.yml` pushes the evidence to `main`, and the back-merge in
+`release-please.yml` pushes to `develop`. On a personal repository, GitHub Actions cannot be a
+bypass actor, so either rule would block those pushes. The local pre-push hook (`just setup`) refuses
+direct pushes to both branches.
 
-Today this is unavailable because the repo is private on a Free plan.
+To require PRs and checks later, give those two workflows a GitHub App token and add the App as a
+bypass actor.
 
 ## Installing a binary
 
