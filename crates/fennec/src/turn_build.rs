@@ -139,6 +139,7 @@ pub fn with_turn<R>(
         autonomous: options.autonomous,
         lang: prefs.display.language,
         preflight_sent_back: false,
+        always_validate_tests: prefs.always_validate_tests,
         stop,
         on_event: &mut options.on_event,
         children: options.children,

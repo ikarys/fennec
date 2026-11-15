@@ -51,6 +51,9 @@ pub struct Preferences {
     pub always_on_skills: Vec<String>,
     /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
     pub enabled_workflows: Vec<String>,
+    /// `alwaysValidateTests`: stop at every tests gate, even when fennec proves
+    /// each check fails before the work. Off: fennec answers those gates.
+    pub always_validate_tests: bool,
     /// MCP servers, configured on the Settings page.
     pub mcp: Vec<McpServer>,
     /// The human's keyboard shortcut overrides, action id → combo (`shortcut::ACTIONS`); an

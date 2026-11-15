@@ -100,9 +100,9 @@ graph LR
   m21 -->|1| m29
   m13 -->|1| m19
   m13 -->|3| m21
-  m13 -->|3| m27
+  m13 -->|4| m27
   m13 -->|4| m31
-  m13 -->|4| m22
+  m13 -->|5| m22
   m18 -->|2| m27
   m1 -->|6| m14
   m1 -->|1| m19
@@ -368,7 +368,7 @@ graph LR
 | `crates/fennec/src/web/views/run_view` | 2 | 2 |  | The server-side run view: the run the server serves pre-calculated, so the UI renders it as it is. |
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
 | `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
-| `crates/fennec/src/agent/workflow` | 7 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
+| `crates/fennec/src/agent/workflow` | 8 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
 | `crates/fennec/src` | 34 | 25 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
 | `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
@@ -382,7 +382,7 @@ graph LR
 | `crates/fennec/src/mcp` | 2 | 2 |  | fennec's side of MCP: connecting a configured server through the sandbox, and caching its tools in the preferences; the protocol lives in `mcp-lite`. |
 | `crates/fennec/src/sandbox` | 3 | 3 |  | fennec's sandbox world for commands (bwrap on Linux, Seatbelt on macOS): what a model runs sees the system read-only, its workdir writable, the human's secrets hidden and, by default, no network. The file tools keep the in-process path guard; this only wraps commands. |
 | `crates/fennec/src/store` | 12 | 12 |  | Storage adapter: the SQLite store, `projects`/`sessions`/`events`. The schema is frozen: stored logs depend on it. Implements the agent's `EventLog`. |
-| `crates/fennec/src/domain` | 80 | 78 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
+| `crates/fennec/src/domain` | 81 | 79 |  | fennec's vocabulary, free of storage, network and UI: what a session is made of and how its log reads back as a conversation. |
 | `crates/rules/src` | 8 | 7 | yes | Fennec's rule engine. |
 | `crates/fennec/src/domain/preferences` | 2 | 2 |  | What the human chose on the Settings page, stored as JSON. |
 | `crates/fennec/src/domain/module_map` | 4 | 4 |  | The project map: a project's modules and the dependencies between them, read from the import lines of its source files (Rust and TypeScript or JavaScript). Deterministic: no model involved. |

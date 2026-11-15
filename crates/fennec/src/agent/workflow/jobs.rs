@@ -201,6 +201,26 @@ fn record_given(
 }
 
 pub(super) fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Result<Cursor, String> {
+    finish_human(turn, choice, comment, choice)
+}
+
+/// fennec's answer to the tests gate when it proved every check fails before
+/// the work: the forward choice, with the checks as the node's output.
+pub(super) fn answer_by_proof(
+    turn: &mut Turn,
+    choices: &[String],
+    output: &str,
+) -> Result<Cursor, String> {
+    let choice = choices.first().ok_or("the human node has no choice")?;
+    finish_human(turn, choice, "", output)
+}
+
+fn finish_human(
+    turn: &mut Turn,
+    choice: &str,
+    comment: &str,
+    output: &str,
+) -> Result<Cursor, String> {
     let events = turn.log.events(turn.session_id)?;
     let state = run::current_run(&events).ok_or("no active workflow run")?;
 
@@ -227,7 +247,7 @@ pub(super) fn answer_human(turn: &mut Turn, choice: &str, comment: &str) -> Resu
         run_id: state.run_id.clone(),
         node_id: open.node_id.clone(),
         port: choice.to_string(),
-        output: choice.to_string(),
+        output: output.to_string(),
         exit_code: None,
         comment,
         duration_ms: None,
@@ -287,7 +307,7 @@ pub(super) fn answer_by_night(
 
 /// Whether `node_id` is fed by the `done` edge of the `tests` agent node: the
 /// human node that validates the tests written before the code.
-fn fed_by_tests_agent(workflow: &Workflow, node_id: &str) -> bool {
+pub(super) fn fed_by_tests_agent(workflow: &Workflow, node_id: &str) -> bool {
     workflow.nodes.iter().any(|node| {
         matches!(&node.kind, NodeKind::Agent { agent, .. } if agent == "tests")
             && workflow

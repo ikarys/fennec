@@ -165,6 +165,7 @@ mod tests {
             autonomous: false,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
+            always_validate_tests: false,
 
             stop: &stop,
             on_event: &mut on_event,

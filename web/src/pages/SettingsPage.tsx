@@ -280,6 +280,10 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
     setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
   }
 
+  function updateAlwaysValidateTests(alwaysValidateTests: boolean) {
+    setForm((previous) => (previous ? { ...previous, alwaysValidateTests } : previous));
+  }
+
   /** Saves one change at once on top of the stored preferences: the form's other unsaved edits stay pending. */
   async function savePatch(patch: Partial<Preferences>) {
     if (!settings) return;
@@ -504,6 +508,8 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
               workflows={settings.optInWorkflows}
               value={form.enabledWorkflows}
               onChange={updateEnabledWorkflows}
+              alwaysValidateTests={form.alwaysValidateTests}
+              onAlwaysValidateTestsChange={updateAlwaysValidateTests}
             />
           )}
 

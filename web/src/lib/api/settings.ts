@@ -135,6 +135,8 @@ export interface Preferences {
   alwaysOnSkills?: string[];
   /** Opt-in embedded workflows the human enabled. */
   enabledWorkflows?: string[];
+  /** Stop at every tests gate, even when fennec proves each check fails before the work. */
+  alwaysValidateTests?: boolean;
   /** MCP servers, configured on the Settings page. */
   mcp?: McpServer[];
   /** The human's keyboard shortcut overrides, action → combo; an empty combo disables. */

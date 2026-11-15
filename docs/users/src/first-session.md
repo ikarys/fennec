@@ -37,15 +37,17 @@ Click **Revise** ③ to send the plan back with your comment, or **Go** ④ to s
 
 ![The plan, its Done when criteria and the Go button](images/first-session-2.png)
 
-## Step 3: validate the tests
+## Step 3: the tests, usually nothing to do
 
 The agent writes the tests first ①. It writes them before any code. The left rail shows where the run is.
 
-Read the list. Each test says which criterion it covers. **Not covered by a test** lists what is left uncovered.
+fennec then runs every criterion's check. When each one runs a test that fails before the work, the tests are validated without you: the step shows **Validated by fennec** and the checks it ran.
 
-Once validated, the tests are protected. The builder cannot change them without asking you. It asks for a waiver that you grant or refuse.
+Otherwise fennec stops and says why, for example **C2 has no check** or **C1's check passes before the work**. Read the list. Each test says which criterion it covers. **Not covered by a test** lists what is left uncovered. Not happy with them? Type a comment and click **Rework** ②. Otherwise click **Validate** ③.
 
-Not happy with them? Type a comment and click **Rework** ②. Otherwise click **Validate** ③.
+Either way, the validated tests are protected. The builder cannot change them without asking you. It asks for a waiver that you grant or refuse.
+
+To read the tests every time, turn on **Always validate the tests** in Settings > Workflows.
 
 ![Validate the tests: the test list, Rework and Validate](images/first-session-3.png)
 

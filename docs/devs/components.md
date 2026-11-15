@@ -221,6 +221,9 @@ Test gate, done (C4): the default workflow writes the tests before the code: onc
 from the "Done when" criteria, and a human node asks to validate them. "Validate" records `tests.approved` with the test files
 written so far (the kernel's choice, at the human's click); from the next turn on they are protected for the rest of the session
 like `.agents/protected` (`domain/test_files.rs`, `turn_build.rs`), so the builder makes them pass without weakening them.
+fennec answers that node itself when every criterion's check runs a test that fails before the work (`agent/workflow/test_gate.rs`;
+a runner that selects no test is caught by `domain/test_selection.rs`, and fails a criteria check too); otherwise it asks and says
+why. Settings > Workflows > Always validate the tests turns that off.
 
 Update, done: `fennec update [--check]` and the top bar's arrow read the latest GitHub release (`/releases/latest`'s
 redirect, cached 6 h for the UI), compare versions (`domain/release.rs`) and, on the human's click only, run the

@@ -13,7 +13,7 @@ lands, add its paragraph to `docs/devs/components.md`.
 
 ## Where things are
 
-- `docs/map.md`: the modules and their dependencies, generated from the imports (regenerate it,
+- `docs/map.md`: the modules and their dependencies, generated from the imports (`just test` regenerates it,
   never edit it). Each file's leading comment says what it is for.
 - `docs/devs/components.md` what fennec already does; `docs/devs/api.md` the HTTP API and event wire format;
   `docs/devs/ui.md` the UI's design rules; `SECURITY.md` the threat model and the known gaps;
