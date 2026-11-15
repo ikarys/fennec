@@ -1,2 +1,2 @@
-rusqlite 0.41.0 0.42.0
+rusqlite 0.41.0 0.43.0
 typescript 5.9.3 7.0.2
