@@ -76,7 +76,7 @@ At the end the CLI prints what fennec verified and the review page's link, `Revi
 | Flag | Meaning |
 | --- | --- |
 | `--workflow <id>` | The workflow to run, e.g. `plan-build-verify` or `quick`. |
-| `--night` | Take the first choice at every gate, and the first option of every question (or let the agent decide). |
+| `--night` | Take the first choice at every gate, and the first option of every question (or let the agent decide). A permission request (a rule approval or a waiver) ends the run: it waits for you in the browser. |
 
 The command exits with status 1 when the run does not end done.
 

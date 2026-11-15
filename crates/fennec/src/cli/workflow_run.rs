@@ -142,6 +142,12 @@ impl Client {
             } => self.human_asked(node_id, question),
             Event::ChatAskUser { options, .. } => self.chat_ask_user(options),
             Event::RuleApprovalRequested { .. } | Event::WaiverRequested { .. } => {
+                if self.night {
+                    return Err(format!(
+                        "needs your decision in the browser: {}/#/s/{}",
+                        self.base, self.session
+                    ));
+                }
                 eprintln!(
                     "waiting for your decision in the browser: {}/#/s/{}",
                     self.base, self.session

@@ -227,6 +227,7 @@ impl Toolbox for LocalTools {
             &self.protection,
             mcp_name.as_deref().unwrap_or(name),
             args,
+            &|| read_file::own_roots(&self.workdir, &self.web_cache),
         )
     }
 
