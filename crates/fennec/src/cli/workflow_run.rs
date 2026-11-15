@@ -61,6 +61,7 @@ pub fn run(workflow_id: &str, night: bool, task: &str) -> Result<(), String> {
         transcript: Transcript::default(),
         streamed: false,
         asked: false,
+        last_error: None,
     };
     stream(&mut client)
 }
@@ -79,6 +80,8 @@ struct Client {
     /// The turn's question already came as an event (`ask_user`, a gate, a
     /// permission): the turn ending on it needs no second answer.
     asked: bool,
+    /// The last model error, shown when the turn ends on it.
+    last_error: Option<String>,
 }
 
 fn stream(client: &mut Client) -> Result<(), String> {
@@ -162,6 +165,24 @@ impl Client {
                 }
                 self.chat_ask_user(None)
             }
+            Event::ChatError { error, .. } => {
+                self.last_error = Some(error);
+                Ok(false)
+            }
+            // A model error leaves the run open for the human to resume in
+            // the browser: nothing more comes on this stream.
+            Event::ChatDone {
+                reason: reason @ (DoneReason::Error | DoneReason::Truncated),
+                ..
+            } => Err(format!(
+                "the agent stopped ({reason}){}; resume or stop it in the browser: {}/#/s/{}",
+                self.last_error
+                    .take()
+                    .map(|e| format!(": {e}"))
+                    .unwrap_or_default(),
+                self.base,
+                self.session
+            )),
             Event::RuleApprovalRequested { .. } | Event::WaiverRequested { .. } => {
                 self.asked = true;
                 if self.night {
@@ -413,6 +434,7 @@ mod tests {
             transcript: Transcript::default(),
             streamed: false,
             asked: false,
+            last_error: None,
         }
     }
 
@@ -422,6 +444,26 @@ mod tests {
             reason: DoneReason::WaitingForUser,
             duration_ms: None,
         }
+    }
+
+    #[test]
+    fn a_turn_ending_on_a_model_error_ends_the_run_with_it() {
+        let mut client = offline_night_client();
+        let error = Event::ChatError {
+            error: "context_length_exceeded".into(),
+            recoverable: false,
+        };
+        assert_eq!(client.handle(error), Ok(false));
+        let done = Event::ChatDone {
+            message_id: "m".into(),
+            reason: DoneReason::Error,
+            duration_ms: None,
+        };
+        let message = client.handle(done).unwrap_err();
+        assert!(
+            message.contains("(error): context_length_exceeded"),
+            "{message}"
+        );
     }
 
     #[test]
