@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/ikarys/fennec/compare/v0.6.0...v0.7.0) (2026-11-15)
+
+
+### Features
+
+* **workflow:** add handoff context to agent nodes ([#438](https://github.com/ikarys/fennec/issues/438)) ([688fe05](https://github.com/ikarys/fennec/commit/688fe05919fd4bd8607ac56ac93dcaa91c1bd11b))
+
+
+### Bug Fixes
+
+* **workflow:** read a verdict the model wrote in bold ([#437](https://github.com/ikarys/fennec/issues/437)) ([1c606a5](https://github.com/ikarys/fennec/commit/1c606a5a8baf87a036b17509ed38eefac14c2a6e))
+
 ## [0.6.0](https://github.com/ikarys/fennec/compare/v0.5.1...v0.6.0) (2026-11-15)
 
 
