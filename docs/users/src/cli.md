@@ -1,6 +1,6 @@
 # Command line
 
-Run fennec from a shell: start the server, run an agent turn, check setup, replay sessions, and update the binary.
+Run fennec from a shell: start the server, run an agent turn or a workflow, check setup, replay sessions, and update the binary.
 
 ## Start the server
 
@@ -51,6 +51,34 @@ fennec run --image ./diagram.png --image ./screenshot.png "explain this flow"
 | `--session <id>` | Continue an existing session. |
 | `--agent <id>` | Use an agent id; `plan` is the default, `builder` writes code. |
 | `--image <path>` | Attach an image; repeat the flag for more images. |
+
+## Run a workflow
+
+```bash
+cd ~/code/my-project
+fennec run --workflow plan-build-verify "add a --verbose flag"
+```
+
+Starts the workflow on the running server (start it with `fennec` or `fennec service start`), in the current directory's project, as if you had sent the task from the web UI. Each step prints its name, then its result: the plan prints in full before its gate.
+
+A gate prints its question and numbered choices:
+
+```text
+Go with this plan?
+[1] Go  [2] Revise
+answer> 2 split step 2 in two
+```
+
+Type the number or the choice's name; the rest of the line is your comment. An agent's question inside a step takes a number or free text. A rule approval or a protected file change waits for you in the browser: the CLI prints the link.
+
+At the end the CLI prints what fennec verified and the review page's link, `Review and integrate: http://127.0.0.1:7777/#/s/<id>/changes`. Integration stays a click in the browser.
+
+| Flag | Meaning |
+| --- | --- |
+| `--workflow <id>` | The workflow to run, e.g. `plan-build-verify` or `quick`. |
+| `--night` | Take the first choice at every gate, and the first option of every question (or let the agent decide). |
+
+The command exits with status 1 when the run does not end done.
 
 ## Check setup
 

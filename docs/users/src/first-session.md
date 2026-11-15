@@ -7,6 +7,8 @@ fennec plans, writes the tests, builds and checks. You decide at each gate. Noth
 - A connected model: [connect a model](connect-model.md).
 - An open project: [open a project](open-project.md).
 
+> **From the terminal:** `fennec run --workflow plan-build-verify "<task>"` runs the same steps in your shell and asks the gates there; integration stays in the browser. See [command line](cli.md#run-a-workflow).
+
 ## Step 1: ask for the change
 
 Click **New session**.

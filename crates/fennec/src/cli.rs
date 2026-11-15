@@ -7,6 +7,7 @@ pub mod remote;
 pub mod service;
 mod transcript;
 pub mod update;
+pub mod workflow_run;
 
 use crate::agent::ports::EventLog;
 use crate::agent::turn::{Turn, compact_session, run_turn};
