@@ -18,7 +18,7 @@ Click a row to reopen a session, or click **New session** ③ to start one.
 
 ![Inside a session: thread, composer, context rail](images/sessions-2.png)
 
-1. In the composer ② at the bottom, the mode button (**Mode: Plan**) offers **Plan** (the **Plan, build, verify** workflow), **Quick change** (a small change built and checked without a plan) or **Ask** (answers about the project with sources, changes nothing). **More workflows** lists the project's other workflows, and the folded **Expert** group the other agents and **No workflow** (talk to the agent directly); see [workflows](workflows.md).
+1. In the composer ② at the bottom, the mode button (**Mode: Plan**) lists under **Workflows** **Plan** (the **Plan, build, verify** workflow), **Build** (a small change built and checked without a plan) and the project's other workflows; under **Agents** **Ask** (answers about the project with sources, changes nothing); and in the folded **Expert** group the other agents and **No workflow** (talk to the agent directly); see [workflows](workflows.md).
 2. Optional: change the model next to it; **⋯** holds **Step by step** (the workflow stops before each step and waits for you; offered when a workflow is chosen), the reasoning effort (**auto**) and the MCP tools.
 3. Type your message: `@` points to a file, `/` opens commands and skills.
 4. Press `Enter` to send, or press `Shift+Enter` to add a line.

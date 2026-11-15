@@ -17,7 +17,7 @@ Type the request in the message box ①.
 
 Use this example: `Add an add_todo(title) function to src/main.py that stores the to-do in an in-memory list, and make list_todos return that list.`
 
-② is the mode: **Plan** (plan, build, verify). Keep it. **Ask** answers about the project and changes nothing; **Quick change** builds a small change without a plan. A chat (**New chat** in the top bar) has no project and no branch.
+② is the mode: **Plan** (plan, build, verify). Keep it. **Ask** answers about the project and changes nothing; **Build** builds a small change without a plan. A chat (**New chat** in the top bar) has no project and no branch.
 
 ③ shows the model that will answer. Click it to choose another.
 

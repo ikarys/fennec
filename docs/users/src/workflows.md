@@ -11,8 +11,8 @@ In the message box, click the mode button. It shows **Mode: Plan**.
 ![The workflow picker in a new session](images/workflows-1.png)
 
 - ① **Plan** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
-- ② **Quick change** runs **Quick build**, for a small change. It has no plan. It has no review.
-- ③ **Expert**, folded, lists the other agents and **No workflow**, which talks to the agent directly: the message you type is the task. The project's own workflows show under **More workflows** above it.
+- ② **Build** runs **Quick build**, for a small change. It has no plan. It has no review.
+- ③ **Expert**, folded, lists the other agents and **No workflow**, which talks to the agent directly: the message you type is the task. The project's other workflows show under **Workflows**, after Plan and Build; **Ask**, under **Agents**, is an agent without a workflow.
 
 **⋯** next to the model holds the run settings: **Step by step** (the workflow stops before each step and waits for you to continue), the reasoning effort and the MCP tools.
 

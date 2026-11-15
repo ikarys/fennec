@@ -69,24 +69,24 @@ export function IntentPicker({
   const primaries = offeredPrimaries(agents, workflows);
   const { workflows: secondaryWorkflows, experts } = menuGroups(agents, workflows, primaries);
 
-  const primaryChoices: Choice[] = primaries.map((primary) => ({
+  const primaryChoice = (primary: (typeof primaries)[number]): Choice => ({
     value: `agent:${primary.agent}`,
     label: t(primary.labelKey),
     description: t(primary.descriptionKey),
-  }));
+  });
+  const workflowChoices: Choice[] = [
+    ...primaries.filter((primary) => primary.workflow !== null).map(primaryChoice),
+    ...secondaryWorkflows.map((workflow) => ({
+      value: `workflow:${workflow.id}`,
+      label: workflow.name,
+      description: workflow.description,
+    })),
+  ];
+  const agentChoices = primaries.filter((primary) => primary.workflow === null).map(primaryChoice);
 
-  const groups: ChoiceGroup[] = [{ choices: primaryChoices }];
-
-  if (secondaryWorkflows.length > 0) {
-    groups.push({
-      label: t('intentWorkflows'),
-      choices: secondaryWorkflows.map((workflow) => ({
-        value: `workflow:${workflow.id}`,
-        label: workflow.name,
-        description: workflow.description,
-      })),
-    });
-  }
+  const groups: ChoiceGroup[] = [];
+  if (workflowChoices.length > 0) groups.push({ label: t('intentWorkflows'), choices: workflowChoices });
+  if (agentChoices.length > 0) groups.push({ label: t('intentAgents'), choices: agentChoices });
 
   const expertChoices: Choice[] = [
     ...experts.map((agent) => ({
@@ -107,7 +107,7 @@ export function IntentPicker({
     collapsed: true,
   });
 
-  if (primaryChoices.length + secondaryWorkflows.length + expertChoices.length < 2) {
+  if (workflowChoices.length + agentChoices.length + expertChoices.length < 2) {
     return null;
   }
 
