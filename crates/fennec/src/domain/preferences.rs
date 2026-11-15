@@ -111,12 +111,15 @@ impl Default for SandboxPrefs {
 #[serde(rename_all = "camelCase", default)]
 pub struct IntegrationPrefs {
     pub model_trailers: bool,
+    /// `integration.verificationBlock`: the verification block in the proposed commit message; on by default.
+    pub verification_block: bool,
 }
 
 impl Default for IntegrationPrefs {
     fn default() -> Self {
         Self {
             model_trailers: true,
+            verification_block: true,
         }
     }
 }

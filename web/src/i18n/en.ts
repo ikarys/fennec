@@ -528,6 +528,9 @@ export const en = {
   modelTrailersLabel: 'Name the AI models in the commit',
   modelTrailersHint:
     'Adds one Assisted-by line per model that answered in the session, so the history says which models wrote the code. Off, the commit keeps only the Fennec-Session line.',
+  verificationBlockLabel: 'Add the verification block to commits',
+  verificationBlockHint:
+    'Ends the proposed commit message with what fennec verified: each criterion and how, the tests protected, the waivers, the files outside the plan. You can still edit it before integrating.',
   nightModeTitle: 'Night mode',
   nightModeHint:
     'When the queue runs in autonomous mode, the agent does not wait for your answer: it decides its own questions and records them as decisions. An idea that exceeds a cap is stopped and the queue moves to the next.',
@@ -1283,9 +1286,16 @@ export const en = {
   runEndReadTokens: 'Read tokens',
   runEndCriteriaDetail: '{verified} verified{verifiedPlural} · {indicative} indicative{indicativePlural}',
   runEndTimeDetail: 'Time detail',
-  runEndShowStats: 'Show the run\'s numbers',
-  runEndHideStats: 'Hide the run\'s numbers',
   runEndNodesSummary: '{duration} · {count} node{plural}',
+  runVerificationTitle: 'Verified by fennec',
+  runVerificationFailed: 'failed',
+  runVerificationPending: 'not checked',
+  runVerificationTests: '{count} tests protected',
+  runVerificationWaivers: 'waivers: {granted}/{asked} granted',
+  runVerificationNoWaivers: 'no waiver',
+  runVerificationOutsideNone: 'no file outside the plan',
+  runVerificationOutside: '{count} files outside the plan:',
+  runVerificationExit: 'exit {code}',
   runEndWorkReady: 'The work is ready in the agent\'s workspace.',
   // components/session/AgentsMdCard.tsx
   agentsMdWriteQuestion: 'Write the draft into AGENTS.md?',

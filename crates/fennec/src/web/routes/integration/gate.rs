@@ -6,13 +6,13 @@ use crate::architecture;
 use crate::domain::criteria::CriterionState;
 use crate::domain::decision::{Decision, decisions_in_force};
 use crate::domain::integration::{Blocker, DiffChecks, Landing, blockers};
-use crate::domain::plan_scope;
 use crate::domain::preflight;
 use crate::domain::project::{Project, SessionSummary};
 use crate::domain::review_map::{self, FileFacts, ReviewSignal};
 use crate::domain::security_scan::ScanStatus;
 use crate::domain::test_files::new_test_patterns;
 use crate::domain::understanding::{self, Understanding};
+use crate::domain::verification;
 use crate::domain::workflow::run;
 use crate::integration::{self, Preview};
 use crate::protected;
@@ -89,6 +89,8 @@ pub(super) struct Gate {
     pub(super) passed_before: Vec<String>,
     /// The session's idea the human may finish here, when it is still started.
     pub(super) idea: Option<(String, String)>,
+    /// The run's verification block, folded from the log.
+    pub(super) verification: verification::Verification,
 }
 
 /// The session's gate; a 404 or 409 when there is nothing to gate.
@@ -129,21 +131,13 @@ pub(super) fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, Htt
         None => Understanding::None,
     };
     checks.understood = understanding.held();
-    // The plan is the contract the human approved: files it does not list are
-    // a deviation the gate must name. The tests the human validated are part
-    // of that contract.
-    let plan = run::current_run(&events)
-        .as_ref()
-        .and_then(run::plan_output)
-        .map(plan_scope::plan_files)
-        .unwrap_or_default();
+    let changed_paths: Vec<String> = changed.iter().map(|(path, _)| path.clone()).collect();
+    let verification_state = verification::of(&events, Some(&changed_paths));
+    checks.outside_plan = verification_state.outside_plan.clone().unwrap_or_default();
     let validated: Vec<String> = crate::domain::test_files::approved(&events)
         .iter()
         .map(|path| path.trim_start_matches("./").to_string())
         .collect();
-    let contract = plan_scope::contract(plan, &validated);
-    let changed_paths: Vec<String> = changed.iter().map(|(path, _)| path.clone()).collect();
-    checks.outside_plan = plan_scope::outside(&contract, &changed_paths);
     checks.validated_tests = validated;
     let hot = risk::hot_files(&top);
     let tested = risk::tested_on_branch(&top, &wt.branch, &preview.files);
@@ -209,6 +203,7 @@ pub(super) fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, Htt
         review,
         passed_before,
         idea,
+        verification: verification_state,
     })
 }
 

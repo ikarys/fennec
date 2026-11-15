@@ -559,6 +559,9 @@ export const fr: Record<MsgKey, string> = {
   modelTrailersLabel: 'Nommer les modèles IA dans le commit',
   modelTrailersHint:
     "Ajoute une ligne Assisted-by par modèle qui a répondu dans la session : l'historique dit quels modèles ont écrit le code. Désactivé, le commit ne garde que la ligne Fennec-Session.",
+  verificationBlockLabel: 'Ajouter le bloc de vérification aux commits',
+  verificationBlockHint:
+    "Termine le message de commit proposé par ce que fennec a vérifié : chaque critère et comment, les tests protégés, les dérogations, les fichiers hors du plan. Tu peux encore le modifier avant d'intégrer.",
   nightModeTitle: 'Mode nuit',
   nightModeHint:
     "Lorsque la file tourne en mode autonome, l'agent n'attend pas ta réponse : il tranche ses questions lui-même et les note comme décisions. Une idée qui dépasse un plafond est arrêtée et la file passe à la suivante.",
@@ -1318,9 +1321,16 @@ export const fr: Record<MsgKey, string> = {
   runEndReadTokens: 'Tokens lus',
   runEndCriteriaDetail: '{verified} vérifié{verifiedPlural} · {indicative} indicatif{indicativePlural}',
   runEndTimeDetail: 'Détail du temps',
-  runEndShowStats: 'Afficher les chiffres du run',
-  runEndHideStats: 'Masquer les chiffres du run',
   runEndNodesSummary: '{duration} · {count} nœud{plural}',
+  runVerificationTitle: 'Vérifié par fennec',
+  runVerificationFailed: 'échoué',
+  runVerificationPending: 'non vérifié',
+  runVerificationTests: '{count} tests protégés',
+  runVerificationWaivers: 'dérogations : {granted}/{asked} accordées',
+  runVerificationNoWaivers: 'aucune dérogation',
+  runVerificationOutsideNone: 'aucun fichier hors du plan',
+  runVerificationOutside: '{count} fichiers hors du plan :',
+  runVerificationExit: 'sortie {code}',
   runEndWorkReady: 'Le travail est prêt dans l\'espace de l\'agent.',
   // components/session/AgentsMdCard.tsx
   agentsMdWriteQuestion: 'Écrire le brouillon dans AGENTS.md ?',

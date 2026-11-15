@@ -51,6 +51,8 @@ export interface SandboxPrefs {
 export interface IntegrationPrefs {
   /** One `Assisted-by` trailer per model that wrote the work (server default true). */
   modelTrailers: boolean;
+  /** The verification block at the end of the proposed commit message (server default true). */
+  verificationBlock: boolean;
 }
 
 /** The ideas queue's caps in night mode, per idea; 0 means no cap. */

@@ -36,6 +36,12 @@ fn preferences_stored_before_model_trailers_keep_them_on() {
     assert!(prefs.integration.model_trailers);
 }
 
+#[test]
+fn preferences_stored_before_verification_block_keep_it_on() {
+    let prefs: Preferences = serde_json::from_str("{}").unwrap();
+    assert!(prefs.integration.verification_block);
+}
+
 fn defaults() -> ModelParams {
     ModelParams {
         provider: LOCAL_PROVIDER.into(),

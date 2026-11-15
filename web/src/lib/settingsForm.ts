@@ -283,7 +283,10 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     sandbox: preferences.sandbox ?? { enabled: true, network: false },
     autonomy: preferences.autonomy ?? { maxMinutesPerIdea: 120, maxTokensPerIdea: 2_000_000 },
     delegation: preferences.delegation ?? { enabled: true, maxPerTurn: 5 },
-    integration: preferences.integration ?? { modelTrailers: true },
+    integration: {
+      modelTrailers: preferences.integration?.modelTrailers ?? true,
+      verificationBlock: preferences.integration?.verificationBlock ?? true,
+    },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? [],
     alwaysValidateTests: preferences.alwaysValidateTests ?? false,

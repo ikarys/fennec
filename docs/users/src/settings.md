@@ -65,7 +65,7 @@ Use **New agent**, **Edit**, **Duplicate**, or delete an agent to manage agents.
 
 ## Autonomy
 
-**Integration commit** can **Name the AI models in the commit**. When on, the integration commit adds one `Assisted-by: fennec:<model>` line per model that answered in the session. When off, it keeps only the `Fennec-Session` line.
+**Integration commit** can **Name the AI models in the commit**. When on, the integration commit adds one `Assisted-by: fennec:<model>` line per model that answered in the session. When off, it keeps only the `Fennec-Session` line. **Add the verification block to commits**, on by default, ends the proposed message with what fennec verified ([review gate](review-gate.md)).
 
 **Night mode** controls unattended queue runs. Set **Max duration per idea (minutes)** and **Max tokens per idea**. A value of 0 means no limit. See [tasks](tasks.md).
 

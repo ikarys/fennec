@@ -165,6 +165,17 @@ Make your dev server read `$PORT` so several sessions can run side by side. The 
 
 The **Commit message** starts from a subject the model proposes. It is **indicative** and you can edit it. The result is one commit, in your name, with the session as provenance (`fennec-Session`). If **Name the AI models in the commit** is on in [settings](settings.md), the commit also names the models that answered in the session.
 
+When the run had criteria, the message ends with what fennec verified, written by fennec itself rather than a model, so a reader of the history can check it:
+
+```
+Verified by fennec:
+- C1 add_todo stores the item: `cargo test add_todo_stores` passed
+- C3 docs updated: judged by the model, passed
+Tests protected: 2, waivers: 0. Files outside the plan: none.
+```
+
+Each criterion says whether fennec ran its check (the command) or a model judged it (indicative). The block stays under ten lines and you can edit it like the rest of the message. Turn it off with **Add the verification block to commits** in [settings](settings.md). The run's end card shows the same figures in the thread, with a button to copy the block.
+
 Git hooks do not run on fennec's own git commands. Your hooks still run on your own `git commit`. If a check you rely on lives in a hook, run it after integrating or make it a `check:` command in the plan.
 
 The **Protect the integrated tests** checkbox appends the integrated test files to `.agents/protected`. **Clean up the agent's workspace** removes the agent's folder and branch after integration.
