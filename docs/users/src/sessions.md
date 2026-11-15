@@ -60,7 +60,7 @@ Session states include **Running**, **Complete**, **Stopped**, **Error**, **Trun
 
 An agent is a session mode: its method and the tools it may use. fennec provides embedded agents, you can add yours in `~/.agents/agents`, and a project can define agents in `.agents/agents`.
 
-The composer menu groups agents by phase: **Start**, **Frame**, **Build**, **Understand**, and **Check**.
+The composer's mode menu offers three main choices: **Plan** (the Plan agent inside **Plan, build, verify**), **Build** (the Builder inside **Quick build**) and **Ask** (the Question agent). **Expert** lists every other agent and workflow.
 
 | Agent | Use | Access |
 | --- | --- | --- |

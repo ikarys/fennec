@@ -86,7 +86,7 @@ Preflight results tell you what the baseline proves:
 
 From the plan card, **Launch** starts the **Plan, build, verify** workflow: criteria are checked, the result is verified in a fresh context, and the diff is reviewed. See [workflows](workflows.md).
 
-**Builder alone, without criteria or review** starts a build without the full gate. **Save to backlog** keeps the plan in the project backlog without launching it now.
+**Builder alone in your folder, without criteria or review** starts a build in your folder, without the full gate. **Save to backlog** keeps the plan in the project backlog without launching it now.
 
 The build normally works in a copy of the repository, a git worktree, so you integrate afterwards. If the session works directly in your folder, nothing separates the agent's work from yours.
 

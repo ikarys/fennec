@@ -39,7 +39,7 @@ Claude Code and Codex optimise how fast an agent writes code. fennec optimises y
 - **Tasks and night runs leave a paper trail.** A queue runs your ready tasks unattended at night, within per-task caps on time and tokens. Every decision is recorded with its reason, a morning report follows, and integrating stays your click, one task at a time.
 - **Yours.** One Rust binary with an embedded web UI and SQLite, running on your machine, under AGPL-3.0.
 
-**When to pick something else.** With a frontier model, Claude Code and Codex are more mature and more polished agents, with a larger ecosystem. For a quick change you want done now they are more direct; fennec has a direct Builder agent for that, but its strength is framed, checked work. fennec is early, and runs on Windows only through WSL2.
+**When to pick something else.** With a frontier model, Claude Code and Codex are more mature and more polished agents, with a larger ecosystem. For a quick change you want done now they are more direct; fennec has a direct Build mode for that, but its strength is framed, checked work. fennec is early, and runs on Windows only through WSL2.
 
 ## How it works
 
@@ -86,7 +86,7 @@ A task is framed in a read-only plan session, then the human approves the plan a
 - Bypass detection flags added lines that silence a lint, type check, or test, and tests or assertions removed on balance.
 - Architecture guard: `.agents/architecture` rules are checked on lines an integration adds; a violation is a blocker.
 - ADRs: MADR files in `docs/adr/` are listed and protected.
-- Protected tests: an unchecked "Protéger les tests intégrés" box in the integration dialog appends integrated test files to `.agents/protected`.
+- Protected tests: an unchecked "Protect the integrated tests" box in the integration dialog appends integrated test files to `.agents/protected`.
 
 ### Tasks & night mode
 

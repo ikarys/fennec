@@ -11,6 +11,7 @@ const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const FENNEC_BIN = process.env.FENNEC_BIN ?? join(repo, 'target/release/fennec');
 const MODEL_URL = process.env.DOC_SHOTS_MODEL_URL ?? 'http://127.0.0.1:8000/v1';
 const OUT = process.env.DOC_SHOTS_OUT ?? join(repo, 'docs/users/src/images');
+const SITE_OUT = process.env.DOC_SHOTS_SITE_OUT ?? join(repo, 'site/images');
 const PORT = 7799;
 const BASE = `http://127.0.0.1:${PORT}`;
 
@@ -55,6 +56,14 @@ async function shot(page, name, items = []) {
   await page.screenshot({ path });
   await clearMarks(page);
   console.log(path);
+}
+
+// A landing-site image: the page as it is, unannotated, at the site's 1600x1000.
+async function siteShot(page, name) {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: join(SITE_OUT, `${name}.png`) });
+  await page.setViewportSize({ width: 1440, height: 900 });
 }
 
 async function connectModel(page) {
@@ -386,6 +395,7 @@ async function tasks(page) {
   await page.waitForTimeout(1200); // the sheet saves after a pause in typing
   const ready = page.getByRole('button', { name: 'Ready', exact: true }).last();
   await shot(page, 'tasks-5', [[criterion, 1], [page.getByPlaceholder('Check'), 2], [ready, 3]]);
+  await siteShot(page, 'task-sheet');
 
   await page.getByRole('tab', { name: 'Framing' }).click();
   const frame = page.getByRole('button', { name: 'Frame with the agent' });
@@ -446,6 +456,21 @@ async function plugins(page) {
   await shot(page, 'plugins-2', [[page.getByText('Enabled', { exact: true }).first(), 1], [page.getByText('Turnstats', { exact: true }).locator('../..'), 2], [ram.locator('..'), 3]]);
 }
 
+// The landing site's hero: the finished run, unannotated, once per theme.
+async function siteHero(page) {
+  await clearMarks(page);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const thread = page.getByRole('main').locator('div.overflow-y-auto').first();
+  await thread.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  for (const theme of ['nuit', 'jour', 'ardoise', 'cyber']) {
+    await page.evaluate((id) => { document.documentElement.dataset.theme = id; }, theme);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(SITE_OUT, `workflow-${theme}.png`) });
+  }
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'nuit'; });
+  await page.setViewportSize({ width: 1440, height: 900 });
+}
+
 // The screens of the tour pages, on the state firstSession leaves: one session, one plan, one integration.
 async function tour(page) {
   const project = await page.evaluate(async () => (await (await fetch('/api/projects')).json()).find((p) => p.name === 'todo-api'));
@@ -475,6 +500,7 @@ async function tour(page) {
   await page.waitForTimeout(1500);
   await idle();
   await shot(page, 'sessions-2', [[page.getByRole('main').locator('div.overflow-y-auto').first(), 1], [composerBox, 2], [(() => { const tabs = page.getByRole('navigation', { name: 'Session context' }).getByRole('button'); return [tabs, tabs]; })(), 3, 2]]);
+  await siteHero(page);
 
   const follow = page.getByRole('switch', { name: /auto-follow/i });
   if (await follow.count()) await follow.uncheck();
@@ -531,6 +557,7 @@ async function tour(page) {
   await message.fill('docs: mention add_todo');
   await idle();
   await shot(page, 'files-2', [[page.getByRole('button', { name: 'Back to reading', exact: true }), 1], [changed.locator('..'), 2], [message, 3], [page.getByRole('button', { name: 'Commit', exact: true }), 4]]);
+  await siteShot(page, 'editor');
   await page.getByRole('button', { name: 'Reset to the last commit', exact: true }).click();
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
   await changed.waitFor({ state: 'detached' }); // the workflow drawn earlier stays untracked: wait for README.md only

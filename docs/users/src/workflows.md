@@ -8,7 +8,7 @@ Click **New session**.
 
 In the message box, click the mode button. It shows **Mode: Plan**.
 
-![The workflow picker in a new session](images/workflows-1.png)
+![The mode menu in a new session: Plan, Build, Ask and Expert](images/workflows-1.png)
 
 - ① **Plan** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
 - ② **Build** runs **Quick build**, for a small change. It has no plan. It has no review.
