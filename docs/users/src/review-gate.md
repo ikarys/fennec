@@ -107,11 +107,11 @@ The review map lists the branch's files riskiest first. Each file can carry sign
 
 Signals are computed from git and the gate's checks where possible. They help you read the diff in the right order.
 
-### Protected files and waivers
+### Protected files
 
 Protected files include fennec's defaults (`.agents`, `AGENTS.md`/`CLAUDE.md`, lockfiles in your checkout, CI config, `.githooks`, accepted ADRs in `docs/adr`) and the paths in your project's `.agents/protected`.
 
-File tools refuse protected files, and the sandbox mounts them read-only. If an agent needs a protected file, it asks for a **Waiver**. The card shows the path and the **Reason (indicative)**. You choose a **Waiver duration** of 1, 8, or 24 hours, then **Grant** or **Refuse**.
+File tools refuse protected files, and the sandbox mounts them read-only. If an agent needs a protected file, it asks for permission. The card, **An agent asks to change a protected file**, shows the path and the **Reason (indicative)**. You choose how long it is **Allowed for**: 1, 8, or 24 hours, then **Grant** or **Refuse**.
 
 A grant exempts exactly that path, in that session, until it expires. fennec writes a MADR file to the session's `docs/adr/`, and that file goes with the branch to the gate. With you away, a waiver request is refused.
 

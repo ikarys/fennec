@@ -172,7 +172,7 @@ Going further: the full reference (templates like `{{nodes.<id>.output}}`, paral
 | Node | What it does | Output ports |
 | --- | --- | --- |
 | **Start** | Exactly one per workflow; carries the task. | `next` |
-| **Agent** | Runs an agent with a prompt. `Context` can be **Session** or **New session**. **Verdicts on criteria** lets it judge criteria without a command. | Its **Outputs**, default `done` |
+| **Agent** | Runs an agent with a prompt. `Context` can be **Session** or **New session**. **Judged by the model, per criterion** lets it judge criteria without a command. | Its **Outputs**, default `done` |
 | **Shell** | Runs a command with a timeout and success codes. | `success`, `failure` |
 | **Human** | Pauses for your choice. | One port per choice |
 | **Condition** | Tests a template value with `equals`, `contains`, or `empty`. | `true`, `false` |

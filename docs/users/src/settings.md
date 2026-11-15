@@ -2,7 +2,7 @@
 
 Configure fennec from the **Settings** page. Changes apply from the next turn, no restart, except server settings that need a restart.
 
-The page opens as sub-pages in a side navigation, grouped under **General**, **Models**, **Agents**, **Security**, **Extensions**, and **About**.
+The page opens as sub-pages in a side navigation, grouped under **Models**, **Safety**, **Extensions**, and **Display**.
 
 ## Appearance
 

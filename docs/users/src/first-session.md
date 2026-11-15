@@ -27,7 +27,7 @@ Press Enter.
 
 After a few seconds the plan appears: its steps, then **Done when** ①, the criteria that say the work is finished (C1, C2…).
 
-Under them, **Preflight** runs each criterion's check before any work. **fails before the work** is expected: it proves the check really tests the change. It is marked **verified**: fennec ran it, no model judged it.
+Under them, **Checked before the work** runs each criterion's check before any work. **fails before the work** is expected: it proves the check really tests the change. It is marked **verified**: fennec ran it, no model judged it.
 
 The question **Go with this plan?** waits for you.
 
