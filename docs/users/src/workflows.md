@@ -21,7 +21,7 @@ Two more workflows, **Write documentation** and **Write a training course**, are
 
 ## Open the workflow list
 
-Click the **Workflows** icon in the top bar. It is the branching icon.
+In the composer's choice menu, pick **Draw your own…** under **More**, or open the command palette and choose **Workflows**.
 
 ![The Workflows page and its list](images/workflows-2.png)
 

@@ -4,7 +4,7 @@ The Insight page shows what your models consumed: calls, tokens, cache and an es
 
 ## Read your usage
 
-Click the **Insight** icon in the top bar (the bar chart icon).
+On the home page, the **This week** card sums up the cost, input and cache. Click **Open Insight** on it.
 
 ![The Insight page: project, period, totals, input per day](images/insight-1.png)
 

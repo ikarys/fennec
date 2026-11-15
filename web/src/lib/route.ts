@@ -4,21 +4,21 @@ import type { MsgKey } from '../i18n/messages';
 import { readStored } from './storage';
 
 /** The fixed pages a tab can show. */
-export type PageId = 'projects' | 'chats' | 'settings' | 'insight' | 'workflows' | 'backlog';
+export type PageId = 'settings' | 'insight' | 'workflows';
+
+/** The Home sections chosen by a filter. */
+export type HomeFilter = 'overview' | 'projects' | 'chats' | 'queue';
 
 /** A workflow opened from the editor: preselected in the new session, step by step (test) or not (run). */
 export interface LaunchWorkflow { id: string; stepByStep: boolean }
 
 export type Route =
-  | { name: 'home' }
+  | { name: 'home'; filter: HomeFilter }
   | { name: 'session'; id: string }
   | { name: 'changes'; id: string; path: string | null }
   | { name: 'new'; id: string; launchWorkflow: LaunchWorkflow | null; frameIdeaId: string | null; fromSessionId: string | null }
   | { name: 'settings'; tab: string | null }
   | { name: 'insight' }
-  | { name: 'backlog' }
-  | { name: 'projects' }
-  | { name: 'chats' }
   | { name: 'split'; left: string | null; right: string | null }
   | { name: 'project'; projectId: string; tab: string | null; sub: string | null; task: string | null }
   | { name: 'editor'; projectId: string; path: string | null; session: string | null }
@@ -29,12 +29,17 @@ export const ACTIVE_TAB_KEY = 'fennec.activeTab';
 
 /** The fixed pages that get a tab in the bar, in display order. */
 export const PAGE_TABS: { page: PageId; titleKey: MsgKey; path: string }[] = [
-  { page: 'projects', titleKey: 'paletteProjects', path: '#/projects' },
-  { page: 'chats', titleKey: 'homeChat', path: '#/chats' },
   { page: 'settings', titleKey: 'settings', path: '#/settings' },
   { page: 'insight', titleKey: 'insight', path: '#/insight' },
-  { page: 'workflows', titleKey: 'workflows', path: '#/workflows' },
-  { page: 'backlog', titleKey: 'tasks', path: '#/backlog' }
+  { page: 'workflows', titleKey: 'workflows', path: '#/workflows' }
+];
+
+/** The Home filters and the hash that opens each one. */
+export const HOME_FILTERS: { filter: HomeFilter; titleKey: MsgKey; path: string }[] = [
+  { filter: 'overview', titleKey: 'homeFilterOverview', path: '#/' },
+  { filter: 'projects', titleKey: 'paletteProjects', path: '#/projects' },
+  { filter: 'chats', titleKey: 'homeChat', path: '#/chats' },
+  { filter: 'queue', titleKey: 'homeFilterQueue', path: '#/backlog' }
 ];
 
 export function parseRoute(hash: string): Route {
@@ -45,13 +50,13 @@ export function parseRoute(hash: string): Route {
     return { name: 'insight' };
   }
   if (hash === '#/backlog') {
-    return { name: 'backlog' };
+    return { name: 'home', filter: 'queue' };
   }
   if (hash === '#/projects') {
-    return { name: 'projects' };
+    return { name: 'home', filter: 'projects' };
   }
   if (hash === '#/chats') {
-    return { name: 'chats' };
+    return { name: 'home', filter: 'chats' };
   }
   if (hash.startsWith('#/project/')) {
     const [pathPart, query] = hash.slice('#/project/'.length).split('?');
@@ -112,7 +117,7 @@ export function parseRoute(hash: string): Route {
     const fromSessionId = params?.get('from') || null;
     return { name: 'new', id: decodeURIComponent(rawId), launchWorkflow, frameIdeaId, fromSessionId };
   }
-  return { name: 'home' };
+  return { name: 'home', filter: 'overview' };
 }
 
 /** A tab derived from the route (a page, a project's editor), never persisted nor split. */
@@ -178,14 +183,8 @@ export function tabIdForRoute(route: Route): string | null {
       return 'page:settings';
     case 'insight':
       return 'page:insight';
-    case 'backlog':
-      return 'page:backlog';
     case 'workflows':
       return 'page:workflows';
-    case 'projects':
-      return 'page:projects';
-    case 'chats':
-      return 'page:chats';
     case 'editor':
       return editorTabId(route.projectId);
     default:

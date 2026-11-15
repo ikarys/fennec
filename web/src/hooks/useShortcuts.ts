@@ -1,17 +1,17 @@
 // The keyboard shortcuts: the server resolves the bindings, a key press only looks its combo up and runs the action.
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Project } from '../lib/api';
-import { PAGE_TABS, tabIdForRoute, type Route } from '../lib/route';
+import { tabIdForRoute, type Route } from '../lib/route';
 import { AGENT_SHORTCUT_EVENT, comboLabel, comboOf, shortcutIndex, type ShortcutAction, type ShortcutBinding } from '../lib/shortcuts';
 
-/** The page each page shortcut opens. */
-const SHORTCUT_PAGES = {
-  goProjects: 'projects',
-  goChats: 'chats',
-  goTasks: 'backlog',
-  goWorkflows: 'workflows',
-  goInsight: 'insight',
-  goSettings: 'settings'
+/** The hash each page shortcut opens. */
+const SHORTCUT_PATHS = {
+  goProjects: '#/projects',
+  goChats: '#/chats',
+  goTasks: '#/backlog',
+  goWorkflows: '#/workflows',
+  goInsight: '#/insight',
+  goSettings: '#/settings'
 } as const;
 
 const AGENT_SHORTCUTS = { agentPlan: 'plan', agentBuilder: 'builder', agentAsk: 'ask' } as const;
@@ -75,7 +75,7 @@ export function useShortcuts(context: ShortcutContext) {
         case 'goWorkflows':
         case 'goInsight':
         case 'goSettings':
-          navigate(PAGE_TABS.find((tab) => tab.page === SHORTCUT_PAGES[action])?.path ?? '#/');
+          navigate(SHORTCUT_PATHS[action]);
           break;
         case 'nextTab':
         case 'prevTab': {

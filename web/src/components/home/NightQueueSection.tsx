@@ -1,13 +1,13 @@
+// The home page's night queue: every project's tasks by stage, and its queue to start or stop.
 import { useCallback, useEffect, useState } from 'react';
-import { getBacklog, type BacklogProject, type BacklogView } from '../lib/api';
-import { startQueue, stopQueue } from '../lib/ideas';
-import { Badge, type BadgeTone } from '../components/ui/Badge';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { BacklogIcon, MoonIcon, PlayIcon, StopIcon } from '../components/ui/Icons';
-import { useT } from '../i18n';
-import { PageHeader } from '../components/ui/PageHeader';
-import type { MsgKey } from '../i18n/messages';
+import { getBacklog, type BacklogProject, type BacklogView } from '../../lib/api';
+import { startQueue, stopQueue } from '../../lib/ideas';
+import { Badge, type BadgeTone } from '../ui/Badge';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { BacklogIcon, MoonIcon, PlayIcon, StopIcon } from '../ui/Icons';
+import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
 function headerSummary(
   view: BacklogView,
@@ -180,7 +180,7 @@ function ProjectRow({
   );
 }
 
-export default function BacklogPage() {
+export function NightQueueSection() {
   const t = useT();
   const [view, setView] = useState<BacklogView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -199,9 +199,8 @@ export default function BacklogPage() {
   useEffect(load, [load]);
 
   return (
-    <main className="grow overflow-y-auto px-4 py-6 md:px-6 md:py-8">
-      <div className="mx-auto max-w-page">
-        <PageHeader Icon={BacklogIcon} title={t('tasks')} subtitle={view ? headerSummary(view, t) : undefined} />
+    <section className="flex flex-col">
+        {view ? <p className="m-0 text-sm text-muted">{headerSummary(view, t)}</p> : null}
 
         {error ? <p className="mt-4 text-err">{error}</p> : null}
         {!view && !error ? <div className="mt-4 text-muted">{t('loading')}</div> : null}
@@ -242,7 +241,6 @@ export default function BacklogPage() {
             )}
           </div>
         ) : null}
-      </div>
-    </main>
+    </section>
   );
 }

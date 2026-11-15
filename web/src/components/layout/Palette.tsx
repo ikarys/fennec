@@ -65,7 +65,6 @@ export function Palette({ open, projects, onClose, onOpenSession, onNewSession, 
 
     const pages: PaletteItem[] = [
       { id: 'page-home', title: t('paletteHome'), meta: shortcuts?.goHome ?? '', action: onHome },
-      { id: 'page-backlog', title: t('tasks'), meta: shortcuts?.goTasks ?? '', action: () => onOpenPage('backlog') },
       { id: 'page-workflows', title: t('workflows'), meta: shortcuts?.goWorkflows ?? '', action: () => onOpenPage('workflows') },
       { id: 'page-insight', title: t('insight'), meta: shortcuts?.goInsight ?? '', action: () => onOpenPage('insight') },
       { id: 'page-settings', title: t('settings'), meta: shortcuts?.goSettings ?? '', action: () => onOpenPage('settings') }

@@ -44,28 +44,29 @@ graph LR
   m36["web/src/pages"]
   m37["web/src/components/agents"]
   m38["web/src/components/editor"]
-  m39["web/src/components/project"]
+  m39["web/src/components/home"]
   m40["web/src/components/project/ideas"]
   m41["web/src/components/workflow"]
-  m42["web/src/components/plugins"]
-  m43["web/src/components/rules"]
-  m44["web/src/components/workflow/fields"]
-  m45["web/src/components/workflow/nodes"]
-  m46["web/src/components/ui"]
-  m47["web/src/hooks"]
-  m48["web/src/components/session"]
-  m49["web/src/components/workflow/session"]
+  m42["web/src/components/project"]
+  m43["web/src/components/workflow/fields"]
+  m44["web/src/components/workflow/nodes"]
+  m45["web/src/components/plugins"]
+  m46["web/src/components/rules"]
+  m47["web/src/components/ui"]
+  m48["web/src/hooks"]
+  m49["web/src/components/session"]
   m50["web/src/components/canvas"]
-  m51["web/src/components/preview"]
-  m52["web/src/lib"]
-  m53["web/src/components/settings"]
-  m54["web/src/lib/api"]
-  m55["web/src/i18n"]
-  m56["crates/fennec"]
-  m57["crates/token-usage/tests"]
-  m58["docs/users/theme"]
-  m59["web"]
-  m60["web/scripts"]
+  m51["web/src/components/workflow/session"]
+  m52["web/src/components/preview"]
+  m53["web/src/lib"]
+  m54["web/src/components/settings"]
+  m55["web/src/lib/api"]
+  m56["web/src/i18n"]
+  m57["crates/fennec"]
+  m58["crates/token-usage/tests"]
+  m59["docs/users/theme"]
+  m60["web"]
+  m61["web/scripts"]
   m14 -->|1| m32
   m14 -->|3| m19
   m14 -->|1| m21
@@ -242,116 +243,123 @@ graph LR
   m17 -->|2| m14
   m17 -->|2| m24
   m34 -->|1| m35
-  m34 -->|1| m39
-  m34 -->|1| m47
-  m34 -->|1| m55
-  m34 -->|2| m52
-  m37 -->|2| m46
+  m34 -->|1| m42
+  m34 -->|1| m48
+  m34 -->|1| m56
+  m34 -->|2| m53
+  m37 -->|2| m47
+  m37 -->|2| m56
   m37 -->|2| m55
-  m37 -->|2| m54
-  m50 -->|1| m51
-  m50 -->|3| m46
+  m50 -->|1| m52
+  m50 -->|3| m47
+  m50 -->|3| m56
+  m50 -->|2| m53
   m50 -->|3| m55
-  m50 -->|2| m52
-  m50 -->|3| m54
-  m38 -->|1| m48
-  m38 -->|4| m46
-  m38 -->|4| m55
-  m38 -->|3| m52
-  m35 -->|1| m42
-  m35 -->|2| m48
-  m35 -->|9| m46
-  m35 -->|3| m47
-  m35 -->|10| m55
-  m35 -->|9| m52
-  m35 -->|1| m36
-  m42 -->|3| m46
-  m42 -->|1| m55
-  m42 -->|2| m52
-  m42 -->|1| m54
-  m51 -->|2| m50
-  m51 -->|2| m48
-  m51 -->|1| m46
-  m51 -->|1| m47
-  m51 -->|5| m55
-  m51 -->|4| m52
-  m51 -->|2| m54
-  m39 -->|1| m50
+  m38 -->|1| m49
+  m38 -->|4| m47
+  m38 -->|4| m56
+  m38 -->|3| m53
   m39 -->|1| m42
-  m39 -->|1| m43
-  m39 -->|4| m48
-  m39 -->|23| m46
-  m39 -->|7| m47
-  m39 -->|24| m55
-  m39 -->|19| m52
-  m39 -->|5| m54
-  m40 -->|17| m46
-  m40 -->|1| m47
-  m40 -->|17| m55
-  m40 -->|17| m52
-  m43 -->|1| m46
-  m43 -->|1| m55
-  m43 -->|1| m54
-  m48 -->|3| m50
-  m48 -->|2| m42
-  m48 -->|4| m51
-  m48 -->|51| m46
-  m48 -->|5| m49
-  m48 -->|3| m47
-  m48 -->|54| m55
-  m48 -->|51| m52
-  m48 -->|3| m54
-  m53 -->|1| m42
-  m53 -->|2| m48
-  m53 -->|27| m46
-  m53 -->|2| m47
-  m53 -->|28| m55
-  m53 -->|25| m52
-  m53 -->|3| m54
-  m46 -->|2| m47
-  m46 -->|5| m55
-  m46 -->|2| m52
-  m41 -->|7| m46
+  m39 -->|2| m49
+  m39 -->|5| m47
+  m39 -->|2| m48
+  m39 -->|5| m56
+  m39 -->|5| m53
+  m35 -->|1| m45
+  m35 -->|2| m49
+  m35 -->|9| m47
+  m35 -->|3| m48
+  m35 -->|10| m56
+  m35 -->|9| m53
+  m35 -->|1| m36
+  m45 -->|3| m47
+  m45 -->|1| m56
+  m45 -->|2| m53
+  m45 -->|1| m55
+  m52 -->|2| m50
+  m52 -->|2| m49
+  m52 -->|1| m47
+  m52 -->|1| m48
+  m52 -->|5| m56
+  m52 -->|4| m53
+  m52 -->|2| m55
+  m42 -->|1| m50
+  m42 -->|1| m45
+  m42 -->|1| m46
+  m42 -->|4| m49
+  m42 -->|23| m47
+  m42 -->|7| m48
+  m42 -->|24| m56
+  m42 -->|19| m53
+  m42 -->|5| m55
+  m40 -->|17| m47
+  m40 -->|1| m48
+  m40 -->|17| m56
+  m40 -->|17| m53
+  m46 -->|1| m47
+  m46 -->|1| m56
+  m46 -->|1| m55
+  m49 -->|3| m50
+  m49 -->|2| m45
+  m49 -->|4| m52
+  m49 -->|51| m47
+  m49 -->|5| m51
+  m49 -->|3| m48
+  m49 -->|54| m56
+  m49 -->|51| m53
+  m49 -->|3| m55
+  m54 -->|1| m45
+  m54 -->|2| m49
+  m54 -->|27| m47
+  m54 -->|2| m48
+  m54 -->|28| m56
+  m54 -->|25| m53
+  m54 -->|3| m55
+  m47 -->|2| m48
+  m47 -->|5| m56
+  m47 -->|2| m53
+  m41 -->|7| m47
+  m41 -->|1| m43
   m41 -->|1| m44
-  m41 -->|1| m45
-  m41 -->|10| m55
-  m41 -->|9| m52
-  m44 -->|5| m46
-  m44 -->|4| m41
-  m44 -->|5| m55
-  m44 -->|5| m52
-  m45 -->|2| m52
-  m49 -->|5| m48
-  m49 -->|7| m46
-  m49 -->|6| m55
-  m49 -->|9| m52
-  m47 -->|2| m35
-  m47 -->|3| m48
-  m47 -->|4| m49
-  m47 -->|10| m55
-  m47 -->|27| m52
-  m47 -->|2| m54
-  m52 -->|1| m53
-  m52 -->|2| m46
-  m52 -->|9| m55
-  m52 -->|3| m54
-  m54 -->|4| m52
+  m41 -->|10| m56
+  m41 -->|9| m53
+  m43 -->|5| m47
+  m43 -->|4| m41
+  m43 -->|5| m56
+  m43 -->|5| m53
+  m44 -->|2| m53
+  m51 -->|5| m49
+  m51 -->|7| m47
+  m51 -->|6| m56
+  m51 -->|9| m53
+  m48 -->|2| m35
+  m48 -->|3| m49
+  m48 -->|4| m51
+  m48 -->|10| m56
+  m48 -->|27| m53
+  m48 -->|2| m55
+  m53 -->|1| m54
+  m53 -->|2| m47
+  m53 -->|9| m56
+  m53 -->|3| m55
+  m55 -->|4| m53
   m36 -->|1| m37
   m36 -->|1| m38
+  m36 -->|1| m39
   m36 -->|2| m35
-  m36 -->|1| m51
-  m36 -->|4| m39
+  m36 -->|1| m52
+  m36 -->|3| m42
   m36 -->|1| m40
-  m36 -->|1| m43
-  m36 -->|5| m48
-  m36 -->|1| m53
-  m36 -->|11| m46
-  m36 -->|1| m41
-  m36 -->|1| m49
-  m36 -->|5| m47
-  m36 -->|12| m55
-  m36 -->|12| m52
+  m36 -->|1| m46
+  m36 -->|3| m49
   m36 -->|1| m54
+  m36 -->|8| m47
+  m36 -->|1| m41
+  m36 -->|1| m51
+  m36 -->|3| m48
+  m36 -->|9| m56
+  m36 -->|9| m53
+  m36 -->|1| m55
 ```
 
 | Module | Files | Tests | Entry point | What it is |
@@ -392,21 +400,22 @@ graph LR
 | `crates/fennec/src/domain/event` | 2 | 2 |  | The session log's vocabulary. Wire names are frozen: stored payloads depend on them. |
 | `web/src` | 2 | 0 | yes |  |
 | `web/src/components/layout` | 10 | 0 |  |  |
-| `web/src/pages` | 12 | 0 |  |  |
+| `web/src/pages` | 9 | 0 |  |  |
 | `web/src/components/agents` | 2 | 0 |  |  |
 | `web/src/components/editor` | 5 | 0 |  |  |
-| `web/src/components/project` | 24 | 0 |  |  |
+| `web/src/components/home` | 5 | 0 |  |  |
 | `web/src/components/project/ideas` | 17 | 0 |  |  |
 | `web/src/components/workflow` | 12 | 0 |  |  |
-| `web/src/components/plugins` | 3 | 0 |  |  |
-| `web/src/components/rules` | 1 | 0 |  |  |
+| `web/src/components/project` | 24 | 0 |  |  |
 | `web/src/components/workflow/fields` | 5 | 0 |  |  |
 | `web/src/components/workflow/nodes` | 2 | 0 |  |  |
+| `web/src/components/plugins` | 3 | 0 |  |  |
+| `web/src/components/rules` | 1 | 0 |  |  |
 | `web/src/components/ui` | 27 | 0 |  |  |
 | `web/src/hooks` | 35 | 1 |  |  |
 | `web/src/components/session` | 66 | 4 |  |  |
-| `web/src/components/workflow/session` | 11 | 2 |  |  |
 | `web/src/components/canvas` | 4 | 0 |  |  |
+| `web/src/components/workflow/session` | 11 | 2 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
 | `web/src/lib` | 50 | 19 |  |  |
 | `web/src/components/settings` | 28 | 0 |  |  |
