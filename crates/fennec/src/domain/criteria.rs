@@ -280,6 +280,8 @@ pub fn parse_verdicts(text: &str) -> Vec<Verdict> {
     let mut verdicts = Vec::new();
 
     for line in text.lines() {
+        // Models bold the verdict (`- **C1: pass** — why`): emphasis is not part of it.
+        let line = line.replace("**", "");
         let line = line.trim();
         let line = line.strip_prefix("- ").unwrap_or(line);
 
@@ -603,6 +605,26 @@ C3: pass
                 Verdict {
                     id: "C3".into(),
                     passed: true,
+                    reason: String::new(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_verdicts_reads_bold_verdicts() {
+        let verdicts = parse_verdicts("- **C1: pass** — gated\n**C2: fail**");
+        assert_eq!(
+            verdicts,
+            vec![
+                Verdict {
+                    id: "C1".into(),
+                    passed: true,
+                    reason: "gated".into(),
+                },
+                Verdict {
+                    id: "C2".into(),
+                    passed: false,
                     reason: String::new(),
                 },
             ]

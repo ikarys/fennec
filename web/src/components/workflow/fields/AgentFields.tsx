@@ -41,6 +41,7 @@ export function AgentFields({ node, agents, names, onChange }: AgentFieldsProps)
           className="w-full"
         >
           <option value="session">{t('agentFieldsContextSession')}</option>
+          <option value="handoff">{t('agentFieldsContextHandoff')}</option>
           <option value="fresh">{t('agentFieldsContextFresh')}</option>
         </Select>
       </FieldRow>

@@ -126,6 +126,24 @@ pub(super) fn compact(turn: &mut Turn, prompt: &RoundPrompt) -> Result<Compacted
     Ok(Compacted::Done)
 }
 
+/// Opens a new window without asking the model, for a `handoff` workflow node:
+/// the node's own prompt starts it, so the cut only marks where the model's
+/// view begins. An empty window is left as it is.
+pub(super) fn open_window(turn: &mut Turn, summary: &str) -> Result<(), String> {
+    let events = turn.log.events(turn.session_id)?;
+    if !compaction::model_view(&events)
+        .iter()
+        .any(|e| matches!(e, Event::MessageStart { .. }))
+    {
+        return Ok(());
+    }
+    turn.append(Event::ContextCompacted {
+        before_tokens: compaction::context_tokens(&events),
+        after_tokens: 0,
+        summary: summary.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

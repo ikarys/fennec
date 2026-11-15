@@ -63,10 +63,11 @@ graph LR
   m55["web/src/lib/api"]
   m56["web/src/i18n"]
   m57["crates/fennec"]
-  m58["crates/token-usage/tests"]
-  m59["docs/users/theme"]
-  m60["web"]
-  m61["web/scripts"]
+  m58["crates/fennec/src/agent/workflow/tests"]
+  m59["crates/token-usage/tests"]
+  m60["docs/users/theme"]
+  m61["web"]
+  m62["web/scripts"]
   m14 -->|1| m32
   m14 -->|3| m19
   m14 -->|1| m21
@@ -378,7 +379,7 @@ graph LR
 | `crates/fennec/src/web/views/run_view` | 2 | 2 |  | The server-side run view: the run the server serves pre-calculated, so the UI renders it as it is. |
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
 | `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
-| `crates/fennec/src/agent/workflow` | 8 | 4 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
+| `crates/fennec/src/agent/workflow` | 7 | 3 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
 | `crates/fennec/src` | 34 | 25 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
 | `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
@@ -423,6 +424,7 @@ graph LR
 | `web/src/lib/api` | 22 | 0 |  |  |
 | `web/src/i18n` | 5 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
+| `crates/fennec/src/agent/workflow/tests` | 3 | 3 |  |  |
 | `crates/token-usage/tests` | 1 | 1 |  |  |
 | `docs/users/theme` | 2 | 0 |  |  |
 | `web` | 1 | 0 |  |  |
