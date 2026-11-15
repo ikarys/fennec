@@ -735,6 +735,7 @@ export const fr: Record<MsgKey, string> = {
   projectTabWork: 'Travail',
   projectTabUnderstand: 'Comprendre',
   projectTabHealth: 'Santé',
+  projectSectionIndicators: 'Indicateurs',
   indicatorsTitle: 'Indicateurs',
   indicatorsHint: 'Mesurés à partir de ce que fennec a enregistré (intégrations, dialogues, git, registre d’usage), jamais de ce que dit un modèle.',
   tasksTabYours: 'À décider',

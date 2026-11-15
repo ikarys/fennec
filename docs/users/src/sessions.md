@@ -6,7 +6,7 @@ A session is a conversation with an agent on one project; fennec keeps every ses
 
 1. On the home page, pick the **Projects** filter.
 2. Click your project.
-3. Stay on **Work** in its left menu and scroll down to **Sessions** ①.
+3. Click **Sessions** ① under **Work** in its left menu.
 
 ![A project's Sessions tab: the list and New session](images/sessions-1.png)
 

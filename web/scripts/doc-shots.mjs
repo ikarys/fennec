@@ -457,8 +457,8 @@ async function tour(page) {
   await newChat.waitFor();
   await idle();
 
-  await page.goto(`${BASE}/#/project/${project.id}`);
-  const sessionsTab = page.getByText('Sessions', { exact: true }).last(); // the Work page's card, below the stat tile
+  await page.goto(`${BASE}/#/project/${project.id}/sessions`);
+  const sessionsTab = page.getByRole('tab', { name: 'Sessions' }); // the project page's left menu
   const row = page.locator('li.cursor-pointer').first();
   await row.waitFor();
   await row.scrollIntoViewIfNeeded();
@@ -496,7 +496,7 @@ async function tour(page) {
   const own = await page.evaluate(async (workdir) => (await fetch('/api/projects', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workdir }) })).json(), clone);
 
   await page.goto(`${BASE}/#/project/${own.id}/map`);
-  const mapTab = page.getByText('Understand', { exact: true }).first(); // the project page's left menu
+  const mapTab = page.getByRole('tab', { name: 'Module map' }); // the project page's left menu
   await page.getByText('Modules', { exact: true }).first().waitFor();
   await page.getByText(/^[1-9]\d* entry point/).waitFor({ timeout: 60_000 });
   await idle();

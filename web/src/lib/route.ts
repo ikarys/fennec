@@ -24,28 +24,22 @@ export type Route =
   | { name: 'editor'; projectId: string; path: string | null; session: string | null }
   | { name: 'workflows'; projectId: string | null; workflowId: string | null; isNew: boolean };
 
-export type ProjectTab = 'work' | 'understand' | 'health';
+export const PROJECT_SECTIONS = ['overview', 'tasks', 'sessions', 'map', 'risks', 'decisions', 'analyses', 'canvas', 'health'] as const;
 
-type ProjectSection = { tab: ProjectTab; anchor: string | null };
+export type ProjectSection = (typeof PROJECT_SECTIONS)[number];
 
-const PROJECT_TABS: Record<string, ProjectSection> = {
-  work: { tab: 'work', anchor: null },
-  understand: { tab: 'understand', anchor: null },
-  health: { tab: 'health', anchor: null },
-  overview: { tab: 'work', anchor: null },
-  tasks: { tab: 'work', anchor: 'tasks' },
-  sessions: { tab: 'work', anchor: 'sessions' },
-  indicators: { tab: 'health', anchor: null },
-  map: { tab: 'understand', anchor: 'map' },
-  risks: { tab: 'understand', anchor: 'risks' },
-  decisions: { tab: 'understand', anchor: 'decisions' },
-  analyses: { tab: 'understand', anchor: 'analyses' },
-  canvas: { tab: 'understand', anchor: 'canvas' },
+/** Group names an earlier build used as tabs: each opens the group's first section. */
+const PROJECT_GROUP_ALIASES: Record<string, ProjectSection> = {
+  work: 'overview',
+  understand: 'map',
+  indicators: 'health',
 };
 
-/** A project tab from the URL; old tab names still open, as their new tab plus the section to scroll to. */
-export function projectTab(tab: string | null): ProjectSection {
-  return (tab !== null && Object.hasOwn(PROJECT_TABS, tab) ? PROJECT_TABS[tab] : null) ?? PROJECT_TABS.work;
+/** The project section from the URL; unknown or missing opens the overview. */
+export function projectSection(tab: string | null): ProjectSection {
+  if (tab === null) return 'overview';
+  if ((PROJECT_SECTIONS as readonly string[]).includes(tab)) return tab as ProjectSection;
+  return Object.hasOwn(PROJECT_GROUP_ALIASES, tab) ? PROJECT_GROUP_ALIASES[tab] : 'overview';
 }
 
 export const TABS_KEY = 'fennec.tabs';

@@ -4,14 +4,20 @@ import { Tabs } from '../components/ui/Tabs';
 import { Button, buttonClass } from '../components/ui/Button';
 import {
   ActivityIcon,
+  AlertIcon,
+  BulbIcon,
+  DecisionIcon,
   EditIcon,
   InsightIcon,
   LayersIcon,
   PlusIcon,
   ProjectIcon,
+  SearchIcon,
+  TerminalIcon,
   TrashIcon,
+  WandIcon,
 } from '../components/ui/Icons';
-import { editorPath, projectTab, withTask, type ProjectTab } from '../lib/route';
+import { editorPath, projectSection, withTask, type ProjectSection } from '../lib/route';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { ProjectOpenActions } from '../components/project/ProjectOpenActions';
@@ -37,9 +43,15 @@ import { useT } from '../i18n';
 
 
 const TABS = [
-  { id: 'work', label: 'projectTabWork', Icon: ActivityIcon },
-  { id: 'understand', label: 'projectTabUnderstand', Icon: LayersIcon },
-  { id: 'health', label: 'projectTabHealth', Icon: InsightIcon },
+  { id: 'overview', label: 'tasksTabOverview', group: 'projectTabWork', Icon: ActivityIcon },
+  { id: 'tasks', label: 'tasks', group: 'projectTabWork', Icon: BulbIcon },
+  { id: 'sessions', label: 'sessionsSectionTitle', group: 'projectTabWork', Icon: TerminalIcon },
+  { id: 'map', label: 'moduleMapTitle', group: 'projectTabUnderstand', Icon: LayersIcon },
+  { id: 'risks', label: 'risksLabel', group: 'projectTabUnderstand', Icon: AlertIcon },
+  { id: 'decisions', label: 'projectPageDecisions', group: 'projectTabUnderstand', Icon: DecisionIcon },
+  { id: 'analyses', label: 'analysesTitle', group: 'projectTabUnderstand', Icon: SearchIcon },
+  { id: 'canvas', label: 'canvasLibraryTab', group: 'projectTabUnderstand', Icon: WandIcon },
+  { id: 'health', label: 'projectSectionIndicators', group: 'projectTabHealth', Icon: InsightIcon },
 ] as const;
 
 /**
@@ -92,8 +104,6 @@ function MapTab({ projectId }: { projectId: string }) {
   );
 }
 
-const anchorId = (name: string) => `project-${name}`;
-
 export default function ProjectPage({
   projects,
   projectId,
@@ -122,15 +132,9 @@ export default function ProjectPage({
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { tab: activeTab, anchor } = projectTab(tab);
+  const activeTab = projectSection(tab);
 
-  useEffect(() => {
-    if (anchor) {
-      document.getElementById(anchorId(anchor))?.scrollIntoView({ block: 'start' });
-    }
-  }, [activeTab, anchor]);
-
-  const handleTabSelect = (id: ProjectTab) => {
+  const handleTabSelect = (id: ProjectSection) => {
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
   };
 
@@ -232,59 +236,45 @@ export default function ProjectPage({
       <div className="mt-6 flex flex-col gap-6 md:flex-row">
         <Tabs
           label={t('projectPageSectionsLabel')}
-          tabs={TABS.map((item) => ({ ...item, label: t(item.label) }))}
+          tabs={TABS.map((item) => ({ ...item, label: t(item.label), group: t(item.group) }))}
           active={activeTab}
           onSelect={handleTabSelect}
         />
         <div className="min-w-0 grow">
-          {activeTab === 'work' ? (
-            <div className="flex flex-col gap-6">
-              <DashboardSection projectId={projectId} />
-              <section id={anchorId('tasks')} className="scroll-mt-4">
-                <TasksSection
-                  projectId={projectId}
-                  sub={sub}
-                  task={task}
-                  onOpenTask={(ideaId) => {
-                    window.location.hash = withTask(window.location.hash, ideaId);
-                  }}
-                  onFrame={handleFrame}
-                  onOpenSession={onOpenSession}
-                  onSelectSub={(s) => {
-                    window.location.hash = `#/project/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(s)}`;
-                  }}
-                />
-              </section>
-              <section id={anchorId('sessions')} className="scroll-mt-4">
-                <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} />
-              </section>
-            </div>
+          {activeTab === 'overview' ? <DashboardSection projectId={projectId} /> : null}
+          {activeTab === 'tasks' ? (
+            <TasksSection
+              projectId={projectId}
+              sub={sub}
+              task={task}
+              onOpenTask={(ideaId) => {
+                window.location.hash = withTask(window.location.hash, ideaId);
+              }}
+              onFrame={handleFrame}
+              onOpenSession={onOpenSession}
+              onSelectSub={(s) => {
+                window.location.hash = `#/project/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(s)}`;
+              }}
+            />
           ) : null}
-          {activeTab === 'understand' ? (
-            <div className="flex flex-col gap-6">
-              <section id={anchorId('map')} className="scroll-mt-4">
-                <MapTab projectId={projectId} />
-              </section>
-              <section id={anchorId('risks')} className="scroll-mt-4">
-                <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} />
-              </section>
-              <section id={anchorId('decisions')} className="scroll-mt-4">
-                <DecisionsSection projectId={projectId} />
-              </section>
-              <section id={anchorId('analyses')} className="scroll-mt-4">
-                <AnalysesSection
-                  busy={analyzing}
-                  error={analyzeError}
-                  sessions={project.sessions}
-                  onStart={(prompt, mode) => void startSession(prompt, mode)}
-                  onOpenSession={onOpenSession}
-                />
-              </section>
-              <section id={anchorId('canvas')} className="scroll-mt-4">
-                <CanvasSection projectId={projectId} />
-              </section>
-            </div>
+          {activeTab === 'sessions' ? (
+            <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} />
           ) : null}
+          {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
+          {activeTab === 'risks' ? (
+            <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} />
+          ) : null}
+          {activeTab === 'decisions' ? <DecisionsSection projectId={projectId} /> : null}
+          {activeTab === 'analyses' ? (
+            <AnalysesSection
+              busy={analyzing}
+              error={analyzeError}
+              sessions={project.sessions}
+              onStart={(prompt, mode) => void startSession(prompt, mode)}
+              onOpenSession={onOpenSession}
+            />
+          ) : null}
+          {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'health' ? (
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

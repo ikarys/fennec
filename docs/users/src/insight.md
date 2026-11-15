@@ -40,7 +40,7 @@ In a session, the **Session tokens** panel shows the same for that session: **Ca
 
 ## What the project measures by itself
 
-The project's **Health** tab holds the budget and the indicators. The indicators measure the project from recorded facts only: integrations, dialogues, git, and the usage ledger. It never measures what a model says. It shows, among others, AI commits made outside fennec, sensitive integrations without a comprehension dialogue, module rule breaks, the month's cost per integration, and integrations tied to an approved plan. See [Understanding the project](understanding.md) for the map and risk zones.
+The project's **Indicators** entry, under **Health** in its left menu, holds the budget and the indicators. The indicators measure the project from recorded facts only: integrations, dialogues, git, and the usage ledger. It never measures what a model says. It shows, among others, AI commits made outside fennec, sensitive integrations without a comprehension dialogue, module rule breaks, the month's cost per integration, and integrations tied to an approved plan. See [Understanding the project](understanding.md) for the map and risk zones.
 
 ## If something goes wrong
 

@@ -704,6 +704,7 @@ export const en = {
   projectTabWork: 'Work',
   projectTabUnderstand: 'Understand',
   projectTabHealth: 'Health',
+  projectSectionIndicators: 'Indicators',
   indicatorsTitle: 'Indicators',
   indicatorsHint: 'Measured from what fennec recorded (integrations, dialogues, git, the usage ledger), never from what a model says.',
   tasksTabYours: 'To decide',

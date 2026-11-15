@@ -13,7 +13,7 @@ import {
   tabIdForRoute,
   splitPath,
   parsePaneToken,
-  projectTab,
+  projectSection,
   paneToken,
   PAGE_TABS,
   HOME_FILTERS,
@@ -27,22 +27,23 @@ import {
   withTask,
 } from './route';
 
-describe('projectTab', () => {
-  it('maps new tab names', () => {
-    expect(projectTab('work')).toEqual({ tab: 'work', anchor: null });
-    expect(projectTab('understand')).toEqual({ tab: 'understand', anchor: null });
-    expect(projectTab('health')).toEqual({ tab: 'health', anchor: null });
+describe('projectSection', () => {
+  it('keeps a known section', () => {
+    expect(projectSection('tasks')).toBe('tasks');
+    expect(projectSection('map')).toBe('map');
+    expect(projectSection('health')).toBe('health');
   });
 
-  it('maps old tab names to new tab with anchor', () => {
-    expect(projectTab('tasks')).toEqual({ tab: 'work', anchor: 'tasks' });
-    expect(projectTab('sessions')).toEqual({ tab: 'work', anchor: 'sessions' });
-    expect(projectTab('map')).toEqual({ tab: 'understand', anchor: 'map' });
+  it('opens the first section of an old group name', () => {
+    expect(projectSection('work')).toBe('overview');
+    expect(projectSection('understand')).toBe('map');
+    expect(projectSection('indicators')).toBe('health');
   });
 
-  it('defaults unknown or null to work', () => {
-    expect(projectTab(null)).toEqual({ tab: 'work', anchor: null });
-    expect(projectTab('nope')).toEqual({ tab: 'work', anchor: null });
+  it('defaults unknown or null to the overview', () => {
+    expect(projectSection(null)).toBe('overview');
+    expect(projectSection('nope')).toBe('overview');
+    expect(projectSection('constructor')).toBe('overview');
   });
 });
 
