@@ -34,8 +34,10 @@ pub struct PreflightResult {
 const CANNOT_RUN_MARKERS: &[&str] = &[
     "command not found",
     "could not resolve host",
-    "enotfound",
-    "eai_again",
+    // Node's DNS codes, with their prefix: a bare "enotfound" is inside
+    // Python's "ModuleNotFoundError" and "FileNotFoundError".
+    "getaddrinfo enotfound",
+    "getaddrinfo eai_again",
     "network is unreachable",
     "temporary failure in name resolution",
     "cannot connect to the docker daemon",
@@ -220,6 +222,12 @@ mod tests {
     fn classify_does_not_blame_the_planners_read_only_workdir() {
         let cargo = "error: failed to open: /work/Cargo.lock\n\nCaused by:\n  Read-only file system (os error 30)";
         assert_eq!(classify(Some(101), cargo), PreflightVerdict::Fails);
+    }
+
+    #[test]
+    fn classify_takes_a_missing_python_test_module_as_a_failure() {
+        let unittest = "ImportError: Failed to import test module: test_flatten\nModuleNotFoundError: No module named 'tests.test_flatten'\nFAILED (errors=1)";
+        assert_eq!(classify(Some(1), unittest), PreflightVerdict::Fails);
     }
 
     #[test]

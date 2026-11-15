@@ -28,6 +28,8 @@ For code that reads outside input (a parser, an import, an API client), cover mo
 
 Run the tests to show they fail for the right reason, and run each criterion's check: it must fail because the code is missing, never because it selects no test. Do not weaken a test to make it pass.
 
+An assertion about behaviour the plan does not change (a boundary next to the new one, an existing case kept as a guard) must pass right now: the code already does it. When one fails, your expected value is wrong, not the code: take it from what the code returns today. Only assertions on the new behaviour may fail before the build; a wrong one cannot be fixed later without the human.
+
 Before you end, run the project's formatter and linter on your test files and fix what they report: once validated the files are protected, and the builder cannot even reformat them without asking the human.
 
 The human validates these tests; once validated they are protected and the builder cannot change them.
