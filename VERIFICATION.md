@@ -43,6 +43,20 @@ The workflows run on GitHub Actions.
 
 Blind tests live in their own repository, https://github.com/ikarys/fennec-blind-tests. A blind test gives an agent only the user guide and the running UI, and the agent follows the guide on a project of its own; each test records the date, commit, findings, what was done about each one, and the agent's scripts and screenshots.
 
+## Agent effectiveness
+
+The agent bench lives in its own repository, fennec-bench, which is not published yet. Each task is a real change on a small open-source repository (ms in TypeScript, semver in Rust, tomli in Python), and each kind of change is covered: a bug fix, a feature with a new module, a refactor across files, a doc change, and a short request whose plan has to ask a question. A deterministic oracle judges each result: the repository's tests, plus hidden tests or greps the agent never sees. fennec runs `plan-build-verify` in night mode, so the first choice answers every gate and no human is involved.
+
+Latest run, 2026-11-15, fennec build 1032 with qwen3.8-27b:
+
+| result | human decisions | model calls | prompt tokens (cached) | completion tokens | wall time |
+|---|---|---|---|---|---|
+| 10/11 pass | 1–3 per task | 31–60 per task | 14.2 M in total (97 % cached) | 0.28 M in total | 39 min |
+
+The failure, tomli-feature, has a correct implementation: the hidden tests pass. The test file the agent wrote at criteria time had two wrong test data lines. The builder found them and asked for a waiver to fix them, and night mode stops at a permission request. The bench also found two hangs in `fennec run`, both fixed before this run: an answer that reached the server while the asking turn was closing, and an agent that asked a question in plain text instead of calling `ask_user`.
+
+Not measured yet: the same tasks run by Claude Code, and a repository with a web UI.
+
 ## Re-run it
 
 Run these commands from the repository root: `just setup`, `just check`, and `just test`. `just setup` installs the git hooks once per clone.
