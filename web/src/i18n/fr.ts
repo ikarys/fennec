@@ -1434,6 +1434,7 @@ export const fr: Record<MsgKey, string> = {
   agentFieldsSubagentOption: '{name} (sous-agent)',
   agentFieldsContextLabel: 'Contexte',
   agentFieldsContextSession: 'session',
+  agentFieldsContextHandoff: 'session, nouvelle fenêtre',
   agentFieldsContextFresh: 'nouvelle session',
   agentFieldsPromptLabel: 'Prompt',
   agentFieldsRetryPromptLabel: 'Prompt de nouvelle tentative',

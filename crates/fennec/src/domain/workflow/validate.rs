@@ -125,9 +125,7 @@ fn check_node_fields(workflow: &Workflow, agents: &[AgentDefinition], issues: &m
                         format!("unknown agent {agent}"),
                     )),
                     // A sub-agent is never a mode of the human's session.
-                    Some(definition)
-                        if definition.subagent && *context == AgentContext::Session =>
-                    {
+                    Some(definition) if definition.subagent && *context != AgentContext::Fresh => {
                         issues.push(issue(
                             Some(node.id.clone()),
                             None,
@@ -845,6 +843,24 @@ mod tests {
         let mut agents = agents();
         agents[1].subagent = true;
         let issues = validate(&example_workflow(), &agents);
+        assert!(
+            messages(&issues).contains(&"sub-agent builder runs only in a fresh context".into())
+        );
+    }
+
+    #[test]
+    fn sub_agent_in_a_handoff_node_is_an_issue() {
+        let mut agents = agents();
+        agents[1].subagent = true;
+        let mut workflow = example_workflow();
+        for node in &mut workflow.nodes {
+            if let NodeKind::Agent { agent, context, .. } = &mut node.kind
+                && agent == "builder"
+            {
+                *context = AgentContext::Handoff;
+            }
+        }
+        let issues = validate(&workflow, &agents);
         assert!(
             messages(&issues).contains(&"sub-agent builder runs only in a fresh context".into())
         );

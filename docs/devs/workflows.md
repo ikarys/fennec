@@ -106,7 +106,7 @@ Unknown fields are kept on save (the editor round-trips them).
 | kind | fields | output ports | output value |
 |---|---|---|---|
 | `start` | (exactly one per workflow) | `next` | the task |
-| `agent` | `agent` (agent id), `prompt`, `retryPrompt?`, `outputs?` (default `["done"]`), `context?` (`"session"` default, or `"fresh"`), `verdicts?` (default false) | each of `outputs` | the agent's last text |
+| `agent` | `agent` (agent id), `prompt`, `retryPrompt?`, `outputs?` (default `["done"]`), `context?` (`"session"` default, `"handoff"` or `"fresh"`), `verdicts?` (default false) | each of `outputs` | the agent's last text |
 | `shell` | `command`, `timeoutSecs?` (default 600), `successCodes?` (default `[0]`) | `success`, `failure` | stdout and stderr, last 8 KiB |
 | `criteria` | `plan` (the id of the agent node whose output holds the plan) | `pass`, `fail` | the failed checks: command, exit code, output |
 | `human` | `question`, `choices` (at least one) | one per choice | the choice, plus the comment typed with it |
@@ -122,7 +122,18 @@ Every node has `id`, `name?` and `position`. A node with a capped edge
 node's agent becomes the mode (`mode.changed` and its reminder, as when the
 human switches), the prompt is appended as a user message marked as coming
 from the workflow, and the agent loop runs. The conversation carries over
-from node to node, so the cached prefix keeps growing. `context: "fresh"`
+from node to node, so the cached prefix keeps growing. `context: "handoff"`
+runs in the session too, but its first pass opens a new context window: a
+`context.compacted` cut (no model call, `afterTokens: 0`) marks where the
+model's view starts, so the node reads its own prompt and not the nodes
+before it. The prompt passes on what the node needs through template
+variables (`{{nodes.plan.output}}`, `{{criteria}}`, `{{filesChanged}}`). A
+retry (pass 2 and later) or a resumed node goes on in its window without a
+new cut. The log stays whole: protection, waivers, session rules and the
+changed files still see everything, and the notices are sent again in the
+new window. The built-in workflow runs its tests and build nodes this way,
+so the builder does not re-read the planning conversation on every call.
+`context: "fresh"`
 runs the node in a child session that starts from the prompt only (see
 Child sessions). Images attached to a workflow start are appended as a user
 message before `workflow.started`, so session-context nodes see them and

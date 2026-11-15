@@ -1399,6 +1399,7 @@ export const en = {
   agentFieldsSubagentOption: '{name} (subagent)',
   agentFieldsContextLabel: 'Context',
   agentFieldsContextSession: 'Session',
+  agentFieldsContextHandoff: 'Session, new window',
   agentFieldsContextFresh: 'New session',
   agentFieldsPromptLabel: 'Prompt',
   agentFieldsRetryPromptLabel: 'Retry prompt',

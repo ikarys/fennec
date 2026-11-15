@@ -97,9 +97,13 @@ pub enum NodeKind {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AgentContext {
+    /// Runs in the session and carries the conversation over.
     #[default]
     Session,
+    /// Runs in a child session that starts from the prompt only.
     Fresh,
+    /// Runs in the session, in a new context window that starts from the prompt.
+    Handoff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
