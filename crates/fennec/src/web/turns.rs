@@ -366,31 +366,30 @@ fn next_job(
 ) -> Result<Option<Job>, String> {
     let store = SqliteStore::open(&settings.db_path)?;
     let events = store.events(session_id)?;
+    let log = NotifyingLog {
+        log: &store,
+        notifier,
+    };
+    let drain = |queue_id: String| log.append(session_id, &Event::QueueDrained { queue_id });
     match queue::after_turn(&events, stopped) {
         queue::AfterTurn::Idle | queue::AfterTurn::Hold => Ok(None),
         queue::AfterTurn::Cancel(ids) => {
-            let log = NotifyingLog {
-                log: &store,
-                notifier,
-            };
             for id in ids {
                 log.append(session_id, &Event::QueueCancelled { queue_id: id })?;
             }
             Ok(None)
         }
         queue::AfterTurn::Start(q) => {
-            let log = NotifyingLog {
-                log: &store,
-                notifier,
-            };
-            log.append(
-                session_id,
-                &Event::QueueDrained {
-                    queue_id: q.queue_id.clone(),
-                },
-            )?;
+            drain(q.queue_id)?;
             let input = resolve(&q.content, &skills::discover(workdir));
             Ok(Some(Job::Input(input, Vec::new())))
+        }
+        queue::AfterTurn::Answer(q) => {
+            drain(q.queue_id)?;
+            Ok(Some(Job::Workflow(WorkflowJob::AgentInput {
+                prompt: q.content,
+                attachments: Vec::new(),
+            })))
         }
     }
 }
