@@ -4,7 +4,7 @@ A session is a conversation with an agent on one project; fennec keeps every ses
 
 ## Step 1: open the project's sessions
 
-1. On the home page, pick the **Projects** filter.
+1. On the home page, open the **Projects** tab.
 2. Click your project.
 3. Click **Sessions** ① under **Work** in its left menu.
 
@@ -48,9 +48,9 @@ A workflow session also shows the **Run** rail on the left: the workflow's steps
 
 ### Projects and sessions
 
-The home page shows what needs you, then one list with a filter: **Overview** (recent sessions, favorite projects, this week's usage), **Projects**, **Chats** and **Night queue**. Use **New chat** to start a conversation without a project, folder, or git. A chat can switch agents like a session; workflows stay hidden because they need a project.
+The home page shows what needs you, then one list in tabs: **Overview** (recent sessions, favorite projects, this week's usage), **Projects**, **Chats** and **Night queue**. Use **New chat** to start a conversation without a project, folder, or git. A chat can switch agents like a session; workflows stay hidden because they need a project.
 
-Open a project from the home page, under **Overview** or the **Projects** filter. The project page shows **Recent sessions** and **All sessions**, and offers **New session in this project**. The session list shows the title, status, modified time, and agent. A session with unintegrated work shows **to integrate**.
+Open a project from the home page, under **Overview** or the **Projects** tab. The project page shows **Recent sessions** and **All sessions**, and offers **New session in this project**. The session list shows the title, status, modified time, and agent. A session with unintegrated work shows **to integrate**.
 
 Session titles appear in the top bar tabs and the project session list. The top bar keeps open session tabs. You can close a tab, use split view, and open the command palette to search a session, project, page, command, or skill. Themes and display options are on **Settings** > **Appearance**.
 

@@ -153,6 +153,6 @@ Each idea also has a status:
 
 ### Cross-project view
 
-The home page's **Night queue** filter shows a cross-project backlog with counts for **To decide**, **running**, **ready**, and **done**. The top bar shows a **To review** counter for work that needs your eye.
+The home page's **Night queue** tab shows a cross-project backlog with counts for **To decide**, **running**, **ready**, and **done**. The top bar shows a **To review** counter for work that needs your eye.
 
 Use it to see which project has work waiting, halted, or ready.

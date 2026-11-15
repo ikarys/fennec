@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ListCard, listRowClass } from '../components/ui/ListCard';
 import { Badge } from '../components/ui/Badge';
-import { Segmented } from '../components/ui/Segmented';
+import { Tabs } from '../components/ui/Tabs';
 import { SetupChecklist } from '../components/project/SetupChecklist';
 import { attentionKindLabel } from '../components/layout/AttentionBell';
 import { HomeOverview, type HomeStatTile } from '../components/home/HomeOverview';
@@ -148,11 +148,12 @@ export function HomePage({
           )}
         </ListCard>
 
-        <Segmented<HomeFilter>
+        <Tabs<HomeFilter>
+          orientation="horizontal"
           label={t('homeFilterLabel')}
-          segments={HOME_FILTERS.map((entry) => ({ value: entry.filter, label: t(entry.titleKey) }))}
-          value={filter}
-          onChange={onFilter}
+          tabs={HOME_FILTERS.map((entry) => ({ id: entry.filter, label: t(entry.titleKey) }))}
+          active={filter}
+          onSelect={onFilter}
         />
 
         {filter === 'overview' ? (
