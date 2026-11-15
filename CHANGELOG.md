@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0](https://github.com/ikarys/fennec/compare/v0.5.1...v0.6.0) (2026-11-15)
+
+
+### Features
+
+* a lighter fennec with one choice in the composer ([#433](https://github.com/ikarys/fennec/issues/433)) ([b1f92c9](https://github.com/ikarys/fennec/commit/b1f92c97d99e52b50572c91ffcb5bbc6c2881779))
+* **composer:** say how much context a mid-session effort or MCP change re-reads ([#424](https://github.com/ikarys/fennec/issues/424)) ([10e1325](https://github.com/ikarys/fennec/commit/10e1325651c5dbce46ec18f218d8b8f908943a8c))
+* **servers:** keep dev servers running across a fennec restart ([#419](https://github.com/ikarys/fennec/issues/419)) ([5bfa0aa](https://github.com/ikarys/fennec/commit/5bfa0aa21ffbbc7cdf9f4902c2a851430b21a40d))
+* **servers:** read the ports a server really listens on ([#418](https://github.com/ikarys/fennec/issues/418)) ([72d5c2c](https://github.com/ikarys/fennec/commit/72d5c2c14e367f69cdb93f42c180c4a771950994))
+* **settings:** redesign the MCP page as an accordion of servers ([#422](https://github.com/ikarys/fennec/issues/422)) ([1c285b8](https://github.com/ikarys/fennec/commit/1c285b85f64ca7fa59bbe63101b1d79bfb7ad366))
+* **workflow:** answer the tests gate when every check proves itself ([#432](https://github.com/ikarys/fennec/issues/432)) ([36c052e](https://github.com/ikarys/fennec/commit/36c052e4ade41f0980da3a2b5b0c20b5b7f0a1de))
+* **workflow:** review once and let the human pick the fixes ([#429](https://github.com/ikarys/fennec/issues/429)) ([0d17c30](https://github.com/ikarys/fennec/commit/0d17c302b0dae27ee990f75c8310272d6193c420))
+
+
+### Bug Fixes
+
+* **agents:** cut sandbox friction rounds ([#430](https://github.com/ikarys/fennec/issues/430)) ([f6cb480](https://github.com/ikarys/fennec/commit/f6cb4800641695d505e5f4b102ddacc385304e34))
+* **agents:** make criteria checks find the tests written for them ([#431](https://github.com/ikarys/fennec/issues/431)) ([0b073e6](https://github.com/ikarys/fennec/commit/0b073e6bf7bacfc491d169438e3ff059c9bd0ca8))
+* **integration:** keep installed dependencies out of agent commits ([#427](https://github.com/ikarys/fennec/issues/427)) ([8231fb0](https://github.com/ikarys/fennec/commit/8231fb04a383e4027cb0173f98d4b9ba3ce07719))
+* **perf:** count a question as a finished turn with a real model ([#420](https://github.com/ikarys/fennec/issues/420)) ([02ad3c6](https://github.com/ikarys/fennec/commit/02ad3c62a361fa98e72b5c33ad61cdd2d2c58dd4))
+* **settings:** normalize MCP server names and stop the autosave retry loop ([#421](https://github.com/ikarys/fennec/issues/421)) ([73cba99](https://github.com/ikarys/fennec/commit/73cba99ec069672270f1c91d94cb7d608429c890))
+* **ui:** enlarge the emblem on the About page ([#426](https://github.com/ikarys/fennec/issues/426)) ([8222dfe](https://github.com/ikarys/fennec/commit/8222dfebca25b6caa09d1c24dff2b8d049fba857))
+* **ui:** tool cards and thinking follow the open-by-default settings ([#417](https://github.com/ikarys/fennec/issues/417)) ([1359353](https://github.com/ikarys/fennec/commit/1359353927aa7dc2dda0141993e7c6f07d8463ab))
+* **ui:** use the emblem for the installed app's icons ([#425](https://github.com/ikarys/fennec/issues/425)) ([cbc128d](https://github.com/ikarys/fennec/commit/cbc128d2f5e6a35e0f3c6b155e7ffa713c74ed09))
+
 ## [0.5.1](https://github.com/ikarys/fennec/compare/v0.5.0...v0.5.1) (2026-11-14)
 
 
