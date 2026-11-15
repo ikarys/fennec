@@ -232,7 +232,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   than the version the human last looked at, up to `current`. The first call records `current`, so a fresh install
   has nothing new.
 - `POST /api/changelog/seen` `{}` → `{unseen: 0}`: the human looked at the changelog of the running version.
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools, shortcuts}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, scanners, sandboxHealth, mcpTools, shortcuts}`
   (`listings` may be the last listing the endpoint answered, refreshed in the background)
   - `shortcuts`: `[{action, combo, default}]`, every keyboard shortcut in the Settings page's order, the stored override applied (an empty combo: disabled). A combo is `Mod`/`Alt`/`Shift` (in that order) then a `KeyboardEvent.code`, e.g. `Alt+Shift+Digit1`; matching by code keeps a shortcut on the same key whatever the layout.
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
@@ -256,8 +256,6 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     set; `contextWindow`/`compactAt` are local).
   - `defaults`: `{provider, model, maxTokens, contextWindow, compactAt, reasoningEffort}`
     from the environment/built-in defaults
-  - `optInWorkflows`: `[{id, name, description}]`, the embedded workflows that stay off
-    until their id is in `preferences.enabledWorkflows`
 - `POST /api/settings` with a full `Preferences` body → 200 with the same body
   as `GET /api/settings`; 400 with the validation message if invalid
 - `POST /api/settings/providers/list` with `{provider, baseUrl, apiKey}` → a

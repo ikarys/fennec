@@ -49,8 +49,6 @@ pub struct Preferences {
     pub integration: IntegrationPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
-    /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
-    pub enabled_workflows: Vec<String>,
     /// `alwaysValidateTests`: stop at every tests gate, even when fennec proves
     /// each check fails before the work. Off: fennec answers those gates.
     pub always_validate_tests: bool,

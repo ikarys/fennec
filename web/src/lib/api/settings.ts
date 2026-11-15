@@ -136,7 +136,6 @@ export interface Preferences {
   /** Skill ids every new session gets in its system prompt. */
   alwaysOnSkills?: string[];
   /** Opt-in embedded workflows the human enabled. */
-  enabledWorkflows?: string[];
   /** Stop at every tests gate, even when fennec proves each check fails before the work. */
   alwaysValidateTests?: boolean;
   /** MCP servers, configured on the Settings page. */
@@ -262,19 +261,12 @@ export interface SandboxHealth {
   detail: string | null;
 }
 
-export interface WorkflowOptIn {
-  id: string;
-  name: string;
-  description: string;
-}
-
 export interface SettingsResponse {
   preferences: Preferences;
   listings: ProviderListing[];
   defaults: SettingsDefaults;
   /** The skills a session can load outside any project: defaults and ~/.agents/skills. */
   skills: SkillSummary[];
-  optInWorkflows: WorkflowOptIn[];
   scanners: ScannerStatus[];
   sandboxHealth: SandboxHealth;
   /** Per server, each cached tool's access and estimated token cost. */

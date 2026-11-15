@@ -583,10 +583,8 @@ export const fr: Record<MsgKey, string> = {
   alwaysActiveSkillsHint:
     'Leurs instructions entrent dans le prompt système des nouvelles sessions, sans load_skill. Une session déjà commencée garde son prompt.',
   noSkillsFound: 'Aucun skill trouvé.',
-  optionalWorkflowsTitle: 'Workflows optionnels',
-  optionalWorkflowsHint:
-    'Embarqués dans fennec, désactivés par défaut. Cochés, ils apparaissent dans la liste des workflows de chaque projet.',
-  noOptionalWorkflows: 'Aucun workflow optionnel.',
+  workflowsSettingsTitle: 'Workflows',
+  workflowsSettingsHint: 'Quand un run de workflow s\'arrête pour toi.',
   // Search, sandbox, instructions (components/settings)
   aboutTagline: 'Le développement assisté par IA qui vous laisse l’auteur de votre logiciel.',
   versionTitle: 'Version',
@@ -1190,7 +1188,6 @@ export const fr: Record<MsgKey, string> = {
   agentsDefaultDescription: 'Embarqués dans le binaire, en lecture seule.',
   optInCount: '{active} / {total} actifs',
   optInSkillsTitle: 'Skills disponibles',
-  optInWorkflowsTitle: 'Workflows disponibles',
   alwaysValidateTestsLabel: 'Toujours valider les tests',
   alwaysValidateTestsHint:
     'Désactivé : fennec valide les tests lui-même quand chaque critère a un check qui lance un test en échec avant le travail. Activé : vous les relisez à chaque fois.',

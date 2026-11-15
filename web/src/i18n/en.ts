@@ -552,10 +552,8 @@ export const en = {
   alwaysActiveSkillsHint:
     'Their instructions enter the system prompt of new sessions, without load_skill. A session already started keeps its prompt.',
   noSkillsFound: 'No skill found.',
-  optionalWorkflowsTitle: 'Optional workflows',
-  optionalWorkflowsHint:
-    'Embedded in fennec, disabled by default. Checked, they appear in the list of each project\'s workflows.',
-  noOptionalWorkflows: 'No optional workflow.',
+  workflowsSettingsTitle: 'Workflows',
+  workflowsSettingsHint: 'When a workflow run stops for you.',
   // Search, sandbox, instructions (components/settings)
   aboutTagline: 'AI-assisted development that keeps you the author of your software.',
   versionTitle: 'Version',
@@ -1155,7 +1153,6 @@ export const en = {
   agentsDefaultDescription: 'Embedded in the binary, read-only.',
   optInCount: '{active} / {total} active',
   optInSkillsTitle: 'Available skills',
-  optInWorkflowsTitle: 'Available workflows',
   alwaysValidateTestsLabel: 'Always validate the tests',
   alwaysValidateTestsHint:
     'Off: fennec validates the tests itself when every criterion has a check that runs a test failing before the work. On: you read them every time.',

@@ -16,8 +16,6 @@ In the message box, click the mode button. It shows **Mode: Plan**.
 
 **⋯** next to the model holds the run settings: **Step by step** (the workflow stops before each step and waits for you to continue), the reasoning effort and the MCP tools.
 
-Two more workflows, **Write documentation** and **Write a training course**, are off by default. Turn them on in **Settings** > **Workflows** > **Optional workflows**.
-
 ## Open the workflow list
 
 Open the command palette and choose **Workflows**.

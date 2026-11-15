@@ -61,7 +61,7 @@ Use **New agent**, **Edit**, **Duplicate**, or delete an agent to manage agents.
 
 ## Workflows
 
-**Available workflows** lists embedded workflows. **Optional workflows** enables the ones that are disabled by default. When checked, they appear in the list of each project's workflows.
+**Always validate the tests**: off, fennec validates the tests itself when every criterion has a check that runs a test failing before the work. On, you read them every time.
 
 ## Autonomy
 
