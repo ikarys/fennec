@@ -110,8 +110,10 @@ pub fn workflow_usage(
     };
 
     let mut view = WorkflowUsageView::default();
-    // (run, node) -> where its last start sits in the log, and its pass and child.
-    let mut open: HashMap<(&str, &str), (usize, u32, Option<&str>)> = HashMap::new();
+    // (run, node) -> where its first start sits in the log, its pass, and the children
+    // of all its starts: a resumed node starts again before it finishes, and both
+    // spans are its calls.
+    let mut open: HashMap<(&str, &str), (usize, u32, Vec<&str>)> = HashMap::new();
     let mut run_start: HashMap<&str, usize> = HashMap::new();
     let mut run_children: HashMap<&str, Vec<&str>> = HashMap::new();
 
@@ -127,7 +129,10 @@ pub fn workflow_usage(
                 child_session_id,
                 ..
             } => {
-                open.insert((run_id, node_id), (i, *pass, child_session_id.as_deref()));
+                let node = open
+                    .entry((run_id, node_id))
+                    .or_insert((i, *pass, Vec::new()));
+                node.2.extend(child_session_id.as_deref());
                 if let Some(child) = child_session_id {
                     run_children.entry(run_id).or_default().push(child);
                 }
@@ -135,13 +140,19 @@ pub fn workflow_usage(
             Event::WorkflowNodeFinished {
                 run_id, node_id, ..
             } => {
-                let Some((start, pass, child)) = open.remove(&(run_id.as_str(), node_id.as_str()))
+                let Some((start, pass, mut children)) =
+                    open.remove(&(run_id.as_str(), node_id.as_str()))
                 else {
                     continue;
                 };
-                let mine: Vec<&CallRecord> = match child {
-                    Some(child) => calls.get(child).into_iter().flatten().collect(),
-                    None => in_session(start, i),
+                children.dedup();
+                let mine: Vec<&CallRecord> = if children.is_empty() {
+                    in_session(start, i)
+                } else {
+                    children
+                        .iter()
+                        .flat_map(|child| calls.get(*child).into_iter().flatten())
+                        .collect()
                 };
                 if mine.is_empty() {
                     continue;
@@ -301,6 +312,25 @@ mod tests {
         assert_eq!(view.runs[0].calls, "2");
         assert_eq!(view.runs[0].read, display::tokens(4000, Lang::Fr.locale()));
         assert_eq!(view.runs[0].cache, "13 % cache");
+    }
+
+    #[test]
+    fn a_resumed_node_counts_the_calls_before_its_resume() {
+        let events = vec![
+            started("a", None),
+            done("m1"),
+            started("a", None),
+            done("m2"),
+            finished("a"),
+        ];
+        let mut calls = HashMap::new();
+        calls.insert(
+            "s".to_string(),
+            vec![call("m1", 1000, 0, 100), call("m2", 1000, 0, 100)],
+        );
+
+        let view = workflow_usage("s", &events, &calls, Lang::En);
+        assert!(view.nodes[0].detail.ends_with("2 calls"));
     }
 
     #[test]
