@@ -1,7 +1,7 @@
 //! Terminal client for a workflow run: starts it on the running server, prints its steps and answers its gates from stdin.
 
 use super::transcript::Transcript;
-use crate::domain::event::{ChoiceOption, Event};
+use crate::domain::event::{ChoiceOption, DoneReason, Event};
 use crate::domain::workflow::definition::{Node, NodeKind, Workflow};
 use crate::domain::workflow::run::RunOutcome;
 use serde_json::Value;
@@ -60,6 +60,7 @@ pub fn run(workflow_id: &str, night: bool, task: &str) -> Result<(), String> {
         workflow: None,
         transcript: Transcript::default(),
         streamed: false,
+        asked: false,
     };
     stream(&mut client)
 }
@@ -75,6 +76,9 @@ struct Client {
     /// The current node's text already streamed here; a node run in a child
     /// session streams nothing, so its output prints when it finishes.
     streamed: bool,
+    /// The turn's question already came as an event (`ask_user`, a gate, a
+    /// permission): the turn ending on it needs no second answer.
+    asked: bool,
 }
 
 fn stream(client: &mut Client) -> Result<(), String> {
@@ -139,9 +143,27 @@ impl Client {
             }
             Event::WorkflowHumanAsked {
                 node_id, question, ..
-            } => self.human_asked(node_id, question),
-            Event::ChatAskUser { options, .. } => self.chat_ask_user(options),
+            } => {
+                self.asked = true;
+                self.human_asked(node_id, question)
+            }
+            Event::ChatAskUser { options, .. } => {
+                self.asked = true;
+                self.chat_ask_user(options)
+            }
+            // An agent that asks in plain text, without `ask_user`, ends its
+            // turn waiting all the same.
+            Event::ChatDone {
+                reason: DoneReason::WaitingForUser,
+                ..
+            } => {
+                if std::mem::take(&mut self.asked) {
+                    return Ok(false);
+                }
+                self.chat_ask_user(None)
+            }
             Event::RuleApprovalRequested { .. } | Event::WaiverRequested { .. } => {
+                self.asked = true;
                 if self.night {
                     return Err(format!(
                         "needs your decision in the browser: {}/#/s/{}",
@@ -371,6 +393,46 @@ fn human_answer(line: &str, choices: &[String]) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A client whose server refuses connections: a handler that answers
+    /// fails, one that stays quiet succeeds.
+    fn offline_night_client() -> Client {
+        Client {
+            agent: ureq::Agent::config_builder()
+                .http_status_as_error(false)
+                .build()
+                .into(),
+            base: {
+                let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("a free port");
+                format!("http://{}", closed.local_addr().expect("its address"))
+            },
+            session: "s".into(),
+            night: true,
+            run_id: None,
+            workflow: None,
+            transcript: Transcript::default(),
+            streamed: false,
+            asked: false,
+        }
+    }
+
+    fn waiting_done() -> Event {
+        Event::ChatDone {
+            message_id: "m".into(),
+            reason: DoneReason::WaitingForUser,
+            duration_ms: None,
+        }
+    }
+
+    #[test]
+    fn a_plain_text_question_is_answered_once() {
+        let mut client = offline_night_client();
+        assert!(client.handle(waiting_done()).is_err(), "no answer was sent");
+
+        client.asked = true;
+        assert_eq!(client.handle(waiting_done()), Ok(false));
+        assert!(!client.asked);
+    }
 
     #[test]
     fn gate_prompt_numbers_choices() {
