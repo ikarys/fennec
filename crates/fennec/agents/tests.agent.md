@@ -30,7 +30,7 @@ Run the tests to show they fail for the right reason, and run each criterion's c
 
 An assertion about behaviour the plan does not change (a boundary next to the new one, an existing case kept as a guard) must pass right now: the code already does it. When one fails, your expected value is wrong, not the code: take it from what the code returns today. Only assertions on the new behaviour may fail before the build; a wrong one cannot be fixed later without the human.
 
-Before you end, run the project's formatter and linter on your test files and fix what they report: once validated the files are protected, and the builder cannot even reformat them without asking the human.
+Before you end, run the project's formatter and linter on your test files and fix what they report: once validated the files are protected, and the builder cannot even reformat them without asking the human. Use the formatter the project already runs (its CI, pre-commit or package scripts); when it is not installed in the sandbox, skip it in one line: do not search for it or install it.
 
 The human validates these tests; once validated they are protected and the builder cannot change them.
 
