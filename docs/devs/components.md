@@ -33,6 +33,9 @@ a fresh agent's question is answered in its child, and the parent run resumes
 on its own once the child completes.
 The default workflow runs the criteria checks, verifies in a fresh context
 (`verify`, `review` sub-agents) and sends the findings back to the builder.
+Its tests and build steps are handoff nodes: each starts a new context window
+in the session from a prompt that carries the plan and the criteria, so the
+builder does not re-read the planning conversation on every call.
 Preview: ```html and ```md blocks of a message, and the .html/.md files an
 agent wrote, rendered in fennec (a sandboxed origin for model HTML).
 Dogfooding, started (`docs/devs/dogfooding.md`): a session that runs a workflow

@@ -188,7 +188,7 @@ pub fn answer_in_node(
                     matches!(
                         node.kind,
                         NodeKind::Agent {
-                            context: AgentContext::Session,
+                            context: AgentContext::Session | AgentContext::Handoff,
                             ..
                         }
                     )
@@ -218,12 +218,12 @@ fn continue_agent_node(
 
     let NodeKind::Agent {
         agent,
-        context: AgentContext::Session,
+        context: AgentContext::Session | AgentContext::Handoff,
         outputs,
         ..
     } = &node.kind
     else {
-        return Err("the open node is not a session-context agent node".into());
+        return Err("the open node is not an agent node of the session".into());
     };
 
     let before = events.len();
@@ -286,11 +286,12 @@ fn run_node(
         .node(node_id)
         .ok_or_else(|| format!("{node_id}: unknown node"))?;
     // An interrupted node resumes the pass it was started on, not a new one.
-    let pass = state
+    let interrupted_pass = state
         .interrupted
         .iter()
         .find(|open| open.node_id == node_id)
-        .map(|open| open.pass)
+        .map(|open| open.pass);
+    let pass = interrupted_pass
         .unwrap_or_else(|| state.node_passes.get(node_id).copied().unwrap_or(0) + 1);
     let mut resumed = resumed_child(env, state, node_id)?;
     if resumed.is_none()
@@ -373,7 +374,26 @@ fn run_node(
                 nodes::fresh_agent(env, &input, agent, outputs, child)?
             }
         }
-        (NodeKind::Agent { agent, outputs, .. }, None) => {
+        (
+            NodeKind::Agent {
+                agent,
+                outputs,
+                context,
+                ..
+            },
+            None,
+        ) => {
+            // A handoff node's first pass reads the prompt, not the nodes before it; a
+            // retry or a resumed node goes on in its own window.
+            if *context == AgentContext::Handoff && pass == 1 && interrupted_pass.is_none() {
+                super::compaction::open_window(
+                    turn,
+                    &format!(
+                        "New window for the workflow step {}: it starts from the step's prompt.",
+                        node.label()
+                    ),
+                )?;
+            }
             session_agent(turn, &input, agent, outputs)?
         }
         (NodeKind::Criteria { plan }, _) => criteria::run(turn, env, &input, plan)?,
