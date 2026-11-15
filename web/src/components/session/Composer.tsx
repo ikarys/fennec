@@ -347,10 +347,13 @@ export function Composer({
                   ⋯
                 </Button>
                 {settingsOpen && (
-                  <Card className="absolute bottom-full right-0 z-20 mb-1 w-72 p-2">
+                  <Card className="absolute bottom-full right-0 z-20 mb-1 w-96 p-2">
                     {workflowSelection?.workflowId && onWorkflowSelectionChange && (
                       <div className="flex items-center justify-between gap-2 px-1.5 py-1 text-sm">
-                        <span>{t("workflowPickerStepByStepLabel")}</span>
+                        <span className="flex flex-col">
+                          <span>{t("workflowPickerStepByStepLabel")}</span>
+                          <span className="text-xs text-muted">{t("workflowPickerStepByStepHint")}</span>
+                        </span>
                         <Switch
                           checked={workflowSelection.stepByStep}
                           onChange={(on) => onWorkflowSelectionChange({ ...workflowSelection, stepByStep: on })}
@@ -360,7 +363,10 @@ export function Composer({
                     )}
                     {onEffortChange && (
                       <div className="flex items-center justify-between gap-2 px-1.5 py-1 text-sm">
-                        <span>{t("sessionEffort")}</span>
+                        <span className="flex flex-col">
+                          <span>{t("sessionEffort")}</span>
+                          <span className="text-xs text-muted">{t("composerEffortHint")}</span>
+                        </span>
                         <EffortPicker
                           effort={effort ?? null}
                           accepted={acceptedEfforts ?? []}
@@ -372,7 +378,10 @@ export function Composer({
                     )}
                     {mcpView && onMcpToggle && (
                       <div className="flex items-center justify-between gap-2 px-1.5 py-1 text-sm">
-                        <span>{t("composerTools")}</span>
+                        <span className="flex flex-col">
+                          <span>{t("composerTools")}</span>
+                          <span className="text-xs text-muted">{t("composerToolsHint")}</span>
+                        </span>
                         <McpPicker
                           view={mcpView}
                           onToggle={onMcpToggle}

@@ -267,7 +267,7 @@ async function workflows(page) {
   await picker.click();
   await page.waitForTimeout(300);
   const item = (name) => page.getByText(name, { exact: true }).last(); // the popover renders after the chip
-  await shot(page, 'workflows-1', [[item('Change'), 1], [item('Quick change'), 2], [item('Expert'), 3]]);
+  await shot(page, 'workflows-1', [[item('Plan'), 1], [item('Quick change'), 2], [item('Expert'), 3]]);
   await page.keyboard.press('Escape');
 
   await page.goto(`${BASE}/#/workflows`);
@@ -348,7 +348,7 @@ async function workflows(page) {
   await test.click();
   const stepByStep = page.getByText('Step by step ✕', { exact: true });
   await stepByStep.waitFor();
-  await shot(page, 'workflows-11', [[page.getByText('build-and-test', { exact: true }).last(), 1], [stepByStep, 2]]);
+  await shot(page, 'workflows-11', [[page.getByText('Mode: build-and-test', { exact: true }).last(), 1], [stepByStep, 2]]);
 }
 
 async function tasks(page) {

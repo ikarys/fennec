@@ -149,7 +149,8 @@ export function IntentPicker({
         groups={groups}
         value={value}
         onChange={handleChange}
-        trigger={triggerLabel}
+        trigger={t('intentTrigger', { label: triggerLabel })}
+        width="w-80"
       />
       {selection.stepByStep && (
         <Button

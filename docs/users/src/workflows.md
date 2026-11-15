@@ -6,15 +6,15 @@ A workflow is a graph of steps fennec runs for a task. fennec follows the graph 
 
 Click **New session**.
 
-In the message box, click **What do you want?**. It shows **Change**.
+In the message box, click the mode button. It shows **Mode: Plan**.
 
 ![The workflow picker in a new session](images/workflows-1.png)
 
-- ① **Change** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
+- ① **Plan** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
 - ② **Quick change** runs **Quick build**, for a small change. It has no plan. It has no review.
-- ③ **Expert**, folded, lists the other agents and **No workflow**, which talks to the agent directly: the message you type is the task. The project's own workflows show under **Workflows** above it.
+- ③ **Expert**, folded, lists the other agents and **No workflow**, which talks to the agent directly: the message you type is the task. The project's own workflows show under **More workflows** above it.
 
-**⋯** next to the model holds the run settings: **Step by step** (stop before every step), the reasoning effort and the MCP tools.
+**⋯** next to the model holds the run settings: **Step by step** (the workflow stops before each step and waits for you to continue), the reasoning effort and the MCP tools.
 
 Two more workflows, **Write documentation** and **Write a training course**, are off by default. Turn them on in **Settings** > **Workflows** > **Optional workflows**.
 
@@ -135,7 +135,7 @@ Click **Save** ②. The buttons ③ turn on: **Run**, then **Test step by step**
 
 ![A new session with build-and-test, step by step](images/workflows-11.png)
 
-Clicking ③ (**Test step by step**) opens a new session. ① **build-and-test** is chosen, and ② **Step by step ✕** is on. The run stops before every step, so you can watch it.
+Clicking ③ (**Test step by step**) opens a new session. ① **Mode: build-and-test** is chosen, and ② **Step by step ✕** is on. The run stops before every step, so you can watch it.
 
 1. Type the task.
 2. Press Enter.
