@@ -71,15 +71,15 @@ Click **Review and integrate…** ②.
 
 The dialog shows the commits, the files, the criteria and the security scanners.
 
-The commit message ① is proposed by the model. It is marked indicative. Read it. Change it if you want.
+The commit message ① is proposed by the model. It is marked indicative. Read its first line; click it to change it.
 
 It becomes one commit, in your name, on your branch.
 
-A **To accept** box appears when something needs your eye. It can be a file no plan step names. Check **I accept it** ② once you agree.
+A **To accept** box ② appears when something needs your eye. It can be a file no plan step names. Read it: the button then says **Integrate and accept the point above**, so the click is your acceptance.
 
-Want to understand the change first? **Narrate** opens an agent that walks you through it, **Understand** one that answers your questions.
+Want to understand the change first? The eye icon (**Narrate**) opens an agent that walks you through it, the speech bubble (**Understand**) one that answers your questions.
 
-Click **Integrate** ③.
+Read, then click **Integrate** ③.
 
 ![Integrate into main: commit message, accept, Integrate](images/first-session-5.png)
 

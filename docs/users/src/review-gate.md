@@ -31,7 +31,7 @@ The dialog shows the commits, the files, the criteria and the security scanners.
 ![Integrate: commit message, To accept, Integrate](images/first-session-5.png)
 
 1. Read the commit message ①. A model proposed it, so it is marked indicative. Change it if you want.
-2. If a **To accept** box appears, read each item (a protected file, a sensitive zone, a file outside the plan, a weakened test…). Tick **I accept it** ② for each one you agree with. **Integrate** stays off until every item is accepted.
+2. If a **To accept** box appears, read each item (a protected file, a sensitive zone, a file outside the plan, a weakened test…) ②. The button then reads **Integrate and accept the point above** (or **the N points above**): clicking it accepts them. A security scanner finding is the exception: tick **I accept it** for it, **Integrate** stays off until you do.
 3. Optional: **Narrate** opens an agent that walks you through the change, **Understand** one that answers your questions.
 4. Click **Integrate** ③.
 
@@ -53,7 +53,7 @@ Or answer the agent in the session to ask for a change before you integrate.
 
 - **Conflict with your branch**: your branch changed the same lines since the run started; see Conflicts below.
 - **Uncommitted changes would be overwritten**: commit or stash your own changes in those files. Then integrate.
-- **Integrate** stays off: an item in **To accept** is not ticked yet.
+- **Integrate** stays off: a security finding in **To accept** is not ticked yet, or a conflict, local changes or a running scan block it.
 
 ---
 
@@ -87,7 +87,7 @@ The gate can block integration for any of these reasons:
 | **The run started from** | Your branch moved, including a detached HEAD, so the commits would go elsewhere. |
 | **Uncommitted changes would be overwritten** | Your folder has uncommitted changes in files the integration would touch. |
 
-You accept each blocker one by one with **I accept it**. The **To accept** list shows what remains.
+**Integrate** accepts every item listed in **To accept** and says so on its label; a security finding needs its own **I accept it**.
 
 ### File signals
 

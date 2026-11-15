@@ -4,6 +4,7 @@ import {
   acknowledgedKinds,
   blockerSentence,
   gateState,
+  integrateLabel,
   narrativePrompt,
   scanBadge,
   understandingPrompt,
@@ -250,7 +251,7 @@ describe('blocker sentence', () => {
 });
 
 describe('acknowledged kinds', () => {
-  it('drops never acknowledged and unticked kinds', () => {
+  it('drops never acknowledged kinds and includes button-accepted kinds', () => {
     const previewFixture = preview({
       blockers: [
         blocker({ kind: 'noCommits' }),
@@ -259,7 +260,7 @@ describe('acknowledged kinds', () => {
       ],
     });
 
-    expect(acknowledgedKinds(previewFixture, { noCommits: true, noCriteria: true })).toEqual(['noCriteria']);
+    expect(acknowledgedKinds(previewFixture, { noCommits: true, noCriteria: true })).toEqual(['noCriteria', 'protectedTouched']);
   });
 });
 
@@ -431,7 +432,20 @@ describe('gate state', () => {
     expect(state.canFinish).toBe(false);
   });
 
-  it('disables integration for an unticked no criteria blocker', () => {
+  it('keeps integration off until a security finding is ticked', () => {
+    const findings = blocker({ kind: 'securityFindings', findings: [{ scanner: 'gitleaks', rule: 'r', path: 's.py', line: 1, detail: 'd' }] });
+    const input = {
+      preview: preview({ commits: [{ sha: 'c1', subject: 'feat' }], blockers: [findings] }),
+      result: null,
+      message: 'feat: x',
+      busy: false,
+    };
+
+    expect(gateState({ ...input, acknowledged: {} }).integrateDisabled).toBe(true);
+    expect(gateState({ ...input, acknowledged: { securityFindings: true } }).integrateDisabled).toBe(false);
+  });
+
+  it('enables integration for an unticked no criteria blocker', () => {
     const state = gateState({
       preview: preview({
         commits: [
@@ -447,7 +461,7 @@ describe('gate state', () => {
       busy: false,
     });
 
-    expect(state.integrateDisabled).toBe(true);
+    expect(state.integrateDisabled).toBe(false);
     expect(state.canFinish).toBe(false);
   });
 
@@ -493,6 +507,33 @@ describe('gate state', () => {
 
     expect(state.integrateDisabled).toBe(false);
     expect(state.canFinish).toBe(false);
+  });
+});
+
+describe('integrateLabel', () => {
+  it('says Integrate when there is nothing to accept', () => {
+    expect(integrateLabel('en', preview())).toBe('Integrate');
+  });
+
+  it('says it accepts one point when one blocker is accepted by the button', () => {
+    const label = integrateLabel('en', preview({ blockers: [blocker({ kind: 'outsidePlan', paths: ['extra.rs'] })] }));
+
+    expect(label).toBe('Integrate and accept the point above');
+  });
+
+  it('says it accepts the count of points when several blockers are accepted by the button', () => {
+    const label = integrateLabel(
+      'en',
+      preview({
+        blockers: [
+          blocker({ kind: 'outsidePlan', paths: ['extra.rs'] }),
+          blocker({ kind: 'noCriteria' }),
+          blocker({ kind: 'securityFindings', findings: [{ scanner: 'gitleaks', rule: 'r', path: 's.py', line: 1, detail: 'd' }] }),
+        ],
+      }),
+    );
+
+    expect(label).toBe('Integrate and accept the 2 points above');
   });
 });
 
