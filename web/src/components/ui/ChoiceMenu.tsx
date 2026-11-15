@@ -157,15 +157,10 @@ export function ChoiceMenu({
                           close();
                         }}
                       >
-                        <span className="flex w-full flex-col">
-                          <span className="flex w-full items-center gap-1.5">
-                            <span className="w-3 shrink-0 text-left">{choice.value === value ? '✓' : ''}</span>
-                            {choice.color !== undefined ? <ChoiceDot color={choice.color} /> : null}
-                            <span className="min-w-0 grow">{choice.label}</span>
-                          </span>
-                          {choice.description ? (
-                            <span className="pl-[1.125rem] text-xs font-normal text-muted">{choice.description}</span>
-                          ) : null}
+                        <span className="flex w-full items-center gap-1.5">
+                          <span className="w-3 shrink-0 text-left">{choice.value === value ? '✓' : ''}</span>
+                          {choice.color !== undefined ? <ChoiceDot color={choice.color} /> : null}
+                          <span className="min-w-0 grow">{choice.label}</span>
                         </span>
                       </Button>
                     ))}

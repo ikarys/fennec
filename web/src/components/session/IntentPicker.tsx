@@ -150,7 +150,6 @@ export function IntentPicker({
         value={value}
         onChange={handleChange}
         trigger={t('intentTrigger', { label: triggerLabel })}
-        width="w-80"
       />
       {selection.stepByStep && (
         <Button
