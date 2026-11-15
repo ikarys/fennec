@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '../../../lib/api';
 import type { WorkflowSummary } from '../../../lib/workflow';
-import { DEFAULT_WORKFLOW_ID, defaultWorkflowSelection } from './WorkflowPicker';
+import { DEFAULT_WORKFLOW_ID, defaultWorkflowSelection } from './workflowSelection';
 
 const workflows: WorkflowSummary[] = [DEFAULT_WORKFLOW_ID, 'quick'].map((id) => ({
   id,

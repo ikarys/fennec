@@ -276,10 +276,6 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
     setForm((previous) => (previous ? { ...previous, alwaysOnSkills } : previous));
   }
 
-  function updateEnabledWorkflows(enabledWorkflows: string[]) {
-    setForm((previous) => (previous ? { ...previous, enabledWorkflows } : previous));
-  }
-
   function updateAlwaysValidateTests(alwaysValidateTests: boolean) {
     setForm((previous) => (previous ? { ...previous, alwaysValidateTests } : previous));
   }
@@ -505,9 +501,6 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
           {active === 'workflows' && (
             <WorkflowsSection
               save={groupSave('workflows')}
-              workflows={settings.optInWorkflows}
-              value={form.enabledWorkflows}
-              onChange={updateEnabledWorkflows}
               alwaysValidateTests={form.alwaysValidateTests}
               onAlwaysValidateTestsChange={updateAlwaysValidateTests}
             />

@@ -12,7 +12,7 @@ import { useLang, useT } from '../i18n';
 import {
   defaultWorkflowSelection,
   type WorkflowSelection,
-} from '../components/workflow/session/WorkflowPicker';
+} from '../components/workflow/session/workflowSelection';
 import type { ThreadView } from '../lib/fold';
 import type { useModeAndModel } from './useModeAndModel';
 import type { useProjectOptions } from './useProjectOptions';

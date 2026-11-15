@@ -6,8 +6,8 @@ import {
   ActivityIcon,
   AlertIcon,
   BulbIcon,
-  EditIcon,
   DecisionIcon,
+  EditIcon,
   InsightIcon,
   LayersIcon,
   PlusIcon,
@@ -17,7 +17,7 @@ import {
   TrashIcon,
   WandIcon,
 } from '../components/ui/Icons';
-import { withTask } from '../lib/route';
+import { editorPath, projectSection, withTask, type ProjectSection } from '../lib/route';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
 import { ProjectOpenActions } from '../components/project/ProjectOpenActions';
@@ -28,6 +28,8 @@ import { RiskSection } from '../components/project/RiskSection';
 import { AnalysesSection } from '../components/project/AnalysesSection';
 import { SessionsSection } from '../components/project/SessionsSection';
 import { DashboardSection } from '../components/project/DashboardSection';
+import { BudgetTile } from '../components/project/BudgetTile';
+import { DiskSection } from '../components/project/DiskSection';
 import { IndicatorsSection } from '../components/project/IndicatorsSection';
 import { CanvasSection } from '../components/project/CanvasSection';
 import {
@@ -37,27 +39,24 @@ import {
   type ProjectOverview,
 } from '../lib/api';
 import { type IdeaView } from '../lib/ideas';
-import { editorPath } from '../lib/route';
 import { useT } from '../i18n';
 
 
 const TABS = [
-  { id: 'overview', label: 'tasksTabOverview', Icon: ActivityIcon },
-  { id: 'indicators', label: 'indicatorsTab', Icon: InsightIcon },
-  { id: 'tasks', label: 'tasks', Icon: BulbIcon },
-  { id: 'sessions', label: 'sessionsSectionTitle', Icon: TerminalIcon },
-  { id: 'map', label: 'moduleMapTitle', Icon: LayersIcon },
-  { id: 'risks', label: 'risksLabel', Icon: AlertIcon },
-  { id: 'decisions', label: 'projectPageDecisions', Icon: DecisionIcon },
-  { id: 'canvas', label: 'canvasLibraryTab', Icon: WandIcon },
-  { id: 'analyses', label: 'analysesTitle', Icon: SearchIcon },
+  { id: 'overview', label: 'tasksTabOverview', group: 'projectTabWork', Icon: ActivityIcon },
+  { id: 'tasks', label: 'tasks', group: 'projectTabWork', Icon: BulbIcon },
+  { id: 'sessions', label: 'sessionsSectionTitle', group: 'projectTabWork', Icon: TerminalIcon },
+  { id: 'map', label: 'moduleMapTitle', group: 'projectTabUnderstand', Icon: LayersIcon },
+  { id: 'risks', label: 'risksLabel', group: 'projectTabUnderstand', Icon: AlertIcon },
+  { id: 'decisions', label: 'projectPageDecisions', group: 'projectTabUnderstand', Icon: DecisionIcon },
+  { id: 'analyses', label: 'analysesTitle', group: 'projectTabUnderstand', Icon: SearchIcon },
+  { id: 'canvas', label: 'canvasLibraryTab', group: 'projectTabUnderstand', Icon: WandIcon },
+  { id: 'health', label: 'projectSectionIndicators', group: 'projectTabHealth', Icon: InsightIcon },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
-
 /**
- * The map tab fetches the project overview on its own so the tasks and doc
- * tabs do not wait for it.
+ * The map section fetches the project overview on its own so the sections
+ * around it do not wait for it.
  */
 function MapTab({ projectId }: { projectId: string }) {
   const t = useT();
@@ -133,10 +132,9 @@ export default function ProjectPage({
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Unknown or null tab defaults to 'overview'.
-  const activeTab: TabId = TABS.find((t) => t.id === tab)?.id ?? 'overview';
+  const activeTab = projectSection(tab);
 
-  const handleTabSelect = (id: TabId) => {
+  const handleTabSelect = (id: ProjectSection) => {
     window.location.hash = `#/project/${encodeURIComponent(projectId)}/${id}`;
   };
 
@@ -238,15 +236,12 @@ export default function ProjectPage({
       <div className="mt-6 flex flex-col gap-6 md:flex-row">
         <Tabs
           label={t('projectPageSectionsLabel')}
-          tabs={TABS.map((item) => ({ ...item, label: t(item.label) }))}
+          tabs={TABS.map((item) => ({ ...item, label: t(item.label), group: t(item.group) }))}
           active={activeTab}
           onSelect={handleTabSelect}
         />
         <div className="min-w-0 grow">
-          {activeTab === 'overview' ? (
-            <DashboardSection projectId={projectId} onOpenSession={onOpenSession} />
-          ) : null}
-          {activeTab === 'indicators' ? <IndicatorsSection projectId={projectId} /> : null}
+          {activeTab === 'overview' ? <DashboardSection projectId={projectId} /> : null}
           {activeTab === 'tasks' ? (
             <TasksSection
               projectId={projectId}
@@ -262,11 +257,14 @@ export default function ProjectPage({
               }}
             />
           ) : null}
-          {activeTab === 'sessions' ? <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} /> : null}
+          {activeTab === 'sessions' ? (
+            <SessionsSection projectName={project.name} sessions={project.sessions} onOpenSession={onOpenSession} onSessionsDeleted={onSessionsDeleted} />
+          ) : null}
           {activeTab === 'map' ? <MapTab projectId={projectId} /> : null}
-          {activeTab === 'risks' ? <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} /> : null}
+          {activeTab === 'risks' ? (
+            <RiskSection projectId={projectId} busy={analyzing} onStart={(prompt, mode) => void startSession(prompt, mode)} />
+          ) : null}
           {activeTab === 'decisions' ? <DecisionsSection projectId={projectId} /> : null}
-          {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
           {activeTab === 'analyses' ? (
             <AnalysesSection
               busy={analyzing}
@@ -275,6 +273,16 @@ export default function ProjectPage({
               onStart={(prompt, mode) => void startSession(prompt, mode)}
               onOpenSession={onOpenSession}
             />
+          ) : null}
+          {activeTab === 'canvas' ? <CanvasSection projectId={projectId} /> : null}
+          {activeTab === 'health' ? (
+            <div className="flex flex-col gap-6">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <BudgetTile projectId={projectId} />
+              </div>
+              <IndicatorsSection projectId={projectId} />
+              <DiskSection projectId={projectId} onOpenSession={onOpenSession} />
+            </div>
           ) : null}
         </div>
       </div>

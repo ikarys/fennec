@@ -12,7 +12,6 @@ use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{Request, error, send_json};
 use crate::web::views::model_view;
-use crate::workflows;
 use llm_providers_connector::{ApiKey, Endpoint, ListedModel, MasterKey, ModelParams, ModelPrefs};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -63,16 +62,6 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> 
         .into_iter()
         .map(|skill| json!({ "id": skill.id, "description": skill.description }))
         .collect();
-    let opt_in_workflows: Vec<Value> = workflows::opt_in_defaults()
-        .into_iter()
-        .map(|workflow| {
-            json!({
-                "id": workflow.id,
-                "name": workflow.name,
-                "description": workflow.description,
-            })
-        })
-        .collect();
     let scanners: Vec<Value> = SCANNERS
         .iter()
         .map(|scanner| {
@@ -91,7 +80,6 @@ pub fn get_settings(app: &App, stream: &mut TcpStream) -> Result<(), HttpError> 
         "listings": listings,
         "defaults": app.settings.llm.defaults,
         "skills": skills,
-        "optInWorkflows": opt_in_workflows,
         "scanners": scanners,
         "sandboxHealth": sandbox_health(),
         "mcpTools": mcp_tools(&prefs),

@@ -28,16 +28,20 @@ pub struct PreflightResult {
 }
 
 // ponytail: heuristic; extend it when a new environment failure shows up.
+// "read-only file system" is not one: the preflight runs in the planner's
+// read-only workdir, which the builder can write (`cargo test` writing its
+// lockfile), so it says nothing about the builder's sandbox.
 const CANNOT_RUN_MARKERS: &[&str] = &[
     "command not found",
     "could not resolve host",
-    "enotfound",
-    "eai_again",
+    // Node's DNS codes, with their prefix: a bare "enotfound" is inside
+    // Python's "ModuleNotFoundError" and "FileNotFoundError".
+    "getaddrinfo enotfound",
+    "getaddrinfo eai_again",
     "network is unreachable",
     "temporary failure in name resolution",
     "cannot connect to the docker daemon",
     "connection refused",
-    "read-only file system",
 ];
 
 pub fn exit_code(tool_output: &str) -> Option<i32> {
@@ -141,9 +145,71 @@ fn last_300_bytes_one_line(output: &str) -> String {
         .join(" ")
 }
 
+/// The module a Python check could not import, when it is a top-level
+/// name (`No module named 'tomli'`): if the repository already holds it,
+/// the check cannot import the project itself, which no change will fix.
+pub fn missing_top_level_module(output: &str) -> Option<&str> {
+    let start = output.rfind("No module named '")?;
+    let name_start = start + "No module named '".len();
+    let rest = &output[name_start..];
+    let end = rest.find('\'')?;
+    let name = &rest[..end];
+
+    if name.is_empty()
+        || name.contains('.')
+        || name.starts_with(|c: char| c.is_ascii_digit())
+        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return None;
+    }
+
+    Some(name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_top_level_module_reads_the_unimportable_package() {
+        let output = r#"ImportError: Failed to import test module: tests
+Traceback (most recent call last):
+  File "/w/tests/__init__.py", line 9, in <module>
+    import tomli as tomllib
+ModuleNotFoundError: No module named 'tomli'
+
+FAILED (errors=1)
+
+[Exit code: 1]"#;
+        assert_eq!(missing_top_level_module(output), Some("tomli"));
+    }
+
+    #[test]
+    fn missing_top_level_module_ignores_a_dotted_module() {
+        let output = "ModuleNotFoundError: No module named 'tests.test_flatten'";
+        assert_eq!(missing_top_level_module(output), None);
+    }
+
+    #[test]
+    fn missing_top_level_module_refuses_a_name_that_is_not_an_identifier() {
+        assert_eq!(missing_top_level_module("No module named '../etc'"), None);
+        assert_eq!(missing_top_level_module("No module named 'a/b'"), None);
+        assert_eq!(missing_top_level_module("No module named ''"), None);
+    }
+
+    #[test]
+    fn missing_top_level_module_is_none_without_the_message() {
+        assert_eq!(
+            missing_top_level_module("ModuleNotFoundError: No module named"),
+            None
+        );
+    }
+
+    #[test]
+    fn missing_top_level_module_reads_the_last_message() {
+        let output = "No module named 'tests.test_flatten'\nNo module named 'tomli'";
+        assert_eq!(missing_top_level_module(output), Some("tomli"));
+    }
 
     fn result(
         criterion_id: &str,
@@ -212,6 +278,18 @@ mod tests {
     fn classify_marks_everything_else_as_fails() {
         assert_eq!(classify(Some(1), "boom"), PreflightVerdict::Fails);
         assert_eq!(classify(Some(2), ""), PreflightVerdict::Fails);
+    }
+
+    #[test]
+    fn classify_does_not_blame_the_planners_read_only_workdir() {
+        let cargo = "error: failed to open: /work/Cargo.lock\n\nCaused by:\n  Read-only file system (os error 30)";
+        assert_eq!(classify(Some(101), cargo), PreflightVerdict::Fails);
+    }
+
+    #[test]
+    fn classify_takes_a_missing_python_test_module_as_a_failure() {
+        let unittest = "ImportError: Failed to import test module: test_flatten\nModuleNotFoundError: No module named 'tests.test_flatten'\nFAILED (errors=1)";
+        assert_eq!(classify(Some(1), unittest), PreflightVerdict::Fails);
     }
 
     #[test]

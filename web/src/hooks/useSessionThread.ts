@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getContext, getThread, getVision, type ContextView, type ServedThread, getEventPage, getRunView, getSkills, getUsage, getUsageCalls, getUsageWorkflow, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage } from '../lib/api';
+import { getContext, getThread, getVision, type ContextView, type ServedThread, getEventPage, getRunView, getSkills, getUsage, getUsageCalls, getUsageWorkflow, getVerification, type WorkflowUsage, type EventPageEntry, type SessionSkills, type CallUsage, type SessionUsage, type SeenImage, type Verification } from '../lib/api';
 import { createThreadFold, type FennecEvent, type ThreadFold, type ThreadView } from '../lib/fold';
 import type { RunView } from '../lib/runView';
 import { useLang } from '../i18n';
@@ -51,6 +51,8 @@ export interface SessionThread {
   /** Each answer's ledger figures by message id. */
   calls: ReadonlyMap<string, CallUsage>;
   workflowUsage: WorkflowUsage;
+  /** The latest run's verification figures; null until the first fetch. */
+  verification: Verification | null;
   /** The header's context gauge; null until the first fetch. */
   context: ContextView | null;
   /** The images the model received, computed server-side; [] until the first fetch. */
@@ -80,6 +82,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
   const [usage, setUsage] = useState<SessionUsage | null>(null);
   const [calls, setCalls] = useState<ReadonlyMap<string, CallUsage>>(new Map());
   const [workflowUsage, setWorkflowUsage] = useState<WorkflowUsage>({ nodes: [], runs: [] });
+  const [verification, setVerification] = useState<Verification | null>(null);
   const [context, setContext] = useState<ContextView | null>(null);
   const [vision, setVision] = useState<SeenImage[]>([]);
   const [served, setServed] = useState<ServedThread>(EMPTY_SERVED);
@@ -127,6 +130,14 @@ export function useSessionThread(sessionId: string | null): SessionThread {
       })
       .catch(() => {
         // Keep the last totals: the next model call refetches.
+      });
+    getVerification(sessionId)
+      .then((result) => {
+        if (request !== usageReqRef.current) return;
+        setVerification(result);
+      })
+      .catch(() => {
+        // Keep the last figures: the run's end refetches.
       });
   }, [sessionId]);
 
@@ -221,6 +232,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     setUsage(null);
     setCalls(new Map());
     setWorkflowUsage({ nodes: [], runs: [] });
+    setVerification(null);
     setContext(null);
     setVision([]);
     setServed(EMPTY_SERVED);
@@ -354,5 +366,5 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     }
   }, [sessionId, loadingOlder, foldAll, refreshSkills]);
 
-  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, context, vision, served, refreshThread };
+  return { view, hasMore, loadingOlder, loadOlder, skills, usage, calls, workflowUsage, verification, context, vision, served, refreshThread };
 }

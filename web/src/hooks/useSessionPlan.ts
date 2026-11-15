@@ -12,7 +12,7 @@ import type { PlanDecisionActions } from '../components/session/PlanDecision';
 import {
   DEFAULT_WORKFLOW_ID,
   defaultWorkflowSelection,
-} from '../components/workflow/session/WorkflowPicker';
+} from '../components/workflow/session/workflowSelection';
 import type { useProjectOptions } from './useProjectOptions';
 
 type ProjectOptions = ReturnType<typeof useProjectOptions>;

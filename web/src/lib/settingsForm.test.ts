@@ -113,7 +113,6 @@ function response(preferencesValue: Preferences, listings: ProviderListing[]): S
     },
     skills: [],
     scanners: [],
-    optInWorkflows: [],
     mcpTools: {},
     sandboxHealth: {
       status: 'ready',
@@ -284,7 +283,6 @@ describe('to form', () => {
     expect(formValue.autonomy).toEqual({ maxMinutesPerIdea: 120, maxTokensPerIdea: 2_000_000 });
     expect(formValue.favorites).toEqual([]);
     expect(formValue.alwaysOnSkills).toEqual([]);
-    expect(formValue.enabledWorkflows).toEqual([]);
     expect(formValue.mcp).toEqual([]);
   });
 

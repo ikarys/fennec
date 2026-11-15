@@ -3,7 +3,7 @@
 import type { IntegrationPreview, ReviewSignal } from '../../lib/api';
 import { DecisionList } from './DecisionList';
 import { CriterionProvenanceBadge, ExistenceOnlyBadge, PassedBeforeBadge, criterionDotClass } from './CriteriaSection';
-import { ChevronRightIcon } from '../ui/Icons';
+import { ChatIcon, ChevronRightIcon, EyeIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { BadgeTone } from '../ui/Badge';
@@ -135,10 +135,12 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate, un
               size="sm"
               className="ml-auto"
               title={t('narrateTitle')}
+              aria-label={t('narrateTitle')}
+              iconOnly
               disabled={narrating}
               onClick={onNarrate}
             >
-              {t('narrate')}
+              <EyeIcon className="h-3.5 w-3.5" />
             </Button>
           )}
           {preview.files.length > 0 && projectId && preview.understanding.state !== 'none' && (
@@ -155,11 +157,13 @@ export function IntegrationReview({ preview, projectId, narrating, onNarrate, un
               variant="secondary"
               size="sm"
               className="ml-1.5"
-              title={t('understandTitle')}
+              title={preview.understanding.state === 'none' ? t('understandTitle') : t('understandResume')}
+              aria-label={preview.understanding.state === 'none' ? t('understandTitle') : t('understandResume')}
+              iconOnly
               disabled={understandingBusy}
               onClick={onUnderstand}
             >
-              {preview.understanding.state === 'none' ? t('understand') : t('understandResume')}
+              <ChatIcon className="h-3.5 w-3.5" />
             </Button>
           )}
         </SectionLabel>

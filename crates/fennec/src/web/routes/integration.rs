@@ -24,7 +24,9 @@ use std::net::TcpStream;
 use std::path::Path;
 
 mod gate;
+mod verification;
 use gate::{gate, target};
+pub use verification::get_verification;
 
 /// `GET /api/sessions/{id}/integration`: what the integration would do and
 /// what blocks it.
@@ -51,6 +53,11 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         .iter()
         .map(|state| CriterionView::new(state, &gate.passed_before))
         .collect();
+    let block = if store.preferences()?.integration.verification_block {
+        gate.verification.block()
+    } else {
+        None
+    };
     send_json(
         stream,
         200,
@@ -59,7 +66,7 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             "base": gate.wt.base,
             "originBranch": gate.preview.origin_branch,
             "humanBranch": gate.preview.human_branch,
-            "defaultMessage": default_message(&gate.title),
+            "defaultMessage": crate::domain::verification::with_block(&default_message(&gate.title), block.as_deref()),
             "commits": gate.preview.commits,
             "files": files,
             "commonSignals": review_map::common(&gate.review),
@@ -161,6 +168,19 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
             (path.as_str(), added, removed)
         })
         .collect();
+    let changed = integration::changed_files(
+        &target.top,
+        &target.wt,
+        &target.preview.files,
+        &target.prefix,
+    )?;
+    let changed_paths: Vec<String> = changed.iter().map(|(path, _)| path.clone()).collect();
+    let verification = crate::domain::verification::of(&events, Some(&changed_paths));
+    let block = if store.preferences()?.integration.verification_block {
+        verification.block()
+    } else {
+        None
+    };
 
     match crate::web::jobs::commit_subject::suggest(
         &app.settings,
@@ -170,7 +190,11 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         &commits,
         &files,
     ) {
-        Ok(message) => send_json(stream, 200, &json!({ "message": message })),
+        Ok(message) => {
+            let message = message
+                .map(|message| crate::domain::verification::with_block(&message, block.as_deref()));
+            send_json(stream, 200, &json!({ "message": message }))
+        }
         Err(e) => {
             eprintln!("fennec: session {id}: commit subject: {e}");
             send_json(stream, 200, &json!({ "message": null }))

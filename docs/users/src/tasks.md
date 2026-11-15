@@ -6,7 +6,7 @@ The Tasks board turns ideas into tasks with a sheet, then a queue runs the ready
 
 ![The Tasks tab of a project](images/tasks-1.png)
 
-Open your project. Click **Tasks** in its left menu. The tabs are **Overview**, **To decide**, **Ready**, **Drafts** and **Done**. Click **New idea** ①. ② is the queue card: **0 ready** for now.
+Open your project. Click **Tasks** under **Work** in its left menu. Their tabs are **Overview**, **To decide**, **Ready**, **Drafts** and **Done**. Click **New idea** ①. ② is the queue card: **0 ready** for now.
 
 ![Type the idea, then Add the idea](images/tasks-2.png)
 
@@ -153,6 +153,6 @@ Each idea also has a status:
 
 ### Cross-project view
 
-The **Tasks** page shows a cross-project backlog with counts for **To decide**, **running**, **ready**, and **done**. The top bar shows a **To review** counter for work that needs your eye.
+The home page's **Night queue** tab shows a cross-project backlog with counts for **To decide**, **running**, **ready**, and **done**. The top bar shows a **To review** counter for work that needs your eye.
 
 Use it to see which project has work waiting, halted, or ready.

@@ -232,7 +232,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   than the version the human last looked at, up to `current`. The first call records `current`, so a fresh install
   has nothing new.
 - `POST /api/changelog/seen` `{}` → `{unseen: 0}`: the human looked at the changelog of the running version.
-- `GET /api/settings` → `{preferences, listings, defaults, skills, optInWorkflows, scanners, sandboxHealth, mcpTools, shortcuts}`
+- `GET /api/settings` → `{preferences, listings, defaults, skills, scanners, sandboxHealth, mcpTools, shortcuts}`
   (`listings` may be the last listing the endpoint answered, refreshed in the background)
   - `shortcuts`: `[{action, combo, default}]`, every keyboard shortcut in the Settings page's order, the stored override applied (an empty combo: disabled). A combo is `Mod`/`Alt`/`Shift` (in that order) then a `KeyboardEvent.code`, e.g. `Alt+Shift+Digit1`; matching by code keeps a shortcut on the same key whatever the layout.
   - `mcpTools`: `{<server name>: [{name, access: read|write|destructive|undeclared, tokens}]}`, each cached
@@ -256,8 +256,6 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
     set; `contextWindow`/`compactAt` are local).
   - `defaults`: `{provider, model, maxTokens, contextWindow, compactAt, reasoningEffort}`
     from the environment/built-in defaults
-  - `optInWorkflows`: `[{id, name, description}]`, the embedded workflows that stay off
-    until their id is in `preferences.enabledWorkflows`
 - `POST /api/settings` with a full `Preferences` body → 200 with the same body
   as `GET /api/settings`; 400 with the validation message if invalid
 - `POST /api/settings/providers/list` with `{provider, baseUrl, apiKey}` → a
@@ -570,7 +568,8 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   the worktree's.
 - `GET /api/sessions/{id}/diff?path=<path>` → `{path, binary, truncated, hunks: [{header, lines: [{kind, old, new, text}]}], editorUrl}`: one file the session's branch changed, over the range the integration takes; `path` as in the integration's `files[].path`, `kind` is `context`, `added` or `removed`, `old`/`new` the line numbers (null on the side the line is absent from), `truncated` past 5000 lines, `editorUrl` opens the worktree's file in the IDE of `display.editor` (verified: read from git). 400 without `path`, 404 when the session does not exist or the branch did not change the path, 409 without a worktree or a git repository.
 - `POST /api/sessions/{id}/understanding` `{dialogueId}` → `{understanding}`: records that the session `dialogueId`, created just before by the UI, is the comprehension dialogue of the session `id` on its branch's current head (`understanding.started`); 400 when `dialogueId` is missing or belongs to another project, 404 when it does not exist, 409 when the branch has no commit. `understanding` in the integration preview is `{state: "none"}`, `{state: "started", sessionId}` (opened, the human has not answered yet) or `{state: "held", sessionId}` (the human answered at least once after the opening brief): verified, folded from the two logs; a dialogue on an older head does not count.
-- `POST /api/sessions/{id}/integration/message` → `{message}`: an English Conventional Commit subject the model proposes for the integration (indicative; `null` when the model fails or answers no valid subject; `defaultMessage` stays the fallback). The body is `{}`.
+- `POST /api/sessions/{id}/integration/message` → `{message}`: an English Conventional Commit subject the model proposes for the integration (indicative; `null` when the model fails or answers no valid subject; `defaultMessage` stays the fallback). The body is `{}`. `defaultMessage` and the suggestion end with the verification block when `integration.verificationBlock` (default true) is on.
+- `GET /api/sessions/{id}/verification` → `{runId, criteria, testsProtected, waiversAsked, waiversGranted, outsidePlan, block}`: the latest run's verification, folded from the log (verified); `runId` is that run (null before any run); `criteria` is one `{id, description, outcome}` per criterion, `outcome.kind` is `verified {command, exitCode, passed}`, `judged {passed}` (indicative) or `pending`; `testsProtected` counts the test files the human validated, `waiversAsked`/`waiversGranted` the waivers asked and granted; `outsidePlan` lists the changed files the plan did not name (null without a worktree or a git repository); `block` is the text appended to commit messages (null without criteria), returned whatever `integration.verificationBlock` says. 404 when the session does not exist.
 - `POST /api/sessions/{id}/integrate` `{acknowledged: [kind], message, protectTests?, removeWorktree?}` → `{head, commits, protectedTests, protectError, worktreeRemoved, removeError}`:
   the human's decision. The server recomputes the gate and answers 400 on a
   blank `message`, 409 while a turn runs, while the human has staged changes,

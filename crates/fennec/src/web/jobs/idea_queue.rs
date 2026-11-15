@@ -74,11 +74,7 @@ pub(crate) fn start_idea(
     if idea.state == IdeaState::Started && !restart {
         return Err("idea already started".into());
     }
-    let Some(found) = find(
-        Path::new(&project.workdir),
-        DEFAULT_WORKFLOW_ID,
-        &store.preferences()?.enabled_workflows,
-    ) else {
+    let Some(found) = find(Path::new(&project.workdir), DEFAULT_WORKFLOW_ID) else {
         return Err(format!("no workflow {DEFAULT_WORKFLOW_ID}"));
     };
     let session_id = match &idea.session_id {

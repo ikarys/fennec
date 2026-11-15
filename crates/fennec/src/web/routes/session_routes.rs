@@ -100,8 +100,7 @@ pub(crate) fn create_session(
     // A workflow start is validated before the session is created.
     let workflow = match &workflow_id {
         Some(id) => {
-            let enabled = &app.store()?.preferences()?.enabled_workflows;
-            let Some(found) = workflows::find(Path::new(&project.workdir), id, enabled) else {
+            let Some(found) = workflows::find(Path::new(&project.workdir), id) else {
                 return error(stream, 404, "no such workflow");
             };
             Some(found)

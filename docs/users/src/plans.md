@@ -16,7 +16,7 @@ The plan agent reads the code but changes nothing. Before the plan, it talks wit
 
 ![The plan, its Done when criteria, Revise and Go](images/first-session-2.png)
 
-The plan card shows the steps, then **Done when** ①: the acceptance criteria C1, C2… A criterion can carry a check command, a shell command that exits with 0 once the criterion holds (for example `.venv/bin/python -m pytest -q`; it runs in the sandbox, in the session's worktree, with no network); a criterion with a check is **verified** by fennec, one without is judged by an agent and stays **indicative**. **Preflight** runs each check before any change: **fails before the work** is what you want; **already passes** proves nothing and goes back to the planner.
+The plan card shows the steps, then **Done when** ①: the acceptance criteria C1, C2… A criterion can carry a check command, a shell command that exits with 0 once the criterion holds (for example `.venv/bin/python -m pytest -q`; it runs in the sandbox, in the session's worktree, with no network); a criterion with a check is **verified** by fennec, one without is judged by an agent and stays **indicative**. **Checked before the work** runs each check before any change: **fails before the work** is what you want; **already passes** proves nothing and goes back to the planner.
 
 1. Optional: type a remark in **Comment** ②.
 2. Click **Revise** ③ to send the plan back with your remark, or click **Go** ④ to start the build.
@@ -46,7 +46,7 @@ The **Workflow finished** card shows the outcome and the run's start, end and du
 
 ## If something goes wrong
 
-- **already passes** in **Preflight**: the check does not test the change. Click **Revise** to ask for a stricter check.
+- **already passes** in **Checked before the work**: the check does not test the change. Click **Revise** to ask for a stricter check.
 - **cannot run here**: the check needs something the sandbox lacks (network, a service). Fix the command or drop the check.
 - The work touched files the plan did not list: the review gate shows them as **outside the plan**. You decide.
 
@@ -74,7 +74,7 @@ Criteria without a check are judged by an agent and marked **indicative**.
 
 ### Preflight
 
-Before the build, fennec runs the plan's checks in the **Preflight** section. The section is marked **verified** because fennec ran the commands itself before any change.
+Before the build, fennec runs the plan's checks in the **Checked before the work** section. The section is marked **verified** because fennec ran the commands itself before any change.
 
 Preflight results tell you what the baseline proves:
 
@@ -86,7 +86,7 @@ Preflight results tell you what the baseline proves:
 
 From the plan card, **Launch** starts the **Plan, build, verify** workflow: criteria are checked, the result is verified in a fresh context, and the diff is reviewed. See [workflows](workflows.md).
 
-**Builder alone, without criteria or review** starts a build without the full gate. **Save to backlog** keeps the plan in the project backlog without launching it now.
+**Builder alone in your folder, without criteria or review** starts a build in your folder, without the full gate. **Save to backlog** keeps the plan in the project backlog without launching it now.
 
 The build normally works in a copy of the repository, a git worktree, so you integrate afterwards. If the session works directly in your folder, nothing separates the agent's work from yours.
 

@@ -41,7 +41,7 @@ commit to the human's branch (rule 1), even when every edge is automatic.
 2. `~/.agents/workflows/`
 3. the defaults embedded in the binary (`crates/fennec/workflows/`)
 
-The embedded defaults are `plan-build-verify` (plan, tests, build, verify), `quick` (small direct build), `write-docs` (project documentation), and `write-training` (a training course).
+The embedded defaults are `plan-build-verify` (plan, tests, build, verify), and `quick` (small direct build).
 
 `plan-build-verify` has a test gate between the plan and the code: once the human approves the plan, the
 `tests` agent writes the tests derived from its "Done when" criteria (its `writes: tests` frontmatter limits its

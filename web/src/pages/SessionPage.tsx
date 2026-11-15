@@ -79,6 +79,7 @@ export function SessionPage({
     usage,
     calls,
     workflowUsage,
+    verification,
     context,
     vision,
     served,
@@ -267,6 +268,7 @@ export function SessionPage({
       pendingPlanCallId={served.pendingPlan?.callId ?? null}
       calls={calls}
       workflowUsage={workflowUsage}
+      verification={verification}
     >
       <div className="flex min-h-0 min-w-0 grow">
         {run && <RunRail run={run} status={status} onJump={jumpToNode} />}

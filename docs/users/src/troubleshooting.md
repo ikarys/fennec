@@ -44,7 +44,7 @@ See [the sandbox](sandbox.md) for the full model of what is blocked.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Worktrees and build cache take disk space | Session worktrees and shared caches live under `~/.local/share/fennec/worktrees/`. | Open the project's **Disk space** section. Use **Free the build cache** and **Delete the worktree and its branch**. |
+| Repository copies and build cache take disk space | Each session's copy of the repository and shared caches live under `~/.local/share/fennec/worktrees/`. | Open the project's **Disk space** section. Use **Free the build cache** and **Delete the worktree and its branch**. |
 | **Orphans** remain | Folders no session or git knows anymore. | Delete them in a terminal. fennec never deletes them on its own. |
 
 ## Budget refusals

@@ -895,31 +895,27 @@
 
     <section class="modes" id="modes" aria-labelledby="modes-title">
       <div class="container">
-        <h2 id="modes-title">Three ways to work.</h2>
-        <p class="modes-lede">Pick the one that fits the job. The further right, the more fennec runs for you, and the more it checks before anything reaches your branch.</p>
+        <h2 id="modes-title">One choice in the composer.</h2>
+        <p class="modes-lede">Say what you want, fennec picks the agents and the steps. The further right, the more fennec runs for you, and the more it checks before anything reaches your branch.</p>
         <div class="modes-grid">
           <article class="mode">
-            <h3>Chat</h3>
-            <p class="mode-where">New chat in the top bar, no project</p>
-            <p>A conversation with no folder and no git: ask, draft, try a snippet. The model works in a scratch folder created only when a tool needs it, deleted with the chat.</p>
-            <p><a href="docs/ways-to-work.html#chat">Chat in the guide</a></p>
+            <h3>Ask</h3>
+            <p class="mode-where">Changes nothing</p>
+            <p>Answers about the project, read-only, each claim sourced.</p>
+            <p>A <strong>Chat</strong>, from the home page or the top bar, is the same with no project, folder or git: the model works in a scratch folder deleted with the chat.</p>
+            <p><a href="docs/sessions.html">Sessions and chats in the guide</a></p>
           </article>
           <article class="mode">
-            <h3>An agent</h3>
-            <p class="mode-where">A session on a project</p>
-            <p>You pick the agent and talk to it directly:</p>
-            <ul>
-              <li><strong>Question</strong> answers about the project, read-only, each claim sourced.</li>
-              <li><strong>Plan</strong> explores and proposes a plan with its criteria, changing nothing.</li>
-              <li><strong>Builder</strong> changes the code and verifies it.</li>
-            </ul>
-            <p><a href="docs/sessions.html">Sessions in the guide</a></p>
+            <h3>Build</h3>
+            <p class="mode-where">A small change, no plan</p>
+            <p>The agent changes the code and fennec checks it. The work still waits for your review and your click.</p>
+            <p><a href="docs/first-session.html">Your first change in the guide</a></p>
           </article>
           <article class="mode mode-workflow">
-            <h3>A workflow</h3>
-            <p class="mode-where">The Workflow picker in the composer</p>
-            <p>You describe the task once, and a graph runs it: <strong>Plan, build, verify</strong> plans with you, builds in its own worktree, runs the criteria checks and has a fresh agent review the diff, then stops at the review gate. Step by step mode stops before each node.</p>
-            <p>The hero screenshot above is one such run. Draw your own in the visual editor: agent, shell, human, condition and parallel nodes.</p>
+            <h3>Plan</h3>
+            <p class="mode-where">Plan, build, verify</p>
+            <p>You describe the task once, and a graph runs it: it plans with you, writes the tests you validate, builds in its own worktree, runs the criteria checks and has a fresh agent review the diff, then stops at the review gate.</p>
+            <p>The hero screenshot above is one such run. <strong>Expert</strong> lists every agent and workflow, and the visual editor draws your own: agent, shell, human, condition and parallel nodes.</p>
             <p><a href="docs/workflows.html">Workflows in the guide</a></p>
           </article>
         </div>
@@ -961,7 +957,7 @@
                 <span class="dot"></span>
                 <span class="dot"></span>
               </div>
-              <img src="images/editor.png" alt="The editor page: the file tree, a Rust file with syntax highlighting, and the changes panel" width="1600" height="1000" loading="lazy">
+              <img src="images/editor.png" alt="The editor page: the file tree, a file being edited, and the changes panel ready to commit" width="1600" height="1000" loading="lazy">
             </figure>
           </div>
         </article>
@@ -1093,7 +1089,7 @@
           <li><strong>Night runs with a paper trail</strong><span>The queue runs ready tasks at night within time and token caps. Every decision is recorded with its reason, and you integrate one task at a time in the morning.</span></li>
           <li><strong>Yours, on your machine</strong><span>One Rust binary with an embedded web UI and SQLite, under AGPL-3.0.</span></li>
         </ul>
-        <p>With a frontier model, Claude Code and Codex are more mature and polished, with a larger ecosystem, and more direct for a quick change. fennec has a direct Builder agent for that, but its strength is framed, checked work. It is early, and runs on Windows only through WSL2.</p>
+        <p>With a frontier model, Claude Code and Codex are more mature and polished, with a larger ecosystem, and more direct for a quick change. fennec has a direct Build mode for that, but its strength is framed, checked work. It is early, and runs on Windows only through WSL2.</p>
         <p>fennec is built with AI assistance itself, in the open. Each commit names the models that wrote it, and the checks are ones anyone can re-run.</p>
       </div>
     </section>

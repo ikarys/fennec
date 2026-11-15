@@ -358,3 +358,15 @@ MCP crate, done: the client (stdio and streamable HTTP, no async runtime), the l
 live in the reusable crate `mcp-lite`, in its own repository and on crates.io (core without I/O always on, `client` default, `oauth` optional),
 fennec keeps the sandboxed spawn, the tool cache and the Vault that seals tokens; automatic token refresh now
 opens the sealed refresh token first (`mcp-lite`, `mcp.rs`, `mcp/oauth.rs`).
+
+One choice in the composer, done: one picker, "What do you want?", replaces the agent and workflow pickers. Ask
+(the `ask` agent, no workflow), Change (`plan`, Plan, build, verify) and Quick change (`builder`, Quick build) come
+first; More holds the other agents and workflows, No workflow, Step by step and Draw your own. A chat shows no picker.
+The MCP and effort pickers sit behind a ⋯ toggle next to the model (`components/session/IntentPicker.tsx`, `Composer.tsx`).
+
+The run proves itself, done: `domain/verification.rs` folds the latest run's log into its criteria (verified by
+a command and its exit, judged by a model, or not checked), the tests the human protected, the waivers asked and
+granted, and the changed files outside the plan. `GET /api/sessions/{id}/verification` serves it; the run end card
+shows it with the run's numbers, no click needed, and copies its text block. The same block, capped at ten lines with
+model text kept to one line per criterion, ends the proposed commit message unless `integration.verificationBlock`
+is off.

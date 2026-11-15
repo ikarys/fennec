@@ -8,13 +8,15 @@ import {
   acknowledgedKinds,
   blockerSentence,
   gateState,
+  integrateLabel,
   narrativePrompt,
+  needsTick,
   scanBadge,
   understandingPrompt,
   type Acknowledged,
   type BlockerKind,
 } from '../../lib/integration';
-import { AlertIcon, BranchIcon, SpinnerIcon } from '../ui/Icons';
+import { AlertIcon, BranchIcon, EditIcon, SpinnerIcon } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -42,6 +44,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
   const [removeWorktree, setRemoveWorktree] = useState(true);
   const [suggested, setSuggested] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [editingMessage, setEditingMessage] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -54,6 +57,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
     setResult(null);
     setAcknowledged({});
     setMessage('');
+    setEditingMessage(false);
     setProtectTests(false);
     setRemoveWorktree(true);
     setSuggested(null);
@@ -290,7 +294,25 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                   </>
                 }
               >
-                <TextArea rows={3} className="w-full font-mono" value={message} onChange={(event) => setMessage(event.target.value)} />
+                {editingMessage ? (
+                  <TextArea
+                    autoFocus
+                    rows={Math.max(3, message.split('\n').length)}
+                    className="w-full font-mono"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingMessage(true)}
+                    title={t('commitMessageEdit')}
+                    className="flex w-full items-center gap-2 rounded-lg border border-border bg-code px-2.5 py-1.5 text-left font-mono text-xs text-text hover:border-accent"
+                  >
+                    <span className="min-w-0 grow truncate">{message.split('\n')[0]}</span>
+                    <EditIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
+                  </button>
+                )}
               </FieldRow>
 
               {preview.testFiles.length > 0 && (
@@ -352,7 +374,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
                             {t('resolveWithAgent')}
                           </Button>
                         )}
-                        {blocker.acknowledgeable && (
+                        {needsTick(blocker) && (
                           <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
                             <input
                               type="checkbox"
@@ -409,7 +431,7 @@ export function IntegrationDialog({ sessionId, open, onClose, projectId }: { ses
               }}
               disabled={canFinish ? posting : integrateDisabled}
             >
-              {canFinish ? t('finishTask') : result ? t('close') : t('integrate')}
+              {canFinish ? t('finishTask') : result ? t('close') : integrateLabel(lang, preview)}
             </Button>
           </div>
         </div>

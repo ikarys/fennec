@@ -1,13 +1,13 @@
 # Understanding the project
 
-The project page shows how the code is built and where it is fragile, computed from the code and git, not by a model. Use it before you hand work to an agent, and to know what to read first.
+The **Understand** group of the project page's left menu shows how the code is built and where it is fragile, computed from the code and git, not by a model. Use it before you hand work to an agent, and to know what to read first.
 
 **Before you start**: the module map reads Rust, TypeScript and JavaScript only. On a project in another language the map and risk zones stay empty.
 
 ## Step 1: read the module map
 
 1. Open the project page.
-2. Click **Module map** ① in its left menu.
+2. Click **Module map** ① under **Understand** in its left menu. The group's other entries are the risk zones, the decisions, the analyses and the canvases.
 
 ![The Module map of a project](images/understanding-1.png)
 
@@ -21,7 +21,7 @@ The project page shows how the code is built and where it is fragile, computed f
 
 ## Step 2: find the risk zones
 
-1. Click **Risks** ① in the left menu.
+1. Scroll down to **Risk zones** ①.
 
 ![The Risks tab: risk zones per module](images/understanding-2.png)
 
@@ -34,7 +34,7 @@ The project page shows how the code is built and where it is fragile, computed f
 
 ## Step 3: read the decisions
 
-1. Click **Decisions** in the left menu.
+1. Scroll down to the decisions.
 2. Click an ADR to read it.
 
 - It lists the project's ADRs from `docs/adr/` with number, title, and status.
@@ -90,11 +90,11 @@ When rules are violated, the **Drift since docs/map.md** section lists **Forbidd
 
 ### Decisions (ADRs)
 
-The **Decisions** tab lists the project's ADRs, the MADR files in `docs/adr/`, in a navigation on the left (number, title, status); the selected one renders on the right. If none exist, it shows **No ADR in docs/adr/.** ADRs are protected from agent writes. They bind the project; they are not the same as decisions an agent records in a session. A line at the top of the tab says where those are: the session's **Session** tab, and the night report for a night run.
+The decisions section lists the project's ADRs, the MADR files in `docs/adr/`, in a navigation on the left (number, title, status); the selected one renders on the right. If none exist, it shows **No ADR in docs/adr/.** ADRs are protected from agent writes. They bind the project; they are not the same as decisions an agent records in a session. A line at the top of the section says where those are: the session's **Session** tab, and the night report for a night run.
 
 ### Risk zones
 
-The **Risk zones** tab lists source files that are often modified, have no own test, or contain a high share of lines from AI commits never integrated through fennec. It is **Computed from git, no model**.
+The **Risk zones** section lists source files that are often modified, have no own test, or contain a high share of lines from AI commits never integrated through fennec. It is **Computed from git, no model**.
 
 Each file can carry signals such as **never reviewed**, **no own test**, and a commit count. Use **Measure again** to recompute the list.
 
@@ -102,7 +102,7 @@ Each file can carry signals such as **never reviewed**, **no own test**, and a c
 
 ### Analyses and questions
 
-The **Analyses** tab opens read-only sessions. Each analysis changes nothing; its report is a proposal.
+The **Analyses** section opens read-only sessions. Each analysis changes nothing; its report is a proposal.
 
 - **Ask a question** asks the project a question. **Send the question** opens a read-only answer, each point sourced.
 - **Check my understanding of this part (dialogue with the understand agent)** asks you architecture-level questions about a module, flow, or design choice.

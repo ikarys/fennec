@@ -6,22 +6,19 @@ A workflow is a graph of steps fennec runs for a task. fennec follows the graph 
 
 Click **New session**.
 
-In the message box, click the workflow picker. It shows **Plan, build, verify**.
+In the message box, click the mode button. It shows **Mode: Plan**.
 
-![The workflow picker in a new session](images/workflows-1.png)
+![The mode menu in a new session: Plan, Build, Ask and Expert](images/workflows-1.png)
 
-The list shows the workflows of this project.
+- ① **Plan** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
+- ② **Build** runs **Quick build**, for a small change. It has no plan. It has no review.
+- ③ **Expert**, folded, lists the other agents and **No workflow**, which talks to the agent directly: the message you type is the task. The project's other workflows show under **Workflows**, after Plan and Build; **Ask**, under **Agents**, is an agent without a workflow.
 
-- ① **Plan, build, verify** is for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
-- ② **Quick build** is for a small change. It has no plan. It has no review.
-
-**No workflow** talks to the agent directly. The message you type is the task.
-
-Two more workflows, **Write documentation** and **Write a training course**, are off by default. Turn them on in **Settings** > **Workflows** > **Optional workflows**.
+**⋯** next to the model holds the run settings: **Step by step** (the workflow stops before each step and waits for you to continue), the reasoning effort and the MCP tools.
 
 ## Open the workflow list
 
-Click the **Workflows** icon in the top bar. It is the branching icon.
+Open the command palette and choose **Workflows**.
 
 ![The Workflows page and its list](images/workflows-2.png)
 
@@ -136,13 +133,13 @@ Click **Save** ②. The buttons ③ turn on: **Run**, then **Test step by step**
 
 ![A new session with build-and-test, step by step](images/workflows-11.png)
 
-Clicking ③ (**Test step by step**) opens a new session. ① **build-and-test** is chosen, and ② **Step by step ✕** is on. The run stops before every step, so you can watch it.
+Clicking ③ (**Test step by step**) opens a new session. ① **Mode: build-and-test** is chosen, and ② **Step by step ✕** is on. The run stops before every step, so you can watch it.
 
 1. Type the task.
 2. Press Enter.
 3. At each stop, click **Continue** or **Stop**.
 
-To run without stops, use **Run** in the editor instead, or click the ✕ of **Step by step** before you press Enter.
+To run without stops, use **Run** in the editor instead, or click the ✕ of **Step by step** (or turn it off under **⋯**) before you press Enter.
 
 A comment you type there is added to the next agent's prompt.
 
@@ -172,7 +169,7 @@ Going further: the full reference (templates like `{{nodes.<id>.output}}`, paral
 | Node | What it does | Output ports |
 | --- | --- | --- |
 | **Start** | Exactly one per workflow; carries the task. | `next` |
-| **Agent** | Runs an agent with a prompt. `Context` can be **Session** or **New session**. **Verdicts on criteria** lets it judge criteria without a command. | Its **Outputs**, default `done` |
+| **Agent** | Runs an agent with a prompt. `Context` can be **Session** or **New session**. **Judged by the model, per criterion** lets it judge criteria without a command. | Its **Outputs**, default `done` |
 | **Shell** | Runs a command with a timeout and success codes. | `success`, `failure` |
 | **Human** | Pauses for your choice. | One port per choice |
 | **Condition** | Tests a template value with `equals`, `contains`, or `empty`. | `true`, `false` |

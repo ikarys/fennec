@@ -49,8 +49,6 @@ pub struct Preferences {
     pub integration: IntegrationPrefs,
     /// Skill ids whose instructions every new session gets in its system prompt.
     pub always_on_skills: Vec<String>,
-    /// Opt-in embedded workflows (`workflows::opt_in_defaults`) the human enabled.
-    pub enabled_workflows: Vec<String>,
     /// `alwaysValidateTests`: stop at every tests gate, even when fennec proves
     /// each check fails before the work. Off: fennec answers those gates.
     pub always_validate_tests: bool,
@@ -111,12 +109,15 @@ impl Default for SandboxPrefs {
 #[serde(rename_all = "camelCase", default)]
 pub struct IntegrationPrefs {
     pub model_trailers: bool,
+    /// `integration.verificationBlock`: the verification block in the proposed commit message; on by default.
+    pub verification_block: bool,
 }
 
 impl Default for IntegrationPrefs {
     fn default() -> Self {
         Self {
             model_trailers: true,
+            verification_block: true,
         }
     }
 }

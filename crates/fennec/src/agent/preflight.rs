@@ -5,8 +5,9 @@ use super::turn::Turn;
 use crate::domain::agent::{AgentDefinition, CommandAccess};
 use crate::domain::criteria::Criterion;
 use crate::domain::event::Event;
-use crate::domain::preflight::{self, PreflightResult};
+use crate::domain::preflight::{self, PreflightResult, PreflightVerdict};
 use serde_json::json;
+use std::path::Path;
 use std::sync::atomic::Ordering;
 
 const TWO_KIB: usize = 2048;
@@ -59,10 +60,17 @@ pub(super) fn run(
         if exit_code.is_none() {
             return Ok(None);
         }
+        let mut verdict = preflight::classify(exit_code, &output);
+        if verdict == PreflightVerdict::Fails
+            && preflight::missing_top_level_module(&output)
+                .is_some_and(|module| defines_module(turn.workdir, module))
+        {
+            verdict = PreflightVerdict::CannotRun;
+        }
         results.push(PreflightResult {
             criterion_id: criterion.id.clone(),
             command: (*check).clone(),
-            verdict: preflight::classify(exit_code, &output),
+            verdict,
             exit_code,
             output: last_two_kib(&output),
             existence_only: crate::domain::check_kind::is_existence_only(check),
@@ -75,6 +83,14 @@ pub(super) fn run(
         results,
     })?;
     Ok(feedback)
+}
+
+/// Whether the repository already holds a Python module of that name, at
+/// its root or under `src/`.
+fn defines_module(workdir: &Path, module: &str) -> bool {
+    [workdir.to_path_buf(), workdir.join("src")]
+        .iter()
+        .any(|dir| dir.join(module).is_dir() || dir.join(format!("{module}.py")).is_file())
 }
 
 fn last_two_kib(output: &str) -> String {

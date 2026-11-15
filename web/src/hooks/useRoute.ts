@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { editorTabId, parseRoute, rememberEditorHash, type Route } from '../lib/route';
 
-const PAGE_ROUTES = ['settings', 'insight', 'backlog', 'workflows', 'projects', 'chats'];
+const PAGE_ROUTES = ['settings', 'insight', 'workflows'];
 
 export function useRoute(openTab: (id: string) => void) {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));

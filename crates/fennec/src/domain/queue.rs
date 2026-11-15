@@ -2,6 +2,7 @@
 //! as a fold of the log.
 
 use super::event::Event;
+use super::workflow::run::{self, Waiting};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +57,9 @@ pub enum AfterTurn {
     Cancel(Vec<String>),
     Hold,
     Start(Queued),
+    /// The run's agent asked the human and the answer was queued while its
+    /// turn was still closing: the answer goes to that agent.
+    Answer(Queued),
 }
 
 /// What a finished turn does with the queue.
@@ -67,16 +71,21 @@ pub fn after_turn(events: &[Event], stopped: bool) -> AfterTurn {
     if stopped {
         return AfterTurn::Cancel(pending.into_iter().map(|q| q.queue_id).collect());
     }
-    // A workflow still running (waiting on the human, paused) is not a turn to
-    // start beside: its same-session agent nodes drain the queue, and what is
-    // left waits for the run to end.
-    if super::rule_approval::pending(events).is_some()
-        || super::waiver::pending(events).is_some()
-        || super::workflow::run::current_run(events).is_some_and(|run| run.finished.is_none())
-    {
+    if super::rule_approval::pending(events).is_some() || super::waiver::pending(events).is_some() {
         return AfterTurn::Hold;
     }
-    AfterTurn::Start(pending.into_iter().next().expect("pending is not empty"))
+    let first = pending.into_iter().next().expect("pending is not empty");
+    let Some(state) = run::current_run(events) else {
+        return AfterTurn::Start(first);
+    };
+    // A workflow still running (waiting on the human, paused) is not a turn to
+    // start beside: its same-session agent nodes drain the queue, and what is
+    // left waits for the run to end. Only an agent's open question takes it.
+    match run::waiting(&state, events) {
+        Some(Waiting::AgentQuestion) => AfterTurn::Answer(first),
+        _ if state.finished.is_none() => AfterTurn::Hold,
+        _ => AfterTurn::Start(first),
+    }
 }
 
 #[cfg(test)]
@@ -211,5 +220,44 @@ mod tests {
             added("a", "first"),
         ];
         assert_eq!(after_turn(&events, false), AfterTurn::Hold);
+    }
+
+    #[test]
+    fn after_turn_gives_a_queued_answer_to_the_agent_that_asked() {
+        let workflow = serde_json::from_value(json!({
+            "id": "w", "name": "w", "edges": [],
+            "nodes": [{"id": "a", "kind": "agent", "agent": "plan"}]
+        }))
+        .expect("a workflow with one agent node");
+        let events = vec![
+            Event::WorkflowStarted {
+                run_id: "r".into(),
+                workflow,
+                task: String::new(),
+                step_by_step: false,
+                started_at: None,
+            },
+            Event::WorkflowNodeStarted {
+                run_id: "r".into(),
+                node_id: "a".into(),
+                pass: 1,
+                via: None,
+                child_session_id: None,
+                started_at: None,
+            },
+            Event::ChatDone {
+                message_id: "m".into(),
+                reason: crate::domain::event::DoneReason::WaitingForUser,
+                duration_ms: None,
+            },
+            added("a", "the answer"),
+        ];
+        assert_eq!(
+            after_turn(&events, false),
+            AfterTurn::Answer(Queued {
+                queue_id: "a".into(),
+                content: "the answer".into()
+            })
+        );
     }
 }

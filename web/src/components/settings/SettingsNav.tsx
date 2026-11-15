@@ -52,12 +52,10 @@ export const SETTINGS_PAGE_META: Record<
 };
 
 const GROUP_HEADINGS: Record<SettingsGroupId, MsgKey> = {
-  general: 'settingsGroupGeneral',
   models: 'settingsGroupModels',
-  agents: 'settingsGroupAgents',
   security: 'settingsGroupSecurity',
   extensions: 'settingsGroupExtensions',
-  about: 'settingsGroupAbout'
+  display: 'settingsGroupDisplay'
 };
 
 export function SettingsNav({ active }: { active: SettingsPageId }) {
