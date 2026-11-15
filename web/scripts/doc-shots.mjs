@@ -267,7 +267,7 @@ async function workflows(page) {
   await picker.click();
   await page.waitForTimeout(300);
   const item = (name) => page.getByText(name, { exact: true }).last(); // the popover renders after the chip
-  await shot(page, 'workflows-1', [[item('Change'), 1], [item('Quick change'), 2], [page.getByText('More', { exact: true }).last(), 3]]);
+  await shot(page, 'workflows-1', [[item('Change'), 1], [item('Quick change'), 2], [item('Expert'), 3]]);
   await page.keyboard.press('Escape');
 
   await page.goto(`${BASE}/#/workflows`);

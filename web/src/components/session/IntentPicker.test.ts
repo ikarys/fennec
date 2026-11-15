@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { Agent } from '../../lib/api';
 import type { WorkflowSummary } from '../../lib/workflow';
 import type { WorkflowSelection } from '../workflow/session/workflowSelection';
-import { currentIntent, offeredPrimaries } from './IntentPicker';
+import { currentIntent, menuGroups, offeredPrimaries } from './IntentPicker';
 
-const workflows: WorkflowSummary[] = ['plan-build-verify', 'quick'].map((id) => ({
+const workflows: WorkflowSummary[] = ['plan-build-verify', 'quick', 'docs'].map((id) => ({
   id,
   name: id,
   description: '',
@@ -44,12 +44,32 @@ function selection(workflowId: string | null): WorkflowSelection {
 describe('offeredPrimaries', () => {
   it('drops a primary whose agent is missing', () => {
     const offered = offeredPrimaries(agents.filter((item) => item.id !== 'builder'), workflows);
-    expect(offered.map((primary) => primary.agent)).toEqual(['ask', 'plan']);
+    expect(offered.map((primary) => primary.agent)).toEqual(['plan', 'ask']);
   });
 
   it('drops a primary whose workflow is missing', () => {
     const offered = offeredPrimaries(agents, workflows.filter((item) => item.id !== 'quick'));
-    expect(offered.map((primary) => primary.agent)).toEqual(['ask', 'plan']);
+    expect(offered.map((primary) => primary.agent)).toEqual(['plan', 'ask']);
+  });
+});
+
+describe('menuGroups', () => {
+  const primaries = offeredPrimaries(agents, workflows);
+
+  it('excludes a primary\'s workflow from the Workflows list', () => {
+    const { workflows: secondary } = menuGroups(agents, workflows, primaries);
+    expect(secondary.map((w) => w.id)).not.toContain('plan-build-verify');
+    expect(secondary.map((w) => w.id)).not.toContain('quick');
+  });
+
+  it('includes a project workflow that no primary offers', () => {
+    const { workflows: secondary } = menuGroups(agents, workflows, primaries);
+    expect(secondary.map((w) => w.id)).toContain('docs');
+  });
+
+  it('lists non-primary agents as experts', () => {
+    const { experts } = menuGroups(agents, workflows, primaries);
+    expect(experts.map((a) => a.id)).toEqual(['audit']);
   });
 });
 

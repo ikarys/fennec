@@ -12,13 +12,15 @@ In the message box, click **What do you want?**. It shows **Change**.
 
 - ① **Change** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
 - ② **Quick change** runs **Quick build**, for a small change. It has no plan. It has no review.
-- ③ **More** lists the other agents and workflows of this project. **No workflow** talks to the agent directly: the message you type is the task.
+- ③ **Expert**, folded, lists the other agents and **No workflow**, which talks to the agent directly: the message you type is the task. The project's own workflows show under **Workflows** above it.
+
+**⋯** next to the model holds the run settings: **Step by step** (stop before every step), the reasoning effort and the MCP tools.
 
 Two more workflows, **Write documentation** and **Write a training course**, are off by default. Turn them on in **Settings** > **Workflows** > **Optional workflows**.
 
 ## Open the workflow list
 
-In the composer's choice menu, pick **Draw your own…** under **More**, or open the command palette and choose **Workflows**.
+Open the command palette and choose **Workflows**.
 
 ![The Workflows page and its list](images/workflows-2.png)
 
@@ -139,7 +141,7 @@ Clicking ③ (**Test step by step**) opens a new session. ① **build-and-test**
 2. Press Enter.
 3. At each stop, click **Continue** or **Stop**.
 
-To run without stops, use **Run** in the editor instead, or click the ✕ of **Step by step** before you press Enter.
+To run without stops, use **Run** in the editor instead, or click the ✕ of **Step by step** (or turn it off under **⋯**) before you press Enter.
 
 A comment you type there is added to the next agent's prompt.
 

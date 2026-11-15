@@ -1,5 +1,5 @@
 /** The composer's single picker for the agent, workflow, and step-by-step mode. */
-import { ChoiceDot, ChoiceMenu, type Choice } from '../ui/ChoiceMenu';
+import { ChoiceMenu, type Choice, type ChoiceGroup } from '../ui/ChoiceMenu';
 import { Button } from '../ui/Button';
 import { useT } from '../../i18n';
 import type { Agent } from '../../lib/api';
@@ -7,9 +7,9 @@ import type { WorkflowSummary } from '../../lib/workflow';
 import type { WorkflowSelection } from '../workflow/session/workflowSelection';
 
 export const PRIMARY_INTENTS = [
-  { agent: 'ask', workflow: null, labelKey: 'intentAsk', descriptionKey: 'intentAskDescription' },
   { agent: 'plan', workflow: 'plan-build-verify', labelKey: 'intentChange', descriptionKey: 'intentChangeDescription' },
   { agent: 'builder', workflow: 'quick', labelKey: 'intentQuick', descriptionKey: 'intentQuickDescription' },
+  { agent: 'ask', workflow: null, labelKey: 'intentAsk', descriptionKey: 'intentAskDescription' },
 ] as const;
 
 /** The primary intents this project offers: the agent exists and its workflow (if any) is offered. */
@@ -19,6 +19,20 @@ export function offeredPrimaries(agents: Agent[], workflows: WorkflowSummary[]):
     if (!agent) return false;
     return primary.workflow === null || workflows.some((workflow) => workflow.id === primary.workflow);
   });
+}
+
+/** The two secondary lists: project workflows not already offered by a primary, and agents that are not primaries. */
+export function menuGroups(
+  agents: Agent[],
+  workflows: WorkflowSummary[],
+  primaries: readonly typeof PRIMARY_INTENTS[number][],
+): { workflows: WorkflowSummary[]; experts: Agent[] } {
+  const primaryAgents = new Set<string>(primaries.map((primary) => primary.agent));
+  const primaryWorkflows = new Set<string | null>(primaries.map((primary) => primary.workflow));
+  return {
+    workflows: workflows.filter((workflow) => !primaryWorkflows.has(workflow.id)),
+    experts: agents.filter((agent) => !primaryAgents.has(agent.id)),
+  };
 }
 
 /** The value the menu checks: a primary when mode and workflow match one, else `workflow:<id>` when a workflow is selected, else `agent:<mode>` (or `none` when mode is null). */
@@ -53,53 +67,47 @@ export function IntentPicker({
 }: IntentPickerProps) {
   const t = useT();
   const primaries = offeredPrimaries(agents, workflows);
-  const primaryAgents = new Set<string>(primaries.map((primary) => primary.agent));
-  const otherAgents = agents.filter((agent) => !primaryAgents.has(agent.id));
+  const { workflows: secondaryWorkflows, experts } = menuGroups(agents, workflows, primaries);
 
-  const primaryChoices: Choice[] = primaries.map((primary) => {
-    const primaryAgent = agents.find((agent) => agent.id === primary.agent);
-    return {
-      value: `agent:${primary.agent}`,
-      label: t(primary.labelKey),
-      description: t(primary.descriptionKey),
-      color: primaryAgent?.color ?? null,
-    };
-  });
+  const primaryChoices: Choice[] = primaries.map((primary) => ({
+    value: `agent:${primary.agent}`,
+    label: t(primary.labelKey),
+    description: t(primary.descriptionKey),
+  }));
 
-  const moreChoices: Choice[] = [
-    ...otherAgents.map((agent) => ({
+  const groups: ChoiceGroup[] = [{ choices: primaryChoices }];
+
+  if (secondaryWorkflows.length > 0) {
+    groups.push({
+      label: t('intentWorkflows'),
+      choices: secondaryWorkflows.map((workflow) => ({
+        value: `workflow:${workflow.id}`,
+        label: workflow.name,
+        description: workflow.description,
+      })),
+    });
+  }
+
+  const expertChoices: Choice[] = [
+    ...experts.map((agent) => ({
       value: `agent:${agent.id}`,
       label: agent.name,
       description: agent.description,
-      color: agent.color,
-    })),
-    ...workflows.map((workflow) => ({
-      value: `workflow:${workflow.id}`,
-      label: workflow.name,
-      description: workflow.description,
     })),
     {
       value: 'none',
       label: t('workflowPickerNone'),
       description: t('workflowPickerNoneDescription'),
     },
-    ...(selection.workflowId
-      ? [
-          {
-            value: 'step',
-            label: t('intentStepByStep'),
-            description: t('workflowPickerStepByStepTitle'),
-          },
-        ]
-      : []),
-    {
-      value: 'draw',
-      label: t('intentDraw'),
-      description: t('intentDrawDescription'),
-    },
   ];
 
-  if (primaryChoices.length + moreChoices.length < 2) {
+  groups.push({
+    label: t('intentMore'),
+    choices: expertChoices,
+    collapsed: true,
+  });
+
+  if (primaryChoices.length + secondaryWorkflows.length + expertChoices.length < 2) {
     return null;
   }
 
@@ -131,17 +139,6 @@ export function IntentPicker({
         workflowId: null,
         stepByStep: false,
       });
-      return;
-    }
-    if (next === 'step') {
-      onWorkflowSelectionChange({
-        ...selection,
-        stepByStep: !selection.stepByStep,
-      });
-      return;
-    }
-    if (next === 'draw') {
-      window.location.hash = '#/workflows';
     }
   }
 
@@ -149,18 +146,10 @@ export function IntentPicker({
     <div className="flex items-center gap-1">
       <ChoiceMenu
         label={t('intentLabel')}
-        groups={[
-          { choices: primaryChoices },
-          { label: t('intentMore'), choices: moreChoices },
-        ]}
+        groups={groups}
         value={value}
         onChange={handleChange}
-        trigger={
-          <>
-            <ChoiceDot color={agent?.color ?? null} />
-            {triggerLabel}
-          </>
-        }
+        trigger={triggerLabel}
       />
       {selection.stepByStep && (
         <Button

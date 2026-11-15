@@ -4,7 +4,8 @@
  * and ignores the theme tokens, so a dark theme got a white menu.
  *
  * A group's title sits on a tinted band, like a `Section`'s header, so it
- * never reads as a choice.
+ * never reads as a choice; a `collapsed` group folds its choices behind a
+ * toggle in that band.
  */
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Button } from './Button';
@@ -25,6 +26,8 @@ export interface ChoiceGroup {
   /** No title: the choices sit flush, with no band. */
   label?: string;
   choices: Choice[];
+  /** When true the band is a toggle and the choices start hidden. */
+  collapsed?: boolean;
 }
 
 export function ChoiceDot({ color }: { color?: string | null }) {
@@ -67,6 +70,7 @@ export function ChoiceMenu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismissable(open, containerRef, close);
@@ -102,38 +106,69 @@ export function ChoiceMenu({
             align === 'right' ? 'right-0' : 'left-0'
           } ${direction === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
         >
-          {groups.map((group, index) => (
-            <div key={group.label ?? `group-${index}`}>
-              {group.label ? (
-                <h3 className="m-0 bg-raised px-2.5 py-1 text-xs font-semibold tracking-wide text-faint uppercase">
-                  {group.label}
-                </h3>
-              ) : null}
-              <div className="flex flex-col py-0.5">
-                {group.choices.map((choice) => (
-                  <Button
-                    key={choice.value}
-                    role="menuitem"
-                    variant="ghost"
-                    size="sm"
-                    multiline
-                    className="w-full"
-                    title={choice.description}
-                    onClick={() => {
-                      onChange(choice.value);
-                      close();
-                    }}
-                  >
-                    <span className="flex w-full items-center gap-1.5">
-                      <span className="w-3 shrink-0 text-left">{choice.value === value ? '✓' : ''}</span>
-                      {choice.color !== undefined ? <ChoiceDot color={choice.color} /> : null}
-                      <span className="min-w-0 grow">{choice.label}</span>
-                    </span>
-                  </Button>
-                ))}
+          {groups.map((group, index) => {
+            const groupKey = group.label ?? `group-${index}`;
+            const isCollapsed = group.collapsed === true;
+            const isGroupOpen = !isCollapsed || openGroups.has(groupKey) || group.choices.some((choice) => choice.value === value);
+            return (
+              <div key={groupKey}>
+                {group.label ? (
+                  isCollapsed ? (
+                    <button
+                      type="button"
+                      className="m-0 flex w-full items-center gap-1 bg-raised px-2.5 py-1 text-xs font-semibold tracking-wide text-faint uppercase"
+                      aria-expanded={isGroupOpen}
+                      onClick={() => {
+                        setOpenGroups((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(groupKey)) {
+                            next.delete(groupKey);
+                          } else {
+                            next.add(groupKey);
+                          }
+                          return next;
+                        });
+                      }}
+                    >
+                      <ChevronDownIcon
+                        className={`h-3 w-3 shrink-0 transition-transform ${isGroupOpen ? '' : '-rotate-90'}`}
+                      />
+                      {group.label}
+                    </button>
+                  ) : (
+                    <h3 className="m-0 bg-raised px-2.5 py-1 text-xs font-semibold tracking-wide text-faint uppercase">
+                      {group.label}
+                    </h3>
+                  )
+                ) : null}
+                {isGroupOpen && (
+                  <div className="flex flex-col py-0.5">
+                    {group.choices.map((choice) => (
+                      <Button
+                        key={choice.value}
+                        role="menuitem"
+                        variant="ghost"
+                        size="sm"
+                        multiline
+                        className="w-full"
+                        title={choice.description}
+                        onClick={() => {
+                          onChange(choice.value);
+                          close();
+                        }}
+                      >
+                        <span className="flex w-full items-center gap-1.5">
+                          <span className="w-3 shrink-0 text-left">{choice.value === value ? '✓' : ''}</span>
+                          {choice.color !== undefined ? <ChoiceDot color={choice.color} /> : null}
+                          <span className="min-w-0 grow">{choice.label}</span>
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </Card>
       )}
     </div>

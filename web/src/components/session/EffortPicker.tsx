@@ -1,5 +1,4 @@
 import { ChoiceMenu } from '../ui/ChoiceMenu';
-import { CpuIcon } from '../ui/Icons';
 import { REASONING_EFFORTS, type ReasoningEffort } from '../../lib/api';
 import { useT } from '../../i18n';
 
@@ -42,12 +41,7 @@ export function EffortPicker({
       ]}
       value={effort ?? 'auto'}
       onChange={(value) => onChange(value === 'auto' ? null : (value as ReasoningEffort))}
-      trigger={
-        <>
-          <CpuIcon className="h-3.5 w-3.5" />
-          {effort ?? defaultEffort ?? t('effortAutoShort')}
-        </>
-      }
+      trigger={effort ?? defaultEffort ?? t('effortAutoShort')}
     />
   );
 }

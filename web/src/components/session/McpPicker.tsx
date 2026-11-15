@@ -48,7 +48,6 @@ export function McpPicker({ view, onToggle, disabled, contextTokens }: McpPicker
 
   const visible = view ? view.servers.filter((server) => server.visible) : [];
   const activeCount = visible.filter((server) => server.active).length;
-  const anyActive = activeCount > 0;
   const label =
     view && visible.length > 0
       ? `${activeCount} MCP${view.totalTokens > 0 ? ` (${formatTokens(lang, view.totalTokens)})` : ''}`
@@ -85,14 +84,7 @@ export function McpPicker({ view, onToggle, disabled, contextTokens }: McpPicker
         title={title}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="flex items-center gap-1.5">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: anyActive ? 'var(--ok)' : 'var(--border)' }}
-            aria-hidden
-          />
-          {label}
-        </span>
+        {label}
       </Button>
       {open && (
         <Card className="absolute bottom-full right-0 z-10 mb-1 w-80 max-h-80 overflow-y-auto p-2">
