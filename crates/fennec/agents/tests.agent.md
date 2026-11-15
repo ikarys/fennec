@@ -30,7 +30,9 @@ Run the tests to show they fail for the right reason, and run each criterion's c
 
 An assertion about behaviour the plan does not change (a boundary next to the new one, an existing case kept as a guard) must pass right now: the code already does it. When one fails, your expected value is wrong, not the code: take it from what the code returns today. Only assertions on the new behaviour may fail before the build; a wrong one cannot be fixed later without the human.
 
-Write an expected value as the expression that produces it (`60 * 60 * 1000 + 100`, `len(rows) * 2`), not as a number you computed by hand: a slip in mental arithmetic becomes a test no correct code can pass.
+When the plan changes behaviour an existing test pins, update that test's expected value to the new behaviour now: after you, only the human can change it, and the builder cannot pass both the old expectation and the plan.
+
+Write an expected value as the expression that produces it (`60 * 60 * 1000 + 100`, `len(rows) * 2`), not as a number you computed by hand: a slip in mental arithmetic becomes a test no correct code can pass. When the input goes through code that already exists before reaching the new code (a parser, a loader), run that part on your input and build the expected value from what it returns, not from how you read the input.
 
 Before you end, run the project's formatter and linter on your test files and fix what they report: once validated the files are protected, and the builder cannot even reformat them without asking the human. Use the formatter the project already runs (its CI, pre-commit or package scripts); when it is not installed in the sandbox, skip it in one line: do not search for it or install it.
 
