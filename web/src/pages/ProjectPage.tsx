@@ -1,22 +1,8 @@
-/** Project page: section rail and content for one project. */
+/** Project page: section bar and content for one project. */
 import { useEffect, useState, type ReactNode } from 'react';
-import { Tabs } from '../components/ui/Tabs';
+import { Segmented } from '../components/ui/Segmented';
 import { Button, buttonClass } from '../components/ui/Button';
-import {
-  ActivityIcon,
-  AlertIcon,
-  BulbIcon,
-  DecisionIcon,
-  EditIcon,
-  InsightIcon,
-  LayersIcon,
-  PlusIcon,
-  ProjectIcon,
-  SearchIcon,
-  TerminalIcon,
-  TrashIcon,
-  WandIcon,
-} from '../components/ui/Icons';
+import { EditIcon, PlusIcon, ProjectIcon, TrashIcon } from '../components/ui/Icons';
 import { editorPath, projectSection, withTask, type ProjectSection } from '../lib/route';
 import { PageHeader } from '../components/ui/PageHeader';
 import { DeleteProjectDialog } from '../components/project/DeleteProjectDialog';
@@ -42,16 +28,26 @@ import { type IdeaView } from '../lib/ideas';
 import { useT } from '../i18n';
 
 
-const TABS = [
-  { id: 'overview', label: 'tasksTabOverview', group: 'projectTabWork', Icon: ActivityIcon },
-  { id: 'tasks', label: 'tasks', group: 'projectTabWork', Icon: BulbIcon },
-  { id: 'sessions', label: 'sessionsSectionTitle', group: 'projectTabWork', Icon: TerminalIcon },
-  { id: 'map', label: 'moduleMapTitle', group: 'projectTabUnderstand', Icon: LayersIcon },
-  { id: 'risks', label: 'risksLabel', group: 'projectTabUnderstand', Icon: AlertIcon },
-  { id: 'decisions', label: 'projectPageDecisions', group: 'projectTabUnderstand', Icon: DecisionIcon },
-  { id: 'analyses', label: 'analysesTitle', group: 'projectTabUnderstand', Icon: SearchIcon },
-  { id: 'canvas', label: 'canvasLibraryTab', group: 'projectTabUnderstand', Icon: WandIcon },
-  { id: 'health', label: 'projectSectionIndicators', group: 'projectTabHealth', Icon: InsightIcon },
+const SECTION_GROUPS = [
+  {
+    label: 'projectTabWork',
+    sections: [
+      { id: 'overview', label: 'tasksTabOverview' },
+      { id: 'tasks', label: 'tasks' },
+      { id: 'sessions', label: 'sessionsSectionTitle' },
+    ],
+  },
+  {
+    label: 'projectTabUnderstand',
+    sections: [
+      { id: 'map', label: 'moduleMapTitle' },
+      { id: 'risks', label: 'risksLabel' },
+      { id: 'decisions', label: 'projectPageDecisions' },
+      { id: 'analyses', label: 'analysesTitle' },
+      { id: 'canvas', label: 'canvasLibraryTab' },
+    ],
+  },
+  { label: 'projectTabHealth', sections: [{ id: 'health', label: 'projectSectionIndicators' }] },
 ] as const;
 
 /**
@@ -233,13 +229,18 @@ export default function ProjectPage({
           }}
         />
       )}
-      <div className="mt-6 flex flex-col gap-6 md:flex-row">
-        <Tabs
-          label={t('projectPageSectionsLabel')}
-          tabs={TABS.map((item) => ({ ...item, label: t(item.label), group: t(item.group) }))}
-          active={activeTab}
-          onSelect={handleTabSelect}
-        />
+      <div className="mt-6 flex flex-col gap-6">
+        <nav aria-label={t('projectPageSectionsLabel')} className="flex flex-wrap gap-3">
+          {SECTION_GROUPS.map((group) => (
+            <Segmented<ProjectSection>
+              key={group.label}
+              label={t(group.label)}
+              segments={group.sections.map((section) => ({ value: section.id, label: t(section.label) }))}
+              value={group.sections.some((section) => section.id === activeTab) ? activeTab : null}
+              onChange={handleTabSelect}
+            />
+          ))}
+        </nav>
         <div className="min-w-0 grow">
           {activeTab === 'overview' ? <DashboardSection projectId={projectId} /> : null}
           {activeTab === 'tasks' ? (
