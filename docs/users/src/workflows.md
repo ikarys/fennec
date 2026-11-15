@@ -6,16 +6,13 @@ A workflow is a graph of steps fennec runs for a task. fennec follows the graph 
 
 Click **New session**.
 
-In the message box, click the workflow picker. It shows **Plan, build, verify**.
+In the message box, click **What do you want?**. It shows **Change**.
 
 ![The workflow picker in a new session](images/workflows-1.png)
 
-The list shows the workflows of this project.
-
-- ① **Plan, build, verify** is for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
-- ② **Quick build** is for a small change. It has no plan. It has no review.
-
-**No workflow** talks to the agent directly. The message you type is the task.
+- ① **Change** runs **Plan, build, verify**, for a full change. It plans. It asks your approval. It runs tests. It builds. It checks. It reviews.
+- ② **Quick change** runs **Quick build**, for a small change. It has no plan. It has no review.
+- ③ **More** lists the other agents and workflows of this project. **No workflow** talks to the agent directly: the message you type is the task.
 
 Two more workflows, **Write documentation** and **Write a training course**, are off by default. Turn them on in **Settings** > **Workflows** > **Optional workflows**.
 
