@@ -118,6 +118,7 @@ export interface SettingsForm {
   integration: IntegrationPrefs;
   alwaysOnSkills: string[];
   enabledWorkflows: string[];
+  alwaysValidateTests: boolean;
   mcp: McpServer[];
   shortcuts: Record<string, string>;
 }
@@ -156,7 +157,10 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   delegation: { prefs: ['delegation'], form: ['delegation'] },
   integration: { prefs: ['integration'], form: ['integration'] },
   skills: { prefs: ['alwaysOnSkills'], form: ['alwaysOnSkills'] },
-  workflows: { prefs: ['enabledWorkflows'], form: ['enabledWorkflows'] },
+  workflows: {
+    prefs: ['enabledWorkflows', 'alwaysValidateTests'],
+    form: ['enabledWorkflows', 'alwaysValidateTests'],
+  },
   mcp: { prefs: ['mcp'], form: ['mcp'] },
   display: { prefs: ['display'], form: ['display'] },
   shortcuts: { prefs: ['shortcuts'], form: ['shortcuts'] }
@@ -282,6 +286,7 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     integration: preferences.integration ?? { modelTrailers: true },
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     enabledWorkflows: preferences.enabledWorkflows ?? [],
+    alwaysValidateTests: preferences.alwaysValidateTests ?? false,
     mcp: preferences.mcp ?? [],
     shortcuts: preferences.shortcuts ?? {}
   };
@@ -380,6 +385,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
     integration: form.integration,
     alwaysOnSkills: form.alwaysOnSkills,
     enabledWorkflows: form.enabledWorkflows,
+    alwaysValidateTests: form.alwaysValidateTests,
     mcp: form.mcp,
     shortcuts: form.shortcuts
   };

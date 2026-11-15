@@ -48,6 +48,10 @@ The embedded defaults are `plan-build-verify` (plan, tests, build, verify), `qui
 file tools to test files), then a human node asks to validate them. "Validate" records `tests.approved` with the
 test files written so far; from the next turn on they are protected for the rest of the session, like the paths of
 `.agents/protected`, so the builder cannot weaken them. "Rework" sends the human's comment back to the `tests` agent.
+The kernel answers that node itself, with the forward choice, when it proves there is nothing to decide: every
+criterion has a check that is not a code search, and each one runs, selects a test and fails
+(`agent/workflow/test_gate.rs`). Otherwise the question says what is missing. The preference
+`alwaysValidateTests` always asks.
 
 Its checks cost tokens, so each runs once. `verify` judges only the criteria without a check command, and the
 kernel skips it when every criterion has one. `review` reads the diff once against the plan; its findings go to the

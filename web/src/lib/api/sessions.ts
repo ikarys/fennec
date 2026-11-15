@@ -345,7 +345,7 @@ export interface ServedPendingPlan {
   callId: string;
   plan: PlanProposal;
   markdown: string;
-  preflight: { criterionId: string; command: string; verdict: 'fails' | 'passesAlready' | 'cannotRun'; exitCode: number | null; output: string; existenceOnly: boolean }[];
+  preflight: { criterionId: string; command: string; verdict: 'fails' | 'passesAlready' | 'cannotRun' | 'ranNothing'; exitCode: number | null; output: string; existenceOnly: boolean }[];
 }
 
 /** The session's blocks folded by the server: the UI computes none. */

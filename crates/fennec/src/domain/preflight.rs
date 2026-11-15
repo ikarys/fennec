@@ -10,6 +10,9 @@ pub enum PreflightVerdict {
     Fails,
     PassesAlready,
     CannotRun,
+    /// The runner selected no test: the test the check names does not exist
+    /// yet, which is expected before the work and a failure after it.
+    RanNothing,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -47,9 +50,10 @@ pub fn exit_code(tool_output: &str) -> Option<i32> {
 
 pub fn classify(exit_code: Option<i32>, output: &str) -> PreflightVerdict {
     match exit_code {
-        Some(0) => return PreflightVerdict::PassesAlready,
         None => return PreflightVerdict::CannotRun,
         Some(code) if [124, 126, 127].contains(&code) => return PreflightVerdict::CannotRun,
+        _ if super::test_selection::ran_no_test(output) => return PreflightVerdict::RanNothing,
+        Some(0) => return PreflightVerdict::PassesAlready,
         _ => {}
     }
 
@@ -93,7 +97,7 @@ pub fn feedback(results: &[PreflightResult]) -> Option<String> {
 
     for result in results {
         match result.verdict {
-            PreflightVerdict::Fails => {}
+            PreflightVerdict::Fails | PreflightVerdict::RanNothing => {}
             PreflightVerdict::PassesAlready => {
                 lines.push(format!(
                     "- {} `{}`: passes already. A check that passes before the work proves nothing: make it fail until the step is done, or keep it only as a guard against a regression and say so in the criterion.",
@@ -188,6 +192,20 @@ mod tests {
                 PreflightVerdict::CannotRun
             );
         }
+    }
+
+    #[test]
+    fn classify_marks_a_runner_that_selected_no_test() {
+        let cargo = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 3 filtered out";
+        assert_eq!(classify(Some(0), cargo), PreflightVerdict::RanNothing);
+        assert_eq!(
+            classify(Some(5), "collected 0 items\nno tests ran"),
+            PreflightVerdict::RanNothing
+        );
+        assert_eq!(
+            classify(Some(0), "running 2 tests\ntest result: ok. 2 passed"),
+            PreflightVerdict::PassesAlready
+        );
     }
 
     #[test]

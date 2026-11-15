@@ -9,6 +9,7 @@ use crate::domain::criteria::{
     parse_verdicts,
 };
 use crate::domain::event::Event;
+use crate::domain::test_selection;
 use crate::domain::workflow::definition::{DEFAULT_SHELL_TIMEOUT_SECS, NodeKind};
 use crate::domain::workflow::run::{self as run, RunOutcome};
 use std::time::Duration;
@@ -78,8 +79,14 @@ pub(super) fn run(
             });
         }
 
-        let output = outcome::last_bytes(&result.output, 4 * 1024);
-        let status = if result.exit_code == Some(0) {
+        let mut output = outcome::last_bytes(&result.output, 4 * 1024);
+        // A selector matching no test exits 0 under most runners: that
+        // proves nothing, so it is a failed check, not a false "verified".
+        let ran_nothing = test_selection::ran_no_test(&result.output);
+        if ran_nothing {
+            output.insert_str(0, "fennec: this check ran no test.\n");
+        }
+        let status = if result.exit_code == Some(0) && !ran_nothing {
             CriterionStatus::Passed {
                 provenance: Provenance::Verified {
                     command: command.clone(),

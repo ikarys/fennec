@@ -7,6 +7,7 @@ mod fork;
 mod jobs;
 mod nodes;
 mod outcome;
+mod test_gate;
 
 #[cfg(test)]
 mod tests;
@@ -321,14 +322,26 @@ fn run_node(
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
     if let NodeKind::Human { question, choices } = &node.kind {
         let (state, files) = folded_after_start(turn)?;
+        let mut question = render(
+            question,
+            &|name| run::variable(&state, node_id, &files, name),
+            false,
+        );
+        if !turn.always_validate_tests && jobs::fed_by_tests_agent(&state.workflow, node_id) {
+            match test_gate::prove(env, &state.criteria, turn.stop) {
+                test_gate::Proof::Holds(output) => {
+                    return jobs::answer_by_proof(turn, choices, &output).map(Step::Go);
+                }
+                test_gate::Proof::Missing(reason) => {
+                    question.push_str(&format!("\n\nfennec stopped here: {reason}."));
+                }
+                test_gate::Proof::Stopped => return Ok(Step::Exit(DoneReason::Stopped)),
+            }
+        }
         turn.append(Event::WorkflowHumanAsked {
             run_id: state.run_id.clone(),
             node_id: node_id.to_string(),
-            question: render(
-                question,
-                &|name| run::variable(&state, node_id, &files, name),
-                false,
-            ),
+            question,
         })?;
         // Night mode: the kernel, never the model, takes the forward choice
         // and records it as a decision the human reviews in the morning.

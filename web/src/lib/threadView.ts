@@ -46,7 +46,7 @@ export type Segment =
 export interface PreflightResultView {
   criterionId: string;
   command: string;
-  verdict: 'fails' | 'passesAlready' | 'cannotRun';
+  verdict: 'fails' | 'passesAlready' | 'cannotRun' | 'ranNothing';
   exitCode?: number;
   output: string;
   existenceOnly?: boolean;

@@ -204,6 +204,7 @@ impl<'a> Harness<'a> {
             autonomous,
             lang: crate::domain::lang::Lang::Fr,
             preflight_sent_back: false,
+            always_validate_tests: false,
             stop: self.stop,
             on_event: &mut self.on_event,
             children: None,

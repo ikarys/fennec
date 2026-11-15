@@ -384,6 +384,8 @@ export const fr: Record<MsgKey, string> = {
   verdictPassesTitle: 'Ne prouve rien : renvoyé au planificateur',
   verdictCannotLabel: 'ne peut pas tourner ici',
   verdictCannotTitle: 'Environnement : renvoyé au planificateur',
+  verdictRanNothingLabel: 'test pas encore écrit',
+  verdictRanNothingTitle: 'Attendu avant le travail : le check ne sélectionne encore aucun test',
   viewTasks: 'Voir les tâches',
   whichTasksQuestion: 'Ajouter quelles tâches au backlog ?',
   proposedTasksHint: "Proposées par l'agent (indicatif), dans l'ordre de construction : chaque tâche ajoutée se cadre ensuite depuis la page du projet.",
@@ -1189,6 +1191,9 @@ export const fr: Record<MsgKey, string> = {
   optInCount: '{active} / {total} actifs',
   optInSkillsTitle: 'Skills disponibles',
   optInWorkflowsTitle: 'Workflows disponibles',
+  alwaysValidateTestsLabel: 'Toujours valider les tests',
+  alwaysValidateTestsHint:
+    'Désactivé : fennec valide les tests lui-même quand chaque critère a un check qui lance un test en échec avant le travail. Activé : vous les relisez à chaque fois.',
   scannersListTitle: 'Scanners',
   scannersInstalledCount: '{installed} / {total} installés',
   agentsNone: 'Aucun.',

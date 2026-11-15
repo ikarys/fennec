@@ -353,6 +353,8 @@ export const en = {
   verdictPassesTitle: 'Proves nothing: sent back to the planner',
   verdictCannotLabel: 'cannot run here',
   verdictCannotTitle: 'Environment: sent back to the planner',
+  verdictRanNothingLabel: 'test not written yet',
+  verdictRanNothingTitle: 'Expected before the work: the check selects no test yet',
   viewTasks: 'View the tasks',
   whichTasksQuestion: 'Which tasks to add to the backlog?',
   proposedTasksHint: 'Proposed by the agent (indicative), in build order: each added task is then framed from the project page.',
@@ -1154,6 +1156,9 @@ export const en = {
   optInCount: '{active} / {total} active',
   optInSkillsTitle: 'Available skills',
   optInWorkflowsTitle: 'Available workflows',
+  alwaysValidateTestsLabel: 'Always validate the tests',
+  alwaysValidateTestsHint:
+    'Off: fennec validates the tests itself when every criterion has a check that runs a test failing before the work. On: you read them every time.',
   scannersListTitle: 'Scanners',
   scannersInstalledCount: '{installed} / {total} installed',
   agentsNone: 'None.',
