@@ -32,7 +32,7 @@ interface SideRailProps {
   panels: RailPanel[];
   /** Bumping `key` (> 0) opens panel `id`. */
   reveal?: { id: string; key: number };
-  /** Drawer width class, default 'w-[380px]'. */
+  /** Drawer width class, default 'w-96'. */
   width?: string;
 }
 
@@ -62,7 +62,7 @@ export function SideRail({
   defaultPinned,
   panels,
   reveal,
-  width = 'w-[380px]',
+  width = 'w-96',
 }: SideRailProps) {
   const t = useT();
   const floating = useContext(SideRailFloat);
@@ -173,7 +173,7 @@ export function SideRail({
   const nav = (
     <nav
       aria-label={label}
-      className={`relative w-[52px] shrink-0 flex flex-col items-center bg-bg pt-2 ${edge} border-border`}
+      className={`relative w-13 shrink-0 flex flex-col items-center bg-bg pt-2 ${edge} border-border`}
     >
       {!docked ? drawer : null}
       {panels.map((panel) => (
