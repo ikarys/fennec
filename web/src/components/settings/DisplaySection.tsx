@@ -23,7 +23,7 @@ interface DisplaySectionProps {
   save?: SectionSave;
 }
 
-const FONT_SIZES = [13, 14, 15, 16];
+const FONT_SIZES = Array.from({ length: 24 - 11 + 1 }, (_, i) => 11 + i);
 
 // Language names stay in their own language, in both UIs.
 const LANGUAGES: { value: 'en' | 'fr'; label: MsgKey }[] = [
@@ -50,12 +50,18 @@ export function DisplaySection({ value, onChange, theme, onThemeChange, save }: 
           />
         </SettingRow>
         <SettingRow label={t('fontSize')} hint={t('fontSizeHint')}>
-          <Segmented
-            label={t('fontSize')}
+          <Select
+            aria-label={t('fontSize')}
+            className="w-24"
             value={value.fontSize}
-            onChange={(size) => onChange({ ...value, fontSize: size })}
-            segments={FONT_SIZES.map((size) => ({ value: size, label: size }))}
-          />
+            onChange={(event) => onChange({ ...value, fontSize: Number(event.target.value) })}
+          >
+            {FONT_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </Select>
         </SettingRow>
         <SettingRow label={t('editorLabel')} hint={t('editorHint')}>
           <Select
