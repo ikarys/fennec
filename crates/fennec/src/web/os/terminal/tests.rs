@@ -1,26 +1,12 @@
 //! The terminal a session opens from the "open a terminal" button: the
 //! command it runs and the errors that say what to do when it cannot.
-//!
-//! The contract for `web/terminal.rs` (the builder adds
-//! `#[cfg(test)] mod terminal_test;` to `web.rs` to compile this module):
-//! - `terminal_command(setting, dir) -> Command`: a non-empty Settings
-//!   `terminal` command line wins (first token the program, the rest its
-//!   args), started in `dir`; without one, the platform default, then the
-//!   first of the known emulators found on PATH ($TERMINAL first).
-//! - `spawn(setting, dir, lang) -> Result<(), String>`: a gone folder and a
-//!   missing terminal are two different errors, neither the raw
-//!   "No such file or directory"; the no-terminal one points at the Settings
-//!   page and `$TERMINAL`.
-//! - `domain::preferences::Preferences` gains `terminal: Option<String>`
-//!   with a serde default: stored settings written by older versions load
-//!   unchanged.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+use super::{spawn, terminal_command};
 use crate::domain::lang::Lang;
 use crate::domain::preferences::Preferences;
-use crate::web::os::terminal::{spawn, terminal_command};
 
 /// A unique dir under the system temp, created.
 static DIR_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -153,6 +139,7 @@ fn a_missing_terminal_setting_clear_error() {
     let _env = env(None, &path);
     let dir = temp_dir();
     let err = spawn(Some("no-such-terminal-xyz"), &dir, Lang::En).unwrap_err();
+    assert!(err.contains("no-such-terminal-xyz"), "{err}");
     assert!(err.contains("Settings"), "{err}");
     assert!(err.contains("$TERMINAL"), "{err}");
     assert!(!err.contains("No such file or directory"), "{err}");
@@ -176,10 +163,23 @@ fn terminal_preference_defaults_to_none_and_round_trips() {
     .unwrap();
     assert_eq!(old.terminal, None);
 
-    let mut p = Preferences::default();
-    p.terminal = Some("alacritty --title fennec".into());
+    let p = Preferences {
+        terminal: Some("alacritty --title fennec".into()),
+        ..Preferences::default()
+    };
     let json = serde_json::to_string(&p).unwrap();
     assert!(json.contains("\"terminal\""));
     let back: Preferences = serde_json::from_str(&json).unwrap();
     assert_eq!(back.terminal, Some("alacritty --title fennec".into()));
+}
+
+#[test]
+fn a_terminal_that_will_not_start_names_the_program() {
+    let dir = temp_dir();
+    let program = dir.join("fake-term");
+    std::fs::write(&program, "#!/bin/sh\n").unwrap();
+    // Not executable: a spawn failure that is not a missing program.
+    let err = spawn(Some(program.to_str().unwrap()), &dir, Lang::En).unwrap_err();
+    assert!(err.contains("could not be started"), "{err}");
+    assert!(err.contains("fake-term"), "{err}");
 }

@@ -54,18 +54,33 @@ pub(super) fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(),
             )
             .to_string());
     }
+    let has_setting = setting.is_some_and(|line| !line.trim().is_empty());
     let mut cmd = terminal_command(setting, dir);
     let program = PathBuf::from(cmd.get_program());
-    let mut child = cmd.spawn().map_err(|err| {
-        match err.kind() {
-            // The setting names a program that is not on PATH, or no emulator was found.
-            io::ErrorKind::NotFound => lang.pick(
+    let mut child = cmd.spawn().map_err(|err| match err.kind() {
+        // The program the setting names is not on PATH.
+        io::ErrorKind::NotFound if has_setting => lang
+            .pick(
+                &format!(
+                    "the terminal command was not found ({}): fix it on the Settings page (Terminal command), or clear it to use $TERMINAL",
+                    program.display()
+                ),
+                &format!(
+                    "la commande de terminal est introuvable ({}) : corrigez-la sur la page Paramètres (commande de terminal), ou videz-la pour utiliser $TERMINAL",
+                    program.display()
+                ),
+            )
+            .to_string(),
+        // No setting and no emulator found on PATH.
+        io::ErrorKind::NotFound => lang
+            .pick(
                 "no terminal emulator found: set one on the Settings page (Terminal command) or in $TERMINAL",
                 "aucun émulateur de terminal trouvé : définissez-en un sur la page Paramètres (commande de terminal) ou dans $TERMINAL",
             )
             .to_string(),
-            // The program exists but will not start (not executable, …).
-            _ => lang.pick(
+        // The program exists but will not start (not executable, …).
+        _ => lang
+            .pick(
                 &format!(
                     "the terminal command could not be started ({}): {err}",
                     program.display()
@@ -76,7 +91,6 @@ pub(super) fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(),
                 ),
             )
             .to_string(),
-        }
     })?;
     std::thread::spawn(move || child.wait());
     Ok(())
@@ -132,28 +146,10 @@ const KNOWN_EMULATORS: &[&str] = &[
     "xterm",
 ];
 
-/// The full path of `name` when it is a file on PATH.
+/// The full path of `name` when it is an executable file on PATH.
 fn on_path(name: &str) -> Option<PathBuf> {
-    let paths = std::env::var_os("PATH")?;
-    std::env::split_paths(&paths)
-        .map(|entry| entry.join(name))
-        .find(|candidate| candidate.is_file())
+    crate::executable::find_in(&std::env::var_os("PATH")?, name)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_terminal_that_will_not_start_names_the_program() {
-        let dir =
-            std::env::temp_dir().join(format!("fennec-terminal-eacces-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let program = dir.join("fake-term");
-        std::fs::write(&program, "#!/bin/sh\n").unwrap();
-        // Not executable: a spawn failure that is not a missing program.
-        let err = spawn(Some(program.to_str().unwrap()), &dir, Lang::En).unwrap_err();
-        assert!(err.contains("could not be started"), "{err}");
-        assert!(err.contains("fake-term"), "{err}");
-    }
-}
+mod tests;
