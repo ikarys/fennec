@@ -93,7 +93,7 @@ function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLas
         </div>
         {hasMeta ? (
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            {showKind && nodeRun && nodeKind ? <span className="text-[11px] text-faint">{t(NODE_KIND_LABELS[nodeKind])}</span> : null}
+            {showKind && nodeRun && nodeKind ? <span className="text-[0.6875rem] text-faint">{t(NODE_KIND_LABELS[nodeKind])}</span> : null}
             {showPort && portBadge ? (
               nodeRun?.output ? (
                 <button

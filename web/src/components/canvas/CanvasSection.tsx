@@ -83,7 +83,7 @@ export function CanvasSection({ sessionId, refreshKey, onOpen, onNew, onCount }:
             <LayersIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
             <span className="min-w-0 truncate text-sm">{artifact.title}</span>
             <Badge tone="neutral" appearance="pill">{artifact.format}</Badge>
-            <span className="ml-auto shrink-0 text-[11px] text-faint">{formatDateTime(lang, artifact.updatedAt)}</span>
+            <span className="ml-auto shrink-0 text-[0.6875rem] text-faint">{formatDateTime(lang, artifact.updatedAt)}</span>
           </button>
         ))
       )}

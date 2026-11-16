@@ -131,5 +131,5 @@ export function MenuItem({
 }
 
 export function MenuLabel({ children }: { children: ReactNode }) {
-  return <div className="px-2 pt-1 pb-0.5 text-[11px] font-semibold tracking-wider text-faint uppercase">{children}</div>;
+  return <div className="px-2 pt-1 pb-0.5 text-[0.6875rem] font-semibold tracking-wider text-faint uppercase">{children}</div>;
 }

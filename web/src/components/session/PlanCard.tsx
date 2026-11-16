@@ -137,7 +137,7 @@ export function PlanBody({ plan, preflight }: { plan: Plan; preflight?: Prefligh
 
 function CriterionId({ id }: { id: string }) {
   return (
-    <span className="mt-px rounded-sm bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-accent">{id}</span>
+    <span className="mt-px rounded-sm bg-accent-soft px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold text-accent">{id}</span>
   );
 }
 
@@ -357,7 +357,7 @@ export function ReportCard({ report }: { report: Report }) {
           <ol className="m-0 flex flex-col gap-1.5 px-3 py-2.5">
             {report.test.map((item, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm text-text">
-                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">{i + 1}</span>
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[0.625rem] font-semibold text-accent">{i + 1}</span>
                 <span className="min-w-0"><Inline>{item}</Inline></span>
               </li>
             ))}

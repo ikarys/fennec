@@ -156,8 +156,8 @@
   --color-code: var(--code);
   --color-scrim: var(--scrim);
   --shadow-float: var(--float-shadow);
-  /* A page's readable width: max-w-page. */
-  --container-page: 960px;
+  /* A page's readable width: max-w-page. In rem so it scales with the font size. */
+  --container-page: 60rem;
 }
 
 html,

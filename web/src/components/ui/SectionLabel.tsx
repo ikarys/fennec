@@ -14,7 +14,7 @@ export function SectionLabel({
   children: ReactNode;
 }) {
   const Tag = as;
-  const look = as === 'h2' ? 'text-xs font-bold text-text' : 'text-[11px] font-semibold text-muted';
+  const look = as === 'h2' ? 'text-xs font-bold text-text' : 'text-[0.6875rem] font-semibold text-muted';
   return (
     <Tag className={`m-0 tracking-wider uppercase ${look} ${className}`.trim()}>
       {children}
