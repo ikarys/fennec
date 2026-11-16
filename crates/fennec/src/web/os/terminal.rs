@@ -8,6 +8,7 @@ use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{error, require_project, send_json};
 use serde_json::json;
+use std::ffi::OsString;
 use std::io;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
@@ -42,10 +43,44 @@ pub(crate) fn open_project(app: &App, stream: &mut TcpStream, id: &str) -> Resul
     }
 }
 
+/// What the default terminal lookup reads from fennec's environment, passed in
+/// so the lookup is tested without rewriting the process-wide variables.
+pub(super) struct TerminalEnv {
+    pub wsl_distro: Option<String>,
+    pub terminal: Option<String>,
+    pub path: Option<OsString>,
+}
+
+impl TerminalEnv {
+    fn current() -> Self {
+        let var = |name| {
+            std::env::var(name)
+                .ok()
+                .filter(|value: &String| !value.is_empty())
+        };
+        Self {
+            wsl_distro: var("WSL_DISTRO_NAME"),
+            terminal: var("TERMINAL"),
+            path: std::env::var_os("PATH"),
+        }
+    }
+}
+
 /// Starts the terminal in `dir`, reaping it in the background so a closed
-/// terminal leaves no zombie. A gone folder and a missing terminal are two
-/// different errors, neither the raw spawn error.
-pub(super) fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(), String> {
+/// terminal leaves no zombie.
+fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(), String> {
+    spawn_in(setting, dir, lang, &TerminalEnv::current())
+}
+
+/// [`spawn`] with the lookup's environment given. A gone folder, no terminal
+/// at all and a terminal command that is missing or will not start are
+/// distinct errors, none the raw spawn error.
+pub(super) fn spawn_in(
+    setting: Option<&str>,
+    dir: &Path,
+    lang: Lang,
+    env: &TerminalEnv,
+) -> Result<(), String> {
     if !dir.exists() {
         return Err(lang
             .pick(
@@ -54,28 +89,27 @@ pub(super) fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(),
             )
             .to_string());
     }
-    let has_setting = setting.is_some_and(|line| !line.trim().is_empty());
-    let mut cmd = terminal_command(setting, dir);
-    let program = PathBuf::from(cmd.get_program());
-    let mut child = cmd.spawn().map_err(|err| match err.kind() {
-        // The program the setting names is not on PATH.
-        io::ErrorKind::NotFound if has_setting => lang
-            .pick(
-                &format!(
-                    "the terminal command was not found ({}): fix it on the Settings page (Terminal command), or clear it to use $TERMINAL",
-                    program.display()
-                ),
-                &format!(
-                    "la commande de terminal est introuvable ({}) : corrigez-la sur la page Paramètres (commande de terminal), ou videz-la pour utiliser $TERMINAL",
-                    program.display()
-                ),
-            )
-            .to_string(),
-        // No setting and no emulator found on PATH.
-        io::ErrorKind::NotFound => lang
+    let Some(mut cmd) = terminal_command(setting, dir, env) else {
+        return Err(lang
             .pick(
                 "no terminal emulator found: set one on the Settings page (Terminal command) or in $TERMINAL",
                 "aucun émulateur de terminal trouvé : définissez-en un sur la page Paramètres (commande de terminal) ou dans $TERMINAL",
+            )
+            .to_string());
+    };
+    let program = PathBuf::from(cmd.get_program());
+    let mut child = cmd.spawn().map_err(|err| match err.kind() {
+        // The setting, $TERMINAL or the platform default names a program not on PATH.
+        io::ErrorKind::NotFound => lang
+            .pick(
+                &format!(
+                    "the terminal command was not found ({}): set a working one on the Settings page (Terminal command) or in $TERMINAL",
+                    program.display()
+                ),
+                &format!(
+                    "la commande de terminal est introuvable ({}) : définissez-en une qui marche sur la page Paramètres (commande de terminal) ou dans $TERMINAL",
+                    program.display()
+                ),
             )
             .to_string(),
         // The program exists but will not start (not executable, …).
@@ -98,39 +132,43 @@ pub(super) fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(),
 
 /// The command that opens a terminal in `dir`: a non-empty `terminal` setting
 /// wins (first token the program, the rest its args); without one, the
-/// WSL/macOS default, and on Linux the first of the known emulators found on
-/// PATH ($TERMINAL first).
-pub(super) fn terminal_command(setting: Option<&str>, dir: &Path) -> Command {
+/// WSL/macOS default, and on Linux `$TERMINAL` or the first of the known
+/// emulators on PATH. `None` when none of them is there.
+pub(super) fn terminal_command(
+    setting: Option<&str>,
+    dir: &Path,
+    env: &TerminalEnv,
+) -> Option<Command> {
     if let Some(line) = setting.map(str::trim).filter(|line| !line.is_empty()) {
         let mut tokens = line.split_whitespace();
         let program = tokens.next().expect("a non-empty line has a first token");
         let mut cmd = Command::new(program);
         cmd.args(tokens);
         cmd.current_dir(dir);
-        return cmd;
+        return Some(cmd);
     }
-    if let Some(distro) = std::env::var("WSL_DISTRO_NAME")
-        .ok()
-        .filter(|d| !d.is_empty())
-    {
+    if let Some(distro) = &env.wsl_distro {
         let mut cmd = Command::new("wt.exe");
-        cmd.args(["wsl.exe", "-d", &distro, "--cd"]).arg(dir);
-        return cmd;
+        cmd.args(["wsl.exe", "-d", distro, "--cd"]).arg(dir);
+        return Some(cmd);
     }
     if cfg!(target_os = "macos") {
         let mut cmd = Command::new("open");
         cmd.args(["-a", "Terminal"]).arg(dir);
-        return cmd;
+        return Some(cmd);
     }
-    let program = std::env::var("TERMINAL")
-        .ok()
-        .filter(|p| !p.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| KNOWN_EMULATORS.iter().find_map(|name| on_path(name)))
-        .unwrap_or_else(|| PathBuf::from(KNOWN_EMULATORS[0]));
+    let program = match &env.terminal {
+        Some(terminal) => PathBuf::from(terminal),
+        None => {
+            let path = env.path.as_deref()?;
+            KNOWN_EMULATORS
+                .iter()
+                .find_map(|name| crate::executable::find_in(path, name))?
+        }
+    };
     let mut cmd = Command::new(program);
     cmd.current_dir(dir);
-    cmd
+    Some(cmd)
 }
 
 /// Terminal emulators fennec looks for on PATH (Linux, after $TERMINAL).
@@ -145,11 +183,6 @@ const KNOWN_EMULATORS: &[&str] = &[
     "st",
     "xterm",
 ];
-
-/// The full path of `name` when it is an executable file on PATH.
-fn on_path(name: &str) -> Option<PathBuf> {
-    crate::executable::find_in(&std::env::var_os("PATH")?, name)
-}
 
 #[cfg(test)]
 mod tests;
