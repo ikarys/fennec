@@ -165,7 +165,7 @@ impl Default for DelegationPrefs {
 /// The UI's base font size in pixels (the CSS body size); the page zooms around it.
 pub const DEFAULT_FONT_SIZE: u16 = 14;
 /// The sizes the Settings page offers.
-pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 13..=16;
+pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 11..=24;
 
 fn default_font_size() -> u16 {
     DEFAULT_FONT_SIZE

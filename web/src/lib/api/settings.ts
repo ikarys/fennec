@@ -25,7 +25,7 @@ export type AgentStyle = 'concise' | 'normal' | 'explanatory' | 'technical';
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
-  /** The UI's base font size in pixels (server default 14, range 13..=16). */
+  /** The UI's base font size in pixels (server default 14, range 11..=24). */
   fontSize: number;
   /** The UI's display language (server default "en"). */
   language?: 'en' | 'fr';

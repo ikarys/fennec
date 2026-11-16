@@ -325,11 +325,11 @@ fn validate_rejects_bad_fields() {
     assert!(p.validate().unwrap_err().contains("duplicate provider"));
 
     let mut p = valid();
-    p.display.font_size = 12;
+    p.display.font_size = 10;
     assert!(p.validate().unwrap_err().contains("font_size"));
 
     let mut p = valid();
-    p.display.font_size = 17;
+    p.display.font_size = 25;
     assert!(p.validate().unwrap_err().contains("font_size"));
 
     let mut p = valid();
