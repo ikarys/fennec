@@ -183,7 +183,7 @@ graph LR
   m12 -->|1| m5
   m12 -->|1| m30
   m8 -->|1| m14
-  m8 -->|2| m26
+  m8 -->|3| m26
   m8 -->|3| m5
   m8 -->|1| m17
   m6 -->|5| m32
@@ -312,9 +312,9 @@ graph LR
   m49 -->|3| m55
   m54 -->|1| m45
   m54 -->|2| m49
-  m54 -->|27| m47
+  m54 -->|28| m47
   m54 -->|2| m48
-  m54 -->|28| m56
+  m54 -->|29| m56
   m54 -->|24| m53
   m54 -->|3| m55
   m47 -->|2| m48
@@ -374,7 +374,7 @@ graph LR
 | `crates/fennec/src/web` | 9 | 7 |  | Web adapter: the server behind the UI. std only, one thread per connection, bound to the configured address. |
 | `crates/fennec/src/web/routes` | 37 | 19 |  | The JSON API (contract: `docs/devs/api.md`) and the UI's pages. |
 | `crates/fennec/src/plugins` | 4 | 4 |  | The plugin manager: one sandboxed host per activated plugin, for the server's lifetime. Plugins are global: a host sees every session of every project. It starts hosts on demand, feeds them events, and serves the block data they emit. The core renders those blocks; a plugin never writes a session log and nothing of it runs in fennec's process. |
-| `crates/fennec/src/web/os` | 5 | 2 |  | The human's own tools opened from the UI, and the project's dev servers. |
+| `crates/fennec/src/web/os` | 6 | 5 |  | The human's own tools opened from the UI, and the project's dev servers. |
 | `crates/fennec/src/web/streams` | 3 | 1 |  | Server-Sent Event streams: a session's events and the human's notices. |
 | `crates/fennec/src/web/views/run_view` | 2 | 2 |  | The server-side run view: the run the server serves pre-calculated, so the UI renders it as it is. |
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
@@ -419,8 +419,8 @@ graph LR
 | `web/src/components/canvas` | 4 | 0 |  |  |
 | `web/src/components/workflow/session` | 11 | 2 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
-| `web/src/lib` | 50 | 19 |  |  |
-| `web/src/components/settings` | 28 | 0 |  |  |
+| `web/src/lib` | 51 | 20 |  |  |
+| `web/src/components/settings` | 29 | 0 |  |  |
 | `web/src/lib/api` | 22 | 0 |  |  |
 | `web/src/i18n` | 5 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
