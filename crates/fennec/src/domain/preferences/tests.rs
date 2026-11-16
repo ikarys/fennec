@@ -332,6 +332,12 @@ fn validate_rejects_bad_fields() {
     p.display.font_size = 25;
     assert!(p.validate().unwrap_err().contains("font_size"));
 
+    for size in [11, 24] {
+        let mut p = valid();
+        p.display.font_size = size;
+        assert!(p.validate().is_ok(), "font size {size}");
+    }
+
     let mut p = valid();
     p.search.searxng_url = Some("ftp://example.com".into());
     assert!(p.validate().unwrap_err().contains("searxng_url"));

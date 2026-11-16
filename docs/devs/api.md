@@ -153,13 +153,14 @@ as the `local` provider's, and written back in the new shape.
     "enabled": true,
     "network": false
   },
-  "shortcuts": {"<action>": "combo"}
+  "shortcuts": {"<action>": "combo"},
+  "terminal": "string | null"
 }
 ```
 
 Validation: `maxTokens >= 1`, `contextWindow >= 1024`,
 `compactionThreshold` in `0.0..=1.0` (NaN rejected), model ids non-empty,
-`fontSize` in `13..=16` (default 14), `searxngUrl` blank or starting with `http://`
+`fontSize` in `11..=24` (default 14), `searxngUrl` blank or starting with `http://`
 or `https://`. `reasoningEffort` is sent as the
 `reasoning_effort` field of the model request when set; `null` omits it.
 
@@ -180,6 +181,8 @@ not in a command: the model only chooses the query. `webFetch` (fennec's own, de
 `delegation` (fennec's own) is the `delegate` tool: `enabled` (default true) lets an agent hand a task to a read-only agent in a hidden child session; `maxPerTurn` (default 5, 0 = no limit) caps the delegations one turn starts, the next ones fail and the agent goes on itself. Turned off, the agents' reminder no longer lists `delegate` and a call is refused.
 
 `billing` (fennec's own) is a `provider/model` → bool map: a model not listed follows the provider default (local models are not billed, paid providers are), and a listed entry overrides it.
+
+`terminal` (fennec's own) is the command line the "open a terminal" buttons run, split on whitespace (no quoting: a path with spaces needs a wrapper script); `null` or blank lets fennec find one (see `POST /api/sessions/{id}/terminal`).
 
 `shortcuts` (fennec's own) holds only the human's overrides of the keyboard shortcuts: an unknown action, a malformed combo (it needs `Mod` or `Alt` unless the key is F1–F12) or two actions on one combo are refused.
 
@@ -606,10 +609,12 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   switches to `builder` (`mode.changed`, reason `conflict`) and a turn starts
   with a prompt naming the conflicted files; `started` is true then.
 - `POST /api/sessions/{id}/terminal` → 202 `{path}`: opens the human's own
-  terminal in the session's folder (its worktree, else the project): Windows
-  Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or
-  `x-terminal-emulator`. Outside the sandbox: the human's action. 500 if it
-  cannot start.
+  terminal in the session's folder (its worktree, else the project): the
+  `terminal` setting when set, else Windows Terminal under WSL, Terminal.app on
+  macOS, else `$TERMINAL` or the first known emulator on PATH
+  (`x-terminal-emulator`, `gnome-terminal`, `konsole`, `kitty`, …). Outside the
+  sandbox: the human's action. 500 if it cannot start, with a message naming
+  the gone folder or the missing program.
 - `POST /api/projects/{id}/terminal` → 202 `{path}`: the same, in the project's folder.
 - `POST /api/sessions/{id}/files` → 202 `{path}`: opens the human's own file
   manager in the session's project folder (their repository, not the worktree):
