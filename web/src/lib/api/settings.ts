@@ -142,6 +142,8 @@ export interface Preferences {
   mcp?: McpServer[];
   /** The human's keyboard shortcut overrides, action → combo; an empty combo disables. */
   shortcuts?: Record<string, string>;
+  /** The terminal command the "open a terminal" button runs; null auto-detects. */
+  terminal?: string | null;
 }
 
 /** One tool of an MCP server, as listed by `tools/list`. */

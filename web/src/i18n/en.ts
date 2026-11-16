@@ -610,6 +610,10 @@ export const en = {
   sandboxNetworkLabel: 'Network for commands',
   sandboxNetworkHint:
     'Cut by default: npm and cargo go offline. Open it to install dependencies or for the browser to reach a dev server. web_search and web_fetch do not depend on it: fennec runs them itself.',
+  terminalTitle: 'Terminal',
+  terminalCommandLabel: 'Terminal command',
+  terminalCommandHint:
+    'Run by the "open a terminal" buttons on a session. First word the program, the rest its flags (e.g. alacritty, konsole -e bash). Empty: fennec finds an emulator on the machine.',
   globalInstructionsTitle: 'Global instructions',
   instructionsLabel: 'Instructions',
   instructionsHint:

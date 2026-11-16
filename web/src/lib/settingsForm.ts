@@ -120,6 +120,7 @@ export interface SettingsForm {
   alwaysValidateTests: boolean;
   mcp: McpServer[];
   shortcuts: Record<string, string>;
+  terminal: string;
 }
 
 
@@ -131,6 +132,7 @@ export type SaveGroup =
   | 'instructions'
   | 'search'
   | 'sandbox'
+  | 'terminal'
   | 'autonomy'
   | 'delegation'
   | 'integration'
@@ -152,6 +154,7 @@ export const SAVE_GROUPS: Record<SaveGroup, { prefs: (keyof Preferences)[]; form
   instructions: { prefs: ['globalInstructions', 'agentStyle'], form: ['instructions', 'agentStyle'] },
   search: { prefs: ['search'], form: ['search'] },
   sandbox: { prefs: ['sandbox'], form: ['sandbox'] },
+  terminal: { prefs: ['terminal'], form: ['terminal'] },
   autonomy: { prefs: ['autonomy'], form: ['autonomy'] },
   delegation: { prefs: ['delegation'], form: ['delegation'] },
   integration: { prefs: ['integration'], form: ['integration'] },
@@ -286,7 +289,8 @@ export function toForm(preferences: Preferences, listings: ProviderListing[]): S
     alwaysOnSkills: preferences.alwaysOnSkills ?? [],
     alwaysValidateTests: preferences.alwaysValidateTests ?? false,
     mcp: preferences.mcp ?? [],
-    shortcuts: preferences.shortcuts ?? {}
+    shortcuts: preferences.shortcuts ?? {},
+    terminal: preferences.terminal ?? ''
   };
 }
 
@@ -363,6 +367,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
 
   const searxngUrl = form.search.url.trim();
   const searxngApiKey = form.search.apiKey.trim();
+  const terminal = form.terminal.trim();
 
   return {
     selected,
@@ -378,6 +383,7 @@ export function buildPreferences(form: SettingsForm, settings: SettingsResponse)
       webFetch: form.search.webFetch
     },
     sandbox: form.sandbox,
+    terminal: terminal === '' ? null : terminal,
     autonomy: form.autonomy,
     delegation: form.delegation,
     integration: form.integration,

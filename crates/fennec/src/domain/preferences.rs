@@ -57,6 +57,9 @@ pub struct Preferences {
     /// The human's keyboard shortcut overrides, action id → combo (`shortcut::ACTIONS`); an
     /// action not listed keeps its default, an empty combo disables it.
     pub shortcuts: BTreeMap<String, String>,
+    /// The terminal command the "open a terminal" button runs; `None` lets
+    /// fennec find an emulator on the machine.
+    pub terminal: Option<String>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,

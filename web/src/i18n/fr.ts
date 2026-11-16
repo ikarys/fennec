@@ -641,6 +641,10 @@ export const fr: Record<MsgKey, string> = {
   sandboxNetworkLabel: 'Réseau pour les commandes',
   sandboxNetworkHint:
     "Coupé par défaut : npm et cargo passent hors ligne. À ouvrir pour installer des dépendances ou pour que le navigateur atteigne un serveur de dev. web_search et web_fetch n'en dépendent pas : fennec les exécute lui-même.",
+  terminalTitle: 'Terminal',
+  terminalCommandLabel: 'Commande de terminal',
+  terminalCommandHint:
+    'Lancée par les boutons « ouvrir un terminal » d’une session. Premier mot le programme, le reste ses options (ex. alacritty, konsole -e bash). Vide : fennec cherche un émulateur sur la machine.',
   globalInstructionsTitle: 'Instructions globales',
   instructionsLabel: 'Instructions',
   instructionsHint:

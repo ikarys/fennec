@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "test": "vitest run"
+    "build": "tsc --noEmit && vite build --configLoader native",
+    "test": "vitest run --configLoader native"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",
