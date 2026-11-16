@@ -1,12 +1,25 @@
 //! Finds the security scanners of `domain::scanner` on PATH, as the sandbox sees it (commands inherit fennec's environment).
 
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+/// The scanner binaries found on PATH, cached per binary: the PATH and the
+/// installed binaries do not change during a session, and a WSL `/mnt/c` PATH
+/// is slow to stat, so re-searching it on every settings read would lag saves.
+static FOUND: LazyLock<std::sync::Mutex<HashMap<String, Option<PathBuf>>>> =
+    LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 pub fn find(binary: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    find_in(&path, binary)
+    let mut cache = crate::locks::lock(&FOUND);
+    if let Some(cached) = cache.get(binary) {
+        return cached.clone();
+    }
+    let found = std::env::var_os("PATH").and_then(|path| find_in(&path, binary));
+    cache.insert(binary.to_string(), found.clone());
+    found
 }
 
 fn find_in(path: &OsStr, binary: &str) -> Option<PathBuf> {
@@ -82,6 +95,39 @@ mod tests {
         let path = std::env::join_paths([root.clone()]).expect("join paths");
         assert_eq!(find_in(&path, "scanner"), None);
 
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// PATH is process-wide; the test that rewrites it runs alone, restoring it after.
+    static PATH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn find_caches_so_a_removed_binary_is_still_found() {
+        let _guard = PATH_LOCK.lock().unwrap();
+        let name = format!("fennec-cache-scanner-{}", std::process::id());
+        let root = temp_root();
+        std::fs::create_dir_all(&root).expect("create temp dir");
+        let binary = root.join(&name);
+        std::fs::write(&binary, b"").expect("write binary");
+        set_mode(&binary, 0o755);
+
+        let old_path = std::env::var_os("PATH");
+        unsafe { std::env::set_var("PATH", &root) };
+
+        let first = find(&name).expect("find the binary");
+        assert_eq!(first, binary);
+
+        // A fresh search would now fail: the binary is gone. The cache keeps it.
+        std::fs::remove_file(&binary).expect("remove binary");
+        let second = find(&name).expect("the cached path, not a fresh search");
+        assert_eq!(second, binary);
+
+        unsafe {
+            match old_path {
+                Some(path) => std::env::set_var("PATH", path),
+                None => std::env::remove_var("PATH"),
+            }
+        }
         let _ = std::fs::remove_dir_all(&root);
     }
 
