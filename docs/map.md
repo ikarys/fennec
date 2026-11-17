@@ -425,7 +425,7 @@ graph LR
 | `web/src/components/workflow/session` | 11 | 2 |  |  |
 | `web/src/components/preview` | 6 | 0 |  |  |
 | `web/src/lib` | 51 | 20 |  |  |
-| `web/src/components/settings` | 29 | 0 |  |  |
+| `web/src/components/settings` | 30 | 1 |  |  |
 | `web/src/lib/api` | 22 | 0 |  |  |
 | `web/src/i18n` | 5 | 1 |  |  |
 | `crates/fennec` | 1 | 0 |  |  |
