@@ -48,6 +48,11 @@ minor findings goes to `accept` directly, the findings listed for the human.
 Fixed: the review node has a third outcome, `minor`, wired straight to the
 human node; its question lists the review's findings.
 
+2026-11-19. Since the single review (#429) `minor` went to the triage node again,
+and night mode answered it with "Fix": the builder then asked a waiver for the
+protected tests the review had nitpicked, and the run stalled. `minor` now ends
+the run; the nits stay in the review's output for the human.
+
 ## Abandoning the work left a run asking for approval — fixed
 
 2026-10-28. A session planned an increment and paused on "Go with this plan?".
