@@ -54,9 +54,12 @@ criterion has a check that is not a code search, and each one runs, selects a te
 `alwaysValidateTests` always asks.
 
 Its checks cost tokens, so each runs once. `verify` judges only the criteria without a check command, and the
-kernel skips it when every criterion has one. `review` reads the diff once against the plan; its findings go to the
-human node "Review findings", where the human picks what `fix-review` fixes. After the fix only the criteria checks
-run again (`recheck`), with no second verify or review.
+kernel skips it when every criterion has one. `verify` and `review` get the run's diff in their prompt (`{{diff}}`)
+and read it once against the plan. A review that ends `clean` or `minor` ends the run: nits the human may take or
+leave stay readable in its output and do not cost a builder round. `findings` go to the human node "Review
+findings", where the human picks what `fix-review` fixes; a finding on a protected file (the validated tests, a
+lockfile) is dismissed in its report, never a waiver. After the fix only the criteria checks run again (`recheck`),
+with no second verify or review.
 
 `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the file name. The editor
 saves into the project's or the global folder; an embedded default is
