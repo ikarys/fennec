@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-15T21:23:26.921Z",
+    "detectionDate": "2026-11-19T07:09:52.597Z",
     "formats": {
       "typescript": {
         "sources": {
@@ -101,8 +101,8 @@
             "newClones": 0
           },
           "web/src/lib/api/settings.ts": {
-            "lines": 367,
-            "tokens": 2506,
+            "lines": 369,
+            "tokens": 2521,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -328,6 +328,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/settings/ModelSection.test.ts": {
+            "lines": 53,
+            "tokens": 668,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/session/SlashMenu.test.ts": {
             "lines": 43,
             "tokens": 621,
@@ -472,6 +484,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/lib/spacing.test.ts": {
+            "lines": 34,
+            "tokens": 289,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/lib/sources.ts": {
             "lines": 33,
             "tokens": 366,
@@ -581,8 +605,8 @@
             "newClones": 0
           },
           "web/src/lib/settingsForm.ts": {
-            "lines": 389,
-            "tokens": 4142,
+            "lines": 395,
+            "tokens": 4227,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -593,8 +617,8 @@
             "newClones": 0
           },
           "web/src/lib/settingsForm.test.ts": {
-            "lines": 521,
-            "tokens": 5018,
+            "lines": 548,
+            "tokens": 5300,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1410,14 +1434,14 @@
           }
         },
         "total": {
-          "lines": 13311,
-          "tokens": 133253,
-          "sources": 117,
+          "lines": 13433,
+          "tokens": 134592,
+          "sources": 119,
           "clones": 17,
           "duplicatedLines": 146,
           "duplicatedTokens": 1596,
-          "percentage": 1.1,
-          "percentageTokens": 1.2,
+          "percentage": 1.09,
+          "percentageTokens": 1.19,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -1593,8 +1617,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/fields/AgentFields.tsx": {
-            "lines": 60,
-            "tokens": 740,
+            "lines": 61,
+            "tokens": 760,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2252,6 +2276,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/settings/TerminalSection.tsx": {
+            "lines": 6,
+            "tokens": 71,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/settings/SkillsSection.tsx": {
             "lines": 15,
             "tokens": 101,
@@ -2397,8 +2433,8 @@
             "newClones": 0
           },
           "web/src/components/settings/ModelSection.tsx": {
-            "lines": 15,
-            "tokens": 269,
+            "lines": 12,
+            "tokens": 121,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2493,8 +2529,8 @@
             "newClones": 0
           },
           "web/src/components/settings/DisplaySection.tsx": {
-            "lines": 70,
-            "tokens": 769,
+            "lines": 76,
+            "tokens": 808,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3909,8 +3945,8 @@
             "newClones": 0
           },
           "web/src/pages/SettingsPage.tsx": {
-            "lines": 464,
-            "tokens": 4696,
+            "lines": 469,
+            "tokens": 4773,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4030,14 +4066,14 @@
           }
         },
         "total": {
-          "lines": 14634,
-          "tokens": 139250,
-          "sources": 217,
+          "lines": 14649,
+          "tokens": 139309,
+          "sources": 218,
           "clones": 3,
           "duplicatedLines": 608,
           "duplicatedTokens": 5161,
           "percentage": 4.15,
-          "percentageTokens": 3.71,
+          "percentageTokens": 3.7,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -4213,8 +4249,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/fields/AgentFields.tsx": {
-            "lines": 92,
-            "tokens": 1066,
+            "lines": 93,
+            "tokens": 1086,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4920,6 +4956,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/settings/TerminalSection.tsx": {
+            "lines": 27,
+            "tokens": 238,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/settings/SkillsSection.tsx": {
             "lines": 37,
             "tokens": 280,
@@ -5065,8 +5113,8 @@
             "newClones": 0
           },
           "web/src/components/settings/ModelSection.tsx": {
-            "lines": 57,
-            "tokens": 710,
+            "lines": 84,
+            "tokens": 910,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5161,8 +5209,8 @@
             "newClones": 0
           },
           "web/src/components/settings/DisplaySection.tsx": {
-            "lines": 117,
-            "tokens": 1238,
+            "lines": 123,
+            "tokens": 1302,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6685,8 +6733,8 @@
             "newClones": 0
           },
           "web/src/pages/SettingsPage.tsx": {
-            "lines": 559,
-            "tokens": 5663,
+            "lines": 565,
+            "tokens": 5753,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6830,13 +6878,13 @@
           }
         },
         "total": {
-          "lines": 28944,
-          "tokens": 276366,
-          "sources": 232,
+          "lines": 29011,
+          "tokens": 276978,
+          "sources": 233,
           "clones": 19,
           "duplicatedLines": 210,
           "duplicatedTokens": 2108,
-          "percentage": 0.73,
+          "percentage": 0.72,
           "percentageTokens": 0.76,
           "newDuplicatedLines": 0,
           "newClones": 0
@@ -6845,7 +6893,7 @@
       "css": {
         "sources": {
           "web/src/styles/app.css": {
-            "lines": 315,
+            "lines": 316,
             "tokens": 2289,
             "sources": 1,
             "clones": 0,
@@ -6858,7 +6906,7 @@
           }
         },
         "total": {
-          "lines": 315,
+          "lines": 316,
           "tokens": 2289,
           "sources": 1,
           "clones": 0,
@@ -6908,15 +6956,51 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "crates/fennec/src/web/os/terminal/tests.rs": {
+            "lines": 154,
+            "tokens": 1679,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/agent/workflow/tests/test_gate.rs": {
+            "lines": 153,
+            "tokens": 1638,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 6,
+            "duplicatedTokens": 76,
+            "percentage": 3.92,
+            "percentageTokens": 4.64,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/agent/workflow/tests/handoff.rs": {
+            "lines": 251,
+            "tokens": 2399,
+            "sources": 1,
+            "clones": 9,
+            "duplicatedLines": 96,
+            "duplicatedTokens": 1096,
+            "percentage": 38.25,
+            "percentageTokens": 45.69,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "crates/fennec/src/web/views/workflow_usage.rs": {
-            "lines": 318,
-            "tokens": 3157,
+            "lines": 348,
+            "tokens": 3406,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 34,
             "duplicatedTokens": 331,
-            "percentage": 10.69,
-            "percentageTokens": 10.48,
+            "percentage": 9.77,
+            "percentageTokens": 9.72,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7497,8 +7581,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/os/terminal.rs": {
-            "lines": 62,
-            "tokens": 771,
+            "lines": 188,
+            "tokens": 1748,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7713,14 +7797,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/workflow/definition.rs": {
-            "lines": 470,
-            "tokens": 3770,
+            "lines": 474,
+            "tokens": 3783,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 20,
             "duplicatedTokens": 190,
-            "percentage": 4.26,
-            "percentageTokens": 5.04,
+            "percentage": 4.22,
+            "percentageTokens": 5.02,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7737,14 +7821,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/preferences/tests.rs": {
-            "lines": 681,
-            "tokens": 6191,
+            "lines": 687,
+            "tokens": 6255,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 14,
             "duplicatedTokens": 140,
-            "percentage": 2.06,
-            "percentageTokens": 2.26,
+            "percentage": 2.04,
+            "percentageTokens": 2.24,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7965,8 +8049,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/listings.rs": {
-            "lines": 71,
-            "tokens": 679,
+            "lines": 91,
+            "tokens": 834,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8865,8 +8949,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/preferences.rs": {
-            "lines": 407,
-            "tokens": 3178,
+            "lines": 410,
+            "tokens": 3196,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9189,14 +9273,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/criteria.rs": {
-            "lines": 869,
-            "tokens": 7021,
+            "lines": 891,
+            "tokens": 7167,
             "sources": 1,
             "clones": 6,
             "duplicatedLines": 60,
             "duplicatedTokens": 614,
-            "percentage": 6.9,
-            "percentageTokens": 8.75,
+            "percentage": 6.73,
+            "percentageTokens": 8.57,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9537,14 +9621,14 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow.rs": {
-            "lines": 558,
-            "tokens": 5794,
+            "lines": 578,
+            "tokens": 5911,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 18,
             "duplicatedTokens": 200,
-            "percentage": 3.23,
-            "percentageTokens": 3.45,
+            "percentage": 3.11,
+            "percentageTokens": 3.38,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9825,8 +9909,8 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/compaction.rs": {
-            "lines": 284,
-            "tokens": 3030,
+            "lines": 302,
+            "tokens": 3206,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10197,14 +10281,14 @@
             "newClones": 0
           },
           "crates/fennec/src/scanners.rs": {
-            "lines": 108,
-            "tokens": 1237,
+            "lines": 89,
+            "tokens": 1019,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 28,
-            "duplicatedTokens": 324,
-            "percentage": 25.93,
-            "percentageTokens": 26.19,
+            "clones": 2,
+            "duplicatedLines": 10,
+            "duplicatedTokens": 152,
+            "percentage": 11.24,
+            "percentageTokens": 14.92,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10341,8 +10425,8 @@
             "newClones": 0
           },
           "crates/fennec/src/main.rs": {
-            "lines": 169,
-            "tokens": 2037,
+            "lines": 170,
+            "tokens": 2042,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10421,6 +10505,18 @@
             "duplicatedTokens": 0,
             "percentage": 0,
             "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/executable.rs": {
+            "lines": 106,
+            "tokens": 1192,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 38,
+            "duplicatedTokens": 476,
+            "percentage": 35.85,
+            "percentageTokens": 39.93,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10738,14 +10834,14 @@
           }
         },
         "total": {
-          "lines": 81100,
-          "tokens": 760074,
-          "sources": 322,
-          "clones": 242,
-          "duplicatedLines": 2770,
-          "duplicatedTokens": 29007,
-          "percentage": 3.42,
-          "percentageTokens": 3.82,
+          "lines": 81995,
+          "tokens": 768684,
+          "sources": 326,
+          "clones": 249,
+          "duplicatedLines": 2831,
+          "duplicatedTokens": 29745,
+          "percentage": 3.45,
+          "percentageTokens": 3.87,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -11189,8 +11285,8 @@
             "newClones": 0
           },
           "crates/fennec/workflows/plan-build-verify.workflow.json": {
-            "lines": 75,
-            "tokens": 1407,
+            "lines": 77,
+            "tokens": 1421,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -11202,8 +11298,8 @@
           }
         },
         "total": {
-          "lines": 92,
-          "tokens": 1634,
+          "lines": 94,
+          "tokens": 1648,
           "sources": 2,
           "clones": 0,
           "duplicatedLines": 0,
@@ -11292,14 +11388,14 @@
       }
     },
     "total": {
-      "lines": 139587,
-      "tokens": 1330301,
-      "sources": 926,
-      "clones": 281,
-      "duplicatedLines": 3734,
-      "duplicatedTokens": 37872,
-      "percentage": 2.68,
-      "percentageTokens": 2.85,
+      "lines": 140689,
+      "tokens": 1340935,
+      "sources": 934,
+      "clones": 288,
+      "duplicatedLines": 3795,
+      "duplicatedTokens": 38610,
+      "percentage": 2.7,
+      "percentageTokens": 2.88,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
@@ -12963,37 +13059,217 @@
     },
     {
       "format": "rust",
+      "lines": 7,
+      "fragment": "::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h",
+      "tokens": 76,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 99,
+        "end": 105,
+        "startLoc": {
+          "line": 99,
+          "column": 32,
+          "position": 909
+        },
+        "endLoc": {
+          "line": 105,
+          "column": 6,
+          "position": 985
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/test_gate.rs",
+        "start": 47,
+        "end": 53,
+        "startLoc": {
+          "line": 47,
+          "column": 32,
+          "position": 752
+        },
+        "endLoc": {
+          "line": 53,
+          "column": 8,
+          "position": 828
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 16,
+      "fragment": "]));\n    let stop = AtomicBool::new(false);\n    let children = FakeChildren::default();\n    let commands = FakeCommands::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h.agents = vec![plan()];\n\n    let reason = run_workflow(\n        &mut h.turn(),\n        &env,\n        WorkflowJob::Start {\n            workflow: handoff_workflow(false",
+      "tokens": 175,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 157,
+        "end": 172,
+        "startLoc": {
+          "line": 157,
+          "column": 67,
+          "position": 1479
+        },
+        "endLoc": {
+          "line": 172,
+          "column": 45,
+          "position": 1654
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 96,
+        "end": 111,
+        "startLoc": {
+          "line": 96,
+          "column": 5,
+          "position": 865
+        },
+        "endLoc": {
+          "line": 111,
+          "column": 44,
+          "position": 1040
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 11,
+      "fragment": "),\n            task: \"do it\".into(),\n            step_by_step: false,\n            attachments: Vec::new(),\n        },\n    )\n    .unwrap();\n    assert_eq!(reason, DoneReason::Complete);\n\n    let events = h.log.0.into_inner();\n    assert!",
+      "tokens": 79,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 172,
+        "end": 182,
+        "startLoc": {
+          "line": 172,
+          "column": 45,
+          "position": 1655
+        },
+        "endLoc": {
+          "line": 182,
+          "column": 12,
+          "position": 1734
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 111,
+        "end": 121,
+        "startLoc": {
+          "line": 111,
+          "column": 44,
+          "position": 1041
+        },
+        "endLoc": {
+          "line": 121,
+          "column": 8,
+          "position": 1120
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 12,
+      "fragment": "let model = Scripted(RefCell::new(vec![reply(\"b done\", vec![])]));\n    let stop = AtomicBool::new(false);\n    let children = FakeChildren::default();\n    let commands = FakeCommands::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h.agents = vec![plan()];\n\n    h",
+      "tokens": 160,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 194,
+        "end": 205,
+        "startLoc": {
+          "line": 194,
+          "column": 5,
+          "position": 1810
+        },
+        "endLoc": {
+          "line": 205,
+          "column": 6,
+          "position": 1970
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 157,
+        "end": 107,
+        "startLoc": {
+          "line": 157,
+          "column": 5,
+          "position": 1455
+        },
+        "endLoc": {
+          "line": 107,
+          "column": 8,
+          "position": 1001
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 10,
+      "fragment": ").unwrap();\n    assert_eq!(reason, DoneReason::Complete);\n\n    let events = h.log.0.into_inner();\n    let compacted = events\n        .iter()\n        .filter(|e| matches!(e, Event::ContextCompacted { .. }))\n        .count();\n    assert_eq!(compacted, 1);\n}",
+      "tokens": 96,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 242,
+        "end": 251,
+        "startLoc": {
+          "line": 242,
+          "column": 71,
+          "position": 2303
+        },
+        "endLoc": {
+          "line": 251,
+          "column": 2,
+          "position": 2399
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
+        "start": 116,
+        "end": 127,
+        "startLoc": {
+          "line": 116,
+          "column": 5,
+          "position": 1079
+        },
+        "endLoc": {
+          "line": 127,
+          "column": 8,
+          "position": 1179
+        }
+      }
+    },
+    {
+      "format": "rust",
       "lines": 8,
       "fragment": ",\n                            display::tokens(t.prompt, lang.locale()),\n                            display::tokens(t.cached, lang.locale()),\n                            display::tokens(t.completion, lang.locale()),\n                            t.calls,\n                            if t.calls > 1 { \"s\" } else { \"\" }\n                        ),\n                    }",
       "tokens": 95,
       "firstFile": {
         "name": "crates/fennec/src/web/views/workflow_usage.rs",
-        "start": 175,
-        "end": 182,
+        "start": 186,
+        "end": 193,
         "startLoc": {
-          "line": 175,
+          "line": 186,
           "column": 96,
-          "position": 1622
+          "position": 1684
         },
         "endLoc": {
-          "line": 182,
+          "line": 193,
           "column": 22,
-          "position": 1717
+          "position": 1779
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/workflow_usage.rs",
-        "start": 167,
-        "end": 174,
+        "start": 178,
+        "end": 185,
         "startLoc": {
-          "line": 167,
+          "line": 178,
           "column": 88,
-          "position": 1515
+          "position": 1577
         },
         "endLoc": {
-          "line": 174,
+          "line": 185,
           "column": 29,
-          "position": 1610
+          "position": 1672
         }
       }
     },
@@ -13163,17 +13439,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/workflow_usage.rs",
-        "start": 230,
-        "end": 250,
+        "start": 241,
+        "end": 261,
         "startLoc": {
-          "line": 230,
+          "line": 241,
           "column": 58,
-          "position": 2236
+          "position": 2298
         },
         "endLoc": {
-          "line": 250,
+          "line": 261,
           "column": 15,
-          "position": 2377
+          "position": 2439
         }
       }
     },
@@ -15128,32 +15404,32 @@
       "tokens": 95,
       "firstFile": {
         "name": "crates/fennec/src/domain/workflow/definition.rs",
-        "start": 230,
-        "end": 240,
+        "start": 234,
+        "end": 244,
         "startLoc": {
-          "line": 230,
+          "line": 234,
           "column": 20,
-          "position": 1861
+          "position": 1874
         },
         "endLoc": {
-          "line": 240,
+          "line": 244,
           "column": 23,
-          "position": 1956
+          "position": 1969
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/workflow/definition.rs",
-        "start": 194,
-        "end": 204,
+        "start": 198,
+        "end": 208,
         "startLoc": {
-          "line": 194,
+          "line": 198,
           "column": 22,
-          "position": 1504
+          "position": 1517
         },
         "endLoc": {
-          "line": 204,
+          "line": 208,
           "column": 25,
-          "position": 1599
+          "position": 1612
         }
       }
     },
@@ -15164,17 +15440,17 @@
       "tokens": 70,
       "firstFile": {
         "name": "crates/fennec/src/domain/preferences/tests.rs",
-        "start": 382,
-        "end": 389,
+        "start": 388,
+        "end": 395,
         "startLoc": {
-          "line": 382,
+          "line": 388,
           "column": 21,
-          "position": 3451
+          "position": 3515
         },
         "endLoc": {
-          "line": 389,
+          "line": 395,
           "column": 16,
-          "position": 3521
+          "position": 3585
         }
       },
       "secondFile": {
@@ -17252,32 +17528,32 @@
       "tokens": 82,
       "firstFile": {
         "name": "crates/fennec/src/domain/criteria.rs",
-        "start": 696,
-        "end": 706,
+        "start": 718,
+        "end": 728,
         "startLoc": {
-          "line": 696,
+          "line": 718,
           "column": 25,
-          "position": 5576
+          "position": 5722
         },
         "endLoc": {
-          "line": 706,
+          "line": 728,
           "column": 11,
-          "position": 5658
+          "position": 5804
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/criteria.rs",
-        "start": 671,
-        "end": 681,
+        "start": 693,
+        "end": 703,
         "startLoc": {
-          "line": 671,
+          "line": 693,
           "column": 29,
-          "position": 5370
+          "position": 5516
         },
         "endLoc": {
-          "line": 681,
+          "line": 703,
           "column": 15,
-          "position": 5452
+          "position": 5598
         }
       }
     },
@@ -17288,32 +17564,32 @@
       "tokens": 145,
       "firstFile": {
         "name": "crates/fennec/src/domain/criteria.rs",
-        "start": 803,
-        "end": 816,
+        "start": 825,
+        "end": 838,
         "startLoc": {
-          "line": 803,
+          "line": 825,
           "column": 52,
-          "position": 6468
+          "position": 6614
         },
         "endLoc": {
-          "line": 816,
+          "line": 838,
           "column": 88,
-          "position": 6613
+          "position": 6759
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/criteria.rs",
-        "start": 784,
-        "end": 797,
+        "start": 806,
+        "end": 819,
         "startLoc": {
-          "line": 784,
+          "line": 806,
           "column": 59,
-          "position": 6301
+          "position": 6447
         },
         "endLoc": {
-          "line": 797,
+          "line": 819,
           "column": 88,
-          "position": 6446
+          "position": 6592
         }
       }
     },
@@ -17324,32 +17600,32 @@
       "tokens": 80,
       "firstFile": {
         "name": "crates/fennec/src/domain/criteria.rs",
-        "start": 840,
-        "end": 847,
+        "start": 862,
+        "end": 869,
         "startLoc": {
-          "line": 840,
+          "line": 862,
           "column": 49,
-          "position": 6786
+          "position": 6932
         },
         "endLoc": {
-          "line": 847,
+          "line": 869,
           "column": 37,
-          "position": 6866
+          "position": 7012
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/criteria.rs",
-        "start": 784,
-        "end": 791,
+        "start": 806,
+        "end": 813,
         "startLoc": {
-          "line": 784,
+          "line": 806,
           "column": 59,
-          "position": 6301
+          "position": 6447
         },
         "endLoc": {
-          "line": 791,
+          "line": 813,
           "column": 44,
-          "position": 6381
+          "position": 6527
         }
       }
     },
@@ -17900,17 +18176,17 @@
       "tokens": 100,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow.rs",
-        "start": 421,
-        "end": 430,
+        "start": 441,
+        "end": 450,
         "startLoc": {
-          "line": 421,
+          "line": 441,
           "column": 23,
-          "position": 4409
+          "position": 4526
         },
         "endLoc": {
-          "line": 430,
+          "line": 450,
           "column": 7,
-          "position": 4509
+          "position": 4626
         }
       },
       "secondFile": {
@@ -17920,12 +18196,12 @@
         "startLoc": {
           "line": 233,
           "column": 17,
-          "position": 2242
+          "position": 2256
         },
         "endLoc": {
           "line": 242,
           "column": 8,
-          "position": 2342
+          "position": 2356
         }
       }
     },
@@ -20163,78 +20439,6 @@
     },
     {
       "format": "rust",
-      "lines": 6,
-      "fragment": "() {\n        let root = temp_root();\n        std::fs::create_dir_all(&root).expect(\"create temp dir\");\n        let binary = root.join(\"scanner\");\n        std::fs::write(&binary, b\"\").expect(\"write binary\");\n        set_mode(&binary, 0o644",
-      "tokens": 80,
-      "firstFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 64,
-        "end": 69,
-        "startLoc": {
-          "line": 64,
-          "column": 43,
-          "position": 682
-        },
-        "endLoc": {
-          "line": 69,
-          "column": 32,
-          "position": 762
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 49,
-        "end": 54,
-        "startLoc": {
-          "line": 49,
-          "column": 32,
-          "position": 503
-        },
-        "endLoc": {
-          "line": 54,
-          "column": 32,
-          "position": 583
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 10,
-      "fragment": ");\n\n        let path = std::env::join_paths([root.clone()]).expect(\"join paths\");\n        assert_eq!(find_in(&path, \"scanner\"), None);\n\n        let _ = std::fs::remove_dir_all(&root);\n    }\n\n    #[test]\n    fn first_directory_in_path_order_wins",
-      "tokens": 82,
-      "firstFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 80,
-        "end": 89,
-        "startLoc": {
-          "line": 80,
-          "column": 64,
-          "position": 879
-        },
-        "endLoc": {
-          "line": 89,
-          "column": 42,
-          "position": 961
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 69,
-        "end": 78,
-        "startLoc": {
-          "line": 69,
-          "column": 32,
-          "position": 763
-        },
-        "endLoc": {
-          "line": 78,
-          "column": 38,
-          "position": 845
-        }
-      }
-    },
-    {
-      "format": "rust",
       "lines": 8,
       "fragment": "fn temp_dir() -> PathBuf {\n        let nanos = std::time::SystemTime::now()\n            .duration_since(std::time::UNIX_EPOCH)\n            .map(|value| value.as_nanos())\n            .unwrap_or(0);\n        let counter = COUNTER.fetch_add(1, Ordering::Relaxed);\n        let dir = std::env::temp_dir().join(format!(\n            \"fennec-protected-test-{}-{nanos}-{counter}\"",
       "tokens": 112,
@@ -20806,6 +21010,150 @@
           "line": 413,
           "column": 12,
           "position": 3773
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": ";\n\n    fn temp_root() -> PathBuf {\n        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);\n        let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);\n        let",
+      "tokens": 84,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 26,
+        "end": 31,
+        "startLoc": {
+          "line": 26,
+          "column": 44,
+          "position": 235
+        },
+        "endLoc": {
+          "line": 31,
+          "column": 12,
+          "position": 319
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/scanners.rs",
+        "start": 42,
+        "end": 47,
+        "startLoc": {
+          "line": 42,
+          "column": 42,
+          "position": 413
+        },
+        "endLoc": {
+          "line": 47,
+          "column": 12,
+          "position": 497
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": "() {\n        let root = temp_root();\n        std::fs::create_dir_all(&root).expect(\"create temp dir\");\n        let binary = root.join(\"program\");\n        std::fs::write(&binary, b\"\").expect(\"write binary\");\n        set_mode(&binary, 0o644",
+      "tokens": 80,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 62,
+        "end": 67,
+        "startLoc": {
+          "line": 62,
+          "column": 43,
+          "position": 637
+        },
+        "endLoc": {
+          "line": 67,
+          "column": 32,
+          "position": 717
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 47,
+        "end": 52,
+        "startLoc": {
+          "line": 47,
+          "column": 32,
+          "position": 458
+        },
+        "endLoc": {
+          "line": 52,
+          "column": 32,
+          "position": 538
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": "() {\n        let root = temp_root();\n        std::fs::create_dir_all(&root).expect(\"create temp dir\");\n\n        let path = std::env::join_paths([root.clone()]).expect(\"join paths\");\n        assert_eq!",
+      "tokens": 68,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 76,
+        "end": 81,
+        "startLoc": {
+          "line": 76,
+          "column": 38,
+          "position": 801
+        },
+        "endLoc": {
+          "line": 81,
+          "column": 19,
+          "position": 869
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/scanners.rs",
+        "start": 57,
+        "end": 61,
+        "startLoc": {
+          "line": 57,
+          "column": 67,
+          "position": 617
+        },
+        "endLoc": {
+          "line": 61,
+          "column": 12,
+          "position": 684
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 10,
+      "fragment": ");\n\n        let path = std::env::join_paths([root.clone()]).expect(\"join paths\");\n        assert_eq!(find_in(&path, \"program\"), None);\n\n        let _ = std::fs::remove_dir_all(&root);\n    }\n\n    #[test]\n    fn first_directory_in_path_order_wins",
+      "tokens": 82,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 78,
+        "end": 87,
+        "startLoc": {
+          "line": 78,
+          "column": 64,
+          "position": 834
+        },
+        "endLoc": {
+          "line": 87,
+          "column": 42,
+          "position": 916
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 67,
+        "end": 76,
+        "startLoc": {
+          "line": 67,
+          "column": 32,
+          "position": 718
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 38,
+          "position": 800
         }
       }
     },
