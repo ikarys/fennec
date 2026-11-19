@@ -303,7 +303,8 @@ fn run_node(
             output: "Every criterion has a check and fennec ran it: nothing left to judge.".into(),
             exit_code: None,
         };
-        return record(turn, state, node_id, end, Some(0));
+        // No duration: nothing ran, and the rail shows the reason instead of "0 ms".
+        return record(turn, state, node_id, end, None);
     }
     let child = match (&node.kind, &resumed) {
         (_, Some((child, _))) => Some(child.clone()),
