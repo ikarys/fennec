@@ -47,7 +47,7 @@ The **Workflow finished** card shows the outcome and the run's start, end and du
 ## If something goes wrong
 
 - **already passes** in **Checked before the work**: the check does not test the change. Click **Revise** to ask for a stricter check.
-- **cannot run here**: the check needs something the sandbox lacks (network, a service). Fix the command or drop the check.
+- **cannot run here**: the check needs something the sandbox lacks (network, a service, a test runner that is not installed, such as `python3 -m pytest` without pytest). Fix the command or drop the check.
 - The work touched files the plan did not list: the review gate shows them as **outside the plan**. You decide.
 
 ---
