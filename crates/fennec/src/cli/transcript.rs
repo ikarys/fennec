@@ -3,18 +3,29 @@ use crate::domain::event::{AskType, Event};
 use std::io::Write;
 
 /// Renders events as a terminal transcript: answer text plain, thinking
-/// and tool output dimmed.
+/// and tool output dimmed; `quiet` drops the thinking.
 #[derive(Default)]
 pub struct Transcript {
+    quiet: bool,
     in_thinking: bool,
     /// Tool output may stop mid-line; the result mark then starts a new one.
     output_open: bool,
 }
 
 impl Transcript {
+    pub fn new(quiet: bool) -> Self {
+        Self {
+            quiet,
+            ..Self::default()
+        }
+    }
+
     pub fn print(&mut self, event: &Event) {
         const DIM: &str = "\x1b[2m";
         const RESET: &str = "\x1b[0m";
+        if self.quiet && matches!(event, Event::MessageThinking { .. }) {
+            return;
+        }
         let mut out = std::io::stdout().lock();
         if self.in_thinking && !matches!(event, Event::MessageThinking { .. }) {
             self.in_thinking = false;

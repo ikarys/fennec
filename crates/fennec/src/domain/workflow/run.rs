@@ -528,15 +528,36 @@ pub fn enter(state: &RunState, via: Via, to: &str, in_branch: bool) -> Next {
     }
 }
 
+/// The most of a diff a prompt carries, about ten thousand tokens: a longer
+/// one is cut at a line and says so, and the agent reads the files for the rest.
+pub const DIFF_PROMPT_CAP: usize = 40_000;
+
+fn bounded_diff(diff: &str) -> String {
+    if diff.len() <= DIFF_PROMPT_CAP {
+        return diff.to_string();
+    }
+    let mut end = DIFF_PROMPT_CAP;
+    while !diff.is_char_boundary(end) {
+        end -= 1;
+    }
+    let end = diff[..end].rfind('\n').unwrap_or(end);
+    format!(
+        "{}\n… diff cut at {DIFF_PROMPT_CAP} characters: read the files for the rest.",
+        &diff[..end]
+    )
+}
+
 pub fn variable(
     state: &RunState,
     node_id: &str,
     files_changed: &[String],
+    diff: &str,
     name: &str,
 ) -> Option<String> {
     match name {
         "task" => Some(state.task.clone()),
         "filesChanged" => Some(files_changed.join("\n")),
+        "diff" => Some(bounded_diff(diff)),
         "pass" => state.node_passes.get(node_id).map(|pass| pass.to_string()),
         "comment" => Some(state.comment.clone()),
         "criteria" => Some(render_for_prompt(&state.criteria)),
@@ -563,7 +584,13 @@ pub fn variable(
     }
 }
 
-pub fn agent_prompt(state: &RunState, node: &Node, pass: u32, files_changed: &[String]) -> String {
+pub fn agent_prompt(
+    state: &RunState,
+    node: &Node,
+    pass: u32,
+    files_changed: &[String],
+    diff: &str,
+) -> String {
     let NodeKind::Agent {
         prompt,
         retry_prompt,
@@ -585,7 +612,7 @@ pub fn agent_prompt(state: &RunState, node: &Node, pass: u32, files_changed: &[S
         // is folded yet.
         &|name| match name {
             "pass" => Some(pass.to_string()),
-            _ => variable(state, &node.id, files_changed, name),
+            _ => variable(state, &node.id, files_changed, diff, name),
         },
         false,
     );
@@ -857,7 +884,7 @@ mod tests {
         });
 
         assert_eq!(
-            variable(&state, "a", &[], "criteria"),
+            variable(&state, "a", &[], "", "criteria"),
             Some("C1: d — no check, to judge: pending".into())
         );
     }
@@ -1323,16 +1350,32 @@ mod tests {
             },
         );
 
-        assert_eq!(variable(&state, "a", &[], "task"), Some("task".into()));
-        assert_eq!(variable(&state, "a", &[], "pass"), Some("3".into()));
+        assert_eq!(variable(&state, "a", &[], "", "task"), Some("task".into()));
         assert_eq!(
-            variable(&state, "a", &[], "nodes.a.output"),
+            variable(&state, "a", &[], "-a\n+b\n", "diff"),
+            Some("-a\n+b\n".into())
+        );
+        assert_eq!(variable(&state, "a", &[], "", "pass"), Some("3".into()));
+        assert_eq!(
+            variable(&state, "a", &[], "", "nodes.a.output"),
             Some("out".into())
         );
         assert_eq!(
-            variable(&state, "a", &[], "nodes.a.port"),
+            variable(&state, "a", &[], "", "nodes.a.port"),
             Some("done".into())
         );
+    }
+
+    #[test]
+    fn a_long_diff_is_cut_at_a_line_and_says_so() {
+        let line = "+".repeat(99) + "\n";
+        let diff = line.repeat(DIFF_PROMPT_CAP / 100 + 5);
+        let bounded = bounded_diff(&diff);
+        assert!(bounded.len() <= DIFF_PROMPT_CAP + 80);
+        assert!(bounded.ends_with("characters: read the files for the rest."));
+        let kept = bounded.rsplit_once('\n').unwrap().0;
+        assert!(kept.lines().all(|l| l == line.trim_end()), "cut mid-line");
+        assert_eq!(bounded_diff("short"), "short");
     }
 
     #[test]
@@ -1342,7 +1385,7 @@ mod tests {
 
         let node = state.workflow.node("a").unwrap();
         assert_eq!(
-            agent_prompt(&state, node, 2, &[]),
+            agent_prompt(&state, node, 2, &[], ""),
             "retry 2\n\nHuman comment: look"
         );
     }

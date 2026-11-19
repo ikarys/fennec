@@ -1,5 +1,7 @@
 use super::*;
-use crate::agent::ports::{AgentRun, ChildSessions, CommandRun, Commands, Completion, EventLog};
+use crate::agent::ports::{
+    AgentRun, Changes, ChildSessions, CommandRun, Commands, Completion, EventLog,
+};
 use crate::agent::test_support::{Harness, Scripted, plan, reply};
 use crate::domain::criteria::{CriterionStatus, Provenance};
 use crate::domain::event::{DoneReason, Event, ToolCall, ToolResult};
@@ -87,6 +89,17 @@ impl Commands for FakeCommands {
     }
 }
 
+/// What every test's run diffs to.
+struct FakeChanges(&'static str);
+
+impl Changes for FakeChanges {
+    fn diff(&self, _files: &[String]) -> String {
+        self.0.into()
+    }
+}
+
+const CHANGES: FakeChanges = FakeChanges("diff of the run");
+
 fn simple_workflow() -> Workflow {
     Workflow {
         id: "w".into(),
@@ -142,6 +155,43 @@ fn simple_workflow() -> Workflow {
 }
 
 #[test]
+fn an_agent_node_prompt_carries_the_diff_of_the_run() {
+    let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
+    let stop = AtomicBool::new(false);
+    let children = FakeChildren::default();
+    let commands = FakeCommands::default();
+    let env = WorkflowEnv {
+        children: &children,
+        commands: &commands,
+        changes: &CHANGES,
+    };
+    let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
+    h.agents = vec![plan()];
+    let mut workflow = simple_workflow();
+    if let NodeKind::Agent { prompt, .. } = &mut workflow.nodes[1].kind {
+        *prompt = "Judge:\n{{diff}}".into();
+    }
+
+    run_workflow(
+        &mut h.turn(),
+        &env,
+        WorkflowJob::Start {
+            workflow,
+            task: "do it".into(),
+            step_by_step: false,
+            attachments: Vec::new(),
+        },
+    )
+    .unwrap();
+
+    let events = h.log.0.into_inner();
+    assert!(events.iter().any(|e| matches!(
+        e,
+        Event::MessageStart { content: Some(content), .. } if content.contains("Judge:\ndiff of the run")
+    )));
+}
+
+#[test]
 fn start_agent_end() {
     let model = Scripted(RefCell::new(vec![reply("done", vec![])]));
     let stop = AtomicBool::new(false);
@@ -150,6 +200,7 @@ fn start_agent_end() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -242,6 +293,7 @@ fn agent_input_stats_cover_the_calls_before_the_interruption() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -285,6 +337,7 @@ fn a_planning_agent_that_only_talks_keeps_its_node_open() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     let mut planner = plan();
@@ -554,6 +607,7 @@ fn criteria_check_that_ran_no_test_fails() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -598,6 +652,7 @@ fn criteria_node_runs_checks_and_reports_failures() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -668,6 +723,7 @@ fn verdicts_record_indicative_only_for_unchecked_criteria() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -727,6 +783,7 @@ fn verdicts_node_with_every_criterion_checked_runs_no_model() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -867,6 +924,7 @@ fn shell_success_and_failure() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -906,6 +964,7 @@ fn shell_success_and_failure() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -948,6 +1007,7 @@ fn human_node() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1093,6 +1153,7 @@ fn night_mode_answers_a_human_node_with_its_first_choice() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1245,6 +1306,7 @@ fn approving_the_plan_records_its_criteria_before_the_criteria_node() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1333,6 +1395,7 @@ fn paused_edge() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1445,6 +1508,7 @@ fn agent_outcome() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1488,6 +1552,7 @@ fn agent_outcome() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1632,6 +1697,7 @@ fn parallel_branches() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1681,6 +1747,7 @@ fn stop_paused_run() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1741,6 +1808,7 @@ fn invalid_workflow_refused() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1776,6 +1844,7 @@ fn start_from_plan_records_the_plan_and_runs_the_criteria() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1873,6 +1942,7 @@ fn start_from_plan_answers_the_approval_node() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1932,6 +2002,7 @@ fn start_with_attachments_puts_them_in_the_session_before_the_run() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -1973,6 +2044,7 @@ fn relaunch_a_run_that_ended_in_error_reruns_the_open_node() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -2054,6 +2126,7 @@ fn relaunch_with_no_reopenable_node_is_refused() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -2156,6 +2229,7 @@ fn resume_interrupted_agent_keeps_its_pass_and_prompt() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -2443,6 +2517,7 @@ fn approval_in_a_session_agent_node_finishes_the_node_and_walks_on() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), workdir.clone(), &stop);
     h.agents = vec![plan()];
@@ -2591,6 +2666,7 @@ fn a_fresh_child_that_asks_keeps_the_run_open_and_resumes_on_the_same_child() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let workflow = fresh_workflow(vec!["ok".into()], false);
     let reason = run_workflow(
@@ -2666,6 +2742,7 @@ fn a_new_pass_of_a_fresh_node_gets_a_new_child() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let workflow = fresh_workflow(vec!["done".into(), "again".into()], true);
     let reason = run_workflow(
@@ -2710,6 +2787,7 @@ fn a_failed_fresh_child_is_not_reused_on_resume() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let workflow = fresh_workflow(vec!["ok".into()], false);
     run_workflow(

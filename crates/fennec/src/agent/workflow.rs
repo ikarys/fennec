@@ -12,7 +12,7 @@ mod test_gate;
 #[cfg(test)]
 mod tests;
 
-use super::ports::{AgentRun, ChildSessions, Commands};
+use super::ports::{AgentRun, Changes, ChildSessions, Commands};
 use super::turn::{self, Turn};
 use crate::domain::attachment::Attachment;
 use crate::domain::clock::now_ms;
@@ -31,6 +31,7 @@ use std::time::Instant;
 pub struct WorkflowEnv<'a> {
     pub children: &'a dyn ChildSessions,
     pub commands: &'a dyn Commands,
+    pub changes: &'a dyn Changes,
 }
 
 /// What the human asks of a session's workflow.
@@ -303,7 +304,8 @@ fn run_node(
             output: "Every criterion has a check and fennec ran it: nothing left to judge.".into(),
             exit_code: None,
         };
-        return record(turn, state, node_id, end, Some(0));
+        // No duration: nothing ran, and the rail shows the reason instead of "0 ms".
+        return record(turn, state, node_id, end, None);
     }
     let child = match (&node.kind, &resumed) {
         (_, Some((child, _))) => Some(child.clone()),
@@ -323,9 +325,10 @@ fn run_node(
     append_node_started(turn, state, node_id, pass, &via, child.as_deref())?;
     if let NodeKind::Human { question, choices } = &node.kind {
         let (state, files) = folded_after_start(turn)?;
+        let diff = env.changes.diff(&files);
         let mut question = render(
             question,
-            &|name| run::variable(&state, node_id, &files, name),
+            &|name| run::variable(&state, node_id, &files, &diff, name),
             false,
         );
         if !turn.always_validate_tests && jobs::fed_by_tests_agent(&state.workflow, node_id) {
@@ -353,11 +356,13 @@ fn run_node(
     }
 
     let (state, files) = folded_after_start(turn)?;
+    let diff = env.changes.diff(&files);
     let input = NodeInput {
         state: &state,
         node,
         pass,
         files: &files,
+        diff: &diff,
         stop: turn.stop,
     };
     let (agent_id, verdicts) = match &node.kind {

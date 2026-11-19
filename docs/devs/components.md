@@ -373,3 +373,18 @@ granted, and the changed files outside the plan. `GET /api/sessions/{id}/verific
 shows it with the run's numbers, no click needed, and copies its text block. The same block, capped at ten lines with
 model text kept to one line per criterion, ends the proposed commit message unless `integration.verificationBlock`
 is off.
+
+The diff once, done: the engine computes the run's diff once, a `Changes` port fed by `changes.rs` (the working
+tree against the worktree's base, untracked files as additions, cut at 40,000 characters on a line), exposed to
+node prompts as `{{diff}}`. The default workflow's verify and review prompts carry it, so those nodes no longer
+spend half their calls on `git diff` and `git show`. The run end card headlines the tokens the server did not take
+from its cache, the run's real cost, with the cached share as detail, and the Tokens panel splits the input into new
+and cached, each with its share of the cost; the server computes every string. The builder and tests prompts say that
+build caches are not scratch (fennec's commits never take them) and that a formatter the project does not run is not
+to be looked for.
+
+The review loop ends on nits, done: a review that files `minor` ends the run, `findings` opens the triage node.
+The review prompt says the tests the human validated are protected, that a remark on them is a finding only when
+the test is wrong, and that an expected value written as an expression is the tests agent's rule; `fix-review`
+dismisses a finding on a protected file in its report instead of requesting a waiver, so a night run reaches the
+integration box instead of stalling on a permission (`docs/devs/dogfooding.md`).

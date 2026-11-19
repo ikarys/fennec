@@ -200,7 +200,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
     getRunView(sessionId)
       .then((runView) => {
         // Only the latest fetch may answer: a stale view must not regress the rail.
-        if (request === runViewReqRef.current) {
+        if (runView && request === runViewReqRef.current) {
           runViewRef.current = runView;
           // The definition may be older than the loaded page: feed it to the
           // fold so the dividers show the real label and kind.
@@ -209,7 +209,7 @@ export function useSessionThread(sessionId: string | null): SessionThread {
         }
       })
       .catch(() => {
-        // No run, or the fetch failed: the next workflow event refetches.
+        // The fetch failed: the next workflow event refetches.
       });
   }, [sessionId, publish]);
 

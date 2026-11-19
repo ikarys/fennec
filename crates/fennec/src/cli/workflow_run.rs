@@ -8,9 +8,22 @@ use serde_json::Value;
 use std::io::{BufRead, Write};
 use std::time::Duration;
 
-pub fn run(workflow_id: &str, night: bool, task: &str) -> Result<(), String> {
-    let port = crate::server_config::port()?;
+/// `port`: the server to talk to; without it, the configured one (settings
+/// or 7777), which may be another instance than the one started with
+/// `fennec --port`, so the target prints before anything starts.
+pub fn run(
+    workflow_id: &str,
+    night: bool,
+    quiet: bool,
+    port: Option<u16>,
+    task: &str,
+) -> Result<(), String> {
+    let port = match port {
+        Some(port) => port,
+        None => crate::server_config::port()?,
+    };
     let base = format!("http://127.0.0.1:{port}");
+    eprintln!("server {base}");
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(5)))
         .http_status_as_error(false)
@@ -58,7 +71,7 @@ pub fn run(workflow_id: &str, night: bool, task: &str) -> Result<(), String> {
         night,
         run_id: None,
         workflow: None,
-        transcript: Transcript::default(),
+        transcript: Transcript::new(quiet),
         streamed: false,
         asked: false,
         last_error: None,

@@ -39,7 +39,7 @@ pub(super) fn prove(env: &WorkflowEnv, criteria: &[CriterionState], stop: &Atomi
         if run.stopped {
             return Proof::Stopped;
         }
-        let missing = match preflight::classify(run.exit_code, &run.output) {
+        let missing = match preflight::classify(run.exit_code, &run.output, command) {
             PreflightVerdict::Fails => None,
             PreflightVerdict::PassesAlready => Some("passes before the work"),
             PreflightVerdict::CannotRun => Some("cannot run here"),

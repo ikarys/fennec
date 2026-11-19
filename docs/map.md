@@ -70,7 +70,7 @@ graph LR
   m62["web"]
   m63["web/scripts"]
   m15 -->|1| m33
-  m15 -->|3| m20
+  m15 -->|4| m20
   m15 -->|1| m22
   m15 -->|1| m19
   m15 -->|21| m27
@@ -385,7 +385,7 @@ graph LR
 | `crates/fennec/src/web/views` | 10 | 9 |  | Display-ready views: the figures and folds the UI renders as they are. |
 | `crates/fennec/src/web/jobs` | 7 | 3 |  | Background work the server runs outside a request: the idea queue, naming, backfills. |
 | `crates/fennec/src/agent/workflow` | 7 | 3 |  | The workflow engine: walks a run through its graph (docs/devs/workflows.md). The path is decided by domain/workflow/run.rs; this file runs the nodes and records everything in the session's log. |
-| `crates/fennec/src` | 35 | 26 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
+| `crates/fennec/src` | 36 | 27 | yes | `fennec`: the composition root. Parses the command line, reads the settings and hands them to the web or terminal adapter. |
 | `crates/fennec/src/llm` | 3 | 2 |  | Model adapter: OpenAI-compatible endpoints (vLLM, llama.cpp, ...). |
 | `crates/fennec/src/domain/risk` | 2 | 2 |  | Pure risk-zone model and deterministic project risk measurements. |
 | `crates/fennec/src/worktree` | 2 | 2 |  | A session's own git worktree. |

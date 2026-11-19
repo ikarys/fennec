@@ -14,6 +14,8 @@ pub struct SessionUsageView {
     pub calls: u64,
     pub prompt_tokens: u64,
     pub cached_tokens: u64,
+    /// `prompt_tokens` the server did not take from its cache.
+    pub uncached_tokens: u64,
     pub completion_tokens: u64,
     /// Share of the prompts the server took from its cache, 0 to 100.
     pub cache_percent: u64,
@@ -21,9 +23,8 @@ pub struct SessionUsageView {
     pub cost: String,
     /// How the cost was reached, or why there is none (models without a price).
     pub cost_detail: String,
-    /// The cost of all the prompt tokens (the cached ones included, as `prompt_tokens`),
-    /// none when no model has a price.
-    pub input_cost: Option<String>,
+    /// The share of the cost of uncached prompt tokens, none when no model has a price.
+    pub uncached_cost: Option<String>,
     /// The share of the cost of cached tokens, none when no model has a price.
     pub cached_cost: Option<String>,
     /// The share of the cost of generated tokens, none when no model has a price.
@@ -43,11 +44,12 @@ impl SessionUsageView {
             calls: summary.calls,
             prompt_tokens: summary.prompt_tokens,
             cached_tokens: summary.cached_tokens,
+            uncached_tokens: summary.prompt_tokens.saturating_sub(summary.cached_tokens),
             completion_tokens: summary.completion_tokens,
             cache_percent: (summary.cache_hit_rate * 100.0).round() as u64,
             cost: pricing.value(lang.locale()),
             cost_detail: pricing.detail(lang),
-            input_cost: pricing.part(pricing.cost.input + pricing.cost.cached, lang.locale()),
+            uncached_cost: pricing.part(pricing.cost.input, lang.locale()),
             cached_cost: pricing.part(pricing.cost.cached, lang.locale()),
             output_cost: pricing.part(pricing.cost.output, lang.locale()),
             last_generation_speed: latest.map(|call| call.generation_speed),
@@ -177,7 +179,7 @@ mod tests {
         assert_eq!(view.cache_percent, 0);
         assert_eq!(view.last_generation_speed, None);
         assert_eq!(view.cost, "—");
-        assert_eq!(view.input_cost, None);
+        assert_eq!(view.uncached_cost, None);
     }
 
     #[test]
@@ -209,6 +211,7 @@ mod tests {
         assert_eq!(view.cache_percent, 67);
         assert_eq!(view.last_generation_speed, Some(42.5));
         assert_eq!(view.prompt_tokens, 300);
+        assert_eq!(view.uncached_tokens, 100);
         assert_eq!(view.cost, "—");
     }
 

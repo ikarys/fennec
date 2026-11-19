@@ -118,6 +118,11 @@ function StepRow({ step, isLast, onShowOutput, onJump }: { step: RailStep; isLas
             {outputLine}
           </span>
         ) : null}
+        {tone !== 'err' && isFinished && nodeRun?.durationMs == null && outputLine ? (
+          <span className="mt-0.5 block truncate text-xs text-muted" title={nodeRun?.output ?? ''}>
+            {outputLine}
+          </span>
+        ) : null}
       </div>
     </li>
   );

@@ -57,7 +57,7 @@ pub fn render(text: &str, value: &dyn Fn(&str) -> Option<String>, quote: bool) -
 
 pub fn check_name(workflow: &Workflow, name: &str) -> Result<(), String> {
     match name {
-        "task" | "filesChanged" | "pass" | "comment" | "criteria" => Ok(()),
+        "task" | "filesChanged" | "diff" | "pass" | "comment" | "criteria" => Ok(()),
         _ if name.starts_with("nodes.") => {
             let rest = &name["nodes.".len()..];
             let (id, field) = rest
@@ -153,6 +153,7 @@ mod tests {
         let workflow = workflow_with_shell();
         assert!(check_name(&workflow, "task").is_ok());
         assert!(check_name(&workflow, "filesChanged").is_ok());
+        assert!(check_name(&workflow, "diff").is_ok());
         assert!(check_name(&workflow, "pass").is_ok());
         assert!(check_name(&workflow, "comment").is_ok());
         assert!(check_name(&workflow, "criteria").is_ok());

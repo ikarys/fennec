@@ -37,13 +37,14 @@ pub fn get_integration(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         .review
         .iter()
         .map(|(path, signals)| {
-            let (added, removed) = gate.preview.counts.get(path).copied().unwrap_or_default();
+            let lines = gate.preview.counts.get(path).copied().unwrap_or_default();
             json!({
                 "path": path,
                 "protected": gate.protected_touched.contains(path),
                 "carried": gate.preview.carried_changes.contains(path),
-                "added": added,
-                "removed": removed,
+                "added": lines.added,
+                "removed": lines.removed,
+                "binary": lines.binary,
                 "signals": signals,
             })
         })
@@ -164,8 +165,8 @@ pub fn suggest_message(app: &App, stream: &mut TcpStream, id: &str) -> Result<()
         .files
         .iter()
         .map(|path| {
-            let (added, removed) = target.preview.counts.get(path).copied().unwrap_or_default();
-            (path.as_str(), added, removed)
+            let lines = target.preview.counts.get(path).copied().unwrap_or_default();
+            (path.as_str(), lines.added, lines.removed)
         })
         .collect();
     let changed = integration::changed_files(

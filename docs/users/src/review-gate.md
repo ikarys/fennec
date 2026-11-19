@@ -171,7 +171,7 @@ When the run had criteria, the message ends with what fennec verified, written b
 Verified by fennec:
 - C1 add_todo stores the item: `cargo test add_todo_stores` passed
 - C3 docs updated: judged by the model, passed
-Tests protected: 2, waivers: 0. Files outside the plan: none.
+Tests approved in the run: 2, waivers: 0. Files outside the plan: none.
 ```
 
 Each criterion says whether fennec ran its check (the command) or a model judged it (indicative). The block stays under ten lines and you can edit it like the rest of the message. Turn it off with **Add the verification block to commits** in [settings](settings.md). The run's end card shows the same figures in the thread, with a button to copy the block.

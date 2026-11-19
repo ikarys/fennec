@@ -126,7 +126,7 @@ fennec marks items **verified** when it computed them deterministically and **in
 
 - **Work** shows **Where the work lands**, **Criteria**, the five most changed files with a link to **Changes**, and buttons to open a terminal and the IDE in the worktree.
 - **Servers** starts the project's servers in the worktree. **Try it** opens it from the worktree row, the integration decision, or the last run's end card.
-- **Session** shows cost and tokens, then **Decisions**, **Skills**, **Vision**, and **Plugins**. Its **Model context** section shows the context breakdown.
+- **Session** shows cost and tokens (**New input** and **Cached input**, each with its share of the cost), then **Decisions**, **Skills**, **Vision**, and **Plugins**. Its **Model context** section shows the context breakdown.
 - **Canvas** lists the session's canvases; click one to open it. A canvas the agent writes opens itself and reveals the tab.
 
 ### Session workspace and changes

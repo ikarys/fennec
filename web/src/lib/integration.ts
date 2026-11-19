@@ -12,21 +12,23 @@ export type Acknowledged = Partial<Record<BlockerKind, boolean>>;
 // These blockers cannot be fixed by an acceptance: the merge has nothing to
 // do, it cannot succeed, or it would overwrite the human's uncommitted work.
 /** The narrate agent's prompt: the branch, its base and the files in the server's review order. */
-export function narrativePrompt(preview: IntegrationPreview): string {
-  const lines = preview.files.map((file, index) => {
+function fileLines(preview: IntegrationPreview): string[] {
+  return preview.files.map((file, index) => {
     const signals = file.signals.length ? ` — signals: ${file.signals.join(', ')}` : '';
-    return `${index + 1}. ${file.path} (+${file.added} −${file.removed})${signals}`;
+    const counts = file.binary ? 'binary' : `+${file.added} −${file.removed}`;
+    return `${index + 1}. ${file.path} (${counts})${signals}`;
   });
+}
+
+export function narrativePrompt(preview: IntegrationPreview): string {
+  const lines = fileLines(preview);
 
   return `Narrate the change of branch \`${preview.branch}\` since base \`${preview.base}\`, file by file in this review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file.`;
 }
 
 /** The understand agent's prompt: the branch, its base, the files in the server's review order, then questions. */
 export function understandingPrompt(preview: IntegrationPreview): string {
-  const lines = preview.files.map((file, index) => {
-    const signals = file.signals.length ? ` — signals: ${file.signals.join(', ')}` : '';
-    return `${index + 1}. ${file.path} (+${file.added} −${file.removed})${signals}`;
-  });
+  const lines = fileLines(preview);
 
   return `Hold a comprehension dialogue with me on the change of branch \`${preview.branch}\` since base \`${preview.base}\`. The files, in review order:\n${lines.join('\n')}\nUse \`git diff ${preview.base} ${preview.branch} -- <path>\` for each file, then ask me your questions.`;
 }

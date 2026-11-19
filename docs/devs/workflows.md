@@ -54,9 +54,12 @@ criterion has a check that is not a code search, and each one runs, selects a te
 `alwaysValidateTests` always asks.
 
 Its checks cost tokens, so each runs once. `verify` judges only the criteria without a check command, and the
-kernel skips it when every criterion has one. `review` reads the diff once against the plan; its findings go to the
-human node "Review findings", where the human picks what `fix-review` fixes. After the fix only the criteria checks
-run again (`recheck`), with no second verify or review.
+kernel skips it when every criterion has one. `verify` and `review` get the run's diff in their prompt (`{{diff}}`)
+and read it once against the plan. A review that ends `clean` or `minor` ends the run: nits the human may take or
+leave stay readable in its output and do not cost a builder round. `findings` go to the human node "Review
+findings", where the human picks what `fix-review` fixes; a finding on a protected file (the validated tests, a
+lockfile) is dismissed in its report, never a waiver. After the fix only the criteria checks run again (`recheck`),
+with no second verify or review.
 
 `id` matches `^[a-z0-9][a-z0-9-]*$` and equals the file name. The editor
 saves into the project's or the global folder; an embedded default is
@@ -127,7 +130,8 @@ runs in the session too, but its first pass opens a new context window: a
 `context.compacted` cut (no model call, `afterTokens: 0`) marks where the
 model's view starts, so the node reads its own prompt and not the nodes
 before it. The prompt passes on what the node needs through template
-variables (`{{nodes.plan.output}}`, `{{criteria}}`, `{{filesChanged}}`). A
+variables (`{{nodes.plan.output}}`, `{{criteria}}`, `{{filesChanged}}`,
+`{{diff}}`). A
 retry (pass 2 and later) or a resumed node goes on in its window without a
 new cut. The log stays whole: protection, waivers, session rules and the
 changed files still see everything, and the notices are sent again in the
@@ -191,6 +195,7 @@ Prompts, commands, condition values and questions may use:
 - `{{nodes.<id>.output}}`, `{{nodes.<id>.port}}`: the latest run of a node
 - `{{nodes.<id>.exitCode}}`: for a shell node
 - `{{filesChanged}}`: the files changed since the run started, one per line
+- `{{diff}}`: the diff of those files, new files as additions, cut at 40,000 characters
 - `{{pass}}`: how many times the current node has run, from 1
 - `{{comment}}`: the latest comment typed at a pause or a human node
 - `{{criteria}}`: the run's criteria, one per line, with their check and status

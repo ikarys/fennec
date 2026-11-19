@@ -24,10 +24,8 @@ pub fn in_worktree(top: &Path, wt: &Worktree) -> Result<ModifiedFiles, String> {
         &["diff", "--numstat", "--no-renames", "--relative", &start],
         None,
     )?;
-    for (path, (added, removed)) in
-        crate::integration::parse_numstat(&String::from_utf8_lossy(&tracked))
-    {
-        files.insert(path, (added as usize, removed as usize));
+    for (path, lines) in crate::integration::parse_numstat(&String::from_utf8_lossy(&tracked)) {
+        files.insert(path, (lines.added as usize, lines.removed as usize));
     }
 
     let untracked = git::run(

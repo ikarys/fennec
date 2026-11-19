@@ -138,8 +138,14 @@ export default function ChangesPage({
                       <span dir="rtl" title={file.path} className="grow overflow-hidden text-ellipsis whitespace-nowrap">
                         <bdi>{file.path}</bdi>
                       </span>
-                      <span className="text-ok tabular-nums">+{file.added}</span>
-                      <span className="text-err tabular-nums">−{file.removed}</span>
+                      {file.binary ? (
+                        <span className="text-muted">{t('fileBinary')}</span>
+                      ) : (
+                        <>
+                          <span className="text-ok tabular-nums">+{file.added}</span>
+                          <span className="text-err tabular-nums">−{file.removed}</span>
+                        </>
+                      )}
                     </span>
                     {(file.protected || file.carried || signals.length > 0) && (
                       <span className="flex flex-wrap gap-1 px-4 pb-1.5">
@@ -178,10 +184,14 @@ export default function ChangesPage({
                   {selectedPath}
                 </span>
                 {selectedFile ? (
-                  <>
-                    <span className="text-xs text-ok tabular-nums">+{selectedFile.added}</span>
-                    <span className="text-xs text-err tabular-nums">−{selectedFile.removed}</span>
-                  </>
+                  selectedFile.binary ? (
+                    <span className="text-xs text-muted">{t('fileBinary')}</span>
+                  ) : (
+                    <>
+                      <span className="text-xs text-ok tabular-nums">+{selectedFile.added}</span>
+                      <span className="text-xs text-err tabular-nums">−{selectedFile.removed}</span>
+                    </>
+                  )
                 ) : null}
                 <span className="ml-auto flex items-center gap-1">
                   {projectId && selectedPath ? (

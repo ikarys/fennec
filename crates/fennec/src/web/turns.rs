@@ -4,6 +4,7 @@
 use crate::agent::ports::{ChildSessions, EventLog};
 use crate::agent::turn::{Turn, compact_session, replay_turn, retry_turn, run_turn};
 use crate::agent::workflow::{WorkflowEnv, WorkflowJob, answer_in_node, run_workflow};
+use crate::changes::GitChanges;
 use crate::config::Settings;
 use crate::domain::attachment::Attachment;
 use crate::domain::event::Event;
@@ -150,7 +151,7 @@ impl Turns {
                         &settings,
                         &notifier,
                         &session_id,
-                        &place.workdir,
+                        &place,
                         &job,
                         &stop,
                         autonomous,
@@ -283,11 +284,20 @@ fn run(
     settings: &Settings,
     notifier: &Notifier,
     session_id: &str,
-    workdir: &Path,
+    place: &Place,
     job: &Job,
     stop: &AtomicBool,
     autonomous: bool,
 ) -> Result<(), String> {
+    let workdir = place.workdir.as_path();
+    // The agent's work starts from the worktree's base; a plain checkout diffs against HEAD.
+    let changes = GitChanges {
+        dir: place.workdir.clone(),
+        start: place
+            .worktree
+            .as_ref()
+            .map_or_else(|| "HEAD".to_string(), |wt| wt.base.clone()),
+    };
     let delegations = AtomicU32::new(0);
     let here = Children {
         settings,
@@ -305,53 +315,36 @@ fn run(
         delegations: Some(&delegations),
         ..here
     };
-    with_turn(
-        &here,
-        session_id,
-        stop,
-        Some(&delegates),
-        |turn, tools| match job {
+    with_turn(&here, session_id, stop, Some(&delegates), |turn, tools| {
+        let env = WorkflowEnv {
+            children: &here,
+            commands: tools,
+            changes: &changes,
+        };
+        match job {
             Job::Input(TurnInput::Prompt(prompt), attachments) => {
                 run_turn(turn, prompt, attachments).map(|_| ())
             }
             Job::Input(TurnInput::Compact, _) => compact_session(turn).map(|_| ()),
             Job::Replay(message_id) => replay_turn(turn, message_id).map(|_| ()),
             Job::Retry => retry_turn(turn).map(|_| ()),
-            Job::Workflow(workflow_job) => run_workflow(
-                turn,
-                &WorkflowEnv {
-                    children: &here,
-                    commands: tools,
-                },
-                workflow_job.clone(),
-            )
-            .map(|_| ()),
+            Job::Workflow(workflow_job) => {
+                run_workflow(turn, &env, workflow_job.clone()).map(|_| ())
+            }
             Job::Approval {
                 call_id,
                 choice,
                 rule_id,
-            } => answer_in_node(
-                turn,
-                &WorkflowEnv {
-                    children: &here,
-                    commands: tools,
-                },
-                |turn| {
-                    crate::agent::rule_approval::answer_approval(turn, call_id, *choice, *rule_id)
-                },
-            )
+            } => answer_in_node(turn, &env, |turn| {
+                crate::agent::rule_approval::answer_approval(turn, call_id, *choice, *rule_id)
+            })
             .map(|_| ()),
-            Job::Waiver { call_id } => answer_in_node(
-                turn,
-                &WorkflowEnv {
-                    children: &here,
-                    commands: tools,
-                },
-                |turn| crate::agent::waiver::answer_waiver(turn, call_id),
-            )
+            Job::Waiver { call_id } => answer_in_node(turn, &env, |turn| {
+                crate::agent::waiver::answer_waiver(turn, call_id)
+            })
             .map(|_| ()),
-        },
-    )
+        }
+    })
 }
 
 /// The queued message that starts the next job once a turn ends, if any.

@@ -30,12 +30,13 @@ pub(super) enum NodeEnd {
 }
 
 /// What every node runner reads: the folded run (its start already applied),
-/// the files changed since the run started, the stop flag.
+/// the files changed since the run started and their diff, the stop flag.
 pub(super) struct NodeInput<'a> {
     pub state: &'a run::RunState,
     pub node: &'a Node,
     pub pass: u32,
     pub files: &'a [String],
+    pub diff: &'a str,
     pub stop: &'a AtomicBool,
 }
 
@@ -54,7 +55,7 @@ pub(super) fn shell(env: &WorkflowEnv, input: &NodeInput) -> NodeEnd {
 
     let cmd = render(
         command,
-        &|name| run::variable(input.state, &input.node.id, input.files, name),
+        &|name| run::variable(input.state, &input.node.id, input.files, input.diff, name),
         true,
     );
     let timeout = Duration::from_secs(timeout_secs.unwrap_or(DEFAULT_SHELL_TIMEOUT_SECS));
@@ -96,7 +97,7 @@ pub(super) fn condition(input: &NodeInput) -> NodeEnd {
 
     let rendered = render(
         value,
-        &|name| run::variable(input.state, &input.node.id, input.files, name),
+        &|name| run::variable(input.state, &input.node.id, input.files, input.diff, name),
         false,
     );
     let result = run::evaluate(*test, &rendered, against.as_deref());
@@ -111,7 +112,8 @@ pub(super) fn condition(input: &NodeInput) -> NodeEnd {
 
 /// The prompt of an agent node: the domain's agent_prompt + the outcome instruction.
 pub(super) fn agent_prompt(input: &NodeInput, outputs: &[String]) -> String {
-    let mut prompt = run::agent_prompt(input.state, input.node, input.pass, input.files);
+    let mut prompt =
+        run::agent_prompt(input.state, input.node, input.pass, input.files, input.diff);
     prompt.push_str(&outcome::outcome_instruction(outputs));
     prompt
 }

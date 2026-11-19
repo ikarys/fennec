@@ -51,10 +51,11 @@ pub fn facts(settings: &Settings, store: &SqliteStore) -> Result<Facts, String> 
         .iter()
         .filter(|project| !crate::chat::is_chat(project))
         .count();
-    let scanners_found = crate::domain::scanner::SCANNERS
+    let scanners_missing = crate::domain::scanner::SCANNERS
         .iter()
-        .filter(|scanner| crate::scanners::find(scanner.binary).is_some())
-        .count();
+        .filter(|scanner| crate::scanners::find(scanner.binary).is_none())
+        .map(|scanner| scanner.name)
+        .collect();
     let scanners_known = crate::domain::scanner::SCANNERS.len();
 
     Ok(Facts {
@@ -62,7 +63,7 @@ pub fn facts(settings: &Settings, store: &SqliteStore) -> Result<Facts, String> 
         sandbox,
         git,
         projects,
-        scanners_found,
+        scanners_missing,
         scanners_known,
     })
 }

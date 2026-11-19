@@ -60,7 +60,7 @@ pub(super) fn run(
         if exit_code.is_none() {
             return Ok(None);
         }
-        let mut verdict = preflight::classify(exit_code, &output);
+        let mut verdict = preflight::classify(exit_code, &output, check);
         if verdict == PreflightVerdict::Fails
             && preflight::missing_top_level_module(&output)
                 .is_some_and(|module| defines_module(turn.workdir, module))
