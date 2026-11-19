@@ -57,13 +57,15 @@ const USAGE: &str = "usage:
   fennec remote <enable|disable|status>    open the server to the network (asks for a password
                                            first) or keep it on 127.0.0.1
   fennec password                          set or change the remote-access password
-  fennec run [--session <id>] [--agent <id>] [--image <path>]... <prompt>
+  fennec run [--quiet] [--session <id>] [--agent <id>] [--image <path>]... <prompt>
                                            run the agent loop in the current directory;
-                                           agent: plan (default, read-only) or builder
-  fennec run --workflow <id> [--night] [--port <n>] <task>
+                                           agent: plan (default, read-only) or builder;
+                                           --quiet: hide the model's reasoning
+  fennec run --workflow <id> [--night] [--quiet] [--port <n>] <task>
                                            run a workflow (e.g. plan-build-verify) on the running
                                            server: steps print here, gates read your answer
                                            (--night: take the first choice at every gate;
+                                           --quiet: hide the model's reasoning;
                                            --port: the server to use, default: the configured one)
   fennec compact <session>                 compact a session in the current directory
   fennec doctor                            check what fennec needs: model, sandbox, git, a project
@@ -119,6 +121,7 @@ fn run(args: &[String]) -> Result<(), String> {
             let mut images = Vec::new();
             let mut workflow = None;
             let mut night = false;
+            let mut quiet = false;
             let mut port = None;
             let mut i = 1;
             while i < args.len() {
@@ -126,8 +129,12 @@ fn run(args: &[String]) -> Result<(), String> {
                 if !flag.starts_with("--") {
                     break;
                 }
-                if flag == "--night" {
-                    night = true;
+                if flag == "--night" || flag == "--quiet" {
+                    if flag == "--night" {
+                        night = true;
+                    } else {
+                        quiet = true;
+                    }
                     i += 1;
                     continue;
                 }
@@ -150,12 +157,19 @@ fn run(args: &[String]) -> Result<(), String> {
                 if session.is_some() || agent.is_some() || !images.is_empty() {
                     return Err(USAGE.into());
                 }
-                return cli::workflow_run::run(&workflow, night, port, &prompt);
+                return cli::workflow_run::run(&workflow, night, quiet, port, &prompt);
             }
             if night || port.is_some() {
                 return Err(USAGE.into());
             }
-            cli::run(&Settings::from_env()?, session, agent, &images, &prompt)
+            cli::run(
+                &Settings::from_env()?,
+                session,
+                agent,
+                &images,
+                quiet,
+                &prompt,
+            )
         }
         Some("compact") => cli::compact(&Settings::from_env()?, args.get(1).ok_or(USAGE)?),
         Some("update") => cli::update::run(&args[1..]),

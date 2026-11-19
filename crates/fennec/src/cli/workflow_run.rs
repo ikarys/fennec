@@ -11,7 +11,13 @@ use std::time::Duration;
 /// `port`: the server to talk to; without it, the configured one (settings
 /// or 7777), which may be another instance than the one started with
 /// `fennec --port`, so the target prints before anything starts.
-pub fn run(workflow_id: &str, night: bool, port: Option<u16>, task: &str) -> Result<(), String> {
+pub fn run(
+    workflow_id: &str,
+    night: bool,
+    quiet: bool,
+    port: Option<u16>,
+    task: &str,
+) -> Result<(), String> {
     let port = match port {
         Some(port) => port,
         None => crate::server_config::port()?,
@@ -65,7 +71,7 @@ pub fn run(workflow_id: &str, night: bool, port: Option<u16>, task: &str) -> Res
         night,
         run_id: None,
         workflow: None,
-        transcript: Transcript::default(),
+        transcript: Transcript::new(quiet),
         streamed: false,
         asked: false,
         last_error: None,
