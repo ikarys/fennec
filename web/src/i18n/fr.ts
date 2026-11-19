@@ -185,7 +185,7 @@ export const fr: Record<MsgKey, string> = {
   indicative: 'indicatif',
   indicativeTitle: "Un agent l'a jugé : le résultat est le dire du modèle, à vérifier.",
   indicativeCount: '{passed}/{total} passés, {indicative} jugés par un agent',
-  noCriteriaHint: 'Le plan n’a pas de liste « Done when » : rien n’est vérifié ici.',
+  noCriteriaHint: 'Aucun critère « Done when » exécutable dans cette session : rien n’est vérifié ici.',
 
   exitCode: 'exit {code}',
   openTerminalHere: 'Ouvrir un terminal ici',
