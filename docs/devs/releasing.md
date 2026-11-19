@@ -14,8 +14,9 @@ just promote
   -> push to main
   -> release-please opens "chore(main): release X.Y.Z"
      (updates Cargo.toml, Cargo.lock, version.txt, CHANGELOG.md)
-  -> merging it tags vX.Y.Z
-  -> publishes release with Linux binaries (x86_64, aarch64)
+  -> merging it tags vX.Y.Z and creates a draft release
+  -> uploads the binaries, then publishes the draft
+     (releases are immutable: a published release never changes)
   -> merges main back into develop
 ```
 
