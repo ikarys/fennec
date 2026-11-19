@@ -13,7 +13,7 @@ rules = { path = "../rules" }
 canvas = { path = "../canvas" }
 mcp-lite = { version = "0.1", features = ["oauth"] }
 ring = "0.17"
-rusqlite = { version = "0.41", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ureq = { version = "3", default-features = false, features = ["json", "rustls"] }
