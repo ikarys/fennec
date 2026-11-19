@@ -155,9 +155,10 @@ export function pauseWorkflow(sessionId: string, runId: string): Promise<void> {
 /**
  * The run view, pre-calculated by the server: steps, states, ports, rounds,
  * upcoming steps and completion counts; the run rail renders it as it is.
+ * `null` when the session has no run.
  */
-export function getRunView(id: string): Promise<RunView> {
-  return request<RunView>(
+export function getRunView(id: string): Promise<RunView | null> {
+  return request<RunView | null>(
     `/api/sessions/${encodeURIComponent(id)}/workflow/run/view`,
   );
 }

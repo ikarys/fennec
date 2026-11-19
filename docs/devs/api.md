@@ -860,7 +860,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `1..=10000` (400 otherwise); 404 if no session; an empty array when there
   is nothing before `before`.
 - `GET /api/sessions/{id}/workflow/run/view` → the latest run pre-calculated
-  by the server, which the UI renders as it is; 404 when the log has no run.
+  by the server, which the UI renders as it is; `null` when the log has no run.
   The body is a `RunView`: `{runId, workflow, task, stepByStep,
   pauseRequested, runs, open, paused, questions, finished, lastComment,
   rounds, upcoming, counts}`. `runs` is one `NodeRun` per started node in

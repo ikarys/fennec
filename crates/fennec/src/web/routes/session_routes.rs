@@ -738,7 +738,8 @@ pub(crate) fn serve_events_page(
     send_json(stream, 200, &Value::Array(out))
 }
 
-/// The run view, pre-calculated by the server: the run the UI renders as it is.
+/// The run view, pre-calculated by the server: the run the UI renders as it
+/// is, or `null` when the log has no run (every session is asked).
 pub(crate) fn serve_run_view(
     app: &App,
     _req: &Request,
@@ -753,7 +754,7 @@ pub(crate) fn serve_run_view(
         .map(|(_, event)| event)
         .collect::<Vec<_>>();
     let Some(view) = crate::web::views::run_view::run_view(&events) else {
-        return error(stream, 404, "no run");
+        return send_json(stream, 200, &Value::Null);
     };
     send_json(stream, 200, &serde_json::to_value(&view)?)
 }
