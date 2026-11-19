@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.8.0](https://github.com/ikarys/fennec/compare/v0.7.0...v0.8.0) (2026-11-19)
+
+
+### Features
+
+* fix terminal open error in right bar ([87bb184](https://github.com/ikarys/fennec/commit/87bb1848adb5ce8eb3816c908378ba24c25fae3f))
+* replace the font size segmented control with an 11 to 24 dropdown ([d4e7dc9](https://github.com/ikarys/fennec/commit/d4e7dc9278ce6b9c7ae8e6547b70ecb68f06cc3c))
+* sidebar font mismatch and small icons ([2433781](https://github.com/ikarys/fennec/commit/2433781d839fa9471263c4f48308ada0a73c1d9b))
+* **site:** add Open Graph card, canonical URL and sitemap ([#445](https://github.com/ikarys/fennec/issues/445)) ([f2b7fa8](https://github.com/ikarys/fennec/commit/f2b7fa8bbcbfbb1b2285f4d4233c961318aca42c))
+
+
+### Bug Fixes
+
+* accept font sizes 11 to 24 in the stored preferences ([da53621](https://github.com/ikarys/fennec/commit/da5362132bb3471117ffa56f8cc30f76a6c3a45f))
+* review fixes for the font size, scanner cache and terminal commits ([#444](https://github.com/ikarys/fennec/issues/444)) ([c3bbb7f](https://github.com/ikarys/fennec/commit/c3bbb7f3289debfa1125fb19844d41303b716b9c))
+* scale the side rail with the font size ([114fe99](https://github.com/ikarys/fennec/commit/114fe99d527619a563d00df3001e15c38825a94c))
+* scale the whole UI with the font size, not just rem elements ([1b7620d](https://github.com/ikarys/fennec/commit/1b7620dcf6d5c89a00897997c505201e2036621a))
+* update dropdown colors in model section ([cffcb6f](https://github.com/ikarys/fennec/commit/cffcb6fcb6eee408c890ebbe6f6a8f5d343a61d3))
+
+
+### Performance
+
+* stop settings saves re-listing providers and re-scanning PATH ([96b804f](https://github.com/ikarys/fennec/commit/96b804fc08be75f279efc9f38b23f190d9f527b9))
+
 ## [0.7.0](https://github.com/ikarys/fennec/compare/v0.6.0...v0.7.0) (2026-11-15)
 
 
