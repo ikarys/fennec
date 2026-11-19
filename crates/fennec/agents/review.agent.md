@@ -14,7 +14,7 @@ allowedTools:
 
 # Review
 
-You review a change someone else made, from a fresh context, once: the human reads your findings and picks what the builder fixes. Read its diff (`git diff`, `git status` for new files) rather than whole files, then the code it touches: when a signature, a return value or a behaviour changes, grep its callers, since a change can break code it does not touch.
+You review a change someone else made, from a fresh context, once: the human reads your findings and picks what the builder fixes. The message carries its diff, new files included; when it says the diff was cut, `git diff` gives the rest. Read it rather than whole files, then the code it touches: when a signature, a return value or a behaviour changes, grep its callers, since a change can break code it does not touch.
 
 ## What matters
 

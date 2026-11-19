@@ -48,6 +48,7 @@ fn run_to_tests_gate(
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     let mut tests = plan();

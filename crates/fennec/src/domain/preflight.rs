@@ -52,7 +52,10 @@ pub fn exit_code(tool_output: &str) -> Option<i32> {
     rest[..end].parse().ok()
 }
 
-pub fn classify(exit_code: Option<i32>, output: &str) -> PreflightVerdict {
+/// `command` is the check itself: a Python runner it names with `-m` and
+/// that is not installed (`No module named 'pytest'`) cannot run here, where
+/// a module the work has yet to write is an expected failure.
+pub fn classify(exit_code: Option<i32>, output: &str, command: &str) -> PreflightVerdict {
     match exit_code {
         None => return PreflightVerdict::CannotRun,
         Some(code) if [124, 126, 127].contains(&code) => return PreflightVerdict::CannotRun,
@@ -65,11 +68,21 @@ pub fn classify(exit_code: Option<i32>, output: &str) -> PreflightVerdict {
     if CANNOT_RUN_MARKERS
         .iter()
         .any(|marker| lowered.contains(marker))
+        || missing_top_level_module(output).is_some_and(|module| runs_module(command, module))
     {
         PreflightVerdict::CannotRun
     } else {
         PreflightVerdict::Fails
     }
+}
+
+/// Whether `command` runs `module` as a Python runner: `python3 -m pytest …`.
+fn runs_module(command: &str, module: &str) -> bool {
+    command
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .any(|pair| pair[0] == "-m" && pair[1] == module)
 }
 
 /// The criteria whose check already passed before any change, from the
@@ -240,21 +253,21 @@ FAILED (errors=1)
     #[test]
     fn classify_uses_the_exit_code_first() {
         assert_eq!(
-            classify(Some(0), "command not found"),
+            classify(Some(0), "command not found", ""),
             PreflightVerdict::PassesAlready
         );
-        assert_eq!(classify(None, ""), PreflightVerdict::CannotRun);
-        assert_eq!(classify(Some(124), ""), PreflightVerdict::CannotRun);
-        assert_eq!(classify(Some(126), ""), PreflightVerdict::CannotRun);
-        assert_eq!(classify(Some(127), ""), PreflightVerdict::CannotRun);
+        assert_eq!(classify(None, "", ""), PreflightVerdict::CannotRun);
+        assert_eq!(classify(Some(124), "", ""), PreflightVerdict::CannotRun);
+        assert_eq!(classify(Some(126), "", ""), PreflightVerdict::CannotRun);
+        assert_eq!(classify(Some(127), "", ""), PreflightVerdict::CannotRun);
     }
 
     #[test]
     fn classify_marks_environment_failures_as_cannot_run() {
         for marker in CANNOT_RUN_MARKERS {
-            assert_eq!(classify(Some(1), marker), PreflightVerdict::CannotRun);
+            assert_eq!(classify(Some(1), marker, ""), PreflightVerdict::CannotRun);
             assert_eq!(
-                classify(Some(1), &marker.to_uppercase()),
+                classify(Some(1), &marker.to_uppercase(), ""),
                 PreflightVerdict::CannotRun
             );
         }
@@ -263,33 +276,47 @@ FAILED (errors=1)
     #[test]
     fn classify_marks_a_runner_that_selected_no_test() {
         let cargo = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 3 filtered out";
-        assert_eq!(classify(Some(0), cargo), PreflightVerdict::RanNothing);
+        assert_eq!(classify(Some(0), cargo, ""), PreflightVerdict::RanNothing);
         assert_eq!(
-            classify(Some(5), "collected 0 items\nno tests ran"),
+            classify(Some(5), "collected 0 items\nno tests ran", ""),
             PreflightVerdict::RanNothing
         );
         assert_eq!(
-            classify(Some(0), "running 2 tests\ntest result: ok. 2 passed"),
+            classify(Some(0), "running 2 tests\ntest result: ok. 2 passed", ""),
             PreflightVerdict::PassesAlready
         );
     }
 
     #[test]
     fn classify_marks_everything_else_as_fails() {
-        assert_eq!(classify(Some(1), "boom"), PreflightVerdict::Fails);
-        assert_eq!(classify(Some(2), ""), PreflightVerdict::Fails);
+        assert_eq!(classify(Some(1), "boom", ""), PreflightVerdict::Fails);
+        assert_eq!(classify(Some(2), "", ""), PreflightVerdict::Fails);
     }
 
     #[test]
     fn classify_does_not_blame_the_planners_read_only_workdir() {
         let cargo = "error: failed to open: /work/Cargo.lock\n\nCaused by:\n  Read-only file system (os error 30)";
-        assert_eq!(classify(Some(101), cargo), PreflightVerdict::Fails);
+        assert_eq!(classify(Some(101), cargo, ""), PreflightVerdict::Fails);
+    }
+
+    #[test]
+    fn classify_marks_a_python_runner_that_is_not_installed_as_cannot_run() {
+        let output = "/usr/bin/python3: No module named 'pytest'\n[Exit code: 1]";
+        assert_eq!(
+            classify(Some(1), output, "python3 -m pytest test_wc.py -q"),
+            PreflightVerdict::CannotRun
+        );
+        assert_eq!(
+            classify(Some(1), output, "python3 test_wc.py"),
+            PreflightVerdict::Fails,
+            "the missing module is not the runner"
+        );
     }
 
     #[test]
     fn classify_takes_a_missing_python_test_module_as_a_failure() {
         let unittest = "ImportError: Failed to import test module: test_flatten\nModuleNotFoundError: No module named 'tests.test_flatten'\nFAILED (errors=1)";
-        assert_eq!(classify(Some(1), unittest), PreflightVerdict::Fails);
+        assert_eq!(classify(Some(1), unittest, ""), PreflightVerdict::Fails);
     }
 
     #[test]

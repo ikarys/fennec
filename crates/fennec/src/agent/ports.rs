@@ -181,3 +181,9 @@ pub struct CommandRun {
 pub trait Commands: Sync {
     fn run(&self, command: &str, timeout: Duration, stop: &AtomicBool) -> CommandRun;
 }
+
+/// The diff of the files a run changed, for the prompts of the nodes that
+/// judge them (`{{diff}}`). Empty when nothing can be diffed.
+pub trait Changes: Sync {
+    fn diff(&self, files: &[String]) -> String;
+}

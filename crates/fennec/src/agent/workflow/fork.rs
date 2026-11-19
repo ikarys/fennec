@@ -48,6 +48,7 @@ pub(super) fn run_fork(
     let events = turn.log.events(turn.session_id)?;
     let state = run::current_run(&events).ok_or("no active run")?;
     let files = files_changed(run::current_run_events(&events));
+    let diff = env.changes.diff(&files);
     let parent_session_id = turn.session_id.to_string();
     let stop = turn.stop;
 
@@ -63,6 +64,7 @@ pub(super) fn run_fork(
                     env,
                     state: state.clone(),
                     files: &files,
+                    diff: &diff,
                     parent_session_id: &parent_session_id,
                     stop,
                     via: via.clone(),
@@ -130,6 +132,7 @@ struct Branch<'a> {
     env: &'a WorkflowEnv<'a>,
     state: RunState,
     files: &'a [String],
+    diff: &'a str,
     parent_session_id: &'a str,
     stop: &'a AtomicBool,
     via: Via,
@@ -211,6 +214,7 @@ fn run_branch_node(
         node: &node,
         pass,
         files: branch.files,
+        diff: branch.diff,
         stop: branch.stop,
     };
     let end = match (&node.kind, &child_session_id) {

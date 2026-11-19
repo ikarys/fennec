@@ -26,9 +26,20 @@ pub struct RunUsageView {
     pub run_id: String,
     pub calls: String,
     pub generated: String,
-    pub read: String,
-    /// `82 % cache`
+    /// Prompt tokens the server did not take from its cache: what the run really cost to read.
+    pub uncached: String,
+    /// `82 % cached of 340k read`
     pub cache: String,
+}
+
+/// `82 % cached of 340k read`: the share the server's cache served, and the whole it is a share of.
+fn cache_line(t: &Totals, lang: Lang) -> String {
+    let percent = display::percent(t.cached, t.prompt);
+    let read = display::tokens(t.prompt, lang.locale());
+    match lang {
+        Lang::En => format!("{percent} % cached of {read} read"),
+        Lang::Fr => format!("{percent} % en cache sur {read} lus"),
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Serialize)]
@@ -208,8 +219,8 @@ pub fn workflow_usage(
                     run_id: run_id.clone(),
                     calls: t.calls.to_string(),
                     generated: display::tokens(t.completion, lang.locale()),
-                    read: display::tokens(t.prompt, lang.locale()),
-                    cache: format!("{} % cache", display::percent(t.cached, t.prompt)),
+                    uncached: display::tokens(t.prompt.saturating_sub(t.cached), lang.locale()),
+                    cache: cache_line(&t, lang),
                 });
             }
             _ => {}
@@ -310,8 +321,17 @@ mod tests {
         assert!(view.nodes[0].detail.contains("1 appel"));
         assert_eq!(view.runs.len(), 1);
         assert_eq!(view.runs[0].calls, "2");
-        assert_eq!(view.runs[0].read, display::tokens(4000, Lang::Fr.locale()));
-        assert_eq!(view.runs[0].cache, "13 % cache");
+        assert_eq!(
+            view.runs[0].uncached,
+            display::tokens(3500, Lang::Fr.locale())
+        );
+        assert_eq!(
+            view.runs[0].cache,
+            format!(
+                "13 % en cache sur {} lus",
+                display::tokens(4000, Lang::Fr.locale())
+            )
+        );
     }
 
     #[test]

@@ -208,6 +208,7 @@ Prompts, commands, condition values, and questions may use:
 - `{{nodes.<id>.output}}`, `{{nodes.<id>.port}}`: the latest run of a node
 - `{{nodes.<id>.exitCode}}`: for a shell node
 - `{{filesChanged}}`: the files changed since the run started, one per line
+- `{{diff}}`: the diff of those files, new files as additions, cut at 40,000 characters
 - `{{pass}}`: how many times the current node has run, from 1
 - `{{comment}}`: the latest comment typed at a pause or a human node
 - `{{criteria}}`: the run's criteria, one per line, with their check and status
