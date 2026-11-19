@@ -1,10 +1,44 @@
-# Third-party actions are pinned by commit SHA; this bumps the pins, one grouped PR a month.
+# Dependency updates as PRs to develop: CI runs on each, the human merges or closes it.
+# Minor and patch bumps come grouped, one PR per ecosystem; a major bump gets its own PR.
+# Security fixes arrive through these weekly runs: Dependabot's security-update PRs
+# would target main (the default branch), which only moves by release.
 version: 2
 updates:
+  - package-ecosystem: cargo
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    assignees: [ikarys]
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      cargo:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /web
+    target-branch: develop
+    schedule:
+      interval: weekly
+    assignees: [ikarys]
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      npm:
+        update-types: [minor, patch]
+
+  # Third-party actions are pinned by commit SHA; this bumps the pins.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
+    assignees: [ikarys]
+    commit-message:
+      prefix: ci
     groups:
       actions:
         patterns: ["*"]
