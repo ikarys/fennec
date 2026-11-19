@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/ikarys/fennec/compare/v0.8.0...v0.9.0) (2026-11-19)
+
+
+### Features
+
+* make plan-build-verify runs cheaper in model calls ([#458](https://github.com/ikarys/fennec/issues/458)) ([8297288](https://github.com/ikarys/fennec/commit/8297288b5b9dd5501baf42cc6cbb822616f0646c))
+
+
+### Bug Fixes
+
+* address the v0.8.0 user-test report ([#457](https://github.com/ikarys/fennec/issues/457)) ([bc87d64](https://github.com/ikarys/fennec/commit/bc87d64282d0af521feb604c987a7e307cea555f))
+* **workflow:** stop the review loop from stalling on the protected tests ([#459](https://github.com/ikarys/fennec/issues/459)) ([6997ddf](https://github.com/ikarys/fennec/commit/6997ddfd2f356bdca23eb14cfc1b4c583fa935fe))
+
 ## [0.8.0](https://github.com/ikarys/fennec/compare/v0.7.0...v0.8.0) (2026-11-19)
 
 
