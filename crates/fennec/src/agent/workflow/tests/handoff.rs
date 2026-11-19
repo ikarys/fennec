@@ -100,6 +100,7 @@ fn a_handoff_node_opens_a_new_window() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -161,6 +162,7 @@ fn a_handoff_node_first_in_the_run_does_not_cut() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];
@@ -198,6 +200,7 @@ fn a_resumed_handoff_node_keeps_its_window() {
     let env = WorkflowEnv {
         children: &children,
         commands: &commands,
+        changes: &CHANGES,
     };
     let mut h = Harness::new(Box::new(model), PathBuf::from("/tmp"), &stop);
     h.agents = vec![plan()];

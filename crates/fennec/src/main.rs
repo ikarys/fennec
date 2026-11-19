@@ -6,6 +6,7 @@ mod agent;
 mod agents;
 mod architecture;
 mod budget;
+mod changes;
 mod chat;
 mod cli;
 mod config;
