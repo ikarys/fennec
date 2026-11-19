@@ -72,6 +72,7 @@ pub fn run(
     if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
         return Err("/compact takes no attachments".into());
     }
+    let seen = store.events(&session_id)?.len();
     let reason = with_turn(settings, &store, &session_id, |turn| {
         let mut reason = match &input {
             TurnInput::Compact => compact_session(turn)?,
@@ -90,8 +91,25 @@ pub fn run(
         Ok(reason)
     })?;
     match reason {
-        DoneReason::Complete => Ok(()),
+        DoneReason::Complete => {
+            print_next_step(&store.events(&session_id)?[seen..], &session_id);
+            Ok(())
+        }
         reason => Err(format!("turn ended: {reason}")),
+    }
+}
+
+/// The plan agent ends on "the human reviews it": say how, so the terminal
+/// does not leave the human guessing the builder's flags.
+fn print_next_step(turn_events: &[Event], session_id: &str) {
+    if turn_events
+        .iter()
+        .any(|event| matches!(event, Event::PlanProposed { .. }))
+    {
+        eprintln!(
+            "plan recorded · to build it: fennec run --session {session_id} --agent builder \"Execute the plan above.\"\n\
+             or review it in the web UI, where the workflow runs tests, build and verification for you"
+        );
     }
 }
 
