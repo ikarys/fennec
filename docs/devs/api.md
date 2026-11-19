@@ -801,7 +801,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/sessions/{id}/compact` → 202; 404 if no session; 409 if a turn is
   running; summarises the history and opens a new context window
 - `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
-  400 with `unknown mode: <mode>` if the id is not a top-level agent; appends
+  400 with `unknown agent: <id> (valid: …)` if the id is not a top-level agent; appends
   `mode.changed` when the mode changes; allowed while a turn runs
 - `POST /api/sessions/{id}/link` `{projectId: string | null}` → `{linkedProjectId}`:
   links a chat to a project, or unlinks it with `null`. The link is a reference
