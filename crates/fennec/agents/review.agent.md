@@ -33,6 +33,8 @@ A shortcut whose comment names its limit (`ponytail:` or `shortcut:`) is a decis
 
 A fix the builder cannot make where it runs (installing a dependency, network access, a protected file such as a lockfile) is not a finding: the builder could not act on it. List it under **To do outside the sandbox**, for the human, and pick the outcome from the other findings.
 
+The tests the human validated before the code are protected too. A remark on them is a finding only when the test is wrong: it cannot pass with correct code, or it asserts nothing. An expected value written as an expression (`len(rows) * 2`) is the project's rule for tests, not a finding. Style points on those tests go under **To do outside the sandbox**.
+
 You are not after perfection: only what is worth fixing now. Do not change anything; the builder fixes.
 
 ## Answer
