@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-16T05:50:48.570Z",
+    "detectionDate": "2026-11-19T06:53:11.115Z",
     "formats": {
       "typescript": {
         "sources": {
@@ -101,8 +101,8 @@
             "newClones": 0
           },
           "web/src/lib/api/settings.ts": {
-            "lines": 367,
-            "tokens": 2506,
+            "lines": 369,
+            "tokens": 2521,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -328,6 +328,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/settings/ModelSection.test.ts": {
+            "lines": 53,
+            "tokens": 668,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/session/SlashMenu.test.ts": {
             "lines": 43,
             "tokens": 621,
@@ -472,6 +484,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/lib/spacing.test.ts": {
+            "lines": 34,
+            "tokens": 289,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/lib/sources.ts": {
             "lines": 33,
             "tokens": 366,
@@ -581,8 +605,8 @@
             "newClones": 0
           },
           "web/src/lib/settingsForm.ts": {
-            "lines": 389,
-            "tokens": 4142,
+            "lines": 395,
+            "tokens": 4227,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -593,8 +617,8 @@
             "newClones": 0
           },
           "web/src/lib/settingsForm.test.ts": {
-            "lines": 521,
-            "tokens": 5018,
+            "lines": 548,
+            "tokens": 5300,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1410,14 +1434,14 @@
           }
         },
         "total": {
-          "lines": 13311,
-          "tokens": 133253,
-          "sources": 117,
+          "lines": 13433,
+          "tokens": 134592,
+          "sources": 119,
           "clones": 17,
           "duplicatedLines": 146,
           "duplicatedTokens": 1596,
-          "percentage": 1.1,
-          "percentageTokens": 1.2,
+          "percentage": 1.09,
+          "percentageTokens": 1.19,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -2252,6 +2276,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/settings/TerminalSection.tsx": {
+            "lines": 6,
+            "tokens": 71,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/settings/SkillsSection.tsx": {
             "lines": 15,
             "tokens": 101,
@@ -2397,8 +2433,8 @@
             "newClones": 0
           },
           "web/src/components/settings/ModelSection.tsx": {
-            "lines": 15,
-            "tokens": 269,
+            "lines": 12,
+            "tokens": 121,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2493,8 +2529,8 @@
             "newClones": 0
           },
           "web/src/components/settings/DisplaySection.tsx": {
-            "lines": 70,
-            "tokens": 769,
+            "lines": 76,
+            "tokens": 808,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3909,8 +3945,8 @@
             "newClones": 0
           },
           "web/src/pages/SettingsPage.tsx": {
-            "lines": 464,
-            "tokens": 4696,
+            "lines": 469,
+            "tokens": 4773,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4030,14 +4066,14 @@
           }
         },
         "total": {
-          "lines": 14635,
-          "tokens": 139270,
-          "sources": 217,
+          "lines": 14649,
+          "tokens": 139309,
+          "sources": 218,
           "clones": 3,
           "duplicatedLines": 608,
           "duplicatedTokens": 5161,
           "percentage": 4.15,
-          "percentageTokens": 3.71,
+          "percentageTokens": 3.7,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -4920,6 +4956,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "web/src/components/settings/TerminalSection.tsx": {
+            "lines": 27,
+            "tokens": 238,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "web/src/components/settings/SkillsSection.tsx": {
             "lines": 37,
             "tokens": 280,
@@ -5065,8 +5113,8 @@
             "newClones": 0
           },
           "web/src/components/settings/ModelSection.tsx": {
-            "lines": 57,
-            "tokens": 710,
+            "lines": 84,
+            "tokens": 910,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5161,8 +5209,8 @@
             "newClones": 0
           },
           "web/src/components/settings/DisplaySection.tsx": {
-            "lines": 117,
-            "tokens": 1238,
+            "lines": 123,
+            "tokens": 1302,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6685,8 +6733,8 @@
             "newClones": 0
           },
           "web/src/pages/SettingsPage.tsx": {
-            "lines": 559,
-            "tokens": 5663,
+            "lines": 565,
+            "tokens": 5753,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6830,13 +6878,13 @@
           }
         },
         "total": {
-          "lines": 28945,
-          "tokens": 276386,
-          "sources": 232,
+          "lines": 29011,
+          "tokens": 276978,
+          "sources": 233,
           "clones": 19,
           "duplicatedLines": 210,
           "duplicatedTokens": 2108,
-          "percentage": 0.73,
+          "percentage": 0.72,
           "percentageTokens": 0.76,
           "newDuplicatedLines": 0,
           "newClones": 0
@@ -6845,7 +6893,7 @@
       "css": {
         "sources": {
           "web/src/styles/app.css": {
-            "lines": 315,
+            "lines": 316,
             "tokens": 2289,
             "sources": 1,
             "clones": 0,
@@ -6858,7 +6906,7 @@
           }
         },
         "total": {
-          "lines": 315,
+          "lines": 316,
           "tokens": 2289,
           "sources": 1,
           "clones": 0,
@@ -6899,6 +6947,18 @@
           "crates/fennec/src/web/routes/integration/gate.rs": {
             "lines": 230,
             "tokens": 2513,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/web/os/terminal/tests.rs": {
+            "lines": 154,
+            "tokens": 1679,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7521,8 +7581,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/os/terminal.rs": {
-            "lines": 62,
-            "tokens": 771,
+            "lines": 188,
+            "tokens": 1748,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7761,14 +7821,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/preferences/tests.rs": {
-            "lines": 681,
-            "tokens": 6191,
+            "lines": 687,
+            "tokens": 6255,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 14,
             "duplicatedTokens": 140,
-            "percentage": 2.06,
-            "percentageTokens": 2.26,
+            "percentage": 2.04,
+            "percentageTokens": 2.24,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7989,8 +8049,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/listings.rs": {
-            "lines": 71,
-            "tokens": 679,
+            "lines": 91,
+            "tokens": 834,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8889,8 +8949,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/preferences.rs": {
-            "lines": 407,
-            "tokens": 3178,
+            "lines": 410,
+            "tokens": 3196,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10221,14 +10281,14 @@
             "newClones": 0
           },
           "crates/fennec/src/scanners.rs": {
-            "lines": 108,
-            "tokens": 1237,
+            "lines": 89,
+            "tokens": 1019,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 28,
-            "duplicatedTokens": 324,
-            "percentage": 25.93,
-            "percentageTokens": 26.19,
+            "clones": 2,
+            "duplicatedLines": 10,
+            "duplicatedTokens": 152,
+            "percentage": 11.24,
+            "percentageTokens": 14.92,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10365,8 +10425,8 @@
             "newClones": 0
           },
           "crates/fennec/src/main.rs": {
-            "lines": 169,
-            "tokens": 2037,
+            "lines": 170,
+            "tokens": 2042,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10445,6 +10505,18 @@
             "duplicatedTokens": 0,
             "percentage": 0,
             "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/executable.rs": {
+            "lines": 106,
+            "tokens": 1192,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 38,
+            "duplicatedTokens": 476,
+            "percentage": 35.85,
+            "percentageTokens": 39.93,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10762,13 +10834,13 @@
           }
         },
         "total": {
-          "lines": 81598,
-          "tokens": 764812,
-          "sources": 324,
-          "clones": 247,
-          "duplicatedLines": 2821,
-          "duplicatedTokens": 29593,
-          "percentage": 3.46,
+          "lines": 81995,
+          "tokens": 768684,
+          "sources": 326,
+          "clones": 249,
+          "duplicatedLines": 2831,
+          "duplicatedTokens": 29745,
+          "percentage": 3.45,
           "percentageTokens": 3.87,
           "newDuplicatedLines": 0,
           "newClones": 0
@@ -11316,12 +11388,12 @@
       }
     },
     "total": {
-      "lines": 140089,
-      "tokens": 1335093,
-      "sources": 928,
-      "clones": 286,
-      "duplicatedLines": 3785,
-      "duplicatedTokens": 38458,
+      "lines": 140689,
+      "tokens": 1340935,
+      "sources": 934,
+      "clones": 288,
+      "duplicatedLines": 3795,
+      "duplicatedTokens": 38610,
       "percentage": 2.7,
       "percentageTokens": 2.88,
       "newDuplicatedLines": 0,
@@ -15368,17 +15440,17 @@
       "tokens": 70,
       "firstFile": {
         "name": "crates/fennec/src/domain/preferences/tests.rs",
-        "start": 382,
-        "end": 389,
+        "start": 388,
+        "end": 395,
         "startLoc": {
-          "line": 382,
+          "line": 388,
           "column": 21,
-          "position": 3451
+          "position": 3515
         },
         "endLoc": {
-          "line": 389,
+          "line": 395,
           "column": 16,
-          "position": 3521
+          "position": 3585
         }
       },
       "secondFile": {
@@ -20367,78 +20439,6 @@
     },
     {
       "format": "rust",
-      "lines": 6,
-      "fragment": "() {\n        let root = temp_root();\n        std::fs::create_dir_all(&root).expect(\"create temp dir\");\n        let binary = root.join(\"scanner\");\n        std::fs::write(&binary, b\"\").expect(\"write binary\");\n        set_mode(&binary, 0o644",
-      "tokens": 80,
-      "firstFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 64,
-        "end": 69,
-        "startLoc": {
-          "line": 64,
-          "column": 43,
-          "position": 682
-        },
-        "endLoc": {
-          "line": 69,
-          "column": 32,
-          "position": 762
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 49,
-        "end": 54,
-        "startLoc": {
-          "line": 49,
-          "column": 32,
-          "position": 503
-        },
-        "endLoc": {
-          "line": 54,
-          "column": 32,
-          "position": 583
-        }
-      }
-    },
-    {
-      "format": "rust",
-      "lines": 10,
-      "fragment": ");\n\n        let path = std::env::join_paths([root.clone()]).expect(\"join paths\");\n        assert_eq!(find_in(&path, \"scanner\"), None);\n\n        let _ = std::fs::remove_dir_all(&root);\n    }\n\n    #[test]\n    fn first_directory_in_path_order_wins",
-      "tokens": 82,
-      "firstFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 80,
-        "end": 89,
-        "startLoc": {
-          "line": 80,
-          "column": 64,
-          "position": 879
-        },
-        "endLoc": {
-          "line": 89,
-          "column": 42,
-          "position": 961
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/scanners.rs",
-        "start": 69,
-        "end": 78,
-        "startLoc": {
-          "line": 69,
-          "column": 32,
-          "position": 763
-        },
-        "endLoc": {
-          "line": 78,
-          "column": 38,
-          "position": 845
-        }
-      }
-    },
-    {
-      "format": "rust",
       "lines": 8,
       "fragment": "fn temp_dir() -> PathBuf {\n        let nanos = std::time::SystemTime::now()\n            .duration_since(std::time::UNIX_EPOCH)\n            .map(|value| value.as_nanos())\n            .unwrap_or(0);\n        let counter = COUNTER.fetch_add(1, Ordering::Relaxed);\n        let dir = std::env::temp_dir().join(format!(\n            \"fennec-protected-test-{}-{nanos}-{counter}\"",
       "tokens": 112,
@@ -21010,6 +21010,150 @@
           "line": 413,
           "column": 12,
           "position": 3773
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": ";\n\n    fn temp_root() -> PathBuf {\n        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);\n        let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);\n        let",
+      "tokens": 84,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 26,
+        "end": 31,
+        "startLoc": {
+          "line": 26,
+          "column": 44,
+          "position": 235
+        },
+        "endLoc": {
+          "line": 31,
+          "column": 12,
+          "position": 319
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/scanners.rs",
+        "start": 42,
+        "end": 47,
+        "startLoc": {
+          "line": 42,
+          "column": 42,
+          "position": 413
+        },
+        "endLoc": {
+          "line": 47,
+          "column": 12,
+          "position": 497
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": "() {\n        let root = temp_root();\n        std::fs::create_dir_all(&root).expect(\"create temp dir\");\n        let binary = root.join(\"program\");\n        std::fs::write(&binary, b\"\").expect(\"write binary\");\n        set_mode(&binary, 0o644",
+      "tokens": 80,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 62,
+        "end": 67,
+        "startLoc": {
+          "line": 62,
+          "column": 43,
+          "position": 637
+        },
+        "endLoc": {
+          "line": 67,
+          "column": 32,
+          "position": 717
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 47,
+        "end": 52,
+        "startLoc": {
+          "line": 47,
+          "column": 32,
+          "position": 458
+        },
+        "endLoc": {
+          "line": 52,
+          "column": 32,
+          "position": 538
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": "() {\n        let root = temp_root();\n        std::fs::create_dir_all(&root).expect(\"create temp dir\");\n\n        let path = std::env::join_paths([root.clone()]).expect(\"join paths\");\n        assert_eq!",
+      "tokens": 68,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 76,
+        "end": 81,
+        "startLoc": {
+          "line": 76,
+          "column": 38,
+          "position": 801
+        },
+        "endLoc": {
+          "line": 81,
+          "column": 19,
+          "position": 869
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/scanners.rs",
+        "start": 57,
+        "end": 61,
+        "startLoc": {
+          "line": 57,
+          "column": 67,
+          "position": 617
+        },
+        "endLoc": {
+          "line": 61,
+          "column": 12,
+          "position": 684
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 10,
+      "fragment": ");\n\n        let path = std::env::join_paths([root.clone()]).expect(\"join paths\");\n        assert_eq!(find_in(&path, \"program\"), None);\n\n        let _ = std::fs::remove_dir_all(&root);\n    }\n\n    #[test]\n    fn first_directory_in_path_order_wins",
+      "tokens": 82,
+      "firstFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 78,
+        "end": 87,
+        "startLoc": {
+          "line": 78,
+          "column": 64,
+          "position": 834
+        },
+        "endLoc": {
+          "line": 87,
+          "column": 42,
+          "position": 916
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/executable.rs",
+        "start": 67,
+        "end": 76,
+        "startLoc": {
+          "line": 67,
+          "column": 32,
+          "position": 718
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 38,
+          "position": 800
         }
       }
     },
