@@ -8,7 +8,7 @@ The page opens as sub-pages in a side navigation, grouped under **Models**, **Sa
 
 **Appearance** sets **Language** (**English** or **Français**), **Theme**, **Reasoning open by default**, **Tool results open by default**, and **Text size**.
 
-**Text size** is the base size of the whole interface, from 11 to 24 px; panels, icons and the side rail scale with it.
+**Text size** is the base size of the whole interface, from 11 to 24; panels, icons and the side rail scale with it.
 
 Choose the **IDE** that open-in-editor buttons target.
 
