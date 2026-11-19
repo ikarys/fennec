@@ -39,13 +39,14 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
-      - name: Upload release assets
+      - name: Upload release assets, then publish the draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           gh release upload "${{ needs.release-please.outputs.tag_name }}" ./* --clobber
+          gh release edit "${{ needs.release-please.outputs.tag_name }}" --draft=false
 
   back-merge:
     if: needs.release-please.outputs.release_created == 'true'
