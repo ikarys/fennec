@@ -649,7 +649,7 @@ mod route {
     }
 
     #[test]
-    fn the_run_view_route_refuses_a_session_without_a_run() {
+    fn the_run_view_route_answers_null_for_a_session_without_a_run() {
         let db_path = std::env::temp_dir().join(format!("fennec-run-view-{}.db", new_id()));
         let app = app(db_path.clone());
         let store = app.store().unwrap();
@@ -667,8 +667,8 @@ mod route {
         };
         let response = run_request(|stream| serve_run_view(&app, &req, stream, &session).unwrap());
         assert!(
-            response.starts_with("HTTP/1.1 404"),
-            "no run: 404, got {response}"
+            response.starts_with("HTTP/1.1 200") && response.trim_end().ends_with("null"),
+            "no run: 200 null, got {response}"
         );
         let _ = std::fs::remove_file(&db_path);
     }

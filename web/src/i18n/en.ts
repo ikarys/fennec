@@ -99,6 +99,7 @@ export const en = {
   changesNoFiles: 'The branch changes no file yet.',
   changesPickFile: 'Pick a file to read its diff.',
   diffBinary: 'Binary file: no line diff.',
+  fileBinary: 'binary',
   diffEmpty: 'No line changed (mode or empty file).',
   diffTruncated: 'Diff cut at 5,000 lines: open the file in the editor for the rest.',
   panelWorkplace: 'Where the work lands',
@@ -153,7 +154,7 @@ export const en = {
   indicative: 'indicative',
   indicativeTitle: 'An agent judged it: the result is the model\'s word, to be checked.',
   indicativeCount: '{passed}/{total} passed, {indicative} judged by an agent',
-  noCriteriaHint: 'The plan carries no "Done when" list: nothing is verified here.',
+  noCriteriaHint: 'No executable "Done when" criterion in this session: nothing is verified here.',
 
   exitCode: 'exit {code}',
   openTerminalHere: 'Open a terminal here',

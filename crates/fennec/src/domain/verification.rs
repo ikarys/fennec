@@ -138,7 +138,10 @@ impl Verification {
             )
         };
 
-        let mut line = format!("Tests protected: {}, {waivers}.", self.tests_protected);
+        let mut line = format!(
+            "Tests approved in the run: {}, {waivers}.",
+            self.tests_protected
+        );
 
         if let Some(outside) = &self.outside_plan {
             line.push_str(&format!(
@@ -319,7 +322,7 @@ mod tests {
                  - C2 list_todos returns the list: `cargo test list_todos_returns` failed (exit 1)\n\
                  - C3 docs updated: judged by the model, passed\n\
                  - C4 something: not checked\n\
-                 Tests protected: 2, waivers: 0. Files outside the plan: none."
+                 Tests approved in the run: 2, waivers: 0. Files outside the plan: none."
                     .to_string()
             )
         );
@@ -418,7 +421,7 @@ mod tests {
             verification
                 .block()
                 .unwrap()
-                .ends_with("Tests protected: 2, waivers: 0.")
+                .ends_with("Tests approved in the run: 2, waivers: 0.")
         );
     }
 

@@ -319,7 +319,7 @@ pub fn resolve_mode<'a>(
 
 /// The event that switches a session to `requested`, None when it already
 /// runs as that agent. Only a top-level agent can be chosen: a sub-agent or
-/// an unknown id is refused with "unknown mode: {requested}".
+/// an unknown id is refused with "unknown agent: {requested}" and the valid ids.
 pub fn switch_to(
     agents: &[AgentDefinition],
     events: &[Event],
@@ -329,7 +329,15 @@ pub fn switch_to(
         .iter()
         .any(|agent| !agent.subagent && agent.id == requested)
     {
-        return Err(format!("unknown mode: {requested}"));
+        let valid: Vec<&str> = agents
+            .iter()
+            .filter(|agent| !agent.subagent)
+            .map(|agent| agent.id.as_str())
+            .collect();
+        return Err(format!(
+            "unknown agent: {requested} (valid: {})",
+            valid.join(", ")
+        ));
     }
 
     let already = resolve(agents, events).is_some_and(|agent| agent.id == requested);
@@ -793,11 +801,11 @@ body
         ];
         assert_eq!(
             switch_to(&agents, &[], "missing"),
-            Err("unknown mode: missing".to_string())
+            Err("unknown agent: missing (valid: plan)".to_string())
         );
         assert_eq!(
             switch_to(&agents, &[], "verifier"),
-            Err("unknown mode: verifier".to_string())
+            Err("unknown agent: verifier (valid: plan)".to_string())
         );
     }
 }

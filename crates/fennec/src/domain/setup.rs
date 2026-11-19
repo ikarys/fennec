@@ -64,7 +64,8 @@ pub struct Facts {
     pub sandbox: SandboxFact,
     pub git: GitFact,
     pub projects: usize,
-    pub scanners_found: usize,
+    /// The names of the security scanners not found on the machine.
+    pub scanners_missing: Vec<&'static str>,
     pub scanners_known: usize,
 }
 
@@ -149,7 +150,9 @@ pub fn checks(facts: &Facts) -> Vec<Check> {
         Check {
             id: CheckId::Project,
             status: CheckStatus::Todo,
-            detail: Some("no project opened yet".to_owned()),
+            detail: Some(
+                "no project opened yet: open its directory from the web UI's home page".to_owned(),
+            ),
         }
     } else {
         let detail = if facts.projects == 1 {
@@ -164,17 +167,26 @@ pub fn checks(facts: &Facts) -> Vec<Check> {
         }
     };
 
-    let scanners = Check {
-        id: CheckId::Scanners,
-        status: if facts.scanners_found == facts.scanners_known {
-            CheckStatus::Ok
-        } else {
-            CheckStatus::Warn
-        },
-        detail: Some(format!(
-            "{} of {} security scanners found",
-            facts.scanners_found, facts.scanners_known
-        )),
+    let found = facts.scanners_known - facts.scanners_missing.len();
+    let scanners = if facts.scanners_missing.is_empty() {
+        Check {
+            id: CheckId::Scanners,
+            status: CheckStatus::Ok,
+            detail: Some(format!(
+                "{found} of {} security scanners found",
+                facts.scanners_known
+            )),
+        }
+    } else {
+        Check {
+            id: CheckId::Scanners,
+            status: CheckStatus::Warn,
+            detail: Some(format!(
+                "{found} of {} security scanners found, missing: {}",
+                facts.scanners_known,
+                facts.scanners_missing.join(", ")
+            )),
+        }
     };
 
     vec![model, sandbox, git, project, scanners]
@@ -198,7 +210,7 @@ mod tests {
             sandbox: SandboxFact::Ready,
             git: GitFact::Ready,
             projects: 1,
-            scanners_found: 4,
+            scanners_missing: Vec::new(),
             scanners_known: 4,
         }
     }
@@ -277,7 +289,10 @@ mod tests {
         facts.projects = 0;
         let checks = checks(&facts);
         assert_eq!(checks[3].status, CheckStatus::Todo);
-        assert_eq!(checks[3].detail.as_deref(), Some("no project opened yet"));
+        assert_eq!(
+            checks[3].detail.as_deref(),
+            Some("no project opened yet: open its directory from the web UI's home page")
+        );
         assert!(!complete(&checks));
     }
 
@@ -292,15 +307,15 @@ mod tests {
     }
 
     #[test]
-    fn scanners_missing_is_warn() {
+    fn scanners_missing_is_warn_and_names_them() {
         let mut facts = good();
-        facts.scanners_found = 3;
+        facts.scanners_missing = vec!["Semgrep"];
         facts.scanners_known = 4;
         let checks = checks(&facts);
         assert_eq!(checks[4].status, CheckStatus::Warn);
         assert_eq!(
             checks[4].detail.as_deref(),
-            Some("3 of 4 security scanners found")
+            Some("3 of 4 security scanners found, missing: Semgrep")
         );
     }
 

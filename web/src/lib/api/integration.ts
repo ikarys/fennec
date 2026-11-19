@@ -88,6 +88,8 @@ export interface IntegrationPreview {
     carried: boolean;
     added: number;
     removed: number;
+    /** git cannot count a binary file's lines: `added`/`removed` are 0 and the UI says so. */
+    binary: boolean;
     /** Deterministic review signals, riskiest files first (server order). */
     signals: ReviewSignal[];
   }[];

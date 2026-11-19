@@ -95,7 +95,7 @@ export function Tile({
   const inline = size === 'sm';
   const figureNode = (
     <span
-      className={`font-semibold leading-none tabular-nums ${s.figure} ${active ? ACTIVE_FIGURES[tone] : 'text-text'}${
+      className={`shrink-0 font-semibold leading-none whitespace-nowrap tabular-nums ${s.figure} ${active ? ACTIVE_FIGURES[tone] : 'text-text'}${
         inline ? ' ml-auto' : ''
       }`}
     >
@@ -115,7 +115,7 @@ export function Tile({
         >
           {icon}
         </span>
-        <span className={`${s.label} font-medium text-text`}>{label}</span>
+        <span className={`${s.label} min-w-0 truncate font-medium text-text`}>{label}</span>
         {pulse ? <span className="ml-auto h-2 w-2 rounded-full animate-pulse bg-accent" /> : null}
         {/* A small tile keeps its figure on the label's line: a row of them stays one line high. */}
         {inline ? figureNode : null}

@@ -44,6 +44,7 @@ pub fn run(
     session: Option<String>,
     agent: Option<String>,
     images: &[String],
+    quiet: bool,
     prompt: &str,
 ) -> Result<(), String> {
     let store = SqliteStore::open(&settings.db_path)?;
@@ -72,7 +73,8 @@ pub fn run(
     if matches!(input, TurnInput::Compact) && !attachments.is_empty() {
         return Err("/compact takes no attachments".into());
     }
-    let reason = with_turn(settings, &store, &session_id, |turn| {
+    let seen = store.events(&session_id)?.len();
+    let reason = with_turn(settings, &store, &session_id, quiet, |turn| {
         let mut reason = match &input {
             TurnInput::Compact => compact_session(turn)?,
             TurnInput::Prompt(prompt) => run_turn(turn, prompt, &attachments)?,
@@ -90,8 +92,25 @@ pub fn run(
         Ok(reason)
     })?;
     match reason {
-        DoneReason::Complete => Ok(()),
+        DoneReason::Complete => {
+            print_next_step(&store.events(&session_id)?[seen..], &session_id);
+            Ok(())
+        }
         reason => Err(format!("turn ended: {reason}")),
+    }
+}
+
+/// The plan agent ends on "the human reviews it": say how, so the terminal
+/// does not leave the human guessing the builder's flags.
+fn print_next_step(turn_events: &[Event], session_id: &str) {
+    if turn_events
+        .iter()
+        .any(|event| matches!(event, Event::PlanProposed { .. }))
+    {
+        eprintln!(
+            "plan recorded · to build it: fennec run --session {session_id} --agent builder \"Execute the plan above.\"\n\
+             or review it in the web UI, where the workflow runs tests, build and verification for you"
+        );
     }
 }
 
@@ -115,17 +134,19 @@ pub fn compact(settings: &Settings, session: &str) -> Result<(), String> {
     if store.session(session)?.is_none() {
         return Err(format!("no session {session}"));
     }
-    match with_turn(settings, &store, session, compact_session)? {
+    match with_turn(settings, &store, session, false, compact_session)? {
         DoneReason::Complete => Ok(()),
         reason => Err(format!("compaction ended: {reason}")),
     }
 }
 
-/// Builds a turn on `session` in the current directory, printing its events.
+/// Builds a turn on `session` in the current directory, printing its events
+/// (without the model's thinking when `quiet`).
 fn with_turn(
     settings: &Settings,
     store: &SqliteStore,
     session_id: &str,
+    quiet: bool,
     work: impl FnOnce(&mut Turn) -> Result<DoneReason, String>,
 ) -> Result<DoneReason, String> {
     let workdir = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -139,7 +160,7 @@ fn with_turn(
     // ponytail: no Ctrl-C handling, the process just dies; a signal handler
     // setting `stop` when an interrupted turn must end cleanly.
     let stop = AtomicBool::new(false);
-    let mut transcript = Transcript::default();
+    let mut transcript = Transcript::new(quiet);
     let mut on_event = |e: &Event| transcript.print(e);
     let mut options = turn_build::Options {
         notifier: None,

@@ -146,11 +146,11 @@ pub(super) fn gate(store: &SqliteStore, app: &App, id: &str) -> Result<Gate, Htt
         .iter()
         .filter_map(|path| {
             let project_path = path.strip_prefix(prefix.as_str())?;
-            let (added, removed) = preview.counts.get(path).copied().unwrap_or_default();
+            let lines = preview.counts.get(path).copied().unwrap_or_default();
             Some(FileFacts {
                 path: project_path.to_string(),
-                added,
-                removed,
+                added: lines.added,
+                removed: lines.removed,
                 protected: protected_touched.contains(path),
                 hot: hot.contains(path),
                 tested: tested.contains(path),

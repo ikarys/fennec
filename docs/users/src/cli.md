@@ -51,6 +51,7 @@ fennec run --image ./diagram.png --image ./screenshot.png "explain this flow"
 | `--session <id>` | Continue an existing session. |
 | `--agent <id>` | Use an agent id; `plan` is the default, `builder` writes code. |
 | `--image <path>` | Attach an image; repeat the flag for more images. |
+| `--quiet` | Hide the model's reasoning; answers and tool results still print. |
 
 ## Run a workflow
 
@@ -77,6 +78,8 @@ At the end the CLI prints what fennec verified and the review page's link, `Revi
 | --- | --- |
 | `--workflow <id>` | The workflow to run, e.g. `plan-build-verify` or `quick`. |
 | `--night` | Take the first choice at every gate, and the first option of every question (or let the agent decide). A permission request (a rule approval or a waiver) ends the run: it waits for you in the browser. |
+| `--quiet` | Hide the model's reasoning; steps, gates and results still print. |
+| `--port <n>` | The server to talk to, when it was started with `--port`; the default is the configured port. The CLI prints the server it uses before starting. |
 
 The command exits with status 1 when the run does not end done.
 

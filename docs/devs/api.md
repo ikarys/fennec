@@ -548,7 +548,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
 - `GET /api/sessions/{id}/repo` → `{dir, branch, originBranch, branchChanged, dirty}`: the human's repository now, for any session: its top directory, checked-out branch (null when detached), the branch the session's worktree started from (null without a worktree), whether they differ, and the count of uncommitted entries (`git status --porcelain`); 409 outside a git repository.
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed, signals}], commonSignals, testFiles, criteria, decisions, blockers, idea}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed, binary, signals}], commonSignals, testFiles, criteria, decisions, blockers, idea}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `files` come riskiest first (the review order): `signals` ⊂
   protected, sensitive, outsidePlan, bypass, architecture, conflictMarker, testsWeakened (the gate's
@@ -801,7 +801,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
 - `POST /api/sessions/{id}/compact` → 202; 404 if no session; 409 if a turn is
   running; summarises the history and opens a new context window
 - `POST /api/sessions/{id}/mode` `{mode}` → 200 `{mode}`; 404 if no session;
-  400 with `unknown mode: <mode>` if the id is not a top-level agent; appends
+  400 with `unknown agent: <id> (valid: …)` if the id is not a top-level agent; appends
   `mode.changed` when the mode changes; allowed while a turn runs
 - `POST /api/sessions/{id}/link` `{projectId: string | null}` → `{linkedProjectId}`:
   links a chat to a project, or unlinks it with `null`. The link is a reference
@@ -860,7 +860,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `1..=10000` (400 otherwise); 404 if no session; an empty array when there
   is nothing before `before`.
 - `GET /api/sessions/{id}/workflow/run/view` → the latest run pre-calculated
-  by the server, which the UI renders as it is; 404 when the log has no run.
+  by the server, which the UI renders as it is; `null` when the log has no run.
   The body is a `RunView`: `{runId, workflow, task, stepByStep,
   pauseRequested, runs, open, paused, questions, finished, lastComment,
   rounds, upcoming, counts}`. `runs` is one `NodeRun` per started node in
