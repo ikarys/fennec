@@ -160,9 +160,12 @@ fn record_origin(top: &Path, wt: &Worktree) -> Result<(), String> {
 /// What the model looked at or used as input, not work to integrate: the
 /// browser's captures, the files an idea pinned, and the dependency links
 /// `link_dependencies` makes, or the directories an install in the worktree
-/// fills when the project ignores neither. The human would cherry-pick them
-/// otherwise (`.gitignore`'s `node_modules/` does not match a symlink, which
-/// git sees as a file; a glob without `/**` matches only that link).
+/// fills when the project ignores neither, and the caches Python's tools
+/// regenerate on every run (a regenerated `.pyc` is byte-identical, so once
+/// committed its deletion never shows in `git status`). The human would
+/// cherry-pick them otherwise (`.gitignore`'s `node_modules/` does not match a
+/// symlink, which git sees as a file; a glob without `/**` matches only that
+/// link).
 const EXCLUDED_INPUTS: &[&str] = &[
     ":(exclude,glob)**/.playwright-cli/**",
     ":(exclude,glob)**/.fennec/**",
@@ -170,6 +173,10 @@ const EXCLUDED_INPUTS: &[&str] = &[
     ":(exclude,glob)**/node_modules/**",
     ":(exclude,glob)**/.venv",
     ":(exclude,glob)**/.venv/**",
+    ":(exclude,glob)**/__pycache__/**",
+    ":(exclude,glob)**/.pytest_cache/**",
+    ":(exclude,glob)**/.mypy_cache/**",
+    ":(exclude,glob)**/.ruff_cache/**",
 ];
 
 /// Commits everything in the worktree (`git add -A`) but the model's inputs,
@@ -548,10 +555,20 @@ mod tests {
         std::fs::create_dir_all(wt.workdir.join(".venv/lib")).unwrap();
         std::fs::write(wt.workdir.join(".venv/lib/site.py"), "py").unwrap();
         assert_eq!(commit(&wt, "installed dependencies only"), Ok(false));
+        for cache in ["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"] {
+            std::fs::create_dir_all(wt.workdir.join(cache)).unwrap();
+            std::fs::write(wt.workdir.join(cache).join("x.bin"), "bin").unwrap();
+        }
+        std::fs::write(wt.workdir.join("agent.txt"), "y\n").unwrap();
+        assert_eq!(commit(&wt, "caches and work"), Ok(true));
+        assert_eq!(
+            text(&wt.path, &["show", "--format=", "--name-only", "HEAD"]).trim(),
+            "agent.txt"
+        );
         let range = format!("{}..{}", wt.base, wt.branch);
         assert_eq!(
             text(&wt.path, &["log", "--format=%s", &range]).trim(),
-            "agent work"
+            "caches and work\nagent work"
         );
         let _ = std::fs::remove_dir_all(&base);
     }
