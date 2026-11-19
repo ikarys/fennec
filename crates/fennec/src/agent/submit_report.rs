@@ -123,18 +123,17 @@ pub fn parse(args: &Value) -> Result<Report, String> {
     let mut report_steps = Vec::with_capacity(steps.len());
     for (index, step) in steps.iter().enumerate() {
         let what = format!("step {}", index + 1);
-        let step_title = tool_args::single_line(
-            &tool_args::required_in(step, "title", &what)?,
-            &format!("{what}'s 'title'"),
-            0,
-        )?;
+        // A step named only by its note keeps it: a retry costs a whole generation.
+        let (title, note) = match (
+            optional_single_line(step, "title", &what)?,
+            optional_single_line(step, "note", &what)?,
+        ) {
+            (Some(title), note) => (title, note),
+            (None, Some(note)) => (note, None),
+            (None, None) => return Err(format!("{what} has no non-empty 'title' string.")),
+        };
         let done = required_bool(step, "done", &what)?;
-        let note = optional_single_line(step, "note", &what)?;
-        report_steps.push(ReportStep {
-            title: step_title,
-            done,
-            note,
-        });
+        report_steps.push(ReportStep { title, done, note });
     }
 
     let criteria = object_list(args, "doneWhen")?;
@@ -338,9 +337,19 @@ mod tests {
     }
 
     #[test]
+    fn a_step_without_a_title_takes_its_note_as_title() {
+        let mut args = valid();
+        args["steps"][0].as_object_mut().unwrap().remove("title");
+        let step = &parse(&args).unwrap().steps[0];
+        assert_eq!(step.title, "The report's vocabulary");
+        assert_eq!(step.note, None);
+    }
+
+    #[test]
     fn parse_names_the_step_field_that_is_missing() {
         let mut args = valid();
         args["steps"][0].as_object_mut().unwrap().remove("title");
+        args["steps"][0].as_object_mut().unwrap().remove("note");
         let err = parse(&args).err().unwrap();
         assert!(err.contains("step 1"));
         assert!(err.contains("'title'"));

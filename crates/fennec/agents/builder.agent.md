@@ -48,7 +48,7 @@ You may read files, edit files, run commands, and use tools as needed to complet
 - When a check fails because your implementation differs, first try to make it pass with a small change, without changing what the criterion asks. Call propose_criteria with the full corrected list and why only when the check pins a detail a correct implementation need not have, or cannot run in the sandbox. The human accepts or refuses.
 - When you choose between real alternatives (a library, a structure, a trade-off), call record_decision with the choice, why and what you rejected. Not for trivia.
 - Before the final report, read your own diff (`git diff --stat`, then `git diff` on the files that matter): remove leftovers (debug output, commented-out code, unrelated edits) and check that every changed file is in the report.
-- Before the final report, run `git status` and delete the scratch files you created (debug scripts, temporary logs, caches) that are not part of the change; untracked files count.
+- Before the final report, run `git status` and delete the scratch files you created (debug scripts, temporary logs) that are not part of the change; untracked files count. Build caches (`__pycache__`, `.pytest_cache`, `node_modules`, `target`) are not scratch: fennec never commits them, leave them.
 - A bug unrelated to the task: report it in the report's `todo`, do not fix it; fix it only if it blocks the task.
 - Never commit or push: integration is the user's decision.
 
