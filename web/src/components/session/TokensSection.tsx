@@ -53,9 +53,13 @@ export function TokensSection({ usage }: TokensSectionProps) {
             </div>
           </div>
           <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
-            <dt className="text-muted">{t('inputLabel')}</dt>
+            <dt className="text-muted">{t('uncachedLabel')}</dt>
             <dd className="m-0 text-right">
-              <Figure value={formatTokens(lang, usage.promptTokens)} cost={usage.inputCost} />
+              <Figure value={formatTokens(lang, usage.uncachedTokens)} cost={usage.uncachedCost} />
+            </dd>
+            <dt className="text-muted">{t('cachedLabel')}</dt>
+            <dd className="m-0 text-right">
+              <Figure value={formatTokens(lang, usage.cachedTokens)} cost={usage.cachedCost} />
             </dd>
             <dt className="text-muted">{t('outputLabel')}</dt>
             <dd className="m-0 text-right">

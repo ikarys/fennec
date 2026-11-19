@@ -687,12 +687,12 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   skills the session loaded (successful `load_skill` calls and `/<skill>`
   messages it typed, first-seen order) and those still in the model's view
   (not dropped by a compaction, not cut by a replay); 404 if no session
-- `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, completionTokens, cachePercent, cost, costDetail, inputCost, cachedCost, outputCost, lastGenerationSpeed}`:
+- `GET /api/sessions/{id}/usage` → `{calls, promptTokens, cachedTokens, uncachedTokens, completionTokens, cachePercent, cost, costDetail, uncachedCost, cachedCost, outputCost, lastGenerationSpeed}`:
   the model calls of the session and of its workflow's child sessions (verify, review) from the usage ledger
   (`usage.db`, crate `token-usage`), which outlives the log;
   `cachePercent` is 0 to 100, `lastGenerationSpeed` (tokens/s) is null before any call;
   `cost` is the estimate at each model's price (Settings, models), `—` when none has one, indicative;
-  `costDetail` says how or why not; `inputCost` (all prompt tokens, as `promptTokens`), `cachedCost` and
+  `costDetail` says how or why not; `uncachedTokens` is `promptTokens` minus `cachedTokens`; `uncachedCost`, `cachedCost` and
   `outputCost` are the parts' costs, null when no model has a price; 404 if no session
 - `GET /api/sessions/{id}/context` → `{percent, tone, compactMark, line, title, summary, tokens, composition}`: the header's gauge and the Session drawer's Context section (`summary`, its collapsed line), from
   the last `context.state` the model still sees (`tone` `ok`/`warn`/`err`, `compactMark` null when compaction is off, `tokens` the size (`12,3k`), null before any measure);
@@ -730,7 +730,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   tooltip, `turnRecap` on a turn's last call only, null otherwise: the turn's wall clock, `chat.done.durationMs`
   with its tools, over the tokens its calls generated); ledger rows stored before the `messageId` label
   existed are labelled at server start
-- `GET /api/sessions/{id}/usage/workflow` → `{nodes: [{itemId, line, detail}], runs: [{runId, calls, generated, read, cache}]}`: the
+- `GET /api/sessions/{id}/usage/workflow` → `{nodes: [{itemId, line, detail}], runs: [{runId, calls, generated, uncached, cache}]}`: the
   tokens of each workflow node run (`itemId` is `wf-{runId}-{nodeId}-{pass}`, its child session's calls or the
   session's own between its start and end) and of each finished run, from the ledger, ready to display.
 - `GET /api/insight?days=<7|30|90|all>&project=<id>` → `{cards: [{kind, label, value, detail}], days: [{day, label,

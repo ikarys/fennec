@@ -235,8 +235,8 @@ export function RunEndCard({
             <Tile
               size="sm"
               icon={<CpuIcon />}
-              figure={usage?.read ?? "–"}
-              label={t("runEndReadTokens")}
+              figure={usage?.uncached ?? "–"}
+              label={t("runEndUncachedTokens")}
               detail={usage?.cache}
             />
             <Tile

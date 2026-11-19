@@ -175,7 +175,9 @@ export interface RunUsage {
   runId: string;
   calls: string;
   generated: string;
-  read: string;
+  /** Prompt tokens the server did not take from its cache. */
+  uncached: string;
+  /** `82 % cached of 340k read`. */
   cache: string;
 }
 

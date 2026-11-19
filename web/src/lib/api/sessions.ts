@@ -202,6 +202,8 @@ export interface SessionUsage {
   calls: number;
   promptTokens: number;
   cachedTokens: number;
+  /** promptTokens minus cachedTokens. */
+  uncachedTokens: number;
   completionTokens: number;
   /** 0 to 100. */
   cachePercent: number;
@@ -209,8 +211,8 @@ export interface SessionUsage {
   cost: string;
   /** How the cost was reached, or why there is none. */
   costDetail: string;
-  /** The cost of all the prompt tokens, cached ones included; null when no model has a price. */
-  inputCost: string | null;
+  /** The share of the cost of uncached prompt tokens; null when no model has a price. */
+  uncachedCost: string | null;
   /** The share of the cost of cached tokens; null when no model has a price. */
   cachedCost: string | null;
   /** The share of the cost of generated tokens; null when no model has a price. */
