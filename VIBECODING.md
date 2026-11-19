@@ -16,6 +16,7 @@ convention:
   tools:
     - "Claude Code:claude-opus-5-5"
     - "Claude Code:claude-sonnet-5-5"
+    - "Claude Code:claude-fable-5-1"
     - "local:qwen3.8-27b"
     - "fennec:qwen3.8-27b"
   attribution_trailers: [Assisted-by]
