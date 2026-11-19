@@ -129,6 +129,7 @@ export const fr: Record<MsgKey, string> = {
   changesNoFiles: 'La branche ne modifie encore aucun fichier.',
   changesPickFile: 'Choisis un fichier pour lire son diff.',
   diffBinary: 'Fichier binaire : pas de diff par ligne.',
+  fileBinary: 'binaire',
   diffEmpty: 'Aucune ligne modifiée (mode ou fichier vide).',
   diffTruncated: "Diff coupé à 5 000 lignes : ouvre le fichier dans l'éditeur pour la suite.",
   panelWorkplace: 'Où atterrit le travail',

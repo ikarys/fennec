@@ -548,7 +548,7 @@ cookie: without it `/api/*` answers 401 `{error: "login required"}` and any othe
   `mode` is the id of the agent the session resolves to from its event log
   (null when there is no top-level agent)
 - `GET /api/sessions/{id}/repo` → `{dir, branch, originBranch, branchChanged, dirty}`: the human's repository now, for any session: its top directory, checked-out branch (null when detached), the branch the session's worktree started from (null without a worktree), whether they differ, and the count of uncommitted entries (`git status --porcelain`); 409 outside a git repository.
-- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed, signals}], commonSignals, testFiles, criteria, decisions, blockers, idea}`:
+- `GET /api/sessions/{id}/integration` → `{branch, base, originBranch, humanBranch, defaultMessage, commits: [{sha, subject}], files: [{path, protected, carried, added, removed, binary, signals}], commonSignals, testFiles, criteria, decisions, blockers, idea}`:
   what integrating the session's worktree branch would do (409 without a
   worktree). `files` come riskiest first (the review order): `signals` ⊂
   protected, sensitive, outsidePlan, bypass, architecture, conflictMarker, testsWeakened (the gate's

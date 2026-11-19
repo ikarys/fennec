@@ -38,11 +38,12 @@ function blocker<T extends { kind: Blocker['kind'] }>(value: T): Blocker {
   return { ...value, acknowledgeable } as unknown as Blocker;
 }
 
-const file = (path: string, added: number, removed: number, signals: ReviewSignal[] = []) => ({ path, added, removed, protected: false, carried: false, signals });
+const file = (path: string, added: number, removed: number, signals: ReviewSignal[] = []) => ({ path, added, removed, binary: false, protected: false, carried: false, signals });
 const TWO_FILES = [
   file('a.rs', 3, 1, ['hot', 'untested']),
   file('b.rs', 0, 2)
 ];
+const BINARY_FILE = [{ ...file('img.png', 0, 0), binary: true }];
 
 describe('narrative prompt', () => {
   it('names branch and base, lists files, and ends with diff instruction', () => {
@@ -58,6 +59,10 @@ describe('narrative prompt', () => {
     expect(prompt).toContain('2. b.rs (+0 −2)');
     expect(prompt).not.toContain('2. b.rs (+0 −2) — signals');
     expect(prompt).toContain('git diff develop fennec/x -- <path>');
+  });
+
+  it('says binary instead of zero counts for a binary file', () => {
+    expect(narrativePrompt(preview({ files: BINARY_FILE }))).toContain('1. img.png (binary)');
   });
 });
 

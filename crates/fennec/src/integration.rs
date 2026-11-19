@@ -26,8 +26,8 @@ pub struct Preview {
     pub commits: Vec<Commit>,
     /// Paths relative to the repository top.
     pub files: Vec<String>,
-    /// Lines added and removed per file of `files` (binary files count 0).
-    pub counts: HashMap<String, (u64, u64)>,
+    /// Lines added and removed per file of `files`.
+    pub counts: HashMap<String, Lines>,
     pub human_branch: Option<String>,
     /// The branch the run started from; `None` for older worktrees or a
     /// detached HEAD.
@@ -244,17 +244,28 @@ fn content_equals(top: &Path, ref_name: &str, file: &str) -> bool {
     }
 }
 
+/// A changed file's line counts; git cannot count a binary file's lines,
+/// so the review says "binary" instead of a misleading `+0 −0`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Lines {
+    pub added: u64,
+    pub removed: u64,
+    pub binary: bool,
+}
+
 /// `git diff --numstat` lines (`added<TAB>removed<TAB>path`); binary files
-/// show `-` and count 0.
-pub(crate) fn parse_numstat(out: &str) -> HashMap<String, (u64, u64)> {
+/// show `-` for both counts.
+pub(crate) fn parse_numstat(out: &str) -> HashMap<String, Lines> {
     out.lines()
         .filter_map(|line| {
             let mut parts = line.splitn(3, '\t');
             let (added, removed, path) = (parts.next()?, parts.next()?, parts.next()?);
-            Some((
-                path.to_string(),
-                (added.parse().unwrap_or(0), removed.parse().unwrap_or(0)),
-            ))
+            let lines = Lines {
+                added: added.parse().unwrap_or(0),
+                removed: removed.parse().unwrap_or(0),
+                binary: added == "-" && removed == "-",
+            };
+            Some((path.to_string(), lines))
         })
         .collect()
 }
@@ -587,10 +598,24 @@ mod tests {
     use super::parse_numstat;
 
     #[test]
-    fn numstat_counts_lines_and_zeroes_binary_files() {
+    fn numstat_counts_lines_and_flags_binary_files() {
         let counts = parse_numstat("3\t1\ta.rs\n-\t-\timg.png\n");
-        assert_eq!(counts["a.rs"], (3, 1));
-        assert_eq!(counts["img.png"], (0, 0));
+        assert_eq!(
+            counts["a.rs"],
+            Lines {
+                added: 3,
+                removed: 1,
+                binary: false
+            }
+        );
+        assert_eq!(
+            counts["img.png"],
+            Lines {
+                added: 0,
+                removed: 0,
+                binary: true
+            }
+        );
     }
 
     use super::*;
@@ -721,8 +746,8 @@ mod tests {
 
         assert!(p.files.contains(&"a.txt".to_string()));
         assert!(p.files.contains(&"c.txt".to_string()));
-        assert_eq!(p.counts["c.txt"], (1, 0));
-        assert_eq!(p.counts["a.txt"], (0, 1));
+        assert_eq!((p.counts["c.txt"].added, p.counts["c.txt"].removed), (1, 0));
+        assert_eq!((p.counts["a.txt"].added, p.counts["a.txt"].removed), (0, 1));
         let _ = std::fs::remove_dir_all(&base);
     }
 
