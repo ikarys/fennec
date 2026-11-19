@@ -25,7 +25,7 @@ export type AgentStyle = 'concise' | 'normal' | 'explanatory' | 'technical';
 export interface DisplayPrefs {
   reasoningOpen: boolean;
   toolResultsOpen: boolean;
-  /** The UI's base font size in pixels (server default 14, range 13..=16). */
+  /** The UI's base font size in pixels (server default 14, range 11..=24). */
   fontSize: number;
   /** The UI's display language (server default "en"). */
   language?: 'en' | 'fr';
@@ -142,6 +142,8 @@ export interface Preferences {
   mcp?: McpServer[];
   /** The human's keyboard shortcut overrides, action → combo; an empty combo disables. */
   shortcuts?: Record<string, string>;
+  /** The terminal command the "open a terminal" button runs; null auto-detects. */
+  terminal?: string | null;
 }
 
 /** One tool of an MCP server, as listed by `tools/list`. */

@@ -19,7 +19,7 @@ function ServerOutput({ lines }: { lines: string[] }) {
   return (
     <pre
       ref={ref}
-      className="max-h-40 overflow-auto rounded-md border border-border bg-raised p-2 font-mono text-[11px] leading-snug whitespace-pre-wrap break-all"
+      className="max-h-40 overflow-auto rounded-md border border-border bg-raised p-2 font-mono text-[0.6875rem] leading-snug whitespace-pre-wrap break-all"
     >
       {lines.join('\n')}
     </pre>
@@ -284,20 +284,20 @@ export function ServerList({ sessionId, onEdit, onServers }: ServerListProps) {
             </div>
 
             <div
-              className="truncate pl-5 font-mono text-[11px] text-faint"
+              className="truncate pl-5 font-mono text-[0.6875rem] text-faint"
               title={server.command}
             >
               {server.command}
             </div>
 
             {server.portIgnored && server.port !== null && (
-              <p className="m-0 pl-5 text-[11px] text-attention">
+              <p className="m-0 pl-5 text-[0.6875rem] text-attention">
                 {t('serverPortIgnored', { port: server.port })}
               </p>
             )}
 
             {server.suggested && (
-              <p className="m-0 pl-5 text-[11px] text-muted">{t('suggestedCommand')}</p>
+              <p className="m-0 pl-5 text-[0.6875rem] text-muted">{t('suggestedCommand')}</p>
             )}
 
             {showOutput && <ServerOutput lines={server.output} />}

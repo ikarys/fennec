@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -5,6 +6,9 @@ import tailwindcss from '@tailwindcss/vite';
 // A preview server started in a worktree points its Vite at its own fennec.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Process CSS in tests instead of stubbing it to empty, so a `?raw` import
+  // of a stylesheet returns its content (spacing.test.ts reads --spacing).
+  test: { css: true },
   server: {
     proxy: {
       '/api': process.env.FENNEC_API ?? 'http://127.0.0.1:7777'

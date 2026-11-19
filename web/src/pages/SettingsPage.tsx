@@ -34,6 +34,7 @@ import { NetworkSection } from '../components/settings/NetworkSection';
 import { SearchSection, type SearchForm } from '../components/settings/SearchSection';
 import { SandboxSection } from '../components/settings/SandboxSection';
 import { McpSection, emptyServer } from '../components/settings/McpSection';
+import { TerminalSection } from '../components/settings/TerminalSection';
 import { AgentsSection } from '../components/agents/AgentsSection';
 import { RulesSection } from '../components/rules/RulesSection';
 import { AutonomySection } from '../components/settings/AutonomySection';
@@ -250,6 +251,10 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
 
   function updateSandbox(sandbox: SandboxPrefs) {
     setForm((previous) => (previous ? { ...previous, sandbox } : previous));
+  }
+
+  function updateTerminal(terminal: string) {
+    setForm((previous) => (previous ? { ...previous, terminal } : previous));
   }
 
   function updateMcp(mcp: McpServer[]) {
@@ -521,6 +526,7 @@ export function SettingsPage({ page, settings, theme, onThemeChange, onSaved, on
                 onChange={updateSandbox}
                 health={settings?.sandboxHealth}
               />
+              <TerminalSection save={groupSave('terminal')} value={form.terminal} onChange={updateTerminal} />
               <NetworkSection />
             </>
           )}

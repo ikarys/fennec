@@ -76,14 +76,14 @@ export function Panel({ id, title, summary, defaultOpen = true, icon, iconTone =
             {icon}
           </span>
         ) : null}
-        <h3 className="m-0 text-[11px] font-semibold uppercase tracking-wide text-muted group-hover:text-text">{title}</h3>
+        <h3 className="m-0 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted group-hover:text-text">{title}</h3>
         {hint !== undefined ? (
           <span role="img" title={hint} aria-label={hint} className="cursor-help text-faint hover:text-accent">
             <InfoIcon className="h-3 w-3" />
           </span>
         ) : null}
         {summary !== undefined ? (
-          <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px] text-muted tabular-nums">
+          <span className="ml-auto flex items-center gap-1.5 font-mono text-[0.6875rem] text-muted tabular-nums">
             {summary}
           </span>
         ) : null}

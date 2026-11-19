@@ -36,8 +36,8 @@ export function RailTab({
       {active ? <span aria-hidden className={`absolute inset-y-0 ${side === 'right' ? 'left-0' : 'right-0'} w-0.5 bg-accent`} /> : null}
       {alert ? <span aria-hidden className="absolute right-2 top-2 size-1.5 rounded-full bg-err" /> : null}
       <Icon className="h-4 w-4" />
-      <span className="max-w-full truncate px-1 text-[10px] leading-none">{label}</span>
-      <span className={`text-[10px] leading-none font-mono tabular-nums ${statusClass ?? 'text-muted'}`}>{status ?? ''}</span>
+      <span className="max-w-full truncate px-1 text-[0.625rem] leading-none">{label}</span>
+      <span className={`text-[0.625rem] leading-none font-mono tabular-nums ${statusClass ?? 'text-muted'}`}>{status ?? ''}</span>
     </button>
   );
 }

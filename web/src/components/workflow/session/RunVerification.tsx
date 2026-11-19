@@ -81,14 +81,14 @@ export function RunVerification({ verification }: { verification: Verification }
               key={criterion.id}
               className="grid grid-cols-[auto_1fr_auto] items-start gap-x-2 gap-y-0.5"
             >
-              <span className="font-mono text-[11px] text-muted">
+              <span className="font-mono text-[0.6875rem] text-muted">
                 {criterion.id}
               </span>
               <div className="min-w-0">
                 <div className="text-xs text-text">{criterion.description}</div>
                 {criterion.outcome.kind === "verified" && (
                   <div
-                    className="truncate font-mono text-[11px] text-muted"
+                    className="truncate font-mono text-[0.6875rem] text-muted"
                     title={criterion.outcome.command}
                   >
                     {criterion.outcome.command}

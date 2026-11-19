@@ -1,107 +1,88 @@
 //! Finds the security scanners of `domain::scanner` on PATH, as the sandbox sees it (commands inherit fennec's environment).
 
+use crate::executable;
+use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::sync::{LazyLock, Mutex};
+
+/// The scanner binaries found on PATH. A WSL `/mnt/c` PATH is slow to scan, so
+/// a found binary is kept and only re-checked with one stat; a missing one is
+/// not cached, so a scanner installed while fennec runs is seen at once.
+static FOUND: LazyLock<Mutex<HashMap<String, PathBuf>>> = LazyLock::new(Mutex::default);
 
 pub fn find(binary: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
-    find_in(&path, binary)
+    find_cached(&FOUND, &path, binary)
 }
 
-fn find_in(path: &OsStr, binary: &str) -> Option<PathBuf> {
-    std::env::split_paths(path)
-        .map(|dir| dir.join(binary))
-        .find(|candidate| is_executable_file(candidate))
-}
-
-fn is_executable_file(candidate: &Path) -> bool {
-    candidate
-        .metadata()
-        .map(|metadata| metadata.is_file() && (metadata.permissions().mode() & 0o111) != 0)
-        .unwrap_or(false)
+/// `binary` from `cache` while it is still an executable file, else searched in
+/// `path`; the lock is not held during the search.
+fn find_cached(
+    cache: &Mutex<HashMap<String, PathBuf>>,
+    path: &OsStr,
+    binary: &str,
+) -> Option<PathBuf> {
+    let cached = crate::locks::lock(cache).get(binary).cloned();
+    if let Some(found) = cached.filter(|found| executable::is_executable_file(found)) {
+        return Some(found);
+    }
+    let found = executable::find_in(path, binary);
+    let mut cache = crate::locks::lock(cache);
+    match &found {
+        Some(found) => cache.insert(binary.to_string(), found.clone()),
+        None => cache.remove(binary),
+    };
+    found
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::os::unix::fs::PermissionsExt;
 
     fn temp_root() -> PathBuf {
         static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time after epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "fennec-scanners-{}-{counter}-{nanos}",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("fennec-scanners-{}-{counter}", std::process::id()))
     }
 
-    fn set_mode(path: &Path, mode: u32) {
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+    fn write_executable(path: &std::path::Path) {
+        std::fs::write(path, b"").expect("write binary");
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
             .expect("set permissions");
     }
 
     #[test]
-    fn finds_an_executable_file() {
+    fn a_scanner_installed_later_is_found_and_a_removed_one_is_not() {
+        let root = temp_root();
+        std::fs::create_dir_all(&root).expect("create temp dir");
+        let path = std::env::join_paths([root.clone()]).expect("join paths");
+        let binary = root.join("scanner");
+        let cache = Mutex::default();
+
+        assert_eq!(find_cached(&cache, &path, "scanner"), None);
+
+        write_executable(&binary);
+        assert_eq!(find_cached(&cache, &path, "scanner"), Some(binary.clone()));
+
+        std::fs::remove_file(&binary).expect("remove binary");
+        assert_eq!(find_cached(&cache, &path, "scanner"), None);
+        assert!(crate::locks::lock(&cache).is_empty());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_found_scanner_is_served_from_the_cache() {
         let root = temp_root();
         std::fs::create_dir_all(&root).expect("create temp dir");
         let binary = root.join("scanner");
-        std::fs::write(&binary, b"").expect("write binary");
-        set_mode(&binary, 0o755);
+        write_executable(&binary);
+        let cache = Mutex::new(HashMap::from([("scanner".to_string(), binary.clone())]));
 
-        let path = std::env::join_paths([root.clone()]).expect("join paths");
-        let found = find_in(&path, "scanner").expect("find executable");
-        assert_eq!(found, binary);
-
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn does_not_find_a_non_executable_file() {
-        let root = temp_root();
-        std::fs::create_dir_all(&root).expect("create temp dir");
-        let binary = root.join("scanner");
-        std::fs::write(&binary, b"").expect("write binary");
-        set_mode(&binary, 0o644);
-
-        let path = std::env::join_paths([root.clone()]).expect("join paths");
-        assert_eq!(find_in(&path, "scanner"), None);
-
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn does_not_find_an_absent_binary() {
-        let root = temp_root();
-        std::fs::create_dir_all(&root).expect("create temp dir");
-
-        let path = std::env::join_paths([root.clone()]).expect("join paths");
-        assert_eq!(find_in(&path, "scanner"), None);
-
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn first_directory_in_path_order_wins() {
-        let root = temp_root();
-        let first = root.join("first");
-        let second = root.join("second");
-        std::fs::create_dir_all(&first).expect("create first");
-        std::fs::create_dir_all(&second).expect("create second");
-        let first_binary = first.join("scanner");
-        let second_binary = second.join("scanner");
-        std::fs::write(&first_binary, b"").expect("write first");
-        std::fs::write(&second_binary, b"").expect("write second");
-        set_mode(&first_binary, 0o755);
-        set_mode(&second_binary, 0o755);
-
-        let path = std::env::join_paths([first.clone(), second.clone()]).expect("join paths");
-        let found = find_in(&path, "scanner").expect("find executable");
-        assert_eq!(found, first_binary);
+        // An empty PATH: only the cache can answer.
+        assert_eq!(find_cached(&cache, OsStr::new(""), "scanner"), Some(binary));
 
         let _ = std::fs::remove_dir_all(&root);
     }

@@ -121,8 +121,9 @@
 
 @theme inline {
   /* The text size setting scales the root font size: text in rem follows it,
-     while spacing and radii stay in px so the layout does not move. */
-  --spacing: 3.5px;
+     and spacing now follows it too (0.21875rem = 3.5px at the default 16px
+     root). Radii stay in px. */
+  --spacing: 0.21875rem;
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 4px;
@@ -155,8 +156,8 @@
   --color-code: var(--code);
   --color-scrim: var(--scrim);
   --shadow-float: var(--float-shadow);
-  /* A page's readable width: max-w-page. */
-  --container-page: 960px;
+  /* A page's readable width: max-w-page. In rem so it scales with the font size. */
+  --container-page: 60rem;
 }
 
 html,

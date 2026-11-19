@@ -57,6 +57,9 @@ pub struct Preferences {
     /// The human's keyboard shortcut overrides, action id → combo (`shortcut::ACTIONS`); an
     /// action not listed keeps its default, an empty combo disables it.
     pub shortcuts: BTreeMap<String, String>,
+    /// The terminal command the "open a terminal" button runs; `None` lets
+    /// fennec find an emulator on the machine.
+    pub terminal: Option<String>,
     /// Before providers (one endpoint): read, moved by `migrate`, never written.
     #[serde(rename = "model", skip_serializing)]
     pub(crate) legacy_model: Option<String>,
@@ -162,7 +165,7 @@ impl Default for DelegationPrefs {
 /// The UI's base font size in pixels (the CSS body size); the page zooms around it.
 pub const DEFAULT_FONT_SIZE: u16 = 14;
 /// The sizes the Settings page offers.
-pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 13..=16;
+pub const FONT_SIZE_RANGE: std::ops::RangeInclusive<u16> = 11..=24;
 
 fn default_font_size() -> u16 {
     DEFAULT_FONT_SIZE

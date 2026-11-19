@@ -10,6 +10,7 @@ mod chat;
 mod cli;
 mod config;
 mod domain;
+mod executable;
 mod folders;
 mod git;
 mod instructions;

@@ -295,6 +295,16 @@ describe('to form', () => {
   it('reads a null selected model as an empty string', () => {
     expect(toForm(preferences(), []).model).toBe('');
   });
+
+  it('reads a stored terminal command', () => {
+    const prefs = preferences({ terminal: 'alacritty --title fennec' });
+
+    expect(toForm(prefs, []).terminal).toBe('alacritty --title fennec');
+  });
+
+  it('reads a missing terminal command as an empty string', () => {
+    expect(toForm(preferences(), []).terminal).toBe('');
+  });
 });
 
 describe('build preferences', () => {
@@ -390,6 +400,22 @@ describe('build preferences', () => {
       'https://searxng.example.com',
     );
   });
+
+  it('stores a blank terminal as null', () => {
+    const prefs = preferences();
+    const formValue = form(prefs, listings, { terminal: '   ' });
+
+    expect(buildPreferences(formValue, response(prefs, listings)).terminal).toBeNull();
+  });
+
+  it('stores a non blank terminal command', () => {
+    const prefs = preferences();
+    const formValue = form(prefs, listings, { terminal: 'alacritty --title fennec' });
+
+    expect(buildPreferences(formValue, response(prefs, listings)).terminal).toBe(
+      'alacritty --title fennec',
+    );
+  });
 });
 
 describe('round trip', () => {
@@ -397,6 +423,7 @@ describe('round trip', () => {
     const listings = [listing('p', ['listed'])];
     const prefs = preferences({
       selected: { provider: 'p', model: 'listed' },
+      terminal: 'alacritty --title fennec',
       providers: [
         provider('p', { env: 'KEY' }, {
           listed: {

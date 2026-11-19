@@ -89,7 +89,7 @@ export function Section({ title, description, Icon, actions, className = '', flu
             <Icon className="h-3.5 w-3.5" />
           </span>
           <div className="flex min-w-0 flex-col">
-            <h2 className="m-0 flex items-center gap-1.5 text-[13px] font-semibold text-text">
+            <h2 className="m-0 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-text">
               {dirtyDot}
               {title}
             </h2>

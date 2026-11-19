@@ -1,10 +1,11 @@
 // The default-model picker: a framed section with one model choice row.
 import type { ModelRef, ProviderListing } from '../../lib/api';
+import { ChoiceMenu, type ChoiceGroup } from '../ui/ChoiceMenu';
 import { Section, type SectionSave } from '../ui/Section';
 import { SettingRow } from '../ui/SettingRow';
-import { Select } from '../ui/Field';
 import { StarIcon } from '../ui/Icons';
 import { useT } from '../../i18n';
+import type { MsgKey } from '../../i18n/messages';
 
 interface ModelSectionProps {
   value: string;
@@ -16,41 +17,67 @@ interface ModelSectionProps {
   save?: SectionSave;
 }
 
+/**
+ * The default-model menu's groups, for a `ChoiceMenu`: the environment default
+ * first, flush under no band; each provider's models under its name; a stored
+ * model the providers no longer list on its own.
+ */
+export function modelMenuGroups(
+  listings: { provider: string; name: string; models: { id: string }[] }[],
+  stored: ModelRef | null,
+  defaultModel: string,
+  translate: (key: MsgKey, vars?: Record<string, string | number>) => string
+): ChoiceGroup[] {
+  const groups: ChoiceGroup[] = [
+    {
+      choices: [
+        {
+          value: '',
+          label: defaultModel ? translate('envDefaultOption', { model: defaultModel }) : translate('envDefaultOptionUnnamed')
+        }
+      ]
+    }
+  ];
+  for (const listing of listings) {
+    groups.push({
+      label: listing.name,
+      choices: listing.models.map((model) => ({ value: `${listing.provider}/${model.id}`, label: model.id }))
+    });
+  }
+  const listed = new Set(groups.flatMap((group) => group.choices.map((choice) => choice.value)));
+  if (stored && !listed.has(`${stored.provider}/${stored.model}`)) {
+    const providerName = listings.find((listing) => listing.provider === stored.provider)?.name ?? stored.provider;
+    groups.push({
+      choices: [
+        {
+          value: `${stored.provider}/${stored.model}`,
+          label: translate('unlistedModelOption', { model: stored.model, provider: providerName })
+        }
+      ]
+    });
+  }
+  return groups;
+}
+
 export function ModelSection({ value, listings, stored, defaultModel, onChange, save }: ModelSectionProps) {
   const t = useT();
-  const listedValues = new Set<string>();
-  for (const listing of listings) {
-    for (const model of listing.models) {
-      listedValues.add(`${listing.provider}/${model.id}`);
-    }
-  }
-
-  const unlistedStored =
-    stored && !listedValues.has(`${stored.provider}/${stored.model}`) ? stored : null;
-  const unlistedProviderName = unlistedStored
-    ? listings.find((listing) => listing.provider === unlistedStored.provider)?.name ?? unlistedStored.provider
-    : '';
+  const groups = modelMenuGroups(listings, stored, defaultModel, t);
+  const label = groups.flatMap((group) => group.choices).find((choice) => choice.value === value)?.label ?? '';
 
   return (
     <Section Icon={StarIcon} flush title={t('defaultModelLabel')} save={save}>
       <SettingRow label={t('defaultModelLabel')} hint={t('modelSectionHint')}>
-        <Select value={value} onChange={(event) => onChange(event.target.value)} className="w-72 max-w-full">
-          <option value="">{defaultModel ? t('envDefaultOption', { model: defaultModel }) : t('envDefaultOptionUnnamed')}</option>
-          {listings.map((listing) => (
-            <optgroup key={listing.provider} label={listing.name}>
-              {listing.models.map((model) => (
-                <option key={`${listing.provider}/${model.id}`} value={`${listing.provider}/${model.id}`}>
-                  {model.id}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-          {unlistedStored && (
-            <option value={`${unlistedStored.provider}/${unlistedStored.model}`}>
-              {t('unlistedModelOption', { model: unlistedStored.model, provider: unlistedProviderName })}
-            </option>
-          )}
-        </Select>
+        <ChoiceMenu
+          label={t('defaultModelLabel')}
+          title={label || undefined}
+          align="right"
+          direction="down"
+          width="w-72"
+          groups={groups}
+          value={value}
+          onChange={onChange}
+          trigger={<span className="max-w-56 truncate">{label}</span>}
+        />
       </SettingRow>
     </Section>
   );

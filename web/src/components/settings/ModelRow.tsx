@@ -142,7 +142,7 @@ export function ModelRow({
 
         <div className="min-w-0 grow">
           <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[13px] text-text truncate">{modelId}</span>
+            <span className="font-mono text-[0.8125rem] text-text truncate">{modelId}</span>
             {model === null && <Badge tone="neutral">{t('manualBadge')}</Badge>}
           </div>
           <div className="flex flex-wrap gap-1 mt-0.5">

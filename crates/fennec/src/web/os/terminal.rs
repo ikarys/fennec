@@ -3,20 +3,25 @@
 //! (trust zone 1), so it runs outside the sandbox; the path comes from the
 //! store, never the request.
 
+use crate::domain::lang::Lang;
 use crate::web::App;
 use crate::web::http::HttpError;
 use crate::web::http::{error, require_project, send_json};
 use serde_json::json;
+use std::ffi::OsString;
+use std::io;
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// `POST /api/sessions/{id}/terminal`.
 pub(crate) fn open(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let (session, project) = app.require_session(id)?;
+    let preferences = store.preferences()?;
+    let lang = preferences.display.language;
     let place = app.place(&store, &session, &project)?;
-    match spawn(&place.workdir) {
+    match spawn(preferences.terminal.as_deref(), &place.workdir, lang) {
         Ok(()) => send_json(stream, 202, &json!({ "path": place.workdir })),
         Err(e) => error(stream, 500, &format!("could not open a terminal: {e}")),
     }
@@ -26,37 +31,158 @@ pub(crate) fn open(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), Ht
 pub(crate) fn open_project(app: &App, stream: &mut TcpStream, id: &str) -> Result<(), HttpError> {
     let store = app.store()?;
     let project = require_project(&store, id)?;
-    match spawn(Path::new(&project.workdir)) {
+    let preferences = store.preferences()?;
+    let lang = preferences.display.language;
+    match spawn(
+        preferences.terminal.as_deref(),
+        Path::new(&project.workdir),
+        lang,
+    ) {
         Ok(()) => send_json(stream, 202, &json!({ "path": project.workdir })),
         Err(e) => error(stream, 500, &format!("could not open a terminal: {e}")),
     }
 }
 
-fn spawn(dir: &Path) -> std::io::Result<()> {
-    let mut child = terminal_command(dir).spawn()?;
-    // Reaped in the background so a closed terminal leaves no zombie.
+/// What the default terminal lookup reads from fennec's environment, passed in
+/// so the lookup is tested without rewriting the process-wide variables.
+pub(super) struct TerminalEnv {
+    pub wsl_distro: Option<String>,
+    pub terminal: Option<String>,
+    pub path: Option<OsString>,
+}
+
+impl TerminalEnv {
+    fn current() -> Self {
+        let var = |name| {
+            std::env::var(name)
+                .ok()
+                .filter(|value: &String| !value.is_empty())
+        };
+        Self {
+            wsl_distro: var("WSL_DISTRO_NAME"),
+            terminal: var("TERMINAL"),
+            path: std::env::var_os("PATH"),
+        }
+    }
+}
+
+/// Starts the terminal in `dir`, reaping it in the background so a closed
+/// terminal leaves no zombie.
+fn spawn(setting: Option<&str>, dir: &Path, lang: Lang) -> Result<(), String> {
+    spawn_in(setting, dir, lang, &TerminalEnv::current())
+}
+
+/// [`spawn`] with the lookup's environment given. A gone folder, no terminal
+/// at all and a terminal command that is missing or will not start are
+/// distinct errors, none the raw spawn error.
+pub(super) fn spawn_in(
+    setting: Option<&str>,
+    dir: &Path,
+    lang: Lang,
+    env: &TerminalEnv,
+) -> Result<(), String> {
+    if !dir.exists() {
+        return Err(lang
+            .pick(
+                &format!("the folder no longer exists: {}", dir.display()),
+                &format!("le dossier n'existe plus : {}", dir.display()),
+            )
+            .to_string());
+    }
+    let Some(mut cmd) = terminal_command(setting, dir, env) else {
+        return Err(lang
+            .pick(
+                "no terminal emulator found: set one on the Settings page (Terminal command) or in $TERMINAL",
+                "aucun émulateur de terminal trouvé : définissez-en un sur la page Paramètres (commande de terminal) ou dans $TERMINAL",
+            )
+            .to_string());
+    };
+    let program = PathBuf::from(cmd.get_program());
+    let mut child = cmd.spawn().map_err(|err| match err.kind() {
+        // The setting, $TERMINAL or the platform default names a program not on PATH.
+        io::ErrorKind::NotFound => lang
+            .pick(
+                &format!(
+                    "the terminal command was not found ({}): set a working one on the Settings page (Terminal command) or in $TERMINAL",
+                    program.display()
+                ),
+                &format!(
+                    "la commande de terminal est introuvable ({}) : définissez-en une qui marche sur la page Paramètres (commande de terminal) ou dans $TERMINAL",
+                    program.display()
+                ),
+            )
+            .to_string(),
+        // The program exists but will not start (not executable, …).
+        _ => lang
+            .pick(
+                &format!(
+                    "the terminal command could not be started ({}): {err}",
+                    program.display()
+                ),
+                &format!(
+                    "la commande de terminal n'a pas pu démarrer ({}) : {err}",
+                    program.display()
+                ),
+            )
+            .to_string(),
+    })?;
     std::thread::spawn(move || child.wait());
     Ok(())
 }
 
-/// Windows Terminal under WSL, Terminal.app on macOS, else `$TERMINAL` or
-/// the Debian alternative, started in `dir`.
-fn terminal_command(dir: &Path) -> Command {
-    if let Some(distro) = std::env::var("WSL_DISTRO_NAME")
-        .ok()
-        .filter(|d| !d.is_empty())
-    {
+/// The command that opens a terminal in `dir`: a non-empty `terminal` setting
+/// wins (first token the program, the rest its args); without one, the
+/// WSL/macOS default, and on Linux `$TERMINAL` or the first of the known
+/// emulators on PATH. `None` when none of them is there.
+pub(super) fn terminal_command(
+    setting: Option<&str>,
+    dir: &Path,
+    env: &TerminalEnv,
+) -> Option<Command> {
+    if let Some(line) = setting.map(str::trim).filter(|line| !line.is_empty()) {
+        let mut tokens = line.split_whitespace();
+        let program = tokens.next().expect("a non-empty line has a first token");
+        let mut cmd = Command::new(program);
+        cmd.args(tokens);
+        cmd.current_dir(dir);
+        return Some(cmd);
+    }
+    if let Some(distro) = &env.wsl_distro {
         let mut cmd = Command::new("wt.exe");
-        cmd.args(["wsl.exe", "-d", &distro, "--cd"]).arg(dir);
-        return cmd;
+        cmd.args(["wsl.exe", "-d", distro, "--cd"]).arg(dir);
+        return Some(cmd);
     }
     if cfg!(target_os = "macos") {
         let mut cmd = Command::new("open");
         cmd.args(["-a", "Terminal"]).arg(dir);
-        return cmd;
+        return Some(cmd);
     }
-    let program = std::env::var("TERMINAL").unwrap_or_else(|_| "x-terminal-emulator".into());
+    let program = match &env.terminal {
+        Some(terminal) => PathBuf::from(terminal),
+        None => {
+            let path = env.path.as_deref()?;
+            KNOWN_EMULATORS
+                .iter()
+                .find_map(|name| crate::executable::find_in(path, name))?
+        }
+    };
     let mut cmd = Command::new(program);
     cmd.current_dir(dir);
-    cmd
+    Some(cmd)
 }
+
+/// Terminal emulators fennec looks for on PATH (Linux, after $TERMINAL).
+const KNOWN_EMULATORS: &[&str] = &[
+    "x-terminal-emulator",
+    "sensible-terminal",
+    "gnome-terminal",
+    "konsole",
+    "xfce4-terminal",
+    "alacritty",
+    "kitty",
+    "st",
+    "xterm",
+];
+
+#[cfg(test)]
+mod tests;
