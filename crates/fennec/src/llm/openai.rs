@@ -113,6 +113,8 @@ impl Model for OpenAiClient {
             tools: req.tools,
             max_tokens: req.max_tokens,
             reasoning_effort: req.reasoning_effort,
+            // No provider shims: the standard body fields only.
+            extra: &Value::Null,
         };
         let streamed =
             llm_providers_connector::stream(&self.endpoint, &chat_request, req.stop, on)?;
