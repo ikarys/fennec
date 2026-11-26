@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-11-19T08:30:08.827Z",
+    "detectionDate": "2026-11-19T21:05:50.435Z",
     "formats": {
       "typescript": {
         "sources": {
@@ -53,8 +53,8 @@
             "newClones": 0
           },
           "web/src/lib/api/workflows.ts": {
-            "lines": 190,
-            "tokens": 1484,
+            "lines": 193,
+            "tokens": 1498,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -113,8 +113,8 @@
             "newClones": 0
           },
           "web/src/lib/api/sessions.ts": {
-            "lines": 604,
-            "tokens": 4669,
+            "lines": 606,
+            "tokens": 4679,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -233,8 +233,8 @@
             "newClones": 0
           },
           "web/src/lib/api/integration.ts": {
-            "lines": 238,
-            "tokens": 1892,
+            "lines": 240,
+            "tokens": 1902,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -821,26 +821,26 @@
             "newClones": 0
           },
           "web/src/lib/integration.ts": {
-            "lines": 173,
-            "tokens": 2208,
+            "lines": 175,
+            "tokens": 2177,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 226,
-            "percentage": 6.94,
-            "percentageTokens": 10.24,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "web/src/lib/integration.test.ts": {
-            "lines": 564,
-            "tokens": 5382,
+            "lines": 569,
+            "tokens": 5463,
             "sources": 1,
             "clones": 10,
             "duplicatedLines": 124,
             "duplicatedTokens": 932,
-            "percentage": 21.99,
-            "percentageTokens": 17.32,
+            "percentage": 21.79,
+            "percentageTokens": 17.06,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1122,7 +1122,7 @@
           },
           "web/src/hooks/useSessionThread.ts": {
             "lines": 370,
-            "tokens": 3891,
+            "tokens": 3895,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1434,14 +1434,14 @@
           }
         },
         "total": {
-          "lines": 13433,
-          "tokens": 134592,
+          "lines": 13447,
+          "tokens": 134680,
           "sources": 119,
-          "clones": 17,
-          "duplicatedLines": 146,
-          "duplicatedTokens": 1596,
-          "percentage": 1.09,
-          "percentageTokens": 1.19,
+          "clones": 16,
+          "duplicatedLines": 140,
+          "duplicatedTokens": 1483,
+          "percentage": 1.04,
+          "percentageTokens": 1.1,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -1473,8 +1473,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunTimeline.tsx": {
-            "lines": 280,
-            "tokens": 3798,
+            "lines": 285,
+            "tokens": 3885,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2673,8 +2673,8 @@
             "newClones": 0
           },
           "web/src/components/session/TokensSection.tsx": {
-            "lines": 32,
-            "tokens": 420,
+            "lines": 36,
+            "tokens": 483,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4017,8 +4017,8 @@
             "newClones": 0
           },
           "web/src/pages/ChangesPage.tsx": {
-            "lines": 134,
-            "tokens": 1517,
+            "lines": 144,
+            "tokens": 1606,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4066,8 +4066,8 @@
           }
         },
         "total": {
-          "lines": 14649,
-          "tokens": 139309,
+          "lines": 14668,
+          "tokens": 139548,
           "sources": 218,
           "clones": 3,
           "duplicatedLines": 608,
@@ -4105,8 +4105,8 @@
             "newClones": 0
           },
           "web/src/components/workflow/session/RunTimeline.tsx": {
-            "lines": 298,
-            "tokens": 4079,
+            "lines": 303,
+            "tokens": 4166,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -5365,8 +5365,8 @@
             "newClones": 0
           },
           "web/src/components/session/TokensSection.tsx": {
-            "lines": 77,
-            "tokens": 853,
+            "lines": 81,
+            "tokens": 916,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6805,8 +6805,8 @@
             "newClones": 0
           },
           "web/src/pages/ChangesPage.tsx": {
-            "lines": 256,
-            "tokens": 2819,
+            "lines": 266,
+            "tokens": 2908,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6878,8 +6878,8 @@
           }
         },
         "total": {
-          "lines": 29011,
-          "tokens": 276978,
+          "lines": 29030,
+          "tokens": 277217,
           "sources": 233,
           "clones": 19,
           "duplicatedLines": 210,
@@ -6922,13 +6922,13 @@
         "sources": {
           "crates/fennec/src/web/views/run_view/tests.rs": {
             "lines": 772,
-            "tokens": 7022,
+            "tokens": 7035,
             "sources": 1,
             "clones": 14,
             "duplicatedLines": 160,
             "duplicatedTokens": 1396,
             "percentage": 20.73,
-            "percentageTokens": 19.88,
+            "percentageTokens": 19.84,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -6946,7 +6946,7 @@
           },
           "crates/fennec/src/web/routes/integration/gate.rs": {
             "lines": 230,
-            "tokens": 2513,
+            "tokens": 2518,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -6969,38 +6969,38 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow/tests/test_gate.rs": {
-            "lines": 153,
-            "tokens": 1638,
+            "lines": 154,
+            "tokens": 1646,
             "sources": 1,
             "clones": 1,
-            "duplicatedLines": 6,
-            "duplicatedTokens": 76,
-            "percentage": 3.92,
-            "percentageTokens": 4.64,
+            "duplicatedLines": 7,
+            "duplicatedTokens": 84,
+            "percentage": 4.55,
+            "percentageTokens": 5.1,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow/tests/handoff.rs": {
-            "lines": 251,
-            "tokens": 2399,
+            "lines": 254,
+            "tokens": 2423,
             "sources": 1,
             "clones": 9,
-            "duplicatedLines": 96,
-            "duplicatedTokens": 1096,
-            "percentage": 38.25,
-            "percentageTokens": 45.69,
+            "duplicatedLines": 101,
+            "duplicatedTokens": 1136,
+            "percentage": 39.76,
+            "percentageTokens": 46.88,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "crates/fennec/src/web/views/workflow_usage.rs": {
-            "lines": 348,
-            "tokens": 3406,
+            "lines": 368,
+            "tokens": 3555,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 34,
             "duplicatedTokens": 331,
-            "percentage": 9.77,
-            "percentageTokens": 9.72,
+            "percentage": 9.24,
+            "percentageTokens": 9.31,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7017,14 +7017,14 @@
             "newClones": 0
           },
           "crates/fennec/src/web/views/session_usage.rs": {
-            "lines": 294,
-            "tokens": 2772,
+            "lines": 297,
+            "tokens": 2801,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 36,
             "duplicatedTokens": 349,
-            "percentage": 12.24,
-            "percentageTokens": 12.59,
+            "percentage": 12.12,
+            "percentageTokens": 12.46,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7221,8 +7221,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/routes/session_routes.rs": {
-            "lines": 878,
-            "tokens": 10518,
+            "lines": 879,
+            "tokens": 10524,
             "sources": 1,
             "clones": 6,
             "duplicatedLines": 44,
@@ -7401,13 +7401,13 @@
             "newClones": 0
           },
           "crates/fennec/src/web/routes/integration.rs": {
-            "lines": 516,
-            "tokens": 5303,
+            "lines": 517,
+            "tokens": 5310,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 20,
             "duplicatedTokens": 198,
-            "percentage": 3.88,
+            "percentage": 3.87,
             "percentageTokens": 3.73,
             "newDuplicatedLines": 0,
             "newClones": 0
@@ -7773,14 +7773,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/workflow/template.rs": {
-            "lines": 177,
-            "tokens": 1623,
+            "lines": 178,
+            "tokens": 1645,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 20,
             "duplicatedTokens": 240,
-            "percentage": 11.3,
-            "percentageTokens": 14.79,
+            "percentage": 11.24,
+            "percentageTokens": 14.59,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -7882,7 +7882,7 @@
           },
           "crates/fennec/src/agent/workflow/test_gate.rs": {
             "lines": 55,
-            "tokens": 561,
+            "tokens": 564,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7905,8 +7905,8 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow/nodes.rs": {
-            "lines": 254,
-            "tokens": 2245,
+            "lines": 256,
+            "tokens": 2273,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7929,8 +7929,8 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow/fork.rs": {
-            "lines": 292,
-            "tokens": 3235,
+            "lines": 296,
+            "tokens": 3280,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -7977,8 +7977,8 @@
             "newClones": 0
           },
           "crates/fennec/src/web/turns.rs": {
-            "lines": 457,
-            "tokens": 4238,
+            "lines": 450,
+            "tokens": 4299,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -8553,14 +8553,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/verification.rs": {
-            "lines": 515,
-            "tokens": 4313,
+            "lines": 518,
+            "tokens": 4324,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 16,
             "duplicatedTokens": 150,
-            "percentage": 3.11,
-            "percentageTokens": 3.48,
+            "percentage": 3.09,
+            "percentageTokens": 3.47,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8685,14 +8685,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/setup.rs": {
-            "lines": 324,
-            "tokens": 2545,
+            "lines": 339,
+            "tokens": 2643,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 16,
             "duplicatedTokens": 156,
-            "percentage": 4.94,
-            "percentageTokens": 6.13,
+            "percentage": 4.72,
+            "percentageTokens": 5.9,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -8937,8 +8937,8 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/preflight.rs": {
-            "lines": 374,
-            "tokens": 2880,
+            "lines": 401,
+            "tokens": 3135,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9501,14 +9501,14 @@
             "newClones": 0
           },
           "crates/fennec/src/domain/agent.rs": {
-            "lines": 803,
-            "tokens": 6296,
+            "lines": 811,
+            "tokens": 6369,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 22,
             "duplicatedTokens": 152,
-            "percentage": 2.74,
-            "percentageTokens": 2.41,
+            "percentage": 2.71,
+            "percentageTokens": 2.39,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9525,8 +9525,8 @@
             "newClones": 0
           },
           "crates/fennec/src/cli/workflow_run.rs": {
-            "lines": 507,
-            "tokens": 4738,
+            "lines": 520,
+            "tokens": 4801,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9549,8 +9549,8 @@
             "newClones": 0
           },
           "crates/fennec/src/cli/transcript.rs": {
-            "lines": 171,
-            "tokens": 1828,
+            "lines": 182,
+            "tokens": 1914,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9621,14 +9621,14 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/workflow.rs": {
-            "lines": 578,
-            "tokens": 5911,
+            "lines": 583,
+            "tokens": 5976,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 18,
             "duplicatedTokens": 200,
-            "percentage": 3.11,
-            "percentageTokens": 3.38,
+            "percentage": 3.09,
+            "percentageTokens": 3.35,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9705,14 +9705,14 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/submit_report.rs": {
-            "lines": 468,
-            "tokens": 4667,
+            "lines": 477,
+            "tokens": 4834,
             "sources": 1,
             "clones": 7,
-            "duplicatedLines": 81,
-            "duplicatedTokens": 907,
-            "percentage": 17.31,
-            "percentageTokens": 19.43,
+            "duplicatedLines": 71,
+            "duplicatedTokens": 756,
+            "percentage": 14.88,
+            "percentageTokens": 15.64,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9817,10 +9817,10 @@
             "tokens": 3969,
             "sources": 1,
             "clones": 7,
-            "duplicatedLines": 81,
-            "duplicatedTokens": 907,
-            "percentage": 19.52,
-            "percentageTokens": 22.85,
+            "duplicatedLines": 71,
+            "duplicatedTokens": 756,
+            "percentage": 17.11,
+            "percentageTokens": 19.05,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -9850,7 +9850,7 @@
           },
           "crates/fennec/src/agent/preflight.rs": {
             "lines": 105,
-            "tokens": 983,
+            "tokens": 986,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -9861,8 +9861,8 @@
             "newClones": 0
           },
           "crates/fennec/src/agent/ports.rs": {
-            "lines": 183,
-            "tokens": 1437,
+            "lines": 189,
+            "tokens": 1478,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10101,14 +10101,14 @@
             "newClones": 0
           },
           "crates/fennec/src/worktree.rs": {
-            "lines": 698,
-            "tokens": 8059,
+            "lines": 715,
+            "tokens": 8247,
             "sources": 1,
             "clones": 5,
             "duplicatedLines": 41,
             "duplicatedTokens": 727,
-            "percentage": 5.87,
-            "percentageTokens": 9.02,
+            "percentage": 5.73,
+            "percentageTokens": 8.82,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10197,8 +10197,8 @@
             "newClones": 0
           },
           "crates/fennec/src/setup.rs": {
-            "lines": 68,
-            "tokens": 720,
+            "lines": 69,
+            "tokens": 733,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10389,14 +10389,14 @@
             "newClones": 0
           },
           "crates/fennec/src/modified_files.rs": {
-            "lines": 150,
-            "tokens": 1667,
+            "lines": 148,
+            "tokens": 1664,
             "sources": 1,
             "clones": 1,
             "duplicatedLines": 13,
             "duplicatedTokens": 217,
-            "percentage": 8.67,
-            "percentageTokens": 13.02,
+            "percentage": 8.78,
+            "percentageTokens": 13.04,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -10425,8 +10425,8 @@
             "newClones": 0
           },
           "crates/fennec/src/main.rs": {
-            "lines": 170,
-            "tokens": 2042,
+            "lines": 188,
+            "tokens": 2243,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10545,8 +10545,8 @@
             "newClones": 0
           },
           "crates/fennec/src/cli.rs": {
-            "lines": 312,
-            "tokens": 3264,
+            "lines": 333,
+            "tokens": 3495,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10559,6 +10559,18 @@
           "crates/fennec/src/chat.rs": {
             "lines": 65,
             "tokens": 470,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "crates/fennec/src/changes.rs": {
+            "lines": 131,
+            "tokens": 1276,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10834,14 +10846,14 @@
           }
         },
         "total": {
-          "lines": 81995,
-          "tokens": 768684,
-          "sources": 326,
+          "lines": 82307,
+          "tokens": 771852,
+          "sources": 327,
           "clones": 249,
-          "duplicatedLines": 2831,
-          "duplicatedTokens": 29745,
-          "percentage": 3.45,
-          "percentageTokens": 3.87,
+          "duplicatedLines": 2824,
+          "duplicatedTokens": 29618,
+          "percentage": 3.43,
+          "percentageTokens": 3.84,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -10902,7 +10914,7 @@
           },
           "crates/fennec/agents/verify.agent.md": {
             "lines": 29,
-            "tokens": 417,
+            "tokens": 495,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10926,7 +10938,7 @@
           },
           "crates/fennec/agents/tests.agent.md": {
             "lines": 46,
-            "tokens": 1053,
+            "tokens": 1166,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10937,8 +10949,8 @@
             "newClones": 0
           },
           "crates/fennec/agents/review.agent.md": {
-            "lines": 47,
-            "tokens": 1103,
+            "lines": 49,
+            "tokens": 1251,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -10986,7 +10998,7 @@
           },
           "crates/fennec/agents/builder.agent.md": {
             "lines": 62,
-            "tokens": 1725,
+            "tokens": 1758,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -11058,8 +11070,8 @@
           }
         },
         "total": {
-          "lines": 843,
-          "tokens": 15181,
+          "lines": 845,
+          "tokens": 15553,
           "sources": 15,
           "clones": 0,
           "duplicatedLines": 0,
@@ -11388,14 +11400,14 @@
       }
     },
     "total": {
-      "lines": 140689,
-      "tokens": 1340935,
-      "sources": 934,
-      "clones": 288,
-      "duplicatedLines": 3795,
-      "duplicatedTokens": 38610,
-      "percentage": 2.7,
-      "percentageTokens": 2.88,
+      "lines": 141055,
+      "tokens": 1345041,
+      "sources": 935,
+      "clones": 287,
+      "duplicatedLines": 3782,
+      "duplicatedTokens": 38370,
+      "percentage": 2.68,
+      "percentageTokens": 2.85,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
@@ -12267,73 +12279,37 @@
     },
     {
       "format": "typescript",
-      "lines": 7,
-      "fragment": "(preview: IntegrationPreview): string {\n  const lines = preview.files.map((file, index) => {\n    const signals = file.signals.length ? ` — signals: ${file.signals.join(', ')}` : '';\n    return `${index + 1}. ${file.path} (+${file.added} −${file.removed})${signals}`;\n  });\n\n  return `Hold a comprehension dialogue with me on the change of branch \\`",
-      "tokens": 113,
-      "firstFile": {
-        "name": "web/src/lib/integration.ts",
-        "start": 25,
-        "end": 31,
-        "startLoc": {
-          "line": 25,
-          "column": 36,
-          "position": 269
-        },
-        "endLoc": {
-          "line": 31,
-          "column": 75,
-          "position": 382
-        }
-      },
-      "secondFile": {
-        "name": "web/src/lib/integration.ts",
-        "start": 15,
-        "end": 21,
-        "startLoc": {
-          "line": 15,
-          "column": 32,
-          "position": 110
-        },
-        "endLoc": {
-          "line": 21,
-          "column": 42,
-          "position": 223
-        }
-      }
-    },
-    {
-      "format": "typescript",
       "lines": 13,
       "fragment": "(\n      preview({\n        files: TWO_FILES,\n      }),\n    );\n\n    expect(prompt).toContain('`fennec/x`');\n    expect(prompt).toContain('`develop`');\n    expect(prompt).toContain('1. a.rs (+3 −1) — signals: hot, untested');\n    expect(prompt).toContain('2. b.rs (+0 −2)');\n    expect(prompt).not.toContain('2. b.rs (+0 −2) — signals');\n    expect(prompt).toContain('git diff develop fennec/x -- <path>');\n    expect",
       "tokens": 99,
       "firstFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 66,
-        "end": 78,
+        "start": 71,
+        "end": 83,
         "startLoc": {
-          "line": 66,
+          "line": 71,
           "column": 39,
-          "position": 633
+          "position": 714
         },
         "endLoc": {
-          "line": 78,
+          "line": 83,
           "column": 11,
-          "position": 732
+          "position": 813
         }
       },
       "secondFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 49,
-        "end": 61,
+        "start": 50,
+        "end": 62,
         "startLoc": {
-          "line": 49,
+          "line": 50,
           "column": 35,
-          "position": 492
+          "position": 529
         },
         "endLoc": {
-          "line": 61,
+          "line": 62,
           "column": 4,
-          "position": 591
+          "position": 628
         }
       }
     },
@@ -12344,32 +12320,32 @@
       "tokens": 74,
       "firstFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 352,
-        "end": 363,
+        "start": 357,
+        "end": 368,
         "startLoc": {
-          "line": 352,
+          "line": 357,
           "column": 9,
-          "position": 3432
+          "position": 3513
         },
         "endLoc": {
-          "line": 363,
+          "line": 368,
           "column": 62,
-          "position": 3506
+          "position": 3587
         }
       },
       "secondFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 285,
-        "end": 296,
+        "start": 290,
+        "end": 301,
         "startLoc": {
-          "line": 285,
+          "line": 290,
           "column": 20,
-          "position": 2912
+          "position": 2993
         },
         "endLoc": {
-          "line": 296,
+          "line": 301,
           "column": 46,
-          "position": 2986
+          "position": 3067
         }
       }
     },
@@ -12380,32 +12356,32 @@
       "tokens": 120,
       "firstFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 379,
-        "end": 395,
+        "start": 384,
+        "end": 400,
         "startLoc": {
-          "line": 379,
+          "line": 384,
           "column": 70,
-          "position": 3641
+          "position": 3722
         },
         "endLoc": {
-          "line": 395,
+          "line": 400,
           "column": 74,
-          "position": 3761
+          "position": 3842
         }
       },
       "secondFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 347,
-        "end": 296,
+        "start": 352,
+        "end": 301,
         "startLoc": {
-          "line": 347,
+          "line": 352,
           "column": 54,
-          "position": 3386
+          "position": 3467
         },
         "endLoc": {
-          "line": 296,
+          "line": 301,
           "column": 46,
-          "position": 2986
+          "position": 3067
         }
       }
     },
@@ -12416,32 +12392,32 @@
       "tokens": 83,
       "firstFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 455,
-        "end": 468,
+        "start": 460,
+        "end": 473,
         "startLoc": {
-          "line": 455,
+          "line": 460,
           "column": 42,
-          "position": 4394
+          "position": 4475
         },
         "endLoc": {
-          "line": 468,
+          "line": 473,
           "column": 60,
-          "position": 4477
+          "position": 4558
         }
       },
       "secondFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 317,
-        "end": 330,
+        "start": 322,
+        "end": 335,
         "startLoc": {
-          "line": 317,
+          "line": 322,
           "column": 41,
-          "position": 3169
+          "position": 3250
         },
         "endLoc": {
-          "line": 330,
+          "line": 335,
           "column": 50,
-          "position": 3252
+          "position": 3333
         }
       }
     },
@@ -12452,32 +12428,32 @@
       "tokens": 90,
       "firstFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 468,
-        "end": 478,
+        "start": 473,
+        "end": 483,
         "startLoc": {
-          "line": 468,
+          "line": 473,
           "column": 60,
-          "position": 4478
+          "position": 4559
         },
         "endLoc": {
-          "line": 478,
+          "line": 483,
           "column": 33,
-          "position": 4568
+          "position": 4649
         }
       },
       "secondFile": {
         "name": "web/src/lib/integration.test.ts",
-        "start": 448,
-        "end": 458,
+        "start": 453,
+        "end": 463,
         "startLoc": {
-          "line": 448,
+          "line": 453,
           "column": 63,
-          "position": 4321
+          "position": 4402
         },
         "endLoc": {
-          "line": 458,
+          "line": 463,
           "column": 23,
-          "position": 4410
+          "position": 4491
         }
       }
     },
@@ -12996,7 +12972,7 @@
         "end": 661,
         "startLoc": {
           "line": 652,
-          "column": 58,
+          "column": 67,
           "position": 5948
         },
         "endLoc": {
@@ -13059,73 +13035,73 @@
     },
     {
       "format": "rust",
-      "lines": 7,
-      "fragment": "::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h",
-      "tokens": 76,
+      "lines": 8,
+      "fragment": "::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n        changes: &CHANGES,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h",
+      "tokens": 84,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
         "start": 99,
-        "end": 105,
+        "end": 106,
         "startLoc": {
           "line": 99,
           "column": 32,
           "position": 909
         },
         "endLoc": {
-          "line": 105,
+          "line": 106,
           "column": 6,
-          "position": 985
+          "position": 993
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/workflow/tests/test_gate.rs",
         "start": 47,
-        "end": 53,
+        "end": 54,
         "startLoc": {
           "line": 47,
           "column": 32,
           "position": 752
         },
         "endLoc": {
-          "line": 53,
+          "line": 54,
           "column": 8,
-          "position": 828
+          "position": 836
         }
       }
     },
     {
       "format": "rust",
-      "lines": 16,
-      "fragment": "]));\n    let stop = AtomicBool::new(false);\n    let children = FakeChildren::default();\n    let commands = FakeCommands::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h.agents = vec![plan()];\n\n    let reason = run_workflow(\n        &mut h.turn(),\n        &env,\n        WorkflowJob::Start {\n            workflow: handoff_workflow(false",
-      "tokens": 175,
+      "lines": 17,
+      "fragment": "]));\n    let stop = AtomicBool::new(false);\n    let children = FakeChildren::default();\n    let commands = FakeCommands::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n        changes: &CHANGES,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h.agents = vec![plan()];\n\n    let reason = run_workflow(\n        &mut h.turn(),\n        &env,\n        WorkflowJob::Start {\n            workflow: handoff_workflow(false",
+      "tokens": 183,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 157,
-        "end": 172,
+        "start": 158,
+        "end": 174,
         "startLoc": {
-          "line": 157,
+          "line": 158,
           "column": 67,
-          "position": 1479
+          "position": 1487
         },
         "endLoc": {
-          "line": 172,
+          "line": 174,
           "column": 45,
-          "position": 1654
+          "position": 1670
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
         "start": 96,
-        "end": 111,
+        "end": 112,
         "startLoc": {
           "line": 96,
           "column": 5,
           "position": 865
         },
         "endLoc": {
-          "line": 111,
+          "line": 112,
           "column": 44,
-          "position": 1040
+          "position": 1048
         }
       }
     },
@@ -13136,68 +13112,68 @@
       "tokens": 79,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 172,
-        "end": 182,
+        "start": 174,
+        "end": 184,
         "startLoc": {
-          "line": 172,
+          "line": 174,
           "column": 45,
-          "position": 1655
+          "position": 1671
         },
         "endLoc": {
-          "line": 182,
+          "line": 184,
           "column": 12,
-          "position": 1734
+          "position": 1750
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 111,
-        "end": 121,
+        "start": 112,
+        "end": 122,
         "startLoc": {
-          "line": 111,
+          "line": 112,
           "column": 44,
-          "position": 1041
+          "position": 1049
         },
         "endLoc": {
-          "line": 121,
+          "line": 122,
           "column": 8,
-          "position": 1120
+          "position": 1128
         }
       }
     },
     {
       "format": "rust",
-      "lines": 12,
-      "fragment": "let model = Scripted(RefCell::new(vec![reply(\"b done\", vec![])]));\n    let stop = AtomicBool::new(false);\n    let children = FakeChildren::default();\n    let commands = FakeCommands::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h.agents = vec![plan()];\n\n    h",
-      "tokens": 160,
+      "lines": 13,
+      "fragment": "let model = Scripted(RefCell::new(vec![reply(\"b done\", vec![])]));\n    let stop = AtomicBool::new(false);\n    let children = FakeChildren::default();\n    let commands = FakeCommands::default();\n    let env = WorkflowEnv {\n        children: &children,\n        commands: &commands,\n        changes: &CHANGES,\n    };\n    let mut h = Harness::new(Box::new(model), PathBuf::from(\"/tmp\"), &stop);\n    h.agents = vec![plan()];\n\n    h",
+      "tokens": 168,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 194,
-        "end": 205,
+        "start": 196,
+        "end": 208,
         "startLoc": {
-          "line": 194,
+          "line": 196,
           "column": 5,
-          "position": 1810
+          "position": 1826
         },
         "endLoc": {
-          "line": 205,
+          "line": 208,
           "column": 6,
-          "position": 1970
+          "position": 1994
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 157,
-        "end": 107,
+        "start": 158,
+        "end": 108,
         "startLoc": {
-          "line": 157,
+          "line": 158,
           "column": 5,
-          "position": 1455
+          "position": 1463
         },
         "endLoc": {
-          "line": 107,
+          "line": 108,
           "column": 8,
-          "position": 1001
+          "position": 1009
         }
       }
     },
@@ -13208,32 +13184,32 @@
       "tokens": 96,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 242,
-        "end": 251,
+        "start": 245,
+        "end": 254,
         "startLoc": {
-          "line": 242,
+          "line": 245,
           "column": 71,
-          "position": 2303
+          "position": 2327
         },
         "endLoc": {
-          "line": 251,
+          "line": 254,
           "column": 2,
-          "position": 2399
+          "position": 2423
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/workflow/tests/handoff.rs",
-        "start": 116,
-        "end": 127,
+        "start": 117,
+        "end": 128,
         "startLoc": {
-          "line": 116,
+          "line": 117,
           "column": 5,
-          "position": 1079
+          "position": 1087
         },
         "endLoc": {
-          "line": 127,
+          "line": 128,
           "column": 8,
-          "position": 1179
+          "position": 1187
         }
       }
     },
@@ -13244,32 +13220,32 @@
       "tokens": 95,
       "firstFile": {
         "name": "crates/fennec/src/web/views/workflow_usage.rs",
-        "start": 186,
-        "end": 193,
+        "start": 197,
+        "end": 204,
         "startLoc": {
-          "line": 186,
+          "line": 197,
           "column": 96,
-          "position": 1684
+          "position": 1801
         },
         "endLoc": {
-          "line": 193,
+          "line": 204,
           "column": 22,
-          "position": 1779
+          "position": 1896
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/workflow_usage.rs",
-        "start": 178,
-        "end": 185,
+        "start": 189,
+        "end": 196,
         "startLoc": {
-          "line": 178,
+          "line": 189,
           "column": 88,
-          "position": 1577
+          "position": 1694
         },
         "endLoc": {
-          "line": 185,
+          "line": 196,
           "column": 29,
-          "position": 1672
+          "position": 1789
         }
       }
     },
@@ -13388,32 +13364,32 @@
       "tokens": 104,
       "firstFile": {
         "name": "crates/fennec/src/web/views/session_usage.rs",
-        "start": 146,
-        "end": 154,
+        "start": 148,
+        "end": 156,
         "startLoc": {
-          "line": 146,
+          "line": 148,
           "column": 94,
-          "position": 1390
+          "position": 1407
         },
         "endLoc": {
-          "line": 154,
+          "line": 156,
           "column": 10,
-          "position": 1494
+          "position": 1511
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/session_usage.rs",
-        "start": 137,
-        "end": 145,
+        "start": 139,
+        "end": 147,
         "startLoc": {
-          "line": 137,
+          "line": 139,
           "column": 84,
-          "position": 1274
+          "position": 1291
         },
         "endLoc": {
-          "line": 145,
+          "line": 147,
           "column": 17,
-          "position": 1378
+          "position": 1395
         }
       }
     },
@@ -13424,32 +13400,32 @@
       "tokens": 141,
       "firstFile": {
         "name": "crates/fennec/src/web/views/session_usage.rs",
-        "start": 229,
-        "end": 249,
+        "start": 232,
+        "end": 252,
         "startLoc": {
-          "line": 229,
+          "line": 232,
           "column": 55,
-          "position": 2201
+          "position": 2230
         },
         "endLoc": {
-          "line": 249,
+          "line": 252,
           "column": 17,
-          "position": 2342
+          "position": 2371
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/views/workflow_usage.rs",
-        "start": 241,
-        "end": 261,
+        "start": 252,
+        "end": 272,
         "startLoc": {
-          "line": 241,
+          "line": 252,
           "column": 58,
-          "position": 2298
+          "position": 2410
         },
         "endLoc": {
-          "line": 261,
+          "line": 272,
           "column": 15,
-          "position": 2439
+          "position": 2551
         }
       }
     },
@@ -13979,17 +13955,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/session_routes.rs",
-        "start": 852,
-        "end": 859,
+        "start": 853,
+        "end": 860,
         "startLoc": {
-          "line": 852,
+          "line": 853,
           "column": 10,
-          "position": 10253
+          "position": 10259
         },
         "endLoc": {
-          "line": 859,
+          "line": 860,
           "column": 24,
-          "position": 10342
+          "position": 10348
         }
       }
     },
@@ -14144,32 +14120,32 @@
       "tokens": 99,
       "firstFile": {
         "name": "crates/fennec/src/web/routes/integration.rs",
-        "start": 416,
-        "end": 426,
+        "start": 417,
+        "end": 427,
         "startLoc": {
-          "line": 416,
+          "line": 417,
           "column": 24,
-          "position": 4248
+          "position": 4255
         },
         "endLoc": {
-          "line": 426,
+          "line": 427,
           "column": 7,
-          "position": 4347
+          "position": 4354
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/web/routes/integration.rs",
-        "start": 363,
-        "end": 373,
+        "start": 364,
+        "end": 374,
         "startLoc": {
-          "line": 363,
+          "line": 364,
           "column": 15,
-          "position": 3712
+          "position": 3719
         },
         "endLoc": {
-          "line": 373,
+          "line": 374,
           "column": 8,
-          "position": 3811
+          "position": 3818
         }
       }
     },
@@ -16808,32 +16784,32 @@
       "tokens": 75,
       "firstFile": {
         "name": "crates/fennec/src/domain/verification.rs",
-        "start": 460,
-        "end": 468,
+        "start": 463,
+        "end": 471,
         "startLoc": {
-          "line": 460,
+          "line": 463,
           "column": 15,
-          "position": 3851
+          "position": 3862
         },
         "endLoc": {
-          "line": 468,
+          "line": 471,
           "column": 44,
-          "position": 3926
+          "position": 3937
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/verification.rs",
-        "start": 436,
-        "end": 444,
+        "start": 439,
+        "end": 447,
         "startLoc": {
-          "line": 436,
+          "line": 439,
           "column": 21,
-          "position": 3651
+          "position": 3662
         },
         "endLoc": {
-          "line": 444,
+          "line": 447,
           "column": 45,
-          "position": 3726
+          "position": 3737
         }
       }
     },
@@ -16844,32 +16820,32 @@
       "tokens": 78,
       "firstFile": {
         "name": "crates/fennec/src/domain/setup.rs",
-        "start": 249,
-        "end": 257,
+        "start": 261,
+        "end": 269,
         "startLoc": {
-          "line": 249,
+          "line": 261,
           "column": 31,
-          "position": 1852
+          "position": 1942
         },
         "endLoc": {
-          "line": 257,
+          "line": 269,
           "column": 54,
-          "position": 1930
+          "position": 2020
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/setup.rs",
-        "start": 233,
-        "end": 241,
+        "start": 245,
+        "end": 253,
         "startLoc": {
-          "line": 233,
+          "line": 245,
           "column": 30,
-          "position": 1715
+          "position": 1805
         },
         "endLoc": {
-          "line": 241,
+          "line": 253,
           "column": 55,
-          "position": 1793
+          "position": 1883
         }
       }
     },
@@ -18140,32 +18116,32 @@
       "tokens": 76,
       "firstFile": {
         "name": "crates/fennec/src/domain/agent.rs",
-        "start": 692,
-        "end": 703,
+        "start": 700,
+        "end": 711,
         "startLoc": {
-          "line": 692,
+          "line": 700,
           "column": 29,
-          "position": 5333
+          "position": 5406
         },
         "endLoc": {
-          "line": 703,
+          "line": 711,
           "column": 60,
-          "position": 5409
+          "position": 5482
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/domain/agent.rs",
-        "start": 675,
-        "end": 686,
+        "start": 683,
+        "end": 694,
         "startLoc": {
-          "line": 675,
+          "line": 683,
           "column": 28,
-          "position": 5180
+          "position": 5253
         },
         "endLoc": {
-          "line": 686,
+          "line": 694,
           "column": 55,
-          "position": 5256
+          "position": 5329
         }
       }
     },
@@ -18176,32 +18152,32 @@
       "tokens": 100,
       "firstFile": {
         "name": "crates/fennec/src/agent/workflow.rs",
-        "start": 441,
-        "end": 450,
+        "start": 446,
+        "end": 455,
         "startLoc": {
-          "line": 441,
+          "line": 446,
           "column": 23,
-          "position": 4526
+          "position": 4591
         },
         "endLoc": {
-          "line": 450,
+          "line": 455,
           "column": 7,
-          "position": 4626
+          "position": 4691
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/workflow.rs",
-        "start": 233,
-        "end": 242,
+        "start": 234,
+        "end": 243,
         "startLoc": {
-          "line": 233,
+          "line": 234,
           "column": 17,
-          "position": 2256
+          "position": 2273
         },
         "endLoc": {
-          "line": 242,
+          "line": 243,
           "column": 8,
-          "position": 2356
+          "position": 2373
         }
       }
     },
@@ -18855,42 +18831,6 @@
     },
     {
       "format": "rust",
-      "lines": 9,
-      "fragment": "= Vec::with_capacity(steps.len());\n    for (index, step) in steps.iter().enumerate() {\n        let what = format!(\"step {}\", index + 1);\n        let step_title = tool_args::single_line(\n            &tool_args::required_in(step, \"title\", &what)?,\n            &format!(\"{what}'s 'title'\"),\n            0,\n        )?;\n        let change",
-      "tokens": 111,
-      "firstFile": {
-        "name": "crates/fennec/src/agent/propose_plan.rs",
-        "start": 117,
-        "end": 125,
-        "startLoc": {
-          "line": 117,
-          "column": 24,
-          "position": 841
-        },
-        "endLoc": {
-          "line": 125,
-          "column": 19,
-          "position": 952
-        }
-      },
-      "secondFile": {
-        "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 123,
-        "end": 131,
-        "startLoc": {
-          "line": 123,
-          "column": 26,
-          "position": 836
-        },
-        "endLoc": {
-          "line": 131,
-          "column": 17,
-          "position": 947
-        }
-      }
-    },
-    {
-      "format": "rust",
       "lines": 10,
       "fragment": "args, \"doneWhen\")?;\n    let mut done_when = Vec::with_capacity(criteria.len());\n    for (index, item) in criteria.iter().enumerate() {\n        let what = format!(\"criterion {}\", index + 1);\n        let text = tool_args::single_line(\n            &tool_args::required_in(item, \"text\", &what)?,\n            &format!(\"{what}'s 'text'\"),\n            0,\n        )?;\n        let check",
       "tokens": 126,
@@ -18911,17 +18851,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 140,
-        "end": 149,
+        "start": 139,
+        "end": 148,
         "startLoc": {
-          "line": 140,
+          "line": 139,
           "column": 32,
-          "position": 1028
+          "position": 1071
         },
         "endLoc": {
-          "line": 149,
+          "line": 148,
           "column": 16,
-          "position": 1154
+          "position": 1197
         }
       }
     },
@@ -18947,33 +18887,69 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 302,
-        "end": 311,
+        "start": 301,
+        "end": 310,
         "startLoc": {
-          "line": 302,
+          "line": 301,
           "column": 34,
-          "position": 2723
+          "position": 2766
         },
         "endLoc": {
-          "line": 311,
+          "line": 310,
           "column": 55,
-          "position": 2820
+          "position": 2863
         }
       }
     },
     {
       "format": "rust",
-      "lines": 32,
-      "fragment": ": [{}]}))\n                .err()\n                .unwrap()\n                .contains(\"'title'\")\n        );\n    }\n\n    #[test]\n    fn parse_rejects_a_title_over_120_chars() {\n        let mut args = valid();\n        args[\"title\"] = json!(\"a\".repeat(121));\n        assert!(parse(&args).err().unwrap().contains(\"120\"));\n        args[\"title\"] = json!(\"a\".repeat(120));\n        assert!(parse(&args).is_ok());\n    }\n\n    #[test]\n    fn parse_rejects_an_empty_step_list() {\n        let mut args = valid();\n        args[\"steps\"] = json!([]);\n        assert!(parse(&args).err().unwrap().contains(\"'steps'\"));\n    }\n\n    #[test]\n    fn parse_names_the_step_field_that_is_missing() {\n        let mut args = valid();\n        args[\"steps\"][0].as_object_mut().unwrap().remove(\"title\");\n        let err = parse(&args).err().unwrap();\n        assert!(err.contains(\"step 1\"));\n        assert!(err.contains(\"'title'\"));\n        args = valid();\n        args[\"steps\"][0].as_object_mut().unwrap().remove(\"change\"",
-      "tokens": 337,
+      "lines": 25,
+      "fragment": ": [{}]}))\n                .err()\n                .unwrap()\n                .contains(\"'title'\")\n        );\n    }\n\n    #[test]\n    fn parse_rejects_a_title_over_120_chars() {\n        let mut args = valid();\n        args[\"title\"] = json!(\"a\".repeat(121));\n        assert!(parse(&args).err().unwrap().contains(\"120\"));\n        args[\"title\"] = json!(\"a\".repeat(120));\n        assert!(parse(&args).is_ok());\n    }\n\n    #[test]\n    fn parse_rejects_an_empty_step_list() {\n        let mut args = valid();\n        args[\"steps\"] = json!([]);\n        assert!(parse(&args).err().unwrap().contains(\"'steps'\"));\n    }\n\n    #[test]\n    fn parse_names_the_step_field_that_is_missing",
+      "tokens": 219,
       "firstFile": {
         "name": "crates/fennec/src/agent/propose_plan.rs",
         "start": 278,
-        "end": 309,
+        "end": 302,
         "startLoc": {
           "line": 278,
           "column": 79,
           "position": 2437
+        },
+        "endLoc": {
+          "line": 302,
+          "column": 50,
+          "position": 2656
+        }
+      },
+      "secondFile": {
+        "name": "crates/fennec/src/agent/submit_report.rs",
+        "start": 316,
+        "end": 340,
+        "startLoc": {
+          "line": 316,
+          "column": 50,
+          "position": 2960
+        },
+        "endLoc": {
+          "line": 340,
+          "column": 54,
+          "position": 3179
+        }
+      }
+    },
+    {
+      "format": "rust",
+      "lines": 6,
+      "fragment": ");\n        let err = parse(&args).err().unwrap();\n        assert!(err.contains(\"step 1\"));\n        assert!(err.contains(\"'title'\"));\n        args = valid();\n        args[\"steps\"][0].as_object_mut().unwrap().remove(\"change\"",
+      "tokens": 78,
+      "firstFile": {
+        "name": "crates/fennec/src/agent/propose_plan.rs",
+        "start": 304,
+        "end": 309,
+        "startLoc": {
+          "line": 304,
+          "column": 65,
+          "position": 2696
         },
         "endLoc": {
           "line": 309,
@@ -18983,17 +18959,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 317,
-        "end": 348,
+        "start": 352,
+        "end": 357,
         "startLoc": {
-          "line": 317,
-          "column": 50,
-          "position": 2917
+          "line": 352,
+          "column": 64,
+          "position": 3343
         },
         "endLoc": {
-          "line": 348,
+          "line": 357,
           "column": 64,
-          "position": 3254
+          "position": 3421
         }
       }
     },
@@ -19019,17 +18995,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 395,
-        "end": 405,
+        "start": 404,
+        "end": 414,
         "startLoc": {
-          "line": 395,
+          "line": 404,
           "column": 38,
-          "position": 3848
+          "position": 4015
         },
         "endLoc": {
-          "line": 405,
+          "line": 414,
           "column": 23,
-          "position": 3932
+          "position": 4099
         }
       }
     },
@@ -19055,17 +19031,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 406,
-        "end": 413,
+        "start": 415,
+        "end": 422,
         "startLoc": {
-          "line": 406,
+          "line": 415,
           "column": 70,
-          "position": 3962
+          "position": 4129
         },
         "endLoc": {
-          "line": 413,
+          "line": 422,
           "column": 32,
-          "position": 4038
+          "position": 4205
         }
       }
     },
@@ -19091,17 +19067,17 @@
       },
       "secondFile": {
         "name": "crates/fennec/src/agent/submit_report.rs",
-        "start": 414,
-        "end": 421,
+        "start": 423,
+        "end": 430,
         "startLoc": {
-          "line": 414,
+          "line": 423,
           "column": 76,
-          "position": 4068
+          "position": 4235
         },
         "endLoc": {
-          "line": 421,
+          "line": 430,
           "column": 34,
-          "position": 4144
+          "position": 4311
         }
       }
     },
@@ -19760,32 +19736,32 @@
       "tokens": 71,
       "firstFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 531,
-        "end": 536,
+        "start": 538,
+        "end": 543,
         "startLoc": {
-          "line": 531,
+          "line": 538,
           "column": 39,
-          "position": 5617
+          "position": 5637
         },
         "endLoc": {
-          "line": 536,
+          "line": 543,
           "column": 17,
-          "position": 5688
+          "position": 5708
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 514,
-        "end": 518,
+        "start": 521,
+        "end": 525,
         "startLoc": {
-          "line": 514,
+          "line": 521,
           "column": 28,
-          "position": 5329
+          "position": 5349
         },
         "endLoc": {
-          "line": 518,
+          "line": 525,
           "column": 26,
-          "position": 5398
+          "position": 5418
         }
       }
     },
@@ -19796,32 +19772,32 @@
       "tokens": 184,
       "firstFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 646,
-        "end": 655,
+        "start": 663,
+        "end": 672,
         "startLoc": {
-          "line": 646,
+          "line": 663,
           "column": 76,
-          "position": 7265
+          "position": 7453
         },
         "endLoc": {
-          "line": 655,
+          "line": 672,
           "column": 12,
-          "position": 7449
+          "position": 7637
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 608,
-        "end": 618,
+        "start": 625,
+        "end": 635,
         "startLoc": {
-          "line": 608,
+          "line": 625,
           "column": 74,
-          "position": 6750
+          "position": 6938
         },
         "endLoc": {
-          "line": 618,
+          "line": 635,
           "column": 19,
-          "position": 6935
+          "position": 7123
         }
       }
     },
@@ -20624,32 +20600,32 @@
       "tokens": 217,
       "firstFile": {
         "name": "crates/fennec/src/modified_files.rs",
-        "start": 90,
-        "end": 103,
+        "start": 88,
+        "end": 101,
         "startLoc": {
-          "line": 90,
+          "line": 88,
           "column": 80,
-          "position": 885
+          "position": 882
         },
         "endLoc": {
-          "line": 103,
+          "line": 101,
           "column": 56,
-          "position": 1102
+          "position": 1099
         }
       },
       "secondFile": {
         "name": "crates/fennec/src/worktree.rs",
-        "start": 417,
-        "end": 430,
+        "start": 424,
+        "end": 437,
         "startLoc": {
-          "line": 417,
+          "line": 424,
           "column": 74,
-          "position": 4042
+          "position": 4062
         },
         "endLoc": {
-          "line": 430,
+          "line": 437,
           "column": 68,
-          "position": 4259
+          "position": 4279
         }
       }
     },
