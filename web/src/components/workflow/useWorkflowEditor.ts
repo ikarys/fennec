@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react
 import {
   useReactFlow,
   type Connection,
-  type EdgeChange,
-  type NodeChange
+  type EdgeChangeset,
+  type NodeChangeset
 } from '@xyflow/react';
 import { useT } from '../../i18n';
 import type { Agent } from '../../lib/api';
@@ -79,7 +79,7 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
   // React Flow is controlled: it hides a node until its measured size comes
   // back, and selects only through these changes. Neither touches the def.
   const onNodesChange = useCallback(
-    (changes: NodeChange<FlowNode>[]) => {
+    (changes: NodeChangeset<FlowNode>) => {
       for (const change of changes) {
         if (change.type === 'dimensions' && change.dimensions) {
           const size = change.dimensions;
@@ -94,7 +94,7 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
           );
         }
       }
-      const edits = changes.filter((change) => (change.type === 'position' && change.position) || change.type === 'remove');
+      const edits = changes.toArray().filter((change) => (change.type === 'position' && change.position) || change.type === 'remove');
       if (edits.length === 0) return;
       updateDef((previous) => {
         let nodes = previous.nodes;
@@ -115,7 +115,7 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
   );
 
   const onEdgesChange = useCallback(
-    (changes: EdgeChange<FlowEdge>[]) => {
+    (changes: EdgeChangeset<FlowEdge>) => {
       for (const change of changes) {
         if (change.type === 'select') {
           setSelection((previous) =>
@@ -127,7 +127,7 @@ export function useWorkflowEditor({ initialDef, initialOrigin, projectId }: UseW
           );
         }
       }
-      const removed = new Set(changes.flatMap((change) => (change.type === 'remove' ? [change.id] : [])));
+      const removed = new Set(changes.toArray().flatMap((change) => (change.type === 'remove' ? [change.id] : [])));
       if (removed.size === 0) return;
       updateDef((previous) => ({ ...previous, edges: previous.edges.filter((edge) => !removed.has(edgeId(edge))) }));
     },
